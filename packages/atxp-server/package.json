@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/novellum-ai/paymcp-client.git",
+    "url": "git+https://github.com/atxp-dev/sdk.git",
     "directory": "packages/atxp-server"
   },
   "type": "module",
