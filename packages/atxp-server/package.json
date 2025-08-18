@@ -1,0 +1,44 @@
+{
+  "name": "@atxp/server",
+  "version": "0.2.5",
+  "description": "ATXP Server - MCP server implementation with payment processing capabilities",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/novellum-ai/paymcp-client.git",
+    "directory": "packages/atxp-server"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@atxp/common": "0.2.5",
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "@types/express": "^5.0.0",
+    "bignumber.js": "^9.3.0",
+    "content-type": "^1.0.5",
+    "express": "^5.0.0",
+    "oauth4webapi": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/supertest": "^6.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "eslint": "^9.32.0",
+    "node-mocks-http": "^1.17.2",
+    "supertest": "^7.1.4",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.9"
+  }
+}

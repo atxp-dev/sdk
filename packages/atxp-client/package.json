@@ -1,0 +1,52 @@
+{
+  "name": "@atxp/client",
+  "version": "0.2.5",
+  "description": "ATXP Client - MCP client with OAuth authentication and payment processing",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/novellum-ai/paymcp-client.git",
+    "directory": "packages/atxp-client"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@atxp/common": "0.2.5",
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "@solana/pay": "^0.2.5",
+    "@solana/web3.js": "^1.98.1",
+    "better-sqlite3": "^12.2.0",
+    "bignumber.js": "^9.3.0",
+    "bs58": "^6.0.0",
+    "oauth4webapi": "^3.5.0",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "peerDependencies": {
+    "expo-crypto": ">=14.0.0",
+    "expo-sqlite": ">=15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/supertest": "^6.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "eslint": "^9.32.0",
+    "fetch-mock": "^12.5.2",
+    "happy-dom": "^15.11.6",
+    "jsdom": "^25.0.1",
+    "supertest": "^7.1.4",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.9"
+  }
+}

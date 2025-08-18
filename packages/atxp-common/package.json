@@ -1,0 +1,43 @@
+{
+  "name": "@atxp/common",
+  "version": "0.2.5",
+  "description": "ATXP Core - Shared utilities and types for Authorization Token Exchange Protocol",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/novellum-ai/paymcp-client.git",
+    "directory": "packages/atxp-common"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "test": "vitest run",
+    "test:integration": "vitest run src/redisOAuthDb.integration.test.ts --reporter=verbose"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "bignumber.js": "^9.3.0",
+    "ioredis": "^5.7.0",
+    "jose": "^6.0.11",
+    "oauth4webapi": "^3.5.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "eslint": "^9.32.0",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.9"
+  }
+}
