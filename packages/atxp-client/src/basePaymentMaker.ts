@@ -50,7 +50,8 @@ const ERC20_ABI = [
 ];
 
 export class BasePaymentMaker implements PaymentMaker {
-  private signingClient: WalletClient;
+  private signingClient: any; // Extended wallet client with public actions
+  private account: ReturnType<typeof privateKeyToAccount>;
   private logger: Logger;
 
   constructor(baseRPCUrl: string, sourceSecretKey: `0x${string}`, logger?: Logger) {
@@ -61,9 +62,9 @@ export class BasePaymentMaker implements PaymentMaker {
       throw new Error('Source secret key is required');
     }
 
-    const sponsorWallet = privateKeyToAccount(sourceSecretKey);
+    this.account = privateKeyToAccount(sourceSecretKey);
     this.signingClient = createWalletClient({
-      account: sponsorWallet,
+      account: this.account,
       chain: base,
       transport: http(baseRPCUrl),
     }).extend(publicActions);
@@ -73,7 +74,7 @@ export class BasePaymentMaker implements PaymentMaker {
   generateJWT = async({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> => {
     const headerObj = { alg: 'ES256K' }; // this value is specific to Base
     const payloadObj = {
-      sub: this.signingClient.account!.address,
+      sub: this.account.address,
       iss: 'accounts.atxp.ai',
       aud: 'https://auth.atxp.ai',
       iat: Math.floor(Date.now() / 1000),
@@ -89,7 +90,7 @@ export class BasePaymentMaker implements PaymentMaker {
     // For Ethereum wallets, we need to use personal_sign format
     const messageBytes = Buffer.from(message, 'utf8');
     const signResult = await this.signingClient.signMessage({
-      account: this.signingClient.account!,
+      account: this.account,
       message: { raw: messageBytes },
     });
     
@@ -116,11 +117,24 @@ export class BasePaymentMaker implements PaymentMaker {
     });
     const hash = await this.signingClient.sendTransaction({
       chain: base,
-      account: this.signingClient.account!,
+      account: this.account,
       to: USDC_CONTRACT_ADDRESS,
       data: data,
       value: parseEther('0'),
     });
+    
+    // Wait for transaction confirmation
+    this.logger.info(`Waiting for transaction confirmation: ${hash}`);
+    const receipt = await this.signingClient.waitForTransactionReceipt({ 
+      hash: hash as `0x${string}`,
+      confirmations: 1 
+    });
+    
+    if (receipt.status === 'reverted') {
+      throw new Error(`Transaction reverted: ${hash}`);
+    }
+    
+    this.logger.info(`Transaction confirmed: ${hash}`);
     return hash;
   }
 }
