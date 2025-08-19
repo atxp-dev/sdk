@@ -1,11 +1,10 @@
 /* eslint-disable no-console */
-import { atxpClient } from '@atxp/client';
-import { ATXPAccount } from '@atxp/client';
+import { atxpClient, BaseAccount } from '@atxp/client';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import 'dotenv/config';
 
 function validateEnv() {
-  const requiredVars = ['SOLANA_ENDPOINT', 'SOLANA_PRIVATE_KEY'];
+  const requiredVars = ['BASE_RPC', 'BASE_PRIVATE_KEY'];
   const missing = requiredVars.filter(varName => !process.env[varName]);
   
   if (missing.length > 0) {
@@ -48,7 +47,8 @@ async function main() {
     validateEnv();
 
     //const account = new SolanaAccount(process.env.SOLANA_ENDPOINT!, process.env.SOLANA_PRIVATE_KEY!);
-    const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
+    //const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
+    const account = new BaseAccount(process.env.BASE_RPC!, process.env.BASE_PRIVATE_KEY! as `0x${string}`);
     const mcpClient = await atxpClient({
       mcpServer: url,
       account,

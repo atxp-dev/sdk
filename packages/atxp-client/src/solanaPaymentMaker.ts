@@ -63,7 +63,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
       microLamports: 20000,
     });
 
-    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver}`);
+    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Solana`);
   
     const transaction = await createTransfer(
       this.connection,

@@ -30,7 +30,8 @@
     "bignumber.js": "^9.3.0",
     "bs58": "^6.0.0",
     "oauth4webapi": "^3.5.0",
-    "react-native-url-polyfill": "^2.0.0"
+    "react-native-url-polyfill": "^2.0.0",
+    "viem": "^2.34.0"
   },
   "peerDependencies": {
     "expo-crypto": ">=14.0.0",
