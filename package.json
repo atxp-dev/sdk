@@ -19,6 +19,7 @@
     "authorization"
   ],
   "scripts": {
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
     "build": "npm run build -w packages/atxp-common && npm run build -w packages/atxp-server && npm run build -w packages/atxp-client",
     "build:dev": "tsc",
     "typecheck": "npm run typecheck --workspaces --if-present",
