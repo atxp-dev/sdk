@@ -3,7 +3,7 @@ import { SignJWT } from 'jose';
 
 // TODO: revisit this
 const ISSUER = 'atxp.ai';
-const AUDIENCE = 'https://api.atxp.ai';
+const AUDIENCE = 'https://auth.atxp.ai';
 
 /**
  * Generate a JWT using the jose library and EdDSA (Ed25519) private key.
