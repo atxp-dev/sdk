@@ -140,7 +140,7 @@ export class ATXPFetcher {
 
     const paymentMaker = this.paymentMakers.get(requestedNetwork);
     if (!paymentMaker) {
-      this.logger.info(`ATXP: payment network ${requestedNetwork} not set up for this server (available networks: ${Array.from(this.paymentMakers.keys()).join(', ')})`);
+      this.logger.info(`ATXP: payment network '${requestedNetwork}' not set up for this client (available networks: ${Array.from(this.paymentMakers.keys()).join(', ')})`);
       return false;
     }
 
