@@ -49,7 +49,8 @@ console.log('Starting MCP server with token', process.env.ATXP_AUTH_CLIENT_TOKEN
 app.use(atxpServer({
   destination: process.env.SOLANA_DESTINATION!,
   resource: `http://localhost:${PORT}`,
-  server: 'http://localhost:3010',
+  //server: 'http://localhost:3010',
+  server: 'https://auth.atxp.ai',
   mountPath: '/',
   payeeName: 'ATXP Client Example Resource Server',
   allowHttp: true,

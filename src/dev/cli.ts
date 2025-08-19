@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import { atxpClient } from '@atxp/client';
-import { SolanaAccount } from '@atxp/client';
+import { ATXPAccount } from '@atxp/client';
 import { ConsoleLogger, LogLevel, SqliteOAuthDb } from '@atxp/common';
 import 'dotenv/config';
 
@@ -47,7 +47,8 @@ async function main() {
   try {
     validateEnv();
 
-    const account = new SolanaAccount(process.env.SOLANA_ENDPOINT!, process.env.SOLANA_PRIVATE_KEY!);
+    //const account = new SolanaAccount(process.env.SOLANA_ENDPOINT!, process.env.SOLANA_PRIVATE_KEY!);
+    const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
     const mcpClient = await atxpClient({
       mcpServer: url,
       account,
@@ -55,7 +56,6 @@ async function main() {
       allowHttp: true,
       logger: new ConsoleLogger({level: LogLevel.DEBUG})
     });
-    
     const res = await mcpClient.callTool({
       name: toolName,
       arguments: namedArgs
