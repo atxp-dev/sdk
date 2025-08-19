@@ -33,7 +33,7 @@ describe('generateJWT', () => {
     expect(payload.iss).toBe('atxp.ai');
     expect(payload.code_challenge).toBe('codeChallenge');
     expect(payload.payment_request_id).toBe('paymentRequestId');
-    expect(payload.aud).toBe('https://api.atxp.ai');
+    expect(payload.aud).toBe('https://auth.atxp.ai');
     expect(typeof payload.iat).toBe('number');
     // Optionally, verify the JWT using jose
     const publicJwk = {
