@@ -1,5 +1,5 @@
 import type { Account, PaymentMaker } from './types.js';
-import type { FetchLike } from '@atxp/common'
+import type { FetchLike, Network } from '@atxp/common'
 import BigNumber from 'bignumber.js';
 
 function toBasicAuth(token: string): string {
@@ -83,10 +83,10 @@ export class ATXPAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
 
-  constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: string }) {
+  constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: Network }) {
     const { origin, token } = parseConnectionString(connectionString);
     const fetchFn = opts?.fetchFn ?? fetch;
-    const network = opts?.network ?? 'solana';
+    const network = opts?.network ?? 'base';
 
     // Use token as a stable accountId namespace to keep OAuth/ATXP state per-connection
     this.accountId = `atxp:${token}`;
@@ -95,5 +95,3 @@ export class ATXPAccount implements Account {
     };
   }
 }
-
-
