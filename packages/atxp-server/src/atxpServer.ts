@@ -19,7 +19,7 @@ type BuildableATXPConfigFields = 'oAuthDb' | 'oAuthClient' | 'paymentServer' | '
 export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConfigFields>> = {
   mountPath: '/',
   currency: 'USDC' as const,
-  network: 'solana' as const,
+  network: 'base' as const,
   server: DEFAULT_AUTHORIZATION_SERVER,
   atxpAuthClientToken: undefined as string|undefined, // Will be set in buildServerConfig
   payeeName: 'An ATXP Server',

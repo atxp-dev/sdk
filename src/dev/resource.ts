@@ -44,12 +44,15 @@ const getServer = () => {
 const app = express();
 app.use(express.json());
 
-console.log('Starting MCP server with destination', process.env.SOLANA_DESTINATION);
-console.log('Starting MCP server with token', process.env.ATXP_AUTH_CLIENT_TOKEN);
+const destination = process.env.ATXP_DESTINATION!;
+console.log('Starting MCP server with destination', destination);
+console.log('Starting MCP server with token', process.env.ATXP_AUTH_CLIENT_TOKEN!);
 app.use(atxpServer({
-  destination: process.env.SOLANA_DESTINATION!,
+  destination,
+  network: 'base',
   resource: `http://localhost:${PORT}`,
-  server: 'http://localhost:3010',
+  //server: 'http://localhost:3010',
+  server: 'https://auth.atxp.ai',
   mountPath: '/',
   payeeName: 'ATXP Client Example Resource Server',
   allowHttp: true,
