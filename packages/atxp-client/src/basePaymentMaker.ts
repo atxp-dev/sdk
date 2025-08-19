@@ -8,9 +8,6 @@ import {
   parseEther,
   publicActions,
   encodeFunctionData,
-  createPublicClient,
-  PublicClient,
-  WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
