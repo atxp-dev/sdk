@@ -30,7 +30,7 @@ describe('solanaPaymentMaker.generateJWT', () => {
     expect(header.typ).toBe('JWT');
     expect(payload.sub).toBe(keypair.publicKey.toBase58());
     expect(payload.iss).toBe('atxp.ai');
-    expect(payload.aud).toBe('https://api.atxp.ai');
+    expect(payload.aud).toBe('https://auth.atxp.ai');
     expect(typeof payload.iat).toBe('number');
     expect(payload.paymentIds).toBeUndefined();
 
