@@ -75,23 +75,28 @@ export class BasePaymentMaker implements PaymentMaker {
     const payloadObj = {
       sub: this.signingClient.account!.address,
       iss: 'accounts.atxp.ai',
-      aud: 'auth.atxp.ai',
+      aud: 'https://auth.atxp.ai',
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 60 * 60,
-      code_challenge: codeChallenge,
-      payment_request_id: paymentRequestId,
+      ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
+      ...(paymentRequestId ? { payment_request_id: paymentRequestId } : {}),
     } as Record<string, unknown>;
 
-    const header = Buffer.from(JSON.stringify(headerObj)).toString('base64');
-    const payload = Buffer.from(JSON.stringify(payloadObj)).toString('base64');
+    const header = Buffer.from(JSON.stringify(headerObj)).toString('base64url');
+    const payload = Buffer.from(JSON.stringify(payloadObj)).toString('base64url');
     const message = `${header}.${payload}`;
 
+    // For Ethereum wallets, we need to use personal_sign format
     const messageBytes = Buffer.from(message, 'utf8');
     const signResult = await this.signingClient.signMessage({
       account: this.signingClient.account!,
       message: { raw: messageBytes },
     });
-    const signature = Buffer.from(signResult, 'hex').toString('base64');
+    
+    // The paymcp server expects ES256K signatures as hex strings with 0x prefix
+    // The signResult from viem is already in hex format with 0x prefix (65 bytes)
+    // We encode the hex string itself (including 0x) as base64url
+    const signature = Buffer.from(signResult, 'utf8').toString('base64url');
 
     return `${header}.${payload}.${signature}`;
   }
