@@ -123,18 +123,23 @@ export class BasePaymentMaker implements PaymentMaker {
       value: parseEther('0'),
     });
     
-    // Wait for transaction confirmation
+    // Wait for transaction confirmation with more blocks to ensure propagation
     this.logger.info(`Waiting for transaction confirmation: ${hash}`);
     const receipt = await this.signingClient.waitForTransactionReceipt({ 
       hash: hash as `0x${string}`,
-      confirmations: 1 
+      confirmations: 3  // Wait for 3 confirmations to ensure better propagation
     });
     
     if (receipt.status === 'reverted') {
       throw new Error(`Transaction reverted: ${hash}`);
     }
     
-    this.logger.info(`Transaction confirmed: ${hash}`);
+    this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
+    
+    // Add a small delay to ensure propagation to other RPC endpoints
+    // TODO: optimize propagation delay for base payment confirmation
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+    
     return hash;
   }
 }
