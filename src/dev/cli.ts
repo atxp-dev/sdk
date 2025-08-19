@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { atxpClient } from '@atxp/client';
 import { ATXPAccount } from '@atxp/client';
-import { ConsoleLogger, LogLevel, SqliteOAuthDb } from '@atxp/common';
+import { ConsoleLogger, LogLevel } from '@atxp/common';
 import 'dotenv/config';
 
 function validateEnv() {
