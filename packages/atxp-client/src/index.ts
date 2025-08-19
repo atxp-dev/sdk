@@ -4,4 +4,6 @@ export * from './atxpFetcher.js'
 export * from './solanaPaymentMaker.js'
 export * from './solanaAccount.js'
 export * from './atxpAccount.js'
+export * from './baseAccount.js'
+export * from './basePaymentMaker.js'
 export * from './types.js';
