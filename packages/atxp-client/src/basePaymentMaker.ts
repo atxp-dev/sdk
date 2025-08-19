@@ -47,6 +47,7 @@ const ERC20_ABI = [
 ];
 
 export class BasePaymentMaker implements PaymentMaker {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private signingClient: any; // Extended wallet client with public actions
   private account: ReturnType<typeof privateKeyToAccount>;
   private logger: Logger;
