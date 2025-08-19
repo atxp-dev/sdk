@@ -110,10 +110,13 @@ export class BasePaymentMaker implements PaymentMaker {
 
     this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base`);
 
+    // Convert amount to USDC units (6 decimals) as BigInt
+    const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
+    
     const data = encodeFunctionData({
       abi: ERC20_ABI,
       functionName: "transfer",
-      args: [receiver as Address, amount.toNumber() * Math.pow(10, USDC_DECIMALS)],
+      args: [receiver as Address, amountInUSDCUnits],
     });
     const hash = await this.signingClient.sendTransaction({
       chain: base,
@@ -135,10 +138,6 @@ export class BasePaymentMaker implements PaymentMaker {
     }
     
     this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
-    
-    // Add a small delay to ensure propagation to other RPC endpoints
-    // TODO: optimize propagation delay for base payment confirmation
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
     
     return hash;
   }
