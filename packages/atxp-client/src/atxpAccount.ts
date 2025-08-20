@@ -1,5 +1,5 @@
 import type { Account, PaymentMaker } from './types.js';
-import type { FetchLike, Network } from '@atxp/common'
+import type { FetchLike, Network, Currency } from '@atxp/common'
 import BigNumber from 'bignumber.js';
 
 function toBasicAuth(token: string): string {
@@ -29,10 +29,10 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     this.fetchFn = fetchFn;
   }
 
-  async makePayment(amount: BigNumber, currency: string, receiver: string, memo: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
     const body = {
       amount: amount.toString(),
-      currency: (currency || '').toLowerCase() === 'usdc' ? 'usdc' : 'usdc',
+      currency,
       receiver,
       memo,
     };

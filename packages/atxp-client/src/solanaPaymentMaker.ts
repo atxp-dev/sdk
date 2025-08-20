@@ -3,7 +3,7 @@ import { Keypair, Connection, PublicKey, ComputeBudgetProgram, sendAndConfirmTra
 import { createTransfer, ValidateTransferError as _ValidateTransferError } from "@solana/pay";
 import bs58 from "bs58";
 import BigNumber from "bignumber.js";
-import { generateJWT } from '@atxp/common';
+import { generateJWT, Currency } from '@atxp/common';
 import { importJWK } from 'jose';
 import { Logger } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
@@ -47,10 +47,9 @@ export class SolanaPaymentMaker implements PaymentMaker {
     return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '');
   }
 
-  makePayment = async (amount: BigNumber, currency: string, receiver: string): Promise<string> => {
-    currency = currency.toLowerCase();
-    if (currency !== 'usdc') {
-      throw new Error('Only usdc currency is supported; received ' + currency);
+  makePayment = async (amount: BigNumber, currency: Currency, receiver: string): Promise<string> => {
+    if (currency.toUpperCase() !== 'USDC') {
+      throw new Error('Only USDC currency is supported; received ' + currency);
     }
 
     const receiverKey = new PublicKey(receiver);

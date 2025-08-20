@@ -1,5 +1,5 @@
 import type { PaymentMaker } from './types.js';
-import { Logger } from '@atxp/common';
+import { Logger, Currency } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
@@ -100,10 +100,9 @@ export class BasePaymentMaker implements PaymentMaker {
     return `${header}.${payload}.${signature}`;
   }
 
-  makePayment = async (amount: BigNumber, currency: string, receiver: string): Promise<string> => {
-    currency = currency.toLowerCase();
-    if (currency !== 'usdc') {
-      throw new Error('Only usdc currency is supported; received ' + currency);
+  makePayment = async (amount: BigNumber, currency: Currency, receiver: string): Promise<string> => {
+    if (currency.toUpperCase() !== 'USDC') {
+      throw new Error('Only USDC currency is supported; received ' + currency);
     }
 
     this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base`);

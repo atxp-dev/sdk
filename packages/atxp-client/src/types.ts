@@ -40,6 +40,6 @@ export type ClientConfig = {
 }
 
 export interface PaymentMaker {
-  makePayment: (amount: BigNumber, currency: string, receiver: string, memo: string) => Promise<string>;
+  makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<string>;
   generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;
 }
