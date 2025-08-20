@@ -35,6 +35,9 @@ export function getIsReactNative() {
   return !!nav && nav.product === 'ReactNative';
 }
 export const isNode = typeof process !== 'undefined' && process.versions?.node;
+export const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+export const isNextJS = typeof process !== 'undefined' && process.env.NEXT_RUNTIME !== undefined;
+export const isWebEnvironment = isBrowser || isNextJS;
 
 // Helper to load modules in both CommonJS and ESM environments
 function loadModule(moduleId: string): any {
@@ -136,6 +139,30 @@ function createReactNativeSQLite(): PlatformSQLite {
   
   return {
     openDatabase: (name: string) => expoSqlite.openDatabaseSync(name),
+  };
+}
+
+function createBrowserCrypto(): PlatformCrypto {
+  return {
+    digest: async (data: Uint8Array) => {
+      if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
+        const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data);
+        return new Uint8Array(hashBuffer);
+      }
+      throw new Error('Web Crypto API not available in this browser environment');
+    },
+    randomUUID: () => {
+      if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.randomUUID) {
+        return globalThis.crypto.randomUUID();
+      }
+      // Fallback UUID generation for older browsers
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    },
+    toHex: (data: Uint8Array) => Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(''),
   };
 }
 
@@ -242,6 +269,14 @@ export let sqlite: PlatformSQLite;
 if (getIsReactNative()) {
   crypto = createReactNativeCrypto();
   sqlite = createReactNativeSQLite();
+} else if (isWebEnvironment) {
+  crypto = createBrowserCrypto();
+  // Browser SQLite will need to use IndexedDB or similar - for now throw error
+  sqlite = {
+    openDatabase: () => {
+      throw new Error('SQLite not available in browser environment. Use MemoryOAuthDb instead.');
+    }
+  };
 } else {
   crypto = createNodeCrypto();
   sqlite = createNodeSQLite();
