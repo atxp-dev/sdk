@@ -19,7 +19,7 @@ import { BigNumber } from "bignumber.js";
 // Type for the extended wallet client with public actions
 type ExtendedWalletClient = WalletClient & PublicActions;
 
-const USDC_CONTRACT_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
+export const USDC_CONTRACT_ADDRESS_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
 const USDC_DECIMALS = 6;
 const ERC20_ABI = [
   {
@@ -73,6 +73,11 @@ export class BasePaymentMaker implements PaymentMaker {
       transport: http(baseRPCUrl),
     }).extend(publicActions) as ExtendedWalletClient;
     this.logger = logger ?? new ConsoleLogger();
+  }
+
+  // expose the logger for subclasses to use
+  _getLogger = () => {
+    return this.logger;
   }
   
   generateJWT = async({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> => {
