@@ -36,14 +36,13 @@ export class BaseAppAccount implements Account {
         try {
           // Attempt to create account with stored permission
           return new BaseAppAccount(baseRPCUrl, storedData.permission, storedData.privateKey);
-        } catch (error) {
-          console.warn('Failed to initialize with stored permission:', error);
+        } catch {
+          // Failed to initialize with stored permission, will request new one
           // Permission might be invalid, remove it
           permissionStorage.removePermission(storageKey);
         }
       } else {
-        // Permission expired, remove it
-        console.info('Stored permission expired, requesting new one');
+        // Permission expired, remove it and request new one
         permissionStorage.removePermission(storageKey);
       }
     }
