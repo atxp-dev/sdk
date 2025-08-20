@@ -25,7 +25,7 @@ if (!userWalletAddress) {
 
 // this will prompt the user for a spend permission if
 // none is found in local storage
-const baseAppAccount = await BaseAppAccount.initialize
+const baseAppAccount = await BaseAppAccount.initialize(
   BASE_RPC_URL,
   userWalletAddress,
   // optional config
@@ -33,6 +33,7 @@ const baseAppAccount = await BaseAppAccount.initialize
     appName: 'My Mini App', // displayed to the user when requesting spend permission
     allowance: 10n, // requesting 10 USDC for each period
     periodInDays: 7, // periods renew every 7 days
+    // storage: customStorage, // optional: provide custom storage implementation (defaults to localStorage)
   }
 );
 
@@ -42,4 +43,23 @@ const client = await atxpClient({
   mcpServer: browseService.mcpServer,
   account: baseAppAccount,
 });
+```
+
+## Testing
+
+For unit tests, you can use the `MemoryStorage` implementation to avoid dependencies on browser APIs:
+
+```typescript
+import { BaseAppAccount } from '@atxp/base';
+import { MemoryStorage } from '@atxp/base';
+
+const testStorage = new MemoryStorage();
+const baseAppAccount = await BaseAppAccount.initialize(
+  BASE_RPC_URL,
+  userWalletAddress,
+  {
+    appName: 'Test App',
+    storage: testStorage, // Use in-memory storage for tests
+  }
+);
 ```
