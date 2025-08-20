@@ -54,9 +54,10 @@ const ERC20_ABI = [
 ];
 
 export class BasePaymentMaker implements PaymentMaker {
-  private signingClient: ExtendedWalletClient;
-  private account: ReturnType<typeof privateKeyToAccount>;
-  private logger: Logger;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  protected signingClient: ExtendedWalletClient;
+  protected account: ReturnType<typeof privateKeyToAccount>;
+  protected logger: Logger;
 
   constructor(baseRPCUrl: string, sourceSecretKey: Hex, logger?: Logger) {
     if (!baseRPCUrl) {
@@ -75,7 +76,7 @@ export class BasePaymentMaker implements PaymentMaker {
     this.logger = logger ?? new ConsoleLogger();
   }
 
-  generateJWT = async({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> => {
+  async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
     const headerObj = { alg: 'ES256K' }; // this value is specific to Base
     const payloadObj = {
       sub: this.account.address,
@@ -106,7 +107,7 @@ export class BasePaymentMaker implements PaymentMaker {
     return `${header}.${payload}.${signature}`;
   }
 
-  makePayment = async (amount: BigNumber, currency: Currency, receiver: string): Promise<string> => {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
     }

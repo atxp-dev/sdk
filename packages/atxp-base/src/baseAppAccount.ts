@@ -6,6 +6,7 @@ import { createBaseAccountSDK } from "@base-org/account";
 import { requestSpendPermission } from "@base-org/account/spend-permission";
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
+import { IStorage, BrowserStorage, PermissionStorage } from './storage.js';
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
@@ -18,13 +19,33 @@ export class BaseAppAccount implements Account {
     appName: string;
     allowance?: bigint;
     periodInDays?: number;
+    storage?: IStorage<string>;
   }): Promise<BaseAppAccount> {
-    // if we have a stored permission, use it to construct account
+    // Initialize storage with type-safe wrapper
+    const baseStorage = config?.storage || new BrowserStorage();
+    const permissionStorage = new PermissionStorage(baseStorage);
     const storageKey = `atxp-base-permission-${userWalletAddress}`;
-    const storedPermission = localStorage.getItem(storageKey);
-    if (storedPermission) {
-      const permission = JSON.parse(storedPermission);
-      return new BaseAppAccount(baseRPCUrl, permission.permission, permission.privateKey);
+    
+    // Try to load existing permission
+    const storedData = permissionStorage.getPermission(storageKey);
+    if (storedData) {
+      // Check if permission is not expired
+      const now = Math.floor(Date.now() / 1000);
+      const permissionEnd = parseInt(storedData.permission.permission.end.toString());
+      if (permissionEnd > now) {
+        try {
+          // Attempt to create account with stored permission
+          return new BaseAppAccount(baseRPCUrl, storedData.permission, storedData.privateKey);
+        } catch (error) {
+          console.warn('Failed to initialize with stored permission:', error);
+          // Permission might be invalid, remove it
+          permissionStorage.removePermission(storageKey);
+        }
+      } else {
+        // Permission expired, remove it
+        console.info('Stored permission expired, requesting new one');
+        permissionStorage.removePermission(storageKey);
+      }
     }
 
     // otherwise, prompt user for spend permission and then construct account
@@ -51,11 +72,11 @@ export class BaseAppAccount implements Account {
       provider,
     });
 
-    // store the permission in local storage
-    localStorage.setItem(storageKey, JSON.stringify({
+    // store the permission using type-safe storage
+    permissionStorage.setPermission(storageKey, {
       privateKey,
       permission,
-    }));
+    });
 
     // construct account with the permission
     return new BaseAppAccount(baseRPCUrl, permission, privateKey);

@@ -1,5 +1,6 @@
 import { BasePaymentMaker } from '@atxp/client';
-import { Logger } from '@atxp/common';
+import { Logger, Currency } from '@atxp/common';
+import { BigNumber } from 'bignumber.js';
 import { prepareSpendCallData } from "@base-org/account/spend-permission";
 import { parseEther, WalletClient, createWalletClient, http, publicActions, PublicClient} from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -24,43 +25,53 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
   }
 
   // override makePayment to use spend permissions
-  makePayment = async (amount: BigNumber, currency: string, receiver: string): Promise<string> => {
-    currency = currency.toLowerCase();
-    if (currency !== 'usdc') {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
+    if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
 
-    this._getLogger().info(`Making spendPermission payment of ${amount} ${currency} to ephemeral wallet on Base`);
+    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ephemeral wallet on Base`);
 
     const spendCalls = await prepareSpendCallData(this.spendPermission, BigInt(amount.toString()));
 
-    let hash: `0x${string}` | undefined;
-    spendCalls.forEach(async (call) =>
-      hash = await this.walletClient.sendTransaction({
+    const transactionHashes: `0x${string}`[] = [];
+    // Execute spend calls sequentially to ensure proper order
+    // Note: prepareSpendCallData may return multiple calls (e.g., permission approval + actual spend)
+    // TODO: Investigate if these can be parallelized or if order matters
+    for (const call of spendCalls) {
+      const hash = await this.walletClient.sendTransaction({
         chain: base,
         to: call.to,
         data: call.data,
         value: parseEther('0'),
         account: this.spendPermission.permission.account as `0x${string}`,
-      })
-    );
+      });
+      transactionHashes.push(hash);
+      this.logger.debug(`Spend permission transaction sent: ${hash}`);
+    }
 
-    if (!hash) {
-      throw new Error('No hash returned from spendPermission sendTransaction');
+    if (transactionHashes.length === 0) {
+      throw new Error('No transaction hashes returned from spendPermission sendTransaction');
     }
     
+    // Use the last hash for waiting and logging (typically the actual spend transaction)
+    const hash = transactionHashes[transactionHashes.length - 1];
+    
     // Wait for transaction confirmation with more blocks to ensure propagation
-    this._getLogger().info(`Waiting for spendPermission transaction confirmation: ${hash}`);
+    this.logger.info(`Waiting for spendPermission transaction confirmation: ${hash}`);
     const receipt = await (this.walletClient as unknown as PublicClient).waitForTransactionReceipt({ 
       hash: hash as `0x${string}`,
       confirmations: 3  // Wait for 3 confirmations to ensure better propagation
     });
     
     if (receipt.status === 'reverted') {
-      throw new Error(`spendPermission transaction reverted: ${hash}`);
+      throw new Error(`spendPermission transaction reverted: ${hash} (all hashes: ${transactionHashes.join(', ')})`);
     }
     
-    this._getLogger().info(`spendPermission transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
+    this.logger.info(`spendPermission transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
+    if (transactionHashes.length > 1) {
+      this.logger.debug(`All transaction hashes from spend permission: ${transactionHashes.join(', ')}`);
+    }
 
     // ok, now the ephemeral wallet has control of the funds, and we need to make the normal payment from here
     return await super.makePayment(amount, currency, receiver);
