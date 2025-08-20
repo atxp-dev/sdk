@@ -34,7 +34,7 @@ export function getIsReactNative() {
   const nav = (typeof navigator !== 'undefined' ? navigator : (typeof global !== 'undefined' ? (global as any).navigator : undefined));
   return !!nav && nav.product === 'ReactNative';
 }
-export const isNode = typeof process !== 'undefined' && process.versions?.node;
+export const isNode = typeof process !== 'undefined' && !!process.versions?.node;
 export const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
 export const isNextJS = typeof process !== 'undefined' && process.env.NEXT_RUNTIME !== undefined;
 export const isWebEnvironment = isBrowser || isNextJS;
@@ -207,7 +207,7 @@ function createNodeSQLite(): PlatformSQLite {
             } catch {
               // Fall back to async loading for ESM
               const module = await import('better-sqlite3');
-              const Database = module.default || module;
+              const Database = (module as any).default || module;
               db = new Database(name);
             }
             return db;
