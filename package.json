@@ -4,7 +4,12 @@
   "description": "ATXP SDK Monorepo - Authorization Token Exchange Protocol packages",
   "license": "MIT",
   "workspaces": [
-    "packages/*"
+    "packages/atxp-common",
+    "packages/atxp-sqlite",
+    "packages/atxp-redis",
+    "packages/atxp-server",
+    "packages/atxp-client",
+    "packages/atxp-base"
   ],
   "repository": {
     "type": "git",
@@ -20,7 +25,7 @@
   ],
   "scripts": {
     "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
-    "build": "npm run build -w packages/atxp-common && npm run build -w packages/atxp-sqlite-db && npm run build -w packages/atxp-redis-db && npm run build -w packages/atxp-server && npm run build -w packages/atxp-client",
+    "build": "npm run build --workspaces --if-present",
     "build:dev": "tsc",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",

@@ -15,7 +15,7 @@ export interface StoredPermissionData {
  * This allows for easy mocking in tests and potential future
  * support for different storage backends (e.g., React Native AsyncStorage)
  */
-export interface IStorage<T = any> {
+export interface IStorage<T = string> {
   getItem(key: string): T | null;
   setItem(key: string, value: T): void;
   removeItem(key: string): void;
@@ -51,16 +51,20 @@ export class PermissionStorage {
     this.storage.removeItem(key);
   }
 
-  private isValidStoredPermission(data: any): data is StoredPermissionData {
-    return (
-      data &&
-      typeof data === 'object' &&
-      typeof data.privateKey === 'string' &&
-      data.privateKey.startsWith('0x') &&
-      data.permission &&
-      typeof data.permission === 'object' &&
-      data.permission.permission &&
-      typeof data.permission.permission === 'object'
+  private isValidStoredPermission(data: unknown): data is StoredPermissionData {
+    if (!data || typeof data !== 'object' || data === null) {
+      return false;
+    }
+    
+    const obj = data as Record<string, unknown>;
+    return Boolean(
+      typeof obj.privateKey === 'string' &&
+      obj.privateKey.startsWith('0x') &&
+      obj.permission &&
+      typeof obj.permission === 'object' &&
+      obj.permission !== null &&
+      'permission' in obj.permission &&
+      typeof (obj.permission as Record<string, unknown>).permission === 'object'
     );
   }
 }

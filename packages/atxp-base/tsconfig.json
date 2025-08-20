@@ -20,6 +20,7 @@
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.expo.test.ts"],
   "references": [
-    { "path": "../atxp-common" }
+    { "path": "../atxp-common" },
+    { "path": "../atxp-client" }
   ]
 }
