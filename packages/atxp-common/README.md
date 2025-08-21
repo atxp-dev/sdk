@@ -99,19 +99,18 @@ throw new PaymentRequiredError({
 ### Platform Utilities
 
 ```typescript
-import { Platform } from '@atxp/common';
+import { crypto, isNode, getIsReactNative } from '@atxp/common';
 
 // Detect runtime environment
-const platform = Platform.detect();
-
-if (platform.isNode) {
-  // Node.js specific code
-} else if (platform.isExpo) {
-  // Expo/React Native specific code
+if (isNode) {
+  // Node.js specific code - can use SQLite or Redis
+} else if (getIsReactNative()) {
+  // React Native/Expo - use MemoryOAuthDb
 }
 
-// Get appropriate database implementation
-const db = Platform.createOAuthDb();
+// Use platform-specific crypto
+const hash = await crypto.digest(new TextEncoder().encode('data'));
+const uuid = crypto.randomUUID();
 ```
 
 ## Type Definitions
@@ -140,12 +139,12 @@ const db = new MemoryOAuthDb();
 
 For production use cases requiring persistent storage, see separate database packages:
 
-- **`@atxp/sqlite-db`**: SQLite implementation using `better-sqlite3` (Node.js only)
-- **`@atxp/redis-db`**: Redis implementation using `ioredis` for distributed applications
+- **`@atxp/sqlite`**: SQLite implementation using `better-sqlite3` (Node.js only)
+- **`@atxp/redis`**: Redis implementation using `ioredis` for distributed applications
 
 ```bash
-npm install @atxp/sqlite-db  # For SQLite storage
-npm install @atxp/redis-db   # For Redis storage
+npm install @atxp/sqlite  # For SQLite storage
+npm install @atxp/redis   # For Redis storage
 ```
 
 ## Logging

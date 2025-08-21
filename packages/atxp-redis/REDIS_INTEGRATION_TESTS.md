@@ -60,8 +60,8 @@ The integration tests verify:
    - Data is properly encrypted in Redis
    - Decryption works correctly on retrieval
 
-4. **Factory Integration**
-   - `createOAuthDb()` correctly creates Redis instances from URLs
+4. **Direct Database Creation**
+   - `RedisOAuthDb` instances work correctly with connection URLs
 
 5. **Error Handling**
    - Connection failures are handled gracefully

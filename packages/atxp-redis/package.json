@@ -1,12 +1,12 @@
 {
-  "name": "@atxp/sqlite-db",
+  "name": "@atxp/redis",
   "version": "0.2.10",
-  "description": "ATXP SQLite Database - SQLite platform implementation for Authorization Token Exchange Protocol",
+  "description": "ATXP Redis Database - Redis OAuth database implementation for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/atxp-dev/sdk.git",
-    "directory": "packages/atxp-sqlite-db"
+    "directory": "packages/atxp-redis"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -20,14 +20,13 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "test": "vitest run",
-    "test:integration": "vitest run src/sqlite.integration.test.ts --reporter=verbose"
+    "test:integration": "vitest run src/redisOAuthDb.integration.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@atxp/common": "^0.2.10",
-    "better-sqlite3": "^12.2.0"
+    "ioredis": "^5.7.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.13.0",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",

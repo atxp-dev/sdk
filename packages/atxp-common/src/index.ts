@@ -1,7 +1,6 @@
 export * from './jwt.js';
 export * from './logger.js'
 export * from './memoryOAuthDb.js';
-export * from './oAuthDbFactory.js';
 export * from './oAuthResource.js'
 export * from './paymentRequiredError.js'
 export * from './servers.js';
