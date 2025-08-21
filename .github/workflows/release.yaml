@@ -54,16 +54,16 @@ jobs:
           
           # Update all workspace package versions
           npm version $VERSION --no-git-tag-version -w packages/atxp-common
-          npm version $VERSION --no-git-tag-version -w packages/atxp-sqlite-db
-          npm version $VERSION --no-git-tag-version -w packages/atxp-redis-db
+          npm version $VERSION --no-git-tag-version -w packages/atxp-sqlite
+          npm version $VERSION --no-git-tag-version -w packages/atxp-redis
           npm version $VERSION --no-git-tag-version -w packages/atxp-server
           npm version $VERSION --no-git-tag-version -w packages/atxp-client
           
           # Update cross-package dependencies to match new version
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-client
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-server
-          npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-sqlite-db
-          npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-redis-db
+          npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-sqlite
+          npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-redis
           
           # Regenerate package-lock.json with updated versions
           npm install
@@ -79,7 +79,7 @@ jobs:
         run: |
           # Publish all workspace packages (order matters for dependencies)
           npm publish -w packages/atxp-common --provenance --access public
-          npm publish -w packages/atxp-sqlite-db --provenance --access public
-          npm publish -w packages/atxp-redis-db --provenance --access public
+          npm publish -w packages/atxp-sqlite --provenance --access public
+          npm publish -w packages/atxp-redis --provenance --access public
           npm publish -w packages/atxp-server --provenance --access public
           npm publish -w packages/atxp-client --provenance --access public
