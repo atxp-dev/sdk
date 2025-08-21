@@ -54,7 +54,6 @@ const ERC20_ABI = [
 ];
 
 export class BasePaymentMaker implements PaymentMaker {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected signingClient: ExtendedWalletClient;
   protected account: ReturnType<typeof privateKeyToAccount>;
   protected logger: Logger;
@@ -117,7 +116,7 @@ export class BasePaymentMaker implements PaymentMaker {
     try {
       // Check balance before attempting payment
       const balanceRaw = await this.signingClient.readContract({
-        address: USDC_CONTRACT_ADDRESS as Address,
+        address: USDC_CONTRACT_ADDRESS_BASE as Address,
         abi: ERC20_ABI,
         functionName: 'balanceOf',
         args: [this.account.address],
@@ -141,7 +140,7 @@ export class BasePaymentMaker implements PaymentMaker {
       const hash = await this.signingClient.sendTransaction({
         chain: base,
         account: this.account,
-        to: USDC_CONTRACT_ADDRESS,
+        to: USDC_CONTRACT_ADDRESS_BASE,
         data: data,
         value: parseEther('0'),
       });
