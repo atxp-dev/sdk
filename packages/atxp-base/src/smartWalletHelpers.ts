@@ -4,7 +4,6 @@ import {
 } from 'permissionless';
 import { 
   toSimpleSmartAccount,
-  type ToSimpleSmartAccountReturnType
 } from 'permissionless/accounts';
 import { 
   createPimlicoClient,
@@ -12,12 +11,8 @@ import {
 import { 
   http, 
   createPublicClient, 
-  type WalletClient,
   type Account,
   type Address,
-  type Chain,
-  type Hex,
-  parseEther
 } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -35,7 +30,7 @@ export interface SmartWalletConfig {
 
 export interface EphemeralSmartWallet {
   address: Address;
-  client: SmartAccountClient<any>;
+  client: SmartAccountClient;
   signer: Account;
 }
 

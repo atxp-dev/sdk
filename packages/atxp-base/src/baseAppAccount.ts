@@ -7,7 +7,7 @@ import { getAddress } from 'viem';
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, PermissionStorage } from './storage.js';
-import { createEphemeralSmartWallet, getSmartWalletAddress, type SmartWalletConfig, type EphemeralSmartWallet } from './smartWalletHelpers.js';
+import { getSmartWalletAddress, type SmartWalletConfig } from './smartWalletHelpers.js';
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
