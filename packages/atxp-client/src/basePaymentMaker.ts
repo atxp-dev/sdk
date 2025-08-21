@@ -1,4 +1,4 @@
-import type { PaymentMaker } from './types.js';
+import type { PaymentMaker, Hex } from './types.js';
 import { Logger, Currency } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
@@ -11,6 +11,13 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
+
+// Type for the extended wallet client with public actions
+type ExtendedWalletClient = {
+  signMessage: (args: { account: ReturnType<typeof privateKeyToAccount>; message: { raw: Buffer } }) => Promise<Hex>;
+  sendTransaction: (args: { chain: typeof base; account: ReturnType<typeof privateKeyToAccount>; to: Address; data: Hex; value: bigint }) => Promise<Hex>;
+  waitForTransactionReceipt: (args: { hash: Hex; confirmations?: number }) => Promise<{ status: 'success' | 'reverted'; blockNumber: bigint }>;
+};
 
 const USDC_CONTRACT_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
 const USDC_DECIMALS = 6;
@@ -47,12 +54,11 @@ const ERC20_ABI = [
 ];
 
 export class BasePaymentMaker implements PaymentMaker {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private signingClient: any; // Extended wallet client with public actions
+  private signingClient: ExtendedWalletClient;
   private account: ReturnType<typeof privateKeyToAccount>;
   private logger: Logger;
 
-  constructor(baseRPCUrl: string, sourceSecretKey: `0x${string}`, logger?: Logger) {
+  constructor(baseRPCUrl: string, sourceSecretKey: Hex, logger?: Logger) {
     if (!baseRPCUrl) {
       throw new Error('Base RPC URL is required');
     }
@@ -65,7 +71,7 @@ export class BasePaymentMaker implements PaymentMaker {
       account: this.account,
       chain: base,
       transport: http(baseRPCUrl),
-    }).extend(publicActions);
+    }).extend(publicActions) as ExtendedWalletClient;
     this.logger = logger ?? new ConsoleLogger();
   }
   
@@ -126,7 +132,7 @@ export class BasePaymentMaker implements PaymentMaker {
     // Wait for transaction confirmation with more blocks to ensure propagation
     this.logger.info(`Waiting for transaction confirmation: ${hash}`);
     const receipt = await this.signingClient.waitForTransactionReceipt({ 
-      hash: hash as `0x${string}`,
+      hash: hash as Hex,
       confirmations: 3  // Wait for 3 confirmations to ensure better propagation
     });
     

@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker } from './types.js';
+import type { Account, PaymentMaker, Hex } from './types.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 
@@ -6,7 +6,7 @@ export class BaseAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
 
-  constructor(baseRPCUrl: string, sourceSecretKey: `0x${string}`) {
+  constructor(baseRPCUrl: string, sourceSecretKey: Hex) {
     if (!baseRPCUrl) {
       throw new Error('Base RPC URL is required');
     }
