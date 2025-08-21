@@ -19,8 +19,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "test": "vitest run",
-    "test:integration": "echo 'Integration tests moved to @atxp/redis-db package'"
+    "test": "vitest run"
   },
   "dependencies": {
     "bignumber.js": "^9.3.0",
