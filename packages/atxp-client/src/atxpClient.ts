@@ -10,11 +10,21 @@ type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
 export type ClientArgs = RequiredClientConfig & Partial<OptionalClientConfig>;
 type BuildableClientConfigFields = 'oAuthDb' | 'logger';
 
+// Detect if we're in a browser environment and bind fetch appropriately
+const getFetch = (): typeof fetch => {
+  if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+    // In browser, bind fetch to window to avoid "Illegal invocation" errors
+    return fetch.bind(window);
+  }
+  // In Node.js or other environments, use fetch as-is
+  return fetch;
+};
+
 export const DEFAULT_CLIENT_CONFIG: Required<Omit<OptionalClientConfig, BuildableClientConfigFields>> = {
   allowedAuthorizationServers: [DEFAULT_AUTHORIZATION_SERVER],
   approvePayment: async (_p) => true,
-  fetchFn: fetch,
-  oAuthChannelFetch: fetch,
+  fetchFn: getFetch(),
+  oAuthChannelFetch: getFetch(),
   allowHttp: false, // may be overridden in buildClientConfig by process.env.NODE_ENV
   clientInfo: {
     name: 'ATXPClient',
