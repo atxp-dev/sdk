@@ -2,6 +2,7 @@ import { BigNumber } from 'bignumber.js';
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
 import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment } from './types.js';
+import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
@@ -85,8 +86,23 @@ export class ATXPFetcher {
     this.onAuthorize = onAuthorize;
     this.onAuthorizeFailure = onAuthorizeFailure;
     this.onPayment = onPayment;
-    this.onPaymentFailure = onPaymentFailure;
+    this.onPaymentFailure = onPaymentFailure || this.defaultPaymentFailureHandler;
   }
+
+  private defaultPaymentFailureHandler = async ({ payment, error }: { payment: ProspectivePayment, error: Error }) => {
+    if (error instanceof InsufficientFundsError) {
+      this.logger.info(`PAYMENT FAILED: Insufficient ${error.currency} funds on ${payment.network}`);
+      this.logger.info(`Required: ${error.required} ${error.currency}`);
+      if (error.available) {
+        this.logger.info(`Available: ${error.available} ${error.currency}`);
+      }
+      this.logger.info(`Account: ${payment.accountId}`);
+    } else if (error instanceof PaymentNetworkError) {
+      this.logger.info(`PAYMENT FAILED: Network error on ${payment.network}: ${error.message}`);
+    } else {
+      this.logger.info(`PAYMENT FAILED: ${error.message}`);
+    }
+  };
 
   protected handlePaymentRequestError = async (paymentRequestError: McpError): Promise<boolean> => {
     if (paymentRequestError.code !== PAYMENT_REQUIRED_ERROR_CODE) {

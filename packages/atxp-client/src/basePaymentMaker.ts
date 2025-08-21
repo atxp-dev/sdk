@@ -1,4 +1,5 @@
 import type { PaymentMaker, Hex } from './types.js';
+import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from './types.js';
 import { Logger, Currency } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
@@ -8,16 +9,15 @@ import {
   parseEther,
   publicActions,
   encodeFunctionData,
+  WalletClient,
+  PublicActions,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
+import { BigNumber } from "bignumber.js";
 
 // Type for the extended wallet client with public actions
-type ExtendedWalletClient = {
-  signMessage: (args: { account: ReturnType<typeof privateKeyToAccount>; message: { raw: Buffer } }) => Promise<Hex>;
-  sendTransaction: (args: { chain: typeof base; account: ReturnType<typeof privateKeyToAccount>; to: Address; data: Hex; value: bigint }) => Promise<Hex>;
-  waitForTransactionReceipt: (args: { hash: Hex; confirmations?: number }) => Promise<{ status: 'success' | 'reverted'; blockNumber: bigint }>;
-};
+type ExtendedWalletClient = WalletClient & PublicActions;
 
 const USDC_CONTRACT_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
 const USDC_DECIMALS = 6;
@@ -108,40 +108,64 @@ export class BasePaymentMaker implements PaymentMaker {
 
   makePayment = async (amount: BigNumber, currency: Currency, receiver: string): Promise<string> => {
     if (currency.toUpperCase() !== 'USDC') {
-      throw new Error('Only USDC currency is supported; received ' + currency);
+      throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
     }
 
     this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base`);
 
-    // Convert amount to USDC units (6 decimals) as BigInt
-    const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
-    
-    const data = encodeFunctionData({
-      abi: ERC20_ABI,
-      functionName: "transfer",
-      args: [receiver as Address, amountInUSDCUnits],
-    });
-    const hash = await this.signingClient.sendTransaction({
-      chain: base,
-      account: this.account,
-      to: USDC_CONTRACT_ADDRESS,
-      data: data,
-      value: parseEther('0'),
-    });
-    
-    // Wait for transaction confirmation with more blocks to ensure propagation
-    this.logger.info(`Waiting for transaction confirmation: ${hash}`);
-    const receipt = await this.signingClient.waitForTransactionReceipt({ 
-      hash: hash as Hex,
-      confirmations: 3  // Wait for 3 confirmations to ensure better propagation
-    });
-    
-    if (receipt.status === 'reverted') {
-      throw new Error(`Transaction reverted: ${hash}`);
+    try {
+      // Check balance before attempting payment
+      const balanceRaw = await this.signingClient.readContract({
+        address: USDC_CONTRACT_ADDRESS as Address,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: [this.account.address],
+      }) as bigint;
+      
+      const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** USDC_DECIMALS);
+      
+      if (balance.lt(amount)) {
+        this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
+        throw new InsufficientFundsErrorClass(currency, amount, balance, 'base');
+      }
+
+      // Convert amount to USDC units (6 decimals) as BigInt
+      const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
+      
+      const data = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: "transfer",
+        args: [receiver as Address, amountInUSDCUnits],
+      });
+      const hash = await this.signingClient.sendTransaction({
+        chain: base,
+        account: this.account,
+        to: USDC_CONTRACT_ADDRESS,
+        data: data,
+        value: parseEther('0'),
+      });
+      
+      // Wait for transaction confirmation with more blocks to ensure propagation
+      this.logger.info(`Waiting for transaction confirmation: ${hash}`);
+      const receipt = await this.signingClient.waitForTransactionReceipt({ 
+        hash: hash as Hex,
+        confirmations: 3  // Wait for 3 confirmations to ensure better propagation
+      });
+      
+      if (receipt.status === 'reverted') {
+        throw new PaymentNetworkErrorClass(`Transaction reverted: ${hash}`, new Error('Transaction reverted on chain'));
+      }
+      
+      this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
+      
+      return hash;
+    } catch (error) {
+      if (error instanceof InsufficientFundsErrorClass || error instanceof PaymentNetworkErrorClass) {
+        throw error;
+      }
+      
+      // Wrap other errors in PaymentNetworkError
+      throw new PaymentNetworkErrorClass(`Payment failed on Base network: ${(error as Error).message}`, error as Error);
     }
-    
-    this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
-    
-    return hash;
   }
 }
