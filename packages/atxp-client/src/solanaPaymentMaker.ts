@@ -1,6 +1,8 @@
 import type { PaymentMaker } from './types.js';
+import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { Keypair, Connection, PublicKey, ComputeBudgetProgram, sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTransfer, ValidateTransferError as _ValidateTransferError } from "@solana/pay";
+import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import bs58 from "bs58";
 import BigNumber from "bignumber.js";
 import { generateJWT, Currency } from '@atxp/common';
@@ -49,39 +51,62 @@ export class SolanaPaymentMaker implements PaymentMaker {
 
   makePayment = async (amount: BigNumber, currency: Currency, receiver: string): Promise<string> => {
     if (currency.toUpperCase() !== 'USDC') {
-      throw new Error('Only USDC currency is supported; received ' + currency);
+      throw new PaymentNetworkError('Only USDC currency is supported; received ' + currency);
     }
 
     const receiverKey = new PublicKey(receiver);
 
-    const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
-      units: 10000,
-    });
-    
-    const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
-      microLamports: 20000,
-    });
-
     this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Solana`);
-  
-    const transaction = await createTransfer(
-      this.connection,
-      this.source.publicKey,
-      {
-        amount: amount,
-        recipient: receiverKey,
-        splToken: USDC_MINT,
-      }
-    );
-    
-    transaction.add(modifyComputeUnits);
-    transaction.add(addPriorityFee);
 
-    const transactionHash = await sendAndConfirmTransaction(
-      this.connection,
-      transaction,
-      [this.source],
-    );
-    return transactionHash;
+    try {
+      // Check balance before attempting payment
+      const tokenAccountAddress = await getAssociatedTokenAddress(
+        USDC_MINT,
+        this.source.publicKey
+      );
+      
+      const tokenAccount = await getAccount(this.connection, tokenAccountAddress);
+      const balance = new BigNumber(tokenAccount.amount.toString()).dividedBy(10 ** 6); // USDC has 6 decimals
+      
+      if (balance.lt(amount)) {
+        this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
+        throw new InsufficientFundsError(currency, amount, balance, 'solana');
+      }
+
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
+        units: 10000,
+      });
+      
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 20000,
+      });
+      
+      const transaction = await createTransfer(
+        this.connection,
+        this.source.publicKey,
+        {
+          amount: amount,
+          recipient: receiverKey,
+          splToken: USDC_MINT,
+        }
+      );
+      
+      transaction.add(modifyComputeUnits);
+      transaction.add(addPriorityFee);
+
+      const transactionHash = await sendAndConfirmTransaction(
+        this.connection,
+        transaction,
+        [this.source],
+      );
+      return transactionHash;
+    } catch (error) {
+      if (error instanceof InsufficientFundsError || error instanceof PaymentNetworkError) {
+        throw error;
+      }
+      
+      // Wrap other errors in PaymentNetworkError
+      throw new PaymentNetworkError(`Payment failed on Solana network: ${(error as Error).message}`, error as Error);
+    }
   }
 }
