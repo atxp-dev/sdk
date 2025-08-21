@@ -22,7 +22,7 @@ describe('SQLite Integration Tests', () => {
     
     try {
       await fs.unlink(tempDbPath);
-    } catch (error) {
+    } catch {
       // File might not exist, ignore
     }
   });
@@ -126,9 +126,6 @@ describe('SQLite Integration Tests', () => {
   });
 
   it('should handle database errors gracefully', async () => {
-    // Test with invalid database path (should work with SQLite)
-    const invalidPath = '/invalid/path/that/does/not/exist/test.db';
-    
     // SQLite will create directories as needed in most cases, so test a different error
     db = new SqliteOAuthDb({ db: tempDbPath });
     await db.ensureInitialized();
