@@ -42,6 +42,31 @@ export type ClientConfig = {
   onPaymentFailure: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
 }
 
+export class InsufficientFundsError extends Error {
+  constructor(
+    public readonly currency: Currency,
+    public readonly required: BigNumber,
+    public readonly available?: BigNumber,
+    public readonly network?: string
+  ) {
+    const availableText = available ? `, Available: ${available}` : '';
+    const networkText = network ? ` on ${network}` : '';
+    super(
+      `Payment failed due to insufficient ${currency} funds${networkText}. ` +
+      `Required: ${required}${availableText}. ` +
+      `Please ensure your account has adequate balance before retrying.`
+    );
+    this.name = 'InsufficientFundsError';
+  }
+}
+
+export class PaymentNetworkError extends Error {
+  constructor(message: string, public readonly originalError?: Error) {
+    super(`Payment failed due to network error: ${message}. Please check your network connection and try again.`);
+    this.name = 'PaymentNetworkError';
+  }
+}
+
 export interface PaymentMaker {
   makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<string>;
   generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;
