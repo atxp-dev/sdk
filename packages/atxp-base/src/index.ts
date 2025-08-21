@@ -8,3 +8,4 @@ export {
   BrowserStorage,
   MemoryStorage 
 } from './storage.js';
+export type { SmartWalletConfig } from './smartWalletHelpers.js';
