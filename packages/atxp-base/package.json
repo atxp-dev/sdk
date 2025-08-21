@@ -24,7 +24,6 @@
   "dependencies": {
     "@atxp/client": "0.2.10",
     "@atxp/common": "0.2.10",
-    "@base-org/account": "^2.0.2",
     "bignumber.js": "^9.3.0",
     "viem": "^2.34.0"
   },
