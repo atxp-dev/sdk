@@ -1,7 +1,7 @@
 import { describe, it, expect} from 'vitest';
 import { atxpServer } from './atxpServer.js';
 import * as TH from './serverTestHelpers.js';
-import { SqliteOAuthDb } from '@atxp/common';
+import { MemoryOAuthDb } from '@atxp/common';
 import express from 'express';
 import request from 'supertest';
 
@@ -64,7 +64,7 @@ describe('ATXP', () => {
 
   it('should save the oAuth token in the DB if it is active', async () => {
     const goodToken = TH.tokenData({active: true, sub: 'test-user'});
-    const oAuthDb = new SqliteOAuthDb({ db: ':memory:' });
+    const oAuthDb = new MemoryOAuthDb();
     const router = atxpServer(TH.config({
       oAuthClient: TH.oAuthClient({introspectResult: goodToken}),
       oAuthDb

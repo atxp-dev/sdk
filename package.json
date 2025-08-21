@@ -20,13 +20,13 @@
   ],
   "scripts": {
     "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
-    "build": "npm run build -w packages/atxp-common && npm run build -w packages/atxp-server && npm run build -w packages/atxp-client",
+    "build": "npm run build -w packages/atxp-common && npm run build -w packages/atxp-sqlite-db && npm run build -w packages/atxp-redis-db && npm run build -w packages/atxp-server && npm run build -w packages/atxp-client",
     "build:dev": "tsc",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "test:integration": "npm run test:integration -w packages/atxp-common",
+    "test:integration": "npm run test:integration -w packages/atxp-redis-db",
     "dev:resource": "npm run build && npm run build:dev && node dist/resource.js",
     "dev:cli": "npm run build && npm run build:dev && node dist/cli.js"
   },

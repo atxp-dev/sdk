@@ -10,24 +10,6 @@ export interface PlatformCrypto {
   toHex: (data: Uint8Array) => string;
 }
 
-export interface PlatformSQLite {
-  openDatabase: (name: string) => SQLiteDatabase;
-}
-
-export interface SQLiteDatabase {
-  execAsync: (sql: string) => Promise<void>;
-  prepareAsync: (sql: string) => Promise<SQLiteStatement>;
-  closeAsync: () => Promise<void>;
-}
-
-export interface SQLiteStatement {
-  executeAsync: <T = any>(...params: any[]) => Promise<SQLiteResult<T>>;
-  finalizeAsync: () => Promise<void>;
-}
-
-export interface SQLiteResult<T> {
-  getFirstAsync: () => Promise<T | null>;
-}
 
 // Platform detection - supports both Expo and bare React Native
 export function getIsReactNative() {
@@ -126,21 +108,6 @@ function createReactNativeCrypto(): PlatformCrypto {
   };
 }
 
-function createReactNativeSQLite(): PlatformSQLite {
-  let expoSqlite: any;
-  try {
-    expoSqlite = loadModule('expo-sqlite');
-  } catch {
-    throw new Error(
-      'React Native detected but expo-sqlite package is required. ' +
-      'Please install it: npm install expo-sqlite'
-    );
-  }
-  
-  return {
-    openDatabase: (name: string) => expoSqlite.openDatabaseSync(name),
-  };
-}
 
 function createBrowserCrypto(): PlatformCrypto {
   return {
@@ -189,97 +156,16 @@ function createNodeCrypto(): PlatformCrypto {
   };
 }
 
-function createNodeSQLite(): PlatformSQLite {
-  return {
-    openDatabase: (name: string) => {
-      let db: any = null;
-      let dbPromise: Promise<any> | null = null;
-      
-      const getDbAsync = async () => {
-        if (db) return db;
-        
-        if (!dbPromise) {
-          dbPromise = (async () => {
-            try {
-              // Try synchronous loading first (works in CJS)
-              const Database = loadModule('better-sqlite3');
-              db = new Database(name);
-            } catch {
-              // Fall back to async loading for ESM
-              const module = await import('better-sqlite3');
-              const Database = (module as any).default || module;
-              db = new Database(name);
-            }
-            return db;
-          })();
-        }
-        
-        return dbPromise;
-      };
-      
-      return {
-        execAsync: async (sql: string) => {
-          const database = await getDbAsync();
-          database.exec(sql);
-        },
-        prepareAsync: async (sql: string) => {
-          const database = await getDbAsync();
-          const stmt = database.prepare(sql);
-          return {
-            executeAsync: async <T>(...params: any[]) => {
-              // Use .all() for SELECT, .run() for others
-              const isSelect = /^\s*select/i.test(sql);
-              let resultRows: T[] = [];
-              if (isSelect) {
-                resultRows = stmt.all(...params);
-              } else {
-                stmt.run(...params);
-              }
-              return {
-                getFirstAsync: async () => {
-                  if (isSelect) {
-                    return resultRows[0] || null;
-                  } else {
-                    return null;
-                  }
-                },
-                // Optionally, you could expose runResult for non-SELECTs if needed
-              };
-            },
-            finalizeAsync: async () => {
-              // better-sqlite3 statements are automatically finalized when they go out of scope
-            },
-          };
-        },
-        closeAsync: async () => {
-          if (db) {
-            db.close();
-            db = null;
-          }
-        },
-      };
-    },
-  };
-}
 
 // Export platform-specific implementations
 export let crypto: PlatformCrypto;
-export let sqlite: PlatformSQLite;
 
 if (getIsReactNative()) {
   crypto = createReactNativeCrypto();
-  sqlite = createReactNativeSQLite();
 } else if (isWebEnvironment) {
   crypto = createBrowserCrypto();
-  // Browser SQLite will need to use IndexedDB or similar - for now throw error
-  sqlite = {
-    openDatabase: () => {
-      throw new Error('SQLite not available in browser environment. Use MemoryOAuthDb instead.');
-    }
-  };
 } else {
   crypto = createNodeCrypto();
-  sqlite = createNodeSQLite();
 }
 
  

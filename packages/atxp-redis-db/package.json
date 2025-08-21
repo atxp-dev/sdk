@@ -1,12 +1,12 @@
 {
-  "name": "@atxp/common",
+  "name": "@atxp/redis-db",
   "version": "0.2.10",
-  "description": "ATXP Core - Shared utilities and types for Authorization Token Exchange Protocol",
+  "description": "ATXP Redis Database - Redis OAuth database implementation for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/atxp-dev/sdk.git",
-    "directory": "packages/atxp-common"
+    "directory": "packages/atxp-redis-db"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -19,21 +19,18 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run src/redisOAuthDb.integration.test.ts --reporter=verbose"
   },
   "dependencies": {
-    "bignumber.js": "^9.3.0",
-    "jose": "^6.0.11",
-    "oauth4webapi": "^3.5.0",
-    "tweetnacl": "^1.0.3",
-    "tweetnacl-util": "^0.15.1"
+    "@atxp/common": "^0.2.10",
+    "ioredis": "^5.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
     "eslint": "^9.32.0",
-    "jsdom": "^25.0.1",
     "typescript": "^5.7.3",
     "vitest": "^3.0.9"
   }

@@ -1,4 +1,4 @@
-import { SqliteOAuthDb } from '@atxp/common';
+import { MemoryOAuthDb } from '@atxp/common';
 import { describe, it, expect, vi } from 'vitest';
 import fetchMock from 'fetch-mock';
 import { mockResourceServer, mockAuthorizationServer } from './clientTestHelpers.js';
@@ -26,7 +26,7 @@ function atxpFetcher(
 ) {
   return new ATXPFetcher({
     accountId: "bdj",
-    db: db ?? new SqliteOAuthDb({db: ':memory:'}),
+    db: db ?? new MemoryOAuthDb(),
     paymentMakers: paymentMakers ?? mockPaymentMakers(),
     fetchFn,
     allowedAuthorizationServers,

@@ -46,8 +46,8 @@ const result = await client.callTool('hello_world', {
 
 ## Platform Support
 
-- **Node.js**: Full support with built-in OAuth database
-- **React Native/Expo**: Requires `expo-crypto` and `expo-sqlite` peer dependencies
+- **Node.js**: Full support with in-memory OAuth database (install `@atxp/sqlite-db` for persistence)
+- **React Native/Expo**: Requires `expo-crypto` peer dependency
 
 ## Authentication Flow
 

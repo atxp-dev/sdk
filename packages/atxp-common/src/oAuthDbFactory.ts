@@ -1,7 +1,5 @@
 import { OAuthDb, Logger } from './types.js';
-import { SqliteOAuthDb, OAuthDbConfig } from './oAuthDb.js';
 import { MemoryOAuthDb, MemoryOAuthDbConfig } from './memoryOAuthDb.js';
-import { RedisOAuthDb, RedisOAuthDbConfig } from './redisOAuthDb.js';
 
 export interface OAuthDbFactoryConfig {
   db?: string;
@@ -12,20 +10,20 @@ export interface OAuthDbFactoryConfig {
 
 /**
  * Factory function that creates the appropriate OAuthDb implementation.
- * Uses RedisOAuthDb when Redis client or URL is provided.
- * Uses MemoryOAuthDb for ':memory:' databases to avoid SQLite dependency.
- * Uses SqliteOAuthDb for persistent storage.
+ * Note: SQLite and Redis implementations have been moved to separate packages.
+ * This factory now only supports the MemoryOAuthDb implementation.
+ * For SQLite support, import from '@atxp/sqlite-db'
+ * For Redis support, import from '@atxp/redis-db'
  */
 export function createOAuthDb(config: OAuthDbFactoryConfig = {}): OAuthDb {
-  const { db = SqliteOAuthDb.getDefaultDbPath(), ...otherConfig } = config;
+  const { db = ':memory:', ...otherConfig } = config;
     
-  // Use in-memory implementation for ':memory:' databases
+  // Use in-memory implementation
   if (db === ':memory:') {
     return new MemoryOAuthDb({ logger: otherConfig.logger });
   }
   
-  // Use SQLite implementation for persistent storage
-  return new SqliteOAuthDb({ db, ...otherConfig });
+  throw new Error('SQLite and Redis database implementations have been moved to separate packages. Use @atxp/sqlite-db for SQLite or @atxp/redis-db for Redis.');
 }
 
 /**
@@ -33,18 +31,4 @@ export function createOAuthDb(config: OAuthDbFactoryConfig = {}): OAuthDb {
  */
 export function createMemoryOAuthDb(config: MemoryOAuthDbConfig = {}): MemoryOAuthDb {
   return new MemoryOAuthDb(config);
-}
-
-/**
- * Convenience function for creating a SQLite OAuth database
- */
-export function createSqliteOAuthDb(config: OAuthDbConfig = {}): SqliteOAuthDb {
-  return new SqliteOAuthDb(config);
-}
-
-/**
- * Convenience function for creating a Redis OAuth database
- */
-export function createRedisOAuthDb(config: RedisOAuthDbConfig): RedisOAuthDb {
-  return new RedisOAuthDb(config);
 }

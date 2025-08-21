@@ -93,22 +93,6 @@ describe('Environment Crypto Fix Validation', () => {
       expect(uuid).toBe('edge-success-uuid');
     });
 
-    it('should throw appropriate SQLite error in Next.js', async () => {
-      const platform = await testEnvironment(() => {
-        Object.defineProperty(globalThis, 'process', {
-          value: { 
-            env: { NEXT_RUNTIME: 'nodejs' },
-            versions: { node: '18.0.0' }
-          },
-          writable: true,
-          configurable: true
-        });
-      });
-      
-      // ✅ Key validation: SQLite correctly unavailable in web environment
-      expect(() => platform.sqlite.openDatabase('test'))
-        .toThrow('SQLite not available in browser environment');
-    });
   });
 
   describe('Environment Priority Validation', () => {
