@@ -140,7 +140,7 @@ const db = new MemoryOAuthDb();
 
 For production use cases requiring persistent storage, see separate database packages:
 
-- **`@atxp/sqlite-db`**: SQLite implementation using `better-sqlite3` (Node.js) or `expo-sqlite` (React Native)
+- **`@atxp/sqlite-db`**: SQLite implementation using `better-sqlite3` (Node.js only)
 - **`@atxp/redis-db`**: Redis implementation using `ioredis` for distributed applications
 
 ```bash

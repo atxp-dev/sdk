@@ -33,8 +33,7 @@
     "viem": "^2.34.0"
   },
   "peerDependencies": {
-    "expo-crypto": ">=14.0.0",
-    "expo-sqlite": ">=15.0.0"
+    "expo-crypto": ">=14.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

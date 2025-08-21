@@ -10,7 +10,7 @@ The ATXP SQLite Database package provides persistent OAuth token storage using S
 
 - 🗄️ **Persistent Storage**: SQLite-based OAuth token persistence
 - 🔐 **Encryption Support**: Optional encryption for sensitive token data  
-- 🌍 **Cross-Platform**: Supports Node.js (`better-sqlite3`) and React Native (`expo-sqlite`)
+- 🌍 **Node.js Only**: SQLite implementation using `better-sqlite3`
 - 🔄 **Auto-Migration**: Automatic database schema creation and updates
 - 🛡️ **Type Safety**: Full TypeScript support
 
@@ -20,15 +20,10 @@ The ATXP SQLite Database package provides persistent OAuth token storage using S
 npm install @atxp/sqlite-db
 ```
 
-### Peer Dependencies
+### Dependencies
 
 - **Node.js**: Automatically installs `better-sqlite3`
-- **React Native/Expo**: Requires `expo-sqlite` (install separately)
-
-```bash
-# For Expo/React Native projects
-npx expo install expo-sqlite
-```
+- **React Native/Expo**: Not currently supported (use `MemoryOAuthDb` from `@atxp/common`)
 
 ## Basic Usage
 
@@ -37,7 +32,7 @@ import { SqliteOAuthDb } from '@atxp/sqlite-db';
 
 // Create database instance
 const db = new SqliteOAuthDb({
-  db: 'oauth.db'  // File path (Node.js) or database name (Expo)
+  db: 'oauth.db'  // File path for database
 });
 
 // Use with ATXP client
@@ -54,7 +49,7 @@ const client = new ATXPClient({
 
 ```typescript
 interface OAuthDbConfig {
-  db?: string;                    // Database path/name (default: 'oauthClient.db')
+  db?: string;                    // Database file path (default: 'oauthClient.db')
   encrypt?: (data: string) => string;  // Optional encryption function
   decrypt?: (data: string) => string;  // Optional decryption function  
   logger?: Logger;                // Optional custom logger
@@ -118,9 +113,7 @@ The SQLite database automatically creates the following tables:
 - Automatic dependency installation
 
 ### React Native/Expo
-- Uses `expo-sqlite` for React Native compatibility
-- Database stored in app's document directory
-- Requires `expo-sqlite` peer dependency
+React Native support is not currently implemented. For React Native applications, use `MemoryOAuthDb` from `@atxp/common` for development, or implement a custom database adapter using React Native AsyncStorage or similar.
 
 ## Migration from @atxp/common
 
