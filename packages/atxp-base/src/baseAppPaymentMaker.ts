@@ -1,28 +1,37 @@
 import { BasePaymentMaker } from '@atxp/client';
 import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { parseEther, WalletClient, createWalletClient, http, publicActions, PublicClient, encodeFunctionData, getAddress} from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { base } from 'viem/chains';
+import { encodeFunctionData, getAddress} from 'viem';
 import { SpendPermission } from './types.js';
+import { createEphemeralSmartWallet, type SmartWalletConfig, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 
 export class BaseAppPaymentMaker extends BasePaymentMaker {
   private spendPermission: SpendPermission;
-  private walletClient: WalletClient;
-  private ephemeralAccount: ReturnType<typeof privateKeyToAccount>;
+  private smartWallet?: EphemeralSmartWallet;
+  private smartWalletConfig: SmartWalletConfig;
+  private privateKey: `0x${string}`;
 
-  constructor(baseRPCUrl: string, spendPermission: SpendPermission, privateKey: `0x${string}`, logger?: Logger) {
+  constructor(baseRPCUrl: string, spendPermission: SpendPermission, privateKey: `0x${string}`, smartWalletConfig: SmartWalletConfig, logger?: Logger) {
     if (!spendPermission) {
       throw new Error('Spend permission is required');
     }
+    if (!smartWalletConfig) {
+      throw new Error('Smart wallet configuration is required');
+    }
     super(baseRPCUrl, privateKey, logger);
     this.spendPermission = spendPermission;
-    this.ephemeralAccount = privateKeyToAccount(privateKey);
-    this.walletClient = createWalletClient({
-      account: this.ephemeralAccount,
-      chain: base,
-      transport: http(baseRPCUrl),
-    }).extend(publicActions);
+    this.smartWalletConfig = smartWalletConfig;
+    this.privateKey = privateKey;
+  }
+
+  // Initialize smart wallet if needed
+  private async ensureSmartWallet(): Promise<void> {
+    if (!this.smartWallet) {
+      this.smartWallet = await createEphemeralSmartWallet(
+        this.privateKey,
+        this.smartWalletConfig
+      );
+    }
   }
 
   // override makePayment to use spend permissions
@@ -86,32 +95,59 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
       ]
     });
     
-    // Execute the spend permission transaction
-    // The transaction is sent from the ephemeral wallet (created from privateKey)
-    // which is the spender in the spend permission
-    const hash = await this.walletClient.sendTransaction({
-      account: this.ephemeralAccount,
-      chain: base,
-      to: SPEND_PERMISSION_MANAGER,
-      data: spendPermissionCalldata,
-      value: parseEther('0'),
-    });
-    
-    this.logger.info(`Spend permission transaction sent: ${hash}`);
-    
-    // Wait for transaction confirmation
-    const receipt = await (this.walletClient as unknown as PublicClient).waitForTransactionReceipt({ 
-      hash: hash as `0x${string}`,
-      confirmations: 3  // Wait for 3 confirmations to ensure better propagation
-    });
-    
-    if (receipt.status === 'reverted') {
-      throw new Error(`Spend permission transaction reverted: ${hash}`);
+    // Ensure smart wallet is initialized
+    await this.ensureSmartWallet();
+    if (!this.smartWallet) {
+      throw new Error('Failed to initialize smart wallet');
     }
-    
-    this.logger.info(`Spend permission transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
-    
-    // Now the ephemeral wallet has the funds, make the actual payment
-    return await super.makePayment(amount, currency, receiver);
+
+    // For smart wallets, batch the spend permission execution and USDC transfer
+    // in a single UserOperation to save gas
+    const USDC_ABI = [{
+      inputs: [
+        { name: 'to', type: 'address' },
+        { name: 'amount', type: 'uint256' }
+      ],
+      name: 'transfer',
+      outputs: [{ name: '', type: 'bool' }],
+      stateMutability: 'nonpayable',
+      type: 'function'
+    }];
+
+    const usdcTransferCalldata = encodeFunctionData({
+      abi: USDC_ABI,
+      functionName: 'transfer',
+      args: [receiver as `0x${string}`, amountBigInt]
+    });
+
+    // Send UserOperation with both calls
+    const userOpHash = await this.smartWallet.client.sendUserOperation({
+      calls: [
+        {
+          to: SPEND_PERMISSION_MANAGER,
+          data: spendPermissionCalldata,
+          value: 0n
+        },
+        {
+          to: USDC_CONTRACT,
+          data: usdcTransferCalldata,
+          value: 0n
+        }
+      ]
+    });
+
+    this.logger.info(`Smart wallet UserOperation sent: ${userOpHash}`);
+
+    // Wait for the UserOperation to be included
+    const receipt = await this.smartWallet.client.waitForUserOperationReceipt({
+      hash: userOpHash
+    });
+
+    if (!receipt.success) {
+      throw new Error(`UserOperation failed: ${userOpHash}`);
+    }
+
+    this.logger.info(`UserOperation confirmed: ${userOpHash}`);
+    return receipt.receipt.transactionHash;
   }
 }

@@ -7,6 +7,7 @@ import { getAddress } from 'viem';
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, PermissionStorage } from './storage.js';
+import { createEphemeralSmartWallet, getSmartWalletAddress, type SmartWalletConfig, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
@@ -19,11 +20,12 @@ export class BaseAppAccount implements Account {
     baseRPCUrl: string, 
     userWalletAddress: string, 
     walletClient: WalletClient,
-    config?: {
+    config: {
       appName: string;
       allowance?: bigint;
       periodInDays?: number;
       storage?: IStorage<string>;
+      smartWallet: SmartWalletConfig;
     }
   ): Promise<BaseAppAccount> {
     // Initialize storage with type-safe wrapper
@@ -40,7 +42,7 @@ export class BaseAppAccount implements Account {
       if (permissionEnd > now) {
         try {
           // Attempt to create account with stored permission
-          return new BaseAppAccount(baseRPCUrl, storedData.permission, storedData.privateKey);
+          return new BaseAppAccount(baseRPCUrl, storedData.permission, storedData.privateKey, config.smartWallet);
         } catch {
           // Failed to initialize with stored permission, will request new one
           // Permission might be invalid, remove it
@@ -56,7 +58,10 @@ export class BaseAppAccount implements Account {
     // BaseAppPayementMaker uses it to pull funds from the user's wallet
     // and pass them along to the MCP server
     const privateKey = generatePrivateKey();
-    const spender = privateKeyToAccount(privateKey);
+    
+    // For smart wallets, we need to get the counterfactual address
+    const signerAddress = privateKeyToAccount(privateKey).address;
+    const spenderAddress = await getSmartWalletAddress(signerAddress, config.smartWallet);
 
     // Create spend permission using wagmi's signTypedData
     const now = Math.floor(Date.now() / 1000);
@@ -87,7 +92,7 @@ export class BaseAppAccount implements Account {
 
     const permissionData = {
       account: userWalletAddress,
-      spender: spender.address,
+      spender: spenderAddress,
       token: USDC_CONTRACT_ADDRESS_BASE,
       allowance: (config?.allowance ?? DEFAULT_ALLOWANCE).toString(),
       period: period,
@@ -127,10 +132,10 @@ export class BaseAppAccount implements Account {
     });
 
     // construct account with the permission
-    return new BaseAppAccount(baseRPCUrl, permission, privateKey);
+    return new BaseAppAccount(baseRPCUrl, permission, privateKey, config.smartWallet);
   }
 
-  constructor(baseRPCUrl: string, spendPermission: SpendPermission, privateKey: `0x${string}`) {
+  constructor(baseRPCUrl: string, spendPermission: SpendPermission, privateKey: `0x${string}`, smartWalletConfig: SmartWalletConfig) {
     if (!baseRPCUrl) {
       throw new Error('Base RPC URL is required');
     }
@@ -140,15 +145,15 @@ export class BaseAppAccount implements Account {
     if (!spendPermission) {
       throw new Error('Spend permission is required');
     }
+    if (!smartWalletConfig) {
+      throw new Error('Smart wallet configuration is required');
+    }
 
-    const account = privateKeyToAccount(privateKey);
+    // The accountId is the smart wallet address
+    this.accountId = spendPermission.permission.spender;
 
-    // this is setting the accountId to the address of the *ephemeral* wallet,
-    // not the user's wallet address. that seems like the least surprising
-    // thing to do, but it might still cause some confusion...
-    this.accountId = account.address;
     this.paymentMakers = {
-      'base': new BaseAppPaymentMaker(baseRPCUrl, spendPermission, privateKey),
+      'base': new BaseAppPaymentMaker(baseRPCUrl, spendPermission, privateKey, smartWalletConfig),
     }
   }
 }
