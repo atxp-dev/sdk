@@ -19,6 +19,16 @@ import { BigNumber } from "bignumber.js";
 // Type for the extended wallet client with public actions
 type ExtendedWalletClient = WalletClient & PublicActions;
 
+// Helper function to convert to base64url that works in both Node.js and browsers
+function toBase64Url(data: string): string {
+  // Convert string to base64
+  const base64 = typeof Buffer !== 'undefined' 
+    ? Buffer.from(data).toString('base64')
+    : btoa(data);
+  // Convert base64 to base64url
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
 export const USDC_CONTRACT_ADDRESS_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
 const USDC_DECIMALS = 6;
 const ERC20_ABI = [
@@ -87,12 +97,14 @@ export class BasePaymentMaker implements PaymentMaker {
       ...(paymentRequestId ? { payment_request_id: paymentRequestId } : {}),
     } as Record<string, unknown>;
 
-    const header = Buffer.from(JSON.stringify(headerObj)).toString('base64url');
-    const payload = Buffer.from(JSON.stringify(payloadObj)).toString('base64url');
+    const header = toBase64Url(JSON.stringify(headerObj));
+    const payload = toBase64Url(JSON.stringify(payloadObj));
     const message = `${header}.${payload}`;
 
     // For Ethereum wallets, we need to use personal_sign format
-    const messageBytes = Buffer.from(message, 'utf8');
+    const messageBytes = typeof Buffer !== 'undefined'
+      ? Buffer.from(message, 'utf8')
+      : new TextEncoder().encode(message);
     const signResult = await this.signingClient.signMessage({
       account: this.account,
       message: { raw: messageBytes },
@@ -101,7 +113,7 @@ export class BasePaymentMaker implements PaymentMaker {
     // The paymcp server expects ES256K signatures as hex strings with 0x prefix
     // The signResult from viem is already in hex format with 0x prefix (65 bytes)
     // We encode the hex string itself (including 0x) as base64url
-    const signature = Buffer.from(signResult, 'utf8').toString('base64url');
+    const signature = toBase64Url(signResult);
 
     return `${header}.${payload}.${signature}`;
   }
