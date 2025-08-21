@@ -1,4 +1,4 @@
-# @atxp/redis-db
+# @atxp/redis
 
 ATXP Redis Database - Redis OAuth database implementation for Authorization Token Exchange Protocol.
 
@@ -18,7 +18,7 @@ The ATXP Redis Database package provides distributed OAuth token storage using R
 ## Installation
 
 ```bash
-npm install @atxp/redis-db
+npm install @atxp/redis
 ```
 
 ### Prerequisites
@@ -29,7 +29,7 @@ npm install @atxp/redis-db
 ## Basic Usage
 
 ```typescript
-import { RedisOAuthDb } from '@atxp/redis-db';
+import { RedisOAuthDb } from '@atxp/redis';
 
 // Create database instance with Redis URL
 const db = new RedisOAuthDb({
@@ -64,7 +64,7 @@ interface RedisOAuthDbConfig {
 ### Custom Redis Client
 ```typescript
 import Redis from 'ioredis';
-import { RedisOAuthDb } from '@atxp/redis-db';
+import { RedisOAuthDb } from '@atxp/redis';
 
 const redis = new Redis({
   host: 'redis.example.com',
@@ -85,7 +85,7 @@ const db = new RedisOAuthDb({
 
 ### Encryption Support
 ```typescript
-import { RedisOAuthDb } from '@atxp/redis-db';
+import { RedisOAuthDb } from '@atxp/redis';
 
 const db = new RedisOAuthDb({
   redis: process.env.REDIS_URL,
@@ -169,7 +169,7 @@ import { MemoryOAuthDb } from '@atxp/common';
 const db = new MemoryOAuthDb();
 
 // New (distributed Redis storage)  
-import { RedisOAuthDb } from '@atxp/redis-db';
+import { RedisOAuthDb } from '@atxp/redis';
 const db = new RedisOAuthDb({
   redis: process.env.REDIS_URL || 'redis://localhost:6379'
 });

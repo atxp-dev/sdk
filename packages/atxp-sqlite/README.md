@@ -1,4 +1,4 @@
-# @atxp/sqlite-db
+# @atxp/sqlite
 
 ATXP SQLite Database - SQLite OAuth database implementation for Authorization Token Exchange Protocol.
 
@@ -17,7 +17,7 @@ The ATXP SQLite Database package provides persistent OAuth token storage using S
 ## Installation
 
 ```bash
-npm install @atxp/sqlite-db
+npm install @atxp/sqlite
 ```
 
 ### Dependencies
@@ -28,7 +28,7 @@ npm install @atxp/sqlite-db
 ## Basic Usage
 
 ```typescript
-import { SqliteOAuthDb } from '@atxp/sqlite-db';
+import { SqliteOAuthDb } from '@atxp/sqlite';
 
 // Create database instance
 const db = new SqliteOAuthDb({
@@ -59,7 +59,7 @@ interface OAuthDbConfig {
 ## Encryption Example
 
 ```typescript
-import { SqliteOAuthDb } from '@atxp/sqlite-db';
+import { SqliteOAuthDb } from '@atxp/sqlite';
 import { createCipher, createDecipher } from 'crypto';
 
 const encryptionKey = 'your-encryption-key';
@@ -124,7 +124,7 @@ If you were previously using the built-in SQLite functionality from `@atxp/commo
 import { SqliteOAuthDb } from '@atxp/common';
 
 // New
-import { SqliteOAuthDb } from '@atxp/sqlite-db';
+import { SqliteOAuthDb } from '@atxp/sqlite';
 ```
 
 The API remains exactly the same - just change the import path.
