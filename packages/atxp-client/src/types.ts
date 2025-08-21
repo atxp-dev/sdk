@@ -3,6 +3,9 @@ import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike }
 import { ClientOptions } from "@modelcontextprotocol/sdk/client/index.js";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
 
+// Type definitions for hex strings
+export type Hex = `0x${string}`;
+
 type AccountPrefix = Network;
 export type AccountIdString = `${AccountPrefix}${string}`;
 
