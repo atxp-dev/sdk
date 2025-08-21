@@ -1,4 +1,4 @@
-import { SqliteOAuthDb } from '@atxp/common';
+import { MemoryOAuthDb } from '@atxp/common';
 import { OAuthAuthenticationRequiredError } from './oAuth.js';
 import { describe, it, expect, vi } from 'vitest';
 import fetchMock from 'fetch-mock';
@@ -18,7 +18,7 @@ function mockPaymentMakers(solanaPaymentMaker?: PaymentMaker) {
 function atxpFetcher(fetchFn: FetchLike, paymentMakers?: {[key: string]: PaymentMaker}, db?: OAuthDb) {
   return new ATXPFetcher({
     accountId: "bdj",
-    db: db ?? new SqliteOAuthDb({db: ':memory:'}),
+    db: db ?? new MemoryOAuthDb(),
     paymentMakers: paymentMakers ?? mockPaymentMakers(),
     fetchFn
   });
@@ -93,7 +93,7 @@ describe('atxpFetcher.fetch oauth', () => {
 
   it('should auth using the local token if one is available', async () => {
     const f = fetchMock.createInstance();
-    const db = new SqliteOAuthDb({db: ':memory:'});
+    const db = new MemoryOAuthDb();
     // ATXP will store inbound tokens in the DB under the '' URL - this allows us to chain together
     // ATXP servers. 
     // Each downstream call will use OAuth token exchange to get a new token for the downstream server

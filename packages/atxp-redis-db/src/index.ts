@@ -1,5 +1,5 @@
-import { ConsoleLogger } from './logger.js';
-import type { AccessToken, ClientCredentials, Logger, OAuthDb, PKCEValues } from './types.js';
+import { ConsoleLogger } from '@atxp/common';
+import type { AccessToken, ClientCredentials, Logger, OAuthDb, PKCEValues } from '@atxp/common';
 
 export interface RedisClient {
   get(key: string): Promise<string | null>;

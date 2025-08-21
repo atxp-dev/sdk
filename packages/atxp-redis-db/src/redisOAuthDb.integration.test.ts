@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { RedisOAuthDb } from './index.js';
-import type { AccessToken, ClientCredentials, PKCEValues } from './types.js';
+import type { AccessToken, ClientCredentials, PKCEValues } from '@atxp/common';
 
 const REDIS_URL = process.env.REDIS_URL;
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getIsReactNative, isNode, isBrowser, isNextJS, isWebEnvironment, crypto, sqlite } from './index.js';
+import { getIsReactNative, isNode, isBrowser, isNextJS, isWebEnvironment, crypto } from './index.js';
 
 describe('Platform Detection Logic', () => {
   it('should have correct environment detection functions', () => {
@@ -23,10 +23,6 @@ describe('Platform Detection Logic', () => {
     expect(typeof crypto.toHex).toBe('function');
   });
 
-  it('should have SQLite implementation available', () => {
-    expect(sqlite).toBeDefined();
-    expect(typeof sqlite.openDatabase).toBe('function');
-  });
 
   it('toHex should convert Uint8Array to hex string correctly', () => {
     const testData = new Uint8Array([0, 15, 255, 128]);
