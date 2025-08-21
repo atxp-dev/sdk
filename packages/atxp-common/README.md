@@ -11,7 +11,7 @@ The ATXP Common package provides shared utilities, types, and core functionality
 ## Features
 
 - 🔐 **JWT Token Management**: Secure token creation, validation, and parsing
-- 🗄️ **OAuth Database**: Abstract database interface with memory and SQLite implementations
+- 🗄️ **OAuth Database**: Abstract database interface with memory implementation
 - 📡 **MCP JSON Utilities**: Type-safe MCP protocol message handling
 - 💰 **Payment Error Handling**: Structured payment requirement error types
 - 🛠️ **Platform Utilities**: Cross-platform compatibility helpers
@@ -136,11 +136,17 @@ const db = new MemoryOAuthDb();
 // Tokens stored in memory, cleared on process restart
 ```
 
-### SQLite Implementation
+### Additional Database Options
 
-Platform-specific SQLite implementations are automatically selected:
-- Node.js: Uses `better-sqlite3`
-- Expo/React Native: Uses `expo-sqlite`
+For production use cases requiring persistent storage, see separate database packages:
+
+- **`@atxp/sqlite-db`**: SQLite implementation using `better-sqlite3` (Node.js) or `expo-sqlite` (React Native)
+- **`@atxp/redis-db`**: Redis implementation using `ioredis` for distributed applications
+
+```bash
+npm install @atxp/sqlite-db  # For SQLite storage
+npm install @atxp/redis-db   # For Redis storage
+```
 
 ## Logging
 

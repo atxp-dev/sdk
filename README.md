@@ -74,9 +74,12 @@ DEBUG=1
 
 ```typescript
 import { atxpFetch } from '@atxp/client';
-import { SqliteOAuthDb } from '@atxp/client';
+import { MemoryOAuthDb } from '@atxp/common';
+// For persistent storage, install: npm install @atxp/sqlite-db
+// import { SqliteOAuthDb } from '@atxp/sqlite-db';
 
-const db = new SqliteOAuthDb({ db: 'oauth.db' });
+const db = new MemoryOAuthDb(); // In-memory for development
+// const db = new SqliteOAuthDb({ db: 'oauth.db' }); // For production
 
 const fetchWithATXP = atxpFetch({
   accountId: 'user123',
@@ -98,10 +101,13 @@ const response = await fetchWithATXP('https://api.example.com/data');
 ### Server-Side Usage
 
 ```typescript
-import { atxpServer } from '@atxp/client';
-import { SqliteOAuthDb } from '@atxp/client';
+import { atxpServer } from '@atxp/server';
+import { MemoryOAuthDb } from '@atxp/common';
+// For persistent storage, install: npm install @atxp/sqlite-db
+// import { SqliteOAuthDb } from '@atxp/sqlite-db';
 
-const db = new SqliteOAuthDb({ db: 'oauth.db' });
+const db = new MemoryOAuthDb(); // In-memory for development
+// const db = new SqliteOAuthDb({ db: 'oauth.db' }); // For production
 
 const app = express();
 app.use('/atxp', atxpServer({
