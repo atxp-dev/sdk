@@ -3,7 +3,7 @@ import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import type { WalletClient } from 'viem';
-import { getAddress } from 'viem';
+import { getAddress, createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, PermissionStorage } from './storage.js';
@@ -53,7 +53,7 @@ export class BaseAppAccount implements Account {
           // In the old EOA approach, the spender was just the ephemeral private key's address
           // In the smart wallet approach, the spender should be a smart wallet address
           const ephemeralEOA = privateKeyToAccount(storedData.privateKey).address;
-          const expectedSmartWallet = await getSmartWalletAddress(ephemeralEOA, config.smartWallet);
+          const expectedSmartWallet = await getSmartWalletAddress(storedData.privateKey, config.smartWallet);
           
           if (storedData.permission.permission.spender.toLowerCase() === ephemeralEOA.toLowerCase()) {
             // This is an old EOA permission, invalidate it
@@ -84,6 +84,67 @@ export class BaseAppAccount implements Account {
     // and pass them along to the MCP server
     const privateKey = generatePrivateKey();
     
+    // Check USDC allowance before creating smart wallet
+    const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
+    const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
+    
+    const publicClient = createPublicClient({
+      chain: base,
+      transport: http(baseRPCUrl)
+    });
+    
+    const allowance = await publicClient.readContract({
+      address: USDC_CONTRACT,
+      abi: [{
+        name: 'allowance',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [
+          { name: 'owner', type: 'address' },
+          { name: 'spender', type: 'address' }
+        ],
+        outputs: [{ name: '', type: 'uint256' }],
+      }],
+      functionName: 'allowance',
+      args: [userWalletAddress as `0x${string}`, SPEND_PERMISSION_MANAGER],
+    });
+    
+    console.log('USDC allowance for SpendPermissionManager:', allowance);
+    
+    if (allowance === 0n) {
+      console.log('User needs to approve SpendPermissionManager to spend USDC');
+      
+      // Request approval
+      try {
+        const hash = await walletClient.writeContract({
+          address: USDC_CONTRACT,
+          abi: [{
+            name: 'approve',
+            type: 'function',
+            stateMutability: 'nonpayable',
+            inputs: [
+              { name: 'spender', type: 'address' },
+              { name: 'amount', type: 'uint256' }
+            ],
+            outputs: [{ name: '', type: 'bool' }],
+          }],
+          functionName: 'approve',
+          args: [SPEND_PERMISSION_MANAGER, BigInt(10 ** 9)], // Approve 1000 USDC
+          chain: base,
+          account: userWalletAddress as `0x${string}`,
+        });
+        
+        console.log('Approval transaction sent:', hash);
+        
+        // Wait for approval
+        await publicClient.waitForTransactionReceipt({ hash });
+        console.log('SpendPermissionManager approved successfully');
+      } catch (approveError) {
+        console.error('Failed to approve SpendPermissionManager:', approveError);
+        throw new Error('SpendPermissionManager must be approved to spend USDC. Please approve the contract at 0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
+      }
+    }
+
     // For smart wallets, we need to get the counterfactual address
     // Pass the private key to get the exact smart wallet address
     const spenderAddress = await getSmartWalletAddress(privateKey, config.smartWallet);
@@ -128,6 +189,7 @@ export class BaseAppAccount implements Account {
     };
 
     // Sign the permission using wagmi wallet client
+    console.log('Requesting signature from wallet for address:', userWalletAddress);
     const signature = await walletClient.signTypedData({
       account: userWalletAddress as `0x${string}`,
       domain,
@@ -135,6 +197,16 @@ export class BaseAppAccount implements Account {
       primaryType: 'SpendPermission',
       message: permissionData,
     });
+    
+    console.log('Received signature:', signature);
+    console.log('Signature length:', signature.length);
+    
+    // Check if this is a smart wallet signature (very long with encoded data)
+    if (signature.length > 150) {
+      console.warn('WARNING: Received what appears to be a smart wallet signature');
+      console.warn('SpendPermissionManager expects a regular EOA signature');
+      console.warn('This will likely cause the transaction to revert');
+    }
 
     const permission: SpendPermission = {
       signature,
