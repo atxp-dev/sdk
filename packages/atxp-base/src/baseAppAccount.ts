@@ -3,7 +3,7 @@ import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import type { WalletClient } from 'viem';
-import { getAddress, createPublicClient, http } from 'viem';
+import { getAddress, createPublicClient, http, Account as ViemAccount } from 'viem';
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
@@ -51,13 +51,16 @@ export class BaseAppAccount implements Account {
     const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
     if (existingData) {
       const smartWallet = await toEphemeralSmartWallet(existingData.privateKey, config.apiKey);
-      return new BaseAppAccount(baseRPCUrl, existingData.permission, existingData.privateKey, smartWallet, logger);
+      const account = privateKeyToAccount(existingData.privateKey);
+      return new BaseAppAccount(baseRPCUrl, existingData.permission, account, smartWallet, logger);
     }
 
     // Create new wallet and permission
     const privateKey = generatePrivateKey();
     const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
-    console.log('Generated intermediate wallet:', smartWallet.address);
+    console.log('Generated ephemeral wallet:', smartWallet.address);
+    // Deploy smart wallet
+    //await this.deploySmartWallet(privateKey, config.apiKey);
     
     // Check USDC allowance before creating smart wallet
     // TODO: We probably need to keep this - it's stored on-chain, so doesn't wipe when we clear storage
@@ -71,13 +74,16 @@ export class BaseAppAccount implements Account {
       config
     );
 
-    // Deploy smart wallet
-    //await this.deploySmartWallet(privateKey, config.apiKey);
-
     // Save wallet and permission
     storage.set(storageKey, {privateKey, permission});
 
-    return new BaseAppAccount(baseRPCUrl, permission, privateKey, smartWallet);
+    // TODO: TEMPORARY HACK- USE MAIN ACCOUNT TO PAY
+    //const account = privateKeyToAccount(privateKey);
+    const account = walletClient.account;
+    if (!account) {
+      throw new Error('Account is required');
+    }
+    return new BaseAppAccount(baseRPCUrl, permission, account, smartWallet);
   }
 
   private static loadSavedWalletAndPermission(
@@ -270,15 +276,15 @@ export class BaseAppAccount implements Account {
   constructor(
     baseRPCUrl: string, 
     spendPermission: SpendPermission, 
-    privateKey: `0x${string}`, 
+    account: ViemAccount, 
     smartWallet: EphemeralSmartWallet,
     logger?: Logger
   ) {
     if (!baseRPCUrl) {
       throw new Error('Base RPC URL is required');
     }
-    if (!privateKey) {
-      throw new Error('Private key (for ephemeral wallet) is required');
+    if (!account) {
+      throw new Error('Account is required');
     }
     if (!spendPermission) {
       throw new Error('Spend permission is required');
@@ -290,7 +296,7 @@ export class BaseAppAccount implements Account {
     this.accountId = spendPermission.permission.spender;
 
     this.paymentMakers = {
-      'base': new BaseAppPaymentMaker(baseRPCUrl, spendPermission, privateKey, smartWallet, logger),
+      'base': new BaseAppPaymentMaker(baseRPCUrl, spendPermission, account, smartWallet, logger),
     }
   }
 
