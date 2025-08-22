@@ -33,11 +33,8 @@ export async function toEphemeralSmartWallet(
   privateKey: `0x${string}`,
   apiKey: string
 ): Promise<EphemeralSmartWallet> {
-  // Create the ephemeral signer
-  // TODO: WAIT, WHAT?
   const signer = privateKeyToAccount(privateKey);
   
-  // Create public client
   const publicClient = createPublicClient({
     chain: base,
     transport: http(`${COINBASE_BUNDLER_URL}/${apiKey}`)
@@ -73,7 +70,7 @@ export async function toEphemeralSmartWallet(
 /**
  * Gets the counterfactual address for a smart wallet without deploying it
  */
-export async function getSmartWalletAddress(
+/*export async function getSmartWalletAddress(
   signerOrPrivateKey: Address | `0x${string}`,
   apiKey: string
 ): Promise<Address> {
@@ -103,4 +100,4 @@ export async function getSmartWalletAddress(
   });
   
   return smartAccount.address;
-}
+}*/
