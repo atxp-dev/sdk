@@ -1,14 +1,4 @@
 import { 
-  createSmartAccountClient,
-  type SmartAccountClient,
-} from 'permissionless';
-import { 
-  toSimpleSmartAccount,
-} from 'permissionless/accounts';
-import { 
-  createPimlicoClient,
-} from 'permissionless/clients/pimlico';
-import { 
   http, 
   createPublicClient, 
   type Account,
@@ -16,11 +6,17 @@ import {
 } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
+import { 
+  toCoinbaseSmartAccount,
+  createBundlerClient,
+  createPaymasterClient,
+  type BundlerClient,
+  type SmartAccount
+} from 'viem/account-abstraction';
 
 // Coinbase CDP Paymaster and Bundler endpoints
 const COINBASE_BUNDLER_URL = 'https://api.developer.coinbase.com/rpc/v1/base';
 const COINBASE_PAYMASTER_URL = 'https://api.developer.coinbase.com/rpc/v1/base';
-const ENTRYPOINT_ADDRESS_V07 = '0x0000000071727De22E5E9d8BAf0edAc6f37da032' as const;
 
 export interface SmartWalletConfig {
   apiKey: string;
@@ -30,7 +26,8 @@ export interface SmartWalletConfig {
 
 export interface EphemeralSmartWallet {
   address: Address;
-  client: SmartAccountClient;
+  client: BundlerClient;
+  account: SmartAccount;
   signer: Account;
 }
 
@@ -50,39 +47,32 @@ export async function createEphemeralSmartWallet(
     transport: http(config.bundlerUrl || `${COINBASE_BUNDLER_URL}/${config.apiKey}`)
   });
   
-  // Create the simple account (smart wallet)
-  const simpleAccount = await toSimpleSmartAccount({
+  // Create the Coinbase smart wallet
+  const account = await toCoinbaseSmartAccount({
     client: publicClient,
-    owner: signer,
-    entryPoint: {
-      address: ENTRYPOINT_ADDRESS_V07,
-      version: '0.7'
-    },
+    owners: [signer],
+    version: '1'
   });
   
   // Log the smart wallet address
-  console.log('Smart wallet address:', simpleAccount.address);
+  console.log('Smart wallet address:', account.address);
   
-  // Create pimlico client for paymaster
-  const pimlicoClient = createPimlicoClient({
-    transport: http(config.paymasterUrl || `${COINBASE_PAYMASTER_URL}/${config.apiKey}`),
-    entryPoint: {
-      address: ENTRYPOINT_ADDRESS_V07,
-      version: '0.7'
-    },
-  });
-  
-  // Create smart account client with paymaster
-  const smartAccountClient = createSmartAccountClient({
-    account: simpleAccount,
+  // Create bundler client with paymaster support
+  const bundlerClient = createBundlerClient({
+    account,
+    client: publicClient,
+    transport: http(config.bundlerUrl || `${COINBASE_BUNDLER_URL}/${config.apiKey}`),
     chain: base,
-    bundlerTransport: http(config.bundlerUrl || `${COINBASE_BUNDLER_URL}/${config.apiKey}`),
-    paymaster: pimlicoClient,
+    paymaster: true, // Enable paymaster sponsorship
+    paymasterContext: {
+      transport: http(config.paymasterUrl || `${COINBASE_PAYMASTER_URL}/${config.apiKey}`)
+    }
   });
   
   return {
-    address: simpleAccount.address,
-    client: smartAccountClient,
+    address: account.address,
+    client: bundlerClient,
+    account,
     signer,
   };
 }
@@ -99,25 +89,21 @@ export async function getSmartWalletAddress(
     transport: http(config.bundlerUrl || `${COINBASE_BUNDLER_URL}/${config.apiKey}`)
   });
   
-  // Create a dummy private key to generate a temporary account
-  // The actual private key doesn't matter since we only need the address
-  const dummyPrivateKey = '0x0000000000000000000000000000000000000000000000000000000000000001' as `0x${string}`;
-  const dummySigner = privateKeyToAccount(dummyPrivateKey);
-  
-  // Override the address to match the intended signer
+  // Create a temporary account with the signer address
+  // We need to use the actual signer to get the correct smart wallet address
   const tempAccount = {
-    ...dummySigner,
     address: signerAddress,
+    type: 'json-rpc' as const,
+    signMessage: async () => '0x' as `0x${string}`,
+    signTypedData: async () => '0x' as `0x${string}`,
+    signTransaction: async () => '0x' as `0x${string}`,
   };
   
-  const simpleAccount = await toSimpleSmartAccount({
+  const smartAccount = await toCoinbaseSmartAccount({
     client: publicClient,
-    owner: tempAccount,
-    entryPoint: {
-      address: ENTRYPOINT_ADDRESS_V07,
-      version: '0.7'
-    },
+    owners: [tempAccount as any],
+    version: '1'
   });
   
-  return simpleAccount.address;
+  return smartAccount.address;
 }
