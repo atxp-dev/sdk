@@ -19,12 +19,6 @@ import {
 const COINBASE_BUNDLER_URL = 'https://api.developer.coinbase.com/rpc/v1/base';
 const COINBASE_PAYMASTER_URL = 'https://api.developer.coinbase.com/rpc/v1/base';
 
-export interface SmartWalletConfig {
-  apiKey: string;
-  paymasterUrl?: string;
-  bundlerUrl?: string;
-}
-
 export interface EphemeralSmartWallet {
   address: Address;
   client: BundlerClient;
@@ -35,17 +29,18 @@ export interface EphemeralSmartWallet {
 /**
  * Creates an ephemeral smart wallet with paymaster support
  */
-export async function createEphemeralSmartWallet(
+export async function toEphemeralSmartWallet(
   privateKey: `0x${string}`,
-  config: SmartWalletConfig
+  apiKey: string
 ): Promise<EphemeralSmartWallet> {
   // Create the ephemeral signer
+  // TODO: WAIT, WHAT?
   const signer = privateKeyToAccount(privateKey);
   
   // Create public client
   const publicClient = createPublicClient({
     chain: base,
-    transport: http(config.bundlerUrl || `${COINBASE_BUNDLER_URL}/${config.apiKey}`)
+    transport: http(`${COINBASE_BUNDLER_URL}/${apiKey}`)
   });
   
   // Create the Coinbase smart wallet
@@ -55,18 +50,15 @@ export async function createEphemeralSmartWallet(
     version: '1'
   });
   
-  // Log the smart wallet address
-  console.log('Smart wallet address:', account.address);
-  
   // Create bundler client with paymaster support
   const bundlerClient = createBundlerClient({
     account,
     client: publicClient,
-    transport: http(config.bundlerUrl || `${COINBASE_BUNDLER_URL}/${config.apiKey}`),
+    transport: http(`${COINBASE_BUNDLER_URL}/${apiKey}`),
     chain: base,
     paymaster: true, // Enable paymaster sponsorship
     paymasterContext: {
-      transport: http(config.paymasterUrl || `${COINBASE_PAYMASTER_URL}/${config.apiKey}`)
+      transport: http(`${COINBASE_PAYMASTER_URL}/${apiKey}`)
     }
   });
   
@@ -83,11 +75,11 @@ export async function createEphemeralSmartWallet(
  */
 export async function getSmartWalletAddress(
   signerOrPrivateKey: Address | `0x${string}`,
-  config: SmartWalletConfig
+  apiKey: string
 ): Promise<Address> {
   const publicClient = createPublicClient({
     chain: base,
-    transport: http(config.bundlerUrl || `${COINBASE_BUNDLER_URL}/${config.apiKey}`)
+    transport: http(`${COINBASE_BUNDLER_URL}/${apiKey}`)
   });
   
   // Check if we received a private key or just an address

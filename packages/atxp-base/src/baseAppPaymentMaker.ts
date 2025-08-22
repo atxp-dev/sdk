@@ -1,63 +1,59 @@
 import { BasePaymentMaker } from '@atxp/client';
 import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { encodeFunctionData, getAddress, createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
+import { encodeFunctionData, getAddress } from 'viem';
 import { SpendPermission } from './types.js';
-import { createEphemeralSmartWallet, type SmartWalletConfig, type EphemeralSmartWallet } from './smartWalletHelpers.js';
+import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 
 export class BaseAppPaymentMaker extends BasePaymentMaker {
   private spendPermission: SpendPermission;
-  private smartWallet?: EphemeralSmartWallet;
-  private smartWalletConfig: SmartWalletConfig;
-  private privateKey: `0x${string}`;
-  private baseRPCUrl: string;
+  private smartWallet: EphemeralSmartWallet;
 
-  constructor(baseRPCUrl: string, spendPermission: SpendPermission, privateKey: `0x${string}`, smartWalletConfig: SmartWalletConfig, logger?: Logger) {
+  constructor(
+    baseRPCUrl: string, 
+    spendPermission: SpendPermission, 
+    privateKey: `0x${string}`, 
+    smartWallet: EphemeralSmartWallet,
+    logger?: Logger
+  ) {
     if (!spendPermission) {
       throw new Error('Spend permission is required');
     }
-    if (!smartWalletConfig) {
-      throw new Error('Smart wallet configuration is required');
-    }
     super(baseRPCUrl, privateKey, logger);
     this.spendPermission = spendPermission;
-    this.smartWalletConfig = smartWalletConfig;
-    this.privateKey = privateKey;
-    this.baseRPCUrl = baseRPCUrl;
+    this.smartWallet = smartWallet;
   }
 
-  // Initialize smart wallet if needed
-  private async ensureSmartWallet(): Promise<void> {
-    if (!this.smartWallet) {
-      this.smartWallet = await createEphemeralSmartWallet(
-        this.privateKey,
-        this.smartWalletConfig
-      );
-    }
-  }
 
   // override makePayment to use spend permissions
   async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
+    this.validatePaymentRequest(currency);
+    
+    const amountBigInt = this.convertAmountToBigInt(amount);
+    
+    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ephemeral wallet on Base`);
+    
+    this.logPaymentDetails(amountBigInt, receiver);
+    
+    // Execute the payment transaction
+    return await this.executePaymentTransaction(amountBigInt, receiver);
+  }
+
+  private validatePaymentRequest(currency: Currency): void {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
+  }
 
-    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ephemeral wallet on Base`);
-
+  private convertAmountToBigInt(amount: BigNumber): bigint {
     // Convert USDC amount to its smallest unit (6 decimals)
     // 0.01 USDC = 10,000 micro-USDC
     const USDC_DECIMALS = 6;
     const amountInMicroUsdc = amount.multipliedBy(10 ** USDC_DECIMALS);
-    const amountBigInt = BigInt(amountInMicroUsdc.toFixed(0));
-    
-    // SpendPermissionManager contract on Base mainnet
-    const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
-    
-    // USDC contract on Base mainnet
-    const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
-    
-    // Debug: Log spend permission details
+    return BigInt(amountInMicroUsdc.toFixed(0));
+  }
+
+  private logPaymentDetails(amountBigInt: bigint, receiver: string): void {
     const now = Math.floor(Date.now() / 1000);
     console.log('Spend permission details:', {
       account: this.spendPermission.permission.account,
@@ -75,9 +71,25 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
       extraData: this.spendPermission.permission.extraData,
       signature: this.spendPermission.signature
     });
+  }
+
+  private async executePaymentTransaction(amountBigInt: bigint, receiver: string): Promise<string> {
+    const spendPermissionCalldata = this.prepareSpendPermissionCall(amountBigInt);
+    const usdcTransferCalldata = this.prepareUSDCTransferCall(amountBigInt, receiver);
+
+    try {
+      const userOpHash = await this.sendUserOperation(spendPermissionCalldata, usdcTransferCalldata);
+      return await this.waitForUserOperation(userOpHash);
+    } catch (error) {
+      this.handleTransactionError(error, amountBigInt, receiver);
+      throw error;
+    }
+  }
+
+  private prepareSpendPermissionCall(amountBigInt: bigint): `0x${string}` {
+    const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
     
-    // Encode the spend permission call
-    const spendPermissionCalldata = encodeFunctionData({
+    return encodeFunctionData({
       abi: [{
         inputs: [
           { name: 'spendPermission', type: 'tuple', components: [
@@ -116,36 +128,11 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
         amountBigInt
       ]
     });
-    
-    // Ensure smart wallet is initialized
-    await this.ensureSmartWallet();
-    if (!this.smartWallet) {
-      throw new Error('Failed to initialize smart wallet');
-    }
+  }
 
-    // The smart wallet should already be deployed during BaseAppAccount initialization
-    // If it's not deployed, log a warning but proceed - the paymaster might handle it
-    const publicClient = createPublicClient({
-      chain: base,
-      transport: http(this.baseRPCUrl)
-    });
+  private prepareUSDCTransferCall(amountBigInt: bigint, receiver: string): `0x${string}` {
+    const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
     
-    const smartWalletCode = await publicClient.getCode({ 
-      address: this.smartWallet.address 
-    });
-    
-    const isDeployed = smartWalletCode !== '0x' && smartWalletCode !== undefined;
-    
-    if (!isDeployed) {
-      this.logger.warn(`Smart wallet not deployed at ${this.smartWallet.address}. It should have been deployed during initialization.`);
-      this.logger.warn(`The transaction may still succeed if the paymaster handles deployment.`);
-    } else {
-      this.logger.info(`Smart wallet is deployed at ${this.smartWallet.address}`);
-    }
-
-        // For smart wallets, we need to execute the spend permission
-    // The SpendPermissionManager will transfer USDC from user to smart wallet
-    // Then we need to forward it to the final receiver
     const USDC_ABI = [{
       inputs: [
         { name: 'to', type: 'address' },
@@ -157,85 +144,92 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
       type: 'function'
     }];
 
-    const usdcTransferCalldata = encodeFunctionData({
+    return encodeFunctionData({
       abi: USDC_ABI,
       functionName: 'transfer',
       args: [receiver as `0x${string}`, amountBigInt]
     });
+  }
 
-    // Send UserOperation with both calls in sequence
-    try {
-      const userOpHash = await this.smartWallet.client.sendUserOperation({
-        calls: [
-          {
-            to: SPEND_PERMISSION_MANAGER,
-            data: spendPermissionCalldata,
-            value: 0n
-          },
-          {
-            to: USDC_CONTRACT,
-            data: usdcTransferCalldata,
-            value: 0n
-          }
-        ],
-        paymaster: true
+  private async sendUserOperation(
+    spendPermissionCalldata: `0x${string}`,
+    usdcTransferCalldata: `0x${string}`
+  ): Promise<`0x${string}`> {
+    const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
+    const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
+
+    const userOpHash = await this.smartWallet.client.sendUserOperation({
+      calls: [
+        {
+          to: SPEND_PERMISSION_MANAGER,
+          data: spendPermissionCalldata,
+          value: 0n
+        },
+        {
+          to: USDC_CONTRACT,
+          data: usdcTransferCalldata,
+          value: 0n
+        }
+      ],
+      paymaster: true
+    });
+
+    this.logger.info(`Smart wallet UserOperation sent: ${userOpHash}`);
+    return userOpHash;
+  }
+
+  private async waitForUserOperation(userOpHash: `0x${string}`): Promise<string> {
+    const receipt = await this.smartWallet.client.waitForUserOperationReceipt({
+      hash: userOpHash
+    });
+
+    if (!receipt.success) {
+      throw new Error(`UserOperation failed: ${userOpHash}`);
+    }
+
+    this.logger.info(`UserOperation confirmed: ${userOpHash}`);
+    return receipt.receipt.transactionHash;
+  }
+
+  private handleTransactionError(error: unknown, amountBigInt: bigint, receiver: string): void {
+    console.error('UserOperation failed:', error);
+    
+    // Add detailed debugging for spend permission errors
+    if (error instanceof Error && error.message.includes('Execution reverted')) {
+      console.error('=== SPEND PERMISSION DEBUGGING ===');
+      console.error('Spend permission details:');
+      console.error('- Account:', this.spendPermission.permission.account);
+      console.error('- Spender:', this.spendPermission.permission.spender);
+      console.error('- Token:', this.spendPermission.permission.token);
+      console.error('- Allowance:', this.spendPermission.permission.allowance);
+      console.error('- Amount:', amountBigInt.toString());
+      console.error('- Receiver:', receiver);
+      console.error('- Smart Wallet:', this.smartWallet.address);
+      console.error('- Current Time:', Math.floor(Date.now() / 1000));
+      console.error('- Start:', Number(this.spendPermission.permission.start));
+      console.error('- End:', Number(this.spendPermission.permission.end));
+      console.error('- Is Valid:', Number(this.spendPermission.permission.start) <= Math.floor(Date.now() / 1000) && Math.floor(Date.now() / 1000) <= Number(this.spendPermission.permission.end));
+      console.error('- Salt:', this.spendPermission.permission.salt);
+      console.error('- Extra Data:', this.spendPermission.permission.extraData);
+      console.error('- Signature Length:', this.spendPermission.signature.length);
+      console.error('- Signature Preview:', this.spendPermission.signature.substring(0, 100) + '...');
+      console.error('=== END DEBUGGING ===');
+    }
+    
+    // Try to decode the specific error
+    if (error instanceof Error && error.message.includes('execution reverted')) {
+      console.error('The transaction reverted. Possible reasons:');
+      console.error('1. The SpendPermissionManager rejected the spend permission');
+      console.error('2. The permission signature might be invalid');
+      console.error('3. The permission might have already been used (check salt)');
+      console.error('4. The smart wallet might not be the correct spender');
+      
+      // Log the permission details again for debugging
+      console.error('Permission was:', {
+        account: this.spendPermission.permission.account,
+        spender: this.spendPermission.permission.spender,
+        smartWallet: this.smartWallet.address
       });
-
-      this.logger.info(`Smart wallet UserOperation sent: ${userOpHash}`);
-
-      // Wait for the UserOperation to be included
-      const receipt = await this.smartWallet.client.waitForUserOperationReceipt({
-        hash: userOpHash
-      });
-
-      if (!receipt.success) {
-        throw new Error(`UserOperation failed: ${userOpHash}`);
-      }
-
-      this.logger.info(`UserOperation confirmed: ${userOpHash}`);
-      return receipt.receipt.transactionHash;
-    } catch (error) {
-      console.error('UserOperation failed:', error);
-      
-      // Add detailed debugging for spend permission errors
-      if (error instanceof Error && error.message.includes('Execution reverted')) {
-        console.error('=== SPEND PERMISSION DEBUGGING ===');
-        console.error('Spend permission details:');
-        console.error('- Account:', this.spendPermission.permission.account);
-        console.error('- Spender:', this.spendPermission.permission.spender);
-        console.error('- Token:', this.spendPermission.permission.token);
-        console.error('- Allowance:', this.spendPermission.permission.allowance);
-        console.error('- Amount:', amountBigInt.toString());
-        console.error('- Receiver:', receiver);
-        console.error('- Smart Wallet:', this.smartWallet?.address);
-        console.error('- Current Time:', Math.floor(Date.now() / 1000));
-        console.error('- Start:', Number(this.spendPermission.permission.start));
-        console.error('- End:', Number(this.spendPermission.permission.end));
-        console.error('- Is Valid:', Number(this.spendPermission.permission.start) <= Math.floor(Date.now() / 1000) && Math.floor(Date.now() / 1000) <= Number(this.spendPermission.permission.end));
-        console.error('- Salt:', this.spendPermission.permission.salt);
-        console.error('- Extra Data:', this.spendPermission.permission.extraData);
-        console.error('- Signature Length:', this.spendPermission.signature.length);
-        console.error('- Signature Preview:', this.spendPermission.signature.substring(0, 100) + '...');
-        console.error('=== END DEBUGGING ===');
-      }
-      
-      // Try to decode the specific error
-      if (error instanceof Error && error.message.includes('execution reverted')) {
-        console.error('The transaction reverted. Possible reasons:');
-        console.error('1. The SpendPermissionManager rejected the spend permission');
-        console.error('2. The permission signature might be invalid');
-        console.error('3. The permission might have already been used (check salt)');
-        console.error('4. The smart wallet might not be the correct spender');
-        
-        // Log the permission details again for debugging
-        console.error('Permission was:', {
-          account: this.spendPermission.permission.account,
-          spender: this.spendPermission.permission.spender,
-          smartWallet: this.smartWallet?.address
-        });
-      }
-      
-      throw error;
     }
   }
 }

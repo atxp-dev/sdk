@@ -3,7 +3,7 @@ import { SpendPermission } from './types.js';
 /**
  * Stored permission data structure
  */
-export interface StoredPermissionData {
+export interface Intermediary {
   /** Ephemeral wallet private key */
   privateKey: `0x${string}`;
   /** Spend permission from Base */
@@ -16,56 +16,35 @@ export interface StoredPermissionData {
  * support for different storage backends (e.g., React Native AsyncStorage)
  */
 export interface IStorage<T = string> {
-  getItem(key: string): T | null;
-  setItem(key: string, value: T): void;
-  removeItem(key: string): void;
+  get(key: string): T | null;
+  set(key: string, value: T): void;
+  delete(key: string): void;
 }
 
 /**
  * Type-safe storage wrapper for permission data
  */
-export class PermissionStorage {
+export class IntermediaryStorage {
   constructor(private storage: IStorage<string>) {}
 
-  getPermission(key: string): StoredPermissionData | null {
-    const data = this.storage.getItem(key);
+  get(key: string): Intermediary | null {
+    const data = this.storage.get(key);
     if (!data) return null;
     
     try {
       const parsed = JSON.parse(data);
-      // Validate the structure
-      if (this.isValidStoredPermission(parsed)) {
-        return parsed;
-      }
-      return null;
+      return parsed as Intermediary;
     } catch {
       return null;
     }
   }
 
-  setPermission(key: string, data: StoredPermissionData): void {
-    this.storage.setItem(key, JSON.stringify(data));
+  set(key: string, data: Intermediary): void {
+    this.storage.set(key, JSON.stringify(data));
   }
 
-  removePermission(key: string): void {
-    this.storage.removeItem(key);
-  }
-
-  private isValidStoredPermission(data: unknown): data is StoredPermissionData {
-    if (!data || typeof data !== 'object' || data === null) {
-      return false;
-    }
-    
-    const obj = data as Record<string, unknown>;
-    return Boolean(
-      typeof obj.privateKey === 'string' &&
-      obj.privateKey.startsWith('0x') &&
-      obj.permission &&
-      typeof obj.permission === 'object' &&
-      obj.permission !== null &&
-      'permission' in obj.permission &&
-      typeof (obj.permission as Record<string, unknown>).permission === 'object'
-    );
+  delete(key: string): void {
+    this.storage.delete(key);
   }
 }
 
@@ -73,15 +52,15 @@ export class PermissionStorage {
  * Browser localStorage implementation
  */
 export class BrowserStorage implements IStorage<string> {
-  getItem(key: string): string | null {
+  get(key: string): string | null {
     return localStorage.getItem(key);
   }
 
-  setItem(key: string, value: string): void {
+  set(key: string, value: string): void {
     localStorage.setItem(key, value);
   }
 
-  removeItem(key: string): void {
+  delete(key: string): void {
     localStorage.removeItem(key);
   }
 }
@@ -92,15 +71,15 @@ export class BrowserStorage implements IStorage<string> {
 export class MemoryStorage implements IStorage<string> {
   private store: Map<string, string> = new Map();
 
-  getItem(key: string): string | null {
+  get(key: string): string | null {
     return this.store.get(key) || null;
   }
 
-  setItem(key: string, value: string): void {
+  set(key: string, value: string): void {
     this.store.set(key, value);
   }
 
-  removeItem(key: string): void {
+  delete(key: string): void {
     this.store.delete(key);
   }
 
