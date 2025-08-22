@@ -85,8 +85,8 @@ export class BaseAppAccount implements Account {
     const privateKey = generatePrivateKey();
     
     // For smart wallets, we need to get the counterfactual address
-    const signerAddress = privateKeyToAccount(privateKey).address;
-    const spenderAddress = await getSmartWalletAddress(signerAddress, config.smartWallet);
+    // Pass the private key to get the exact smart wallet address
+    const spenderAddress = await getSmartWalletAddress(privateKey, config.smartWallet);
 
     // Create spend permission using wagmi's signTypedData
     const now = Math.floor(Date.now() / 1000);
