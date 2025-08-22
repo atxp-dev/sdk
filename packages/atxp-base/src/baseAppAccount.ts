@@ -7,7 +7,7 @@ import { getAddress, createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
-import { getSmartWalletAddress, toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
+import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { Logger } from '@atxp/common';
 
 const DEFAULT_ALLOWANCE = 10n;
@@ -48,7 +48,7 @@ export class BaseAppAccount implements Account {
     const storageKey = this.toStorageKey(userWalletAddress);
     
     // Try to load existing permission
-    const existingData = await this.loadSavedWalletAndPermission(storage, storageKey);
+    const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
     if (existingData) {
       const smartWallet = await toEphemeralSmartWallet(existingData.privateKey, config.apiKey);
       return new BaseAppAccount(baseRPCUrl, existingData.permission, existingData.privateKey, smartWallet, logger);
@@ -56,48 +56,34 @@ export class BaseAppAccount implements Account {
 
     // Create new wallet and permission
     const privateKey = generatePrivateKey();
+    const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
+    console.log('Generated intermediate wallet:', smartWallet.address);
     
     // Check USDC allowance before creating smart wallet
-    await this.checkAndRequestUSDCApproval(baseRPCUrl, userWalletAddress, walletClient);
+    // TODO: We probably need to keep this - it's stored on-chain, so doesn't wipe when we clear storage
+    //await this.checkAndRequestUSDCApproval(baseRPCUrl, userWalletAddress, walletClient);
 
     // Create spend permission
     const permission = await this.createSpendPermission(
-      baseRPCUrl,
       userWalletAddress,
       walletClient,
-      privateKey,
+      smartWallet.address,
       config
     );
 
     // Deploy smart wallet
-    await this.deploySmartWallet(privateKey, config.apiKey);
-
-    // Create smart wallet instance for payment maker
-    const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
+    //await this.deploySmartWallet(privateKey, config.apiKey);
 
     // Save wallet and permission
-    await this.saveWalletAndPermission(storage, storageKey, privateKey, permission);
+    storage.set(storageKey, {privateKey, permission});
 
     return new BaseAppAccount(baseRPCUrl, permission, privateKey, smartWallet);
   }
 
-  private static async saveWalletAndPermission(
-    permissionStorage: IntermediaryStorage,
-    storageKey: string,
-    privateKey: `0x${string}`,
-    permission: SpendPermission
-  ): Promise<void> {
-    permissionStorage.set(storageKey, {
-      privateKey,
-      permission,
-    });
-  }
-
-
-  private static async loadSavedWalletAndPermission(
+  private static loadSavedWalletAndPermission(
     permissionStorage: IntermediaryStorage,
     storageKey: string
-  ): Promise<Intermediary | null> {
+  ): Intermediary | null {
     const storedData = permissionStorage.get(storageKey);
     if (!storedData) return null;
     
@@ -176,10 +162,10 @@ export class BaseAppAccount implements Account {
   }
 
   private static async createSpendPermission(
-    baseRPCUrl: string,
     userWalletAddress: string,
     walletClient: WalletClient,
-    privateKey: `0x${string}`,
+    //privateKey: `0x${string}`,
+    spenderAddress: string,
     config: {
       appName: string;
       allowance?: bigint;
@@ -187,7 +173,7 @@ export class BaseAppAccount implements Account {
       apiKey: string;
     }
   ): Promise<SpendPermission> {
-    const spenderAddress = await getSmartWalletAddress(privateKey, config.apiKey);
+    //const spenderAddress = await getSmartWalletAddress(privateKey, config.apiKey);
 
     const now = Math.floor(Date.now() / 1000);
     const period = (config?.periodInDays ?? DEFAULT_PERIOD_IN_DAYS) * 24 * 60 * 60;
@@ -235,6 +221,8 @@ export class BaseAppAccount implements Account {
       primaryType: 'SpendPermission',
       message: permissionData,
     });
+
+    console.log(`Signed SpendPermission for ${userWalletAddress} with spender ${spenderAddress}`);
 
     return {
       signature,
