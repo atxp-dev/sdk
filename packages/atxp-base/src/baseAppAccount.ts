@@ -167,6 +167,9 @@ export class BaseAppAccount implements Account {
       // The paymaster will cover the deployment cost
       // We need at least one call - send 0 ETH to self as a no-op
       console.log('Sending deployment UserOperation...');
+      console.log('Bundler URL:', config.smartWallet.bundlerUrl || `https://api.developer.coinbase.com/rpc/v1/base/${config.smartWallet.apiKey}`);
+      console.log('Paymaster URL:', config.smartWallet.paymasterUrl || `https://api.developer.coinbase.com/rpc/v1/base/${config.smartWallet.apiKey}`);
+      
       const deployTx = await smartWallet.client.sendUserOperation({
         calls: [{
           to: smartWallet.address,
@@ -200,17 +203,18 @@ export class BaseAppAccount implements Account {
         // Check for specific AA13 error
         if (error.message.includes('AA13')) {
           console.error('\n⚠️  AA13 Error - Common causes:');
-          console.error('1. Paymaster not enabled in Coinbase Developer Platform');
-          console.error('2. Smart wallet factory contract not allowlisted in paymaster');
+          console.error('1. Paymaster configuration issues');
+          console.error('2. Paymaster spending limits exceeded');
           console.error('3. API key invalid or expired');
-          console.error('4. Paymaster spending limits exceeded');
-          console.error('\nTo fix:');
-          console.error('1. Go to https://portal.cdp.coinbase.com/');
-          console.error('2. Ensure paymaster is enabled for your API key');
-          console.error('3. Add these contracts to your paymaster allowlist:');
-          console.error('   - Coinbase Smart Wallet Factory: 0x0BA5ED0c6AA8c49038F819E587E2633c4A9F428a');
-          console.error('   - USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
-          console.error('   - Spend Permission Manager: 0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
+          console.error('4. Issue with EntryPoint contract version mismatch');
+          console.error('\nTo debug:');
+          console.error('1. Double-check your paymaster settings at https://portal.cdp.coinbase.com/');
+          console.error('   - Is "Allow any contract" actually enabled?');
+          console.error('   - Are there any spending limits that might be exceeded?');
+          console.error('   - Is the paymaster balance sufficient?');
+          console.error('2. Check if your API key is for the correct environment (mainnet vs testnet)');
+          console.error('3. Factory contract verified to exist at: 0x91E60e0613810449d098b0b5Ec8b51A0FE8c8985');
+          console.error('4. Try increasing gas limits if the issue persists');
 
         }
       }
