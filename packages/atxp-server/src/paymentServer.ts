@@ -1,4 +1,4 @@
-import { PaymentServer, ChargeResponse } from "./types.js";
+import { PaymentServer, ChargeResponse, Charge } from "./types.js";
 import { Network, Currency, AuthorizationServerUrl, FetchLike, Logger, PaymentRequestData } from "@atxp/common";
 import BigNumber from "bignumber.js";
 
@@ -50,10 +50,8 @@ export class ATXPPaymentServer implements PaymentServer {
     }
   }
 
-  createPaymentRequest = async({source, destination, network, currency, amount}: 
-    {source: string, destination: string, network: Network, currency: Currency, amount: BigNumber}): Promise<string> => {
-    const body = {source, destination, network, currency, amount};
-    const response = await this.makeRequest('POST', '/payment-request', body);
+  createPaymentRequest = async(charge: Charge): Promise<string> => {
+    const response = await this.makeRequest('POST', '/payment-request', charge);
     const json = await response.json() as {id?: string};
     if (response.status !== 200) {
       this.logger.warn(`POST /payment-request responded with unexpected HTTP status ${response.status}`);

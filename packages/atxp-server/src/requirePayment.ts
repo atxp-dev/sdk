@@ -17,7 +17,8 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     currency: config.currency, 
     network: config.network, 
     destination: config.destination, 
-    source: user
+    source: user,
+    payeeName: config.payeeName,
   };
 
   config.logger.debug(`Charging amount ${charge.amount}, destination ${charge.destination}, source ${charge.source}`);

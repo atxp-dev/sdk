@@ -25,6 +25,7 @@ describe('requirePayment', () => {
         network: config.network,
         destination: config.destination,
         source: 'test-user',
+        payeeName: config.payeeName,
       });
     });
   });
@@ -54,7 +55,8 @@ describe('requirePayment', () => {
           currency: config.currency,
           network: config.network,
           destination: config.destination,
-          source: 'test-user'
+          source: 'test-user',
+          payeeName: config.payeeName,
         });
       }
     });
