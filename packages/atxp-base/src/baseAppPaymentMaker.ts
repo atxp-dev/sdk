@@ -1,7 +1,7 @@
 import { BasePaymentMaker } from '@atxp/client';
 import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { encodeFunctionData, getAddress } from 'viem';
+import { encodeFunctionData, getAddress, Account } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 
@@ -12,21 +12,21 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
   constructor(
     baseRPCUrl: string, 
     spendPermission: SpendPermission, 
-    privateKey: `0x${string}`, 
+    account: Account,
     smartWallet: EphemeralSmartWallet,
     logger?: Logger
   ) {
     if (!spendPermission) {
       throw new Error('Spend permission is required');
     }
-    super(baseRPCUrl, privateKey, logger);
+    super(baseRPCUrl, account, logger);
     this.spendPermission = spendPermission;
     this.smartWallet = smartWallet;
   }
 
 
   // override makePayment to use spend permissions
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
+  /*async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
     this.validatePaymentRequest(currency);
     
     const amountBigInt = this.convertAmountToBigInt(amount);
@@ -231,5 +231,5 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
         smartWallet: this.smartWallet.address
       });
     }
-  }
+  }*/
 }

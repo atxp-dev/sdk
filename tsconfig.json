@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2020", 
+    "target": "ES2022", 
     "module": "ESNext",
-    "lib": ["ES2020", "DOM"],
+    "lib": ["ES2022", "DOM"],
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
@@ -11,7 +11,11 @@
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
     "declaration": false,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": false,
+    "noEmit": false,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false
   },
   "include": ["src/dev/**/*.ts"],
   "exclude": ["node_modules", "dist", "examples", "packages"] 
