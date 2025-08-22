@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { SpendPermission } from './types.js';
-import { SmartWalletConfig } from './smartWalletHelpers.js';
 
 const FAKE_PERMISSION: SpendPermission = {
   signature: '0x123',
@@ -19,17 +18,13 @@ const FAKE_PERMISSION: SpendPermission = {
   }
 };
 
-const FAKE_SMART_WALLET_CONFIG: SmartWalletConfig = {
-  apiKey: 'test-api-key',
-  paymasterUrl: 'https://test-paymaster.com',
-  bundlerUrl: 'https://test-bundler.com'
-};
+const FAKE_API_KEY = 'test-api-key';
 
 describe('basePaymentMaker.generateJWT', () => {
   it('should generate a valid JWT with default payload', async () => {
     const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
-    const paymentMaker = new BaseAppPaymentMaker('https://example.com', FAKE_PERMISSION, privateKey, FAKE_SMART_WALLET_CONFIG);
+    const paymentMaker = new BaseAppPaymentMaker('https://example.com', FAKE_PERMISSION, privateKey, FAKE_API_KEY);
     const jwt = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: 'testCodeChallenge'});
 
     // JWT format: header.payload.signature (all base64url)
@@ -69,7 +64,7 @@ describe('basePaymentMaker.generateJWT', () => {
 
   it('should include payment request id if provided', async () => {
     const privateKey = generatePrivateKey();
-    const paymentMaker = new BaseAppPaymentMaker('https://example.com', FAKE_PERMISSION, privateKey, FAKE_SMART_WALLET_CONFIG);
+    const paymentMaker = new BaseAppPaymentMaker('https://example.com', FAKE_PERMISSION, privateKey, FAKE_API_KEY);
     const paymentRequestId = 'id1';
     const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
     const [, payloadB64] = jwt.split('.');

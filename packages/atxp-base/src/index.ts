@@ -3,9 +3,8 @@ export { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 export type { SpendPermission } from './types.js';
 export { 
   type IStorage,
-  type StoredPermissionData,
-  PermissionStorage,
+  type Intermediary as StoredPermissionData,
+  IntermediaryStorage as PermissionStorage,
   BrowserStorage,
   MemoryStorage 
 } from './storage.js';
-export type { SmartWalletConfig } from './smartWalletHelpers.js';
