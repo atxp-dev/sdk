@@ -30,6 +30,7 @@ export type PaymentRequestData = {
   source: string;
   resource: URL;
   resourceName: string;
+  payeeName?: string | null;
   iss: string;
 }
 
