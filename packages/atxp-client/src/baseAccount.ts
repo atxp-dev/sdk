@@ -18,7 +18,7 @@ export class BaseAccount implements Account {
 
     this.accountId = account.address;
     this.paymentMakers = {
-      'base': new BasePaymentMaker(baseRPCUrl, sourceSecretKey),
+      'base': BasePaymentMaker.fromSecretKey(baseRPCUrl, sourceSecretKey),
     }
   }
 }
