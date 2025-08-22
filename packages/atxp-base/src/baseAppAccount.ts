@@ -175,7 +175,8 @@ export class BaseAppAccount implements Account {
           to: smartWallet.address,
           value: 0n,
           data: '0x' as `0x${string}`
-        }]
+        }],
+        paymaster: true
       });
       
       console.log('Smart wallet deployment UserOperation sent:', deployTx);
@@ -213,7 +214,7 @@ export class BaseAppAccount implements Account {
           console.error('   - Are there any spending limits that might be exceeded?');
           console.error('   - Is the paymaster balance sufficient?');
           console.error('2. Check if your API key is for the correct environment (mainnet vs testnet)');
-          console.error('3. Factory contract verified to exist at: 0x91E60e0613810449d098b0b5Ec8b51A0FE8c8985');
+          console.error('3. Using Coinbase Smart Wallet Factory');
           console.error('4. Try increasing gas limits if the issue persists');
 
         }

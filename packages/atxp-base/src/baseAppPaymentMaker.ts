@@ -144,20 +144,21 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     });
 
     // Send UserOperation with both calls
-    const userOpHash = await this.smartWallet.client.sendUserOperation({
-      calls: [
-        {
-          to: SPEND_PERMISSION_MANAGER,
-          data: spendPermissionCalldata,
-          value: 0n
-        },
-        {
-          to: USDC_CONTRACT,
-          data: usdcTransferCalldata,
-          value: 0n
-        }
-      ]
-    });
+          const userOpHash = await this.smartWallet.client.sendUserOperation({
+        calls: [
+          {
+            to: SPEND_PERMISSION_MANAGER,
+            data: spendPermissionCalldata,
+            value: 0n
+          },
+          {
+            to: USDC_CONTRACT,
+            data: usdcTransferCalldata,
+            value: 0n
+          }
+        ],
+        paymaster: true
+      });
 
     this.logger.info(`Smart wallet UserOperation sent: ${userOpHash}`);
 

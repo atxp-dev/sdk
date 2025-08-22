@@ -26,7 +26,7 @@
     "@atxp/client": "0.2.10",
     "@atxp/common": "0.2.10",
     "bignumber.js": "^9.3.0",
-    "permissionless": "^0.2.54",
+
     "viem": "^2.34.0"
   },
   "devDependencies": {
