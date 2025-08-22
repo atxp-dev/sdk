@@ -57,6 +57,25 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     // USDC contract on Base mainnet
     const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
     
+    // Debug: Log spend permission details
+    const now = Math.floor(Date.now() / 1000);
+    console.log('Spend permission details:', {
+      account: this.spendPermission.permission.account,
+      spender: this.spendPermission.permission.spender,
+      token: this.spendPermission.permission.token,
+      allowance: this.spendPermission.permission.allowance,
+      amount: amountBigInt.toString(),
+      receiver,
+      smartWallet: this.smartWallet?.address,
+      currentTime: now,
+      start: this.spendPermission.permission.start,
+      end: this.spendPermission.permission.end,
+      isValid: now >= Number(this.spendPermission.permission.start) && now <= Number(this.spendPermission.permission.end),
+      salt: this.spendPermission.permission.salt,
+      extraData: this.spendPermission.permission.extraData,
+      signature: this.spendPermission.signature
+    });
+    
     // Encode the spend permission call
     const spendPermissionCalldata = encodeFunctionData({
       abi: [{
@@ -124,8 +143,9 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
       this.logger.info(`Smart wallet is deployed at ${this.smartWallet.address}`);
     }
 
-    // For smart wallets, batch the spend permission execution and USDC transfer
-    // in a single UserOperation to save gas
+        // For smart wallets, we need to execute the spend permission
+    // The SpendPermissionManager will transfer USDC from user to smart wallet
+    // Then we need to forward it to the final receiver
     const USDC_ABI = [{
       inputs: [
         { name: 'to', type: 'address' },
@@ -143,8 +163,9 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
       args: [receiver as `0x${string}`, amountBigInt]
     });
 
-    // Send UserOperation with both calls
-          const userOpHash = await this.smartWallet.client.sendUserOperation({
+    // Send UserOperation with both calls in sequence
+    try {
+      const userOpHash = await this.smartWallet.client.sendUserOperation({
         calls: [
           {
             to: SPEND_PERMISSION_MANAGER,
@@ -160,18 +181,39 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
         paymaster: true
       });
 
-    this.logger.info(`Smart wallet UserOperation sent: ${userOpHash}`);
+      this.logger.info(`Smart wallet UserOperation sent: ${userOpHash}`);
 
-    // Wait for the UserOperation to be included
-    const receipt = await this.smartWallet.client.waitForUserOperationReceipt({
-      hash: userOpHash
-    });
+      // Wait for the UserOperation to be included
+      const receipt = await this.smartWallet.client.waitForUserOperationReceipt({
+        hash: userOpHash
+      });
 
-    if (!receipt.success) {
-      throw new Error(`UserOperation failed: ${userOpHash}`);
+      if (!receipt.success) {
+        throw new Error(`UserOperation failed: ${userOpHash}`);
+      }
+
+      this.logger.info(`UserOperation confirmed: ${userOpHash}`);
+      return receipt.receipt.transactionHash;
+    } catch (error) {
+      console.error('UserOperation failed:', error);
+      
+      // Try to decode the specific error
+      if (error instanceof Error && error.message.includes('execution reverted')) {
+        console.error('The transaction reverted. Possible reasons:');
+        console.error('1. The SpendPermissionManager rejected the spend permission');
+        console.error('2. The permission signature might be invalid');
+        console.error('3. The permission might have already been used (check salt)');
+        console.error('4. The smart wallet might not be the correct spender');
+        
+        // Log the permission details again for debugging
+        console.error('Permission was:', {
+          account: this.spendPermission.permission.account,
+          spender: this.spendPermission.permission.spender,
+          smartWallet: this.smartWallet?.address
+        });
+      }
+      
+      throw error;
     }
-
-    this.logger.info(`UserOperation confirmed: ${userOpHash}`);
-    return receipt.receipt.transactionHash;
   }
 }
