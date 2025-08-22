@@ -7,7 +7,7 @@ import { getAddress } from 'viem';
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, PermissionStorage } from './storage.js';
-import { getSmartWalletAddress, type SmartWalletConfig } from './smartWalletHelpers.js';
+import { getSmartWalletAddress, createEphemeralSmartWallet, type SmartWalletConfig } from './smartWalletHelpers.js';
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
@@ -28,6 +28,14 @@ export class BaseAppAccount implements Account {
       smartWallet: SmartWalletConfig;
     }
   ): Promise<BaseAppAccount> {
+    // Validate smart wallet configuration
+    if (!config.smartWallet?.apiKey) {
+      throw new Error(
+        'Smart wallet API key is required. ' +
+        'Get your API key from https://portal.cdp.coinbase.com/'
+      );
+    }
+    
     // Initialize storage with type-safe wrapper
     const baseStorage = config?.storage || new BrowserStorage();
     const permissionStorage = new PermissionStorage(baseStorage);
@@ -41,11 +49,28 @@ export class BaseAppAccount implements Account {
       const permissionEnd = parseInt(storedData.permission.permission.end.toString());
       if (permissionEnd > now) {
         try {
-          // Attempt to create account with stored permission
-          return new BaseAppAccount(baseRPCUrl, storedData.permission, storedData.privateKey, config.smartWallet);
-        } catch {
+          // IMPORTANT: Check if this is a smart wallet permission
+          // In the old EOA approach, the spender was just the ephemeral private key's address
+          // In the smart wallet approach, the spender should be a smart wallet address
+          const ephemeralEOA = privateKeyToAccount(storedData.privateKey).address;
+          const expectedSmartWallet = await getSmartWalletAddress(ephemeralEOA, config.smartWallet);
+          
+          if (storedData.permission.permission.spender.toLowerCase() === ephemeralEOA.toLowerCase()) {
+            // This is an old EOA permission, invalidate it
+            console.warn('Found legacy EOA spend permission, clearing it to use smart wallets');
+            permissionStorage.removePermission(storageKey);
+          } else if (storedData.permission.permission.spender.toLowerCase() === expectedSmartWallet.toLowerCase()) {
+            // This is a valid smart wallet permission
+            return new BaseAppAccount(baseRPCUrl, storedData.permission, storedData.privateKey, config.smartWallet);
+          } else {
+            // Unknown spender format, clear it to be safe
+            console.warn('Found spend permission with unexpected spender address, clearing it');
+            permissionStorage.removePermission(storageKey);
+          }
+        } catch (error) {
           // Failed to initialize with stored permission, will request new one
           // Permission might be invalid, remove it
+          console.error('Failed to validate stored permission:', error);
           permissionStorage.removePermission(storageKey);
         }
       } else {
@@ -73,7 +98,7 @@ export class BaseAppAccount implements Account {
       name: 'SpendPermissionManager',
       version: '1',
       chainId: base.id,
-      verifyingContract: getAddress('0x4b22970FBf7Bb7F3FBe4fD8D68b53e5d497c6E4D'), // SpendPermissionManager on Base
+      verifyingContract: getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad'), // SpendPermissionManager on Base
     };
 
     const types = {
@@ -131,6 +156,70 @@ export class BaseAppAccount implements Account {
       permission,
     });
 
+    // Deploy the smart wallet immediately after creating the spend permission
+    // This ensures the smart wallet exists before any spend permission execution
+    console.log('Deploying smart wallet to enable spend permissions...');
+    try {
+      const smartWallet = await createEphemeralSmartWallet(privateKey, config.smartWallet);
+      console.log('Smart wallet created at address:', smartWallet.address);
+      
+      // Send a deployment transaction with a dummy call
+      // The paymaster will cover the deployment cost
+      // We need at least one call - send 0 ETH to self as a no-op
+      console.log('Sending deployment UserOperation...');
+      const deployTx = await smartWallet.client.sendUserOperation({
+        calls: [{
+          to: smartWallet.address,
+          value: 0n,
+          data: '0x' as `0x${string}`
+        }]
+      });
+      
+      console.log('Smart wallet deployment UserOperation sent:', deployTx);
+      
+      // Wait for deployment
+      const receipt = await smartWallet.client.waitForUserOperationReceipt({
+        hash: deployTx
+      });
+      
+      if (receipt.success) {
+        console.log('✅ Smart wallet deployed successfully at:', smartWallet.address);
+        console.log('Transaction hash:', receipt.receipt.transactionHash);
+      } else {
+        console.error('❌ Smart wallet deployment failed:', receipt);
+        throw new Error(
+          `Smart wallet deployment failed. Receipt: ${JSON.stringify(receipt)}`
+        );
+      }
+    } catch (error) {
+      console.error('❌ Failed to deploy smart wallet:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
+        // Check for specific AA13 error
+        if (error.message.includes('AA13')) {
+          console.error('\n⚠️  AA13 Error - Common causes:');
+          console.error('1. Paymaster not enabled in Coinbase Developer Platform');
+          console.error('2. Smart wallet factory contract not allowlisted in paymaster');
+          console.error('3. API key invalid or expired');
+          console.error('4. Paymaster spending limits exceeded');
+          console.error('\nTo fix:');
+          console.error('1. Go to https://portal.cdp.coinbase.com/');
+          console.error('2. Ensure paymaster is enabled for your API key');
+          console.error('3. Add these contracts to your paymaster allowlist:');
+          console.error('   - Coinbase Smart Wallet Factory: 0x0BA5ED0c6AA8c49038F819E587E2633c4A9F428a');
+          console.error('   - USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
+          console.error('   - Spend Permission Manager: 0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
+
+        }
+      }
+      throw new Error(
+        `Failed to deploy smart wallet. This is required for spend permissions to work. ` +
+        `Original error: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
     // construct account with the permission
     return new BaseAppAccount(baseRPCUrl, permission, privateKey, config.smartWallet);
   }
@@ -155,5 +244,53 @@ export class BaseAppAccount implements Account {
     this.paymentMakers = {
       'base': new BaseAppPaymentMaker(baseRPCUrl, spendPermission, privateKey, smartWalletConfig),
     }
+  }
+
+  /**
+   * Clear stored spend permission and ephemeral wallet data for a specific wallet
+   * @param userWalletAddress The user's wallet address
+   * @param storage Optional storage implementation (defaults to browser localStorage)
+   */
+  static clearStoredPermission(
+    userWalletAddress: string,
+    storage?: IStorage<string>
+  ): void {
+    const baseStorage = storage || new BrowserStorage();
+    const permissionStorage = new PermissionStorage(baseStorage);
+    const storageKey = `atxp-base-permission-${userWalletAddress}`;
+    
+    permissionStorage.removePermission(storageKey);
+    console.log(`Cleared spend permission for wallet ${userWalletAddress}`);
+  }
+
+  /**
+   * Clear all ATXP-related data from storage
+   * This includes spend permissions and any OAuth tokens
+   * @param storage Optional storage implementation (defaults to browser localStorage)
+   */
+  static clearAllStoredData(storage?: IStorage<string>): void {
+    if (typeof window === 'undefined') {
+      console.warn('clearAllStoredData is only available in browser environments');
+      return;
+    }
+
+    const keysToRemove: string[] = [];
+    
+    // Find all ATXP-related keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('atxp') || key.startsWith('0x'))) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    // Remove identified keys
+    console.log(`Clearing ${keysToRemove.length} ATXP-related storage keys`);
+    keysToRemove.forEach(key => {
+      console.log('Removing:', key);
+      localStorage.removeItem(key);
+    });
+    
+    console.log('All ATXP-related data cleared from storage');
   }
 }

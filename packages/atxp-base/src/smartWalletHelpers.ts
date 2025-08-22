@@ -60,6 +60,9 @@ export async function createEphemeralSmartWallet(
     },
   });
   
+  // Log the smart wallet address
+  console.log('Smart wallet address:', simpleAccount.address);
+  
   // Create pimlico client for paymaster
   const pimlicoClient = createPimlicoClient({
     transport: http(config.paymasterUrl || `${COINBASE_PAYMASTER_URL}/${config.apiKey}`),

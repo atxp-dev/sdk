@@ -1,7 +1,8 @@
 import { BasePaymentMaker } from '@atxp/client';
 import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { encodeFunctionData, getAddress} from 'viem';
+import { encodeFunctionData, getAddress, createPublicClient, http } from 'viem';
+import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { createEphemeralSmartWallet, type SmartWalletConfig, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 
@@ -10,6 +11,7 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
   private smartWallet?: EphemeralSmartWallet;
   private smartWalletConfig: SmartWalletConfig;
   private privateKey: `0x${string}`;
+  private baseRPCUrl: string;
 
   constructor(baseRPCUrl: string, spendPermission: SpendPermission, privateKey: `0x${string}`, smartWalletConfig: SmartWalletConfig, logger?: Logger) {
     if (!spendPermission) {
@@ -22,6 +24,7 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     this.spendPermission = spendPermission;
     this.smartWalletConfig = smartWalletConfig;
     this.privateKey = privateKey;
+    this.baseRPCUrl = baseRPCUrl;
   }
 
   // Initialize smart wallet if needed
@@ -49,7 +52,7 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     const amountBigInt = BigInt(amountInMicroUsdc.toFixed(0));
     
     // SpendPermissionManager contract on Base mainnet
-    const SPEND_PERMISSION_MANAGER = getAddress('0x4b22970FBf7Bb7F3FBe4fD8D68b53e5d497c6E4D');
+    const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
     
     // USDC contract on Base mainnet
     const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
@@ -99,6 +102,26 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     await this.ensureSmartWallet();
     if (!this.smartWallet) {
       throw new Error('Failed to initialize smart wallet');
+    }
+
+    // The smart wallet should already be deployed during BaseAppAccount initialization
+    // If it's not deployed, log a warning but proceed - the paymaster might handle it
+    const publicClient = createPublicClient({
+      chain: base,
+      transport: http(this.baseRPCUrl)
+    });
+    
+    const smartWalletCode = await publicClient.getCode({ 
+      address: this.smartWallet.address 
+    });
+    
+    const isDeployed = smartWalletCode !== '0x' && smartWalletCode !== undefined;
+    
+    if (!isDeployed) {
+      this.logger.warn(`Smart wallet not deployed at ${this.smartWallet.address}. It should have been deployed during initialization.`);
+      this.logger.warn(`The transaction may still succeed if the paymaster handles deployment.`);
+    } else {
+      this.logger.info(`Smart wallet is deployed at ${this.smartWallet.address}`);
     }
 
     // For smart wallets, batch the spend permission execution and USDC transfer
