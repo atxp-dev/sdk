@@ -201,11 +201,14 @@ export class BaseAppAccount implements Account {
     console.log('Received signature:', signature);
     console.log('Signature length:', signature.length);
     
-    // Check if this is a smart wallet signature (very long with encoded data)
+    // MiniKit returns smart wallet signatures with WebAuthn data
+    // We'll try to use them as-is and see if the contract can handle them
     if (signature.length > 150) {
-      console.warn('WARNING: Received what appears to be a smart wallet signature');
-      console.warn('SpendPermissionManager expects a regular EOA signature');
-      console.warn('This will likely cause the transaction to revert');
+      console.log('Smart wallet signature detected - attempting to use with SpendPermissionManager');
+      console.log('Signature format analysis:');
+      console.log('- Length:', signature.length);
+      console.log('- Starts with 0x:', signature.startsWith('0x'));
+      console.log('- Contains webauthn data:', signature.includes('webauthn'));
     }
 
     const permission: SpendPermission = {

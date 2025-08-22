@@ -197,6 +197,28 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     } catch (error) {
       console.error('UserOperation failed:', error);
       
+      // Add detailed debugging for spend permission errors
+      if (error instanceof Error && error.message.includes('Execution reverted')) {
+        console.error('=== SPEND PERMISSION DEBUGGING ===');
+        console.error('Spend permission details:');
+        console.error('- Account:', this.spendPermission.permission.account);
+        console.error('- Spender:', this.spendPermission.permission.spender);
+        console.error('- Token:', this.spendPermission.permission.token);
+        console.error('- Allowance:', this.spendPermission.permission.allowance);
+        console.error('- Amount:', amountBigInt.toString());
+        console.error('- Receiver:', receiver);
+        console.error('- Smart Wallet:', this.smartWallet?.address);
+        console.error('- Current Time:', Math.floor(Date.now() / 1000));
+        console.error('- Start:', Number(this.spendPermission.permission.start));
+        console.error('- End:', Number(this.spendPermission.permission.end));
+        console.error('- Is Valid:', Number(this.spendPermission.permission.start) <= Math.floor(Date.now() / 1000) && Math.floor(Date.now() / 1000) <= Number(this.spendPermission.permission.end));
+        console.error('- Salt:', this.spendPermission.permission.salt);
+        console.error('- Extra Data:', this.spendPermission.permission.extraData);
+        console.error('- Signature Length:', this.spendPermission.signature.length);
+        console.error('- Signature Preview:', this.spendPermission.signature.substring(0, 100) + '...');
+        console.error('=== END DEBUGGING ===');
+      }
+      
       // Try to decode the specific error
       if (error instanceof Error && error.message.includes('execution reverted')) {
         console.error('The transaction reverted. Possible reasons:');
