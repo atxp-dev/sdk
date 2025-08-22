@@ -11,6 +11,7 @@ import {
   encodeFunctionData,
   WalletClient,
   PublicActions,
+  Account,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
@@ -65,18 +66,23 @@ const ERC20_ABI = [
 
 export class BasePaymentMaker implements PaymentMaker {
   protected signingClient: ExtendedWalletClient;
-  protected account: ReturnType<typeof privateKeyToAccount>;
+  protected account: Account;
   protected logger: Logger;
 
-  constructor(baseRPCUrl: string, sourceSecretKey: Hex, logger?: Logger) {
+  static fromSecretKey(baseRPCUrl: string, sourceSecretKey: Hex, logger?: Logger): BasePaymentMaker {
+    const account = privateKeyToAccount(sourceSecretKey);
+    return new BasePaymentMaker(baseRPCUrl, account, logger);
+  }
+
+  constructor(baseRPCUrl: string, account: Account, logger?: Logger) {
     if (!baseRPCUrl) {
       throw new Error('Base RPC URL is required');
     }
-    if (!sourceSecretKey) {
-      throw new Error('Source secret key is required');
+    if (!account) {
+      throw new Error('Account is required');
     }
 
-    this.account = privateKeyToAccount(sourceSecretKey);
+    this.account = account;
     this.signingClient = createWalletClient({
       account: this.account,
       chain: base,
