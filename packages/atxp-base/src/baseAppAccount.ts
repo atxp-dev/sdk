@@ -42,6 +42,7 @@ export class BaseAppAccount implements Account {
       );
     }
     
+    /*
     // Initialize storage
     const baseStorage = config?.storage || new BrowserStorage();
     const storage = new IntermediaryStorage(baseStorage);
@@ -77,15 +78,20 @@ export class BaseAppAccount implements Account {
     // Save wallet and permission
     storage.set(storageKey, {privateKey, permission});
 
+    */
+
     // TODO: TEMPORARY HACK- USE MAIN ACCOUNT TO PAY
     //const account = privateKeyToAccount(privateKey);
     const account = walletClient.account;
     if (!account) {
       throw new Error('Account is required');
     }
-    return new BaseAppAccount(baseRPCUrl, permission, account, smartWallet);
+    console.log('walletClient:', walletClient);
+    //return new BaseAppAccount(baseRPCUrl, permission, account, smartWallet, logger);
+    return new BaseAppAccount(baseRPCUrl, walletClient, logger);
   }
 
+  /*
   private static loadSavedWalletAndPermission(
     permissionStorage: IntermediaryStorage,
     storageKey: string
@@ -297,6 +303,26 @@ export class BaseAppAccount implements Account {
 
     this.paymentMakers = {
       'base': new BaseAppPaymentMaker(baseRPCUrl, spendPermission, account, smartWallet, logger),
+    }
+  }*/
+
+  constructor(
+    baseRPCUrl: string, 
+    //account: ViemAccount, 
+    walletClient: WalletClient,
+    logger?: Logger
+  ) {
+    if (!baseRPCUrl) {
+      throw new Error('Base RPC URL is required');
+    }
+    if (!walletClient) {
+      throw new Error('Wallet client is required');
+    }
+
+    this.accountId = walletClient!.account!.address;
+
+    this.paymentMakers = {
+      'base': new BaseAppPaymentMaker(baseRPCUrl, walletClient, logger),
     }
   }
 

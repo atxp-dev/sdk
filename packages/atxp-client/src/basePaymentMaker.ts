@@ -66,35 +66,39 @@ const ERC20_ABI = [
 
 export class BasePaymentMaker implements PaymentMaker {
   protected signingClient: ExtendedWalletClient;
-  protected account: Account;
+  //protected account: Account;
   protected logger: Logger;
 
+  /*
   static fromSecretKey(baseRPCUrl: string, sourceSecretKey: Hex, logger?: Logger): BasePaymentMaker {
     const account = privateKeyToAccount(sourceSecretKey);
     return new BasePaymentMaker(baseRPCUrl, account, logger);
-  }
+  }*/
 
-  constructor(baseRPCUrl: string, account: Account, logger?: Logger) {
+  constructor(baseRPCUrl: string, walletClient: WalletClient, logger?: Logger) {
     if (!baseRPCUrl) {
-      throw new Error('Base RPC URL is required');
+      throw new Error('baseRPCUrl was empty');
     }
-    if (!account) {
-      throw new Error('Account is required');
+    if (!walletClient) {
+      throw new Error('walletClient was empty');
+    }
+    if(!walletClient.account) {
+      throw new Error('walletClient.account was empty');
     }
 
-    this.account = account;
-    this.signingClient = createWalletClient({
-      account: this.account,
-      chain: base,
-      transport: http(baseRPCUrl),
-    }).extend(publicActions) as ExtendedWalletClient;
+    this.signingClient = walletClient.extend(publicActions) as ExtendedWalletClient;
+    //this.publicClient = createWalletClient({
+      //account: this.account,
+      //chain: base,
+      //transport: http(baseRPCUrl),
+    //}).extend(publicActions) as ExtendedWalletClient;
     this.logger = logger ?? new ConsoleLogger();
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
     const headerObj = { alg: 'ES256K' }; // this value is specific to Base
     const payloadObj = {
-      sub: this.account.address,
+      sub: this.signingClient.account!.address,
       iss: 'accounts.atxp.ai',
       aud: 'https://auth.atxp.ai',
       iat: Math.floor(Date.now() / 1000),
@@ -112,16 +116,23 @@ export class BasePaymentMaker implements PaymentMaker {
       ? Buffer.from(message, 'utf8')
       : new TextEncoder().encode(message);
     const signResult = await this.signingClient.signMessage({
-      account: this.account,
+      account: this.signingClient.account!,
       message: { raw: messageBytes },
     });
+    console.log('signResult:', signResult);
     
     // The paymcp server expects ES256K signatures as hex strings with 0x prefix
     // The signResult from viem is already in hex format with 0x prefix (65 bytes)
     // We encode the hex string itself (including 0x) as base64url
     const signature = toBase64Url(signResult);
 
-    return `${header}.${payload}.${signature}`;
+    const jwt = `${header}.${payload}.${signature}`;
+    console.log('Preparing JWT for auth server...');
+    console.log('sub:', this.signingClient.account!.address);
+    console.log('code_challenge:', codeChallenge);
+    console.log('payment_request_id:', paymentRequestId);
+    console.log('jwt:', jwt);
+    return jwt;
   }
 
   async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
@@ -129,7 +140,7 @@ export class BasePaymentMaker implements PaymentMaker {
       throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
     }
 
-    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base`);
+    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base from ${this.signingClient.account!.address}`);
 
     try {
       // Check balance before attempting payment
@@ -137,7 +148,7 @@ export class BasePaymentMaker implements PaymentMaker {
         address: USDC_CONTRACT_ADDRESS_BASE as Address,
         abi: ERC20_ABI,
         functionName: 'balanceOf',
-        args: [this.account.address],
+        args: [this.signingClient.account!.address],
       }) as bigint;
       
       const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** USDC_DECIMALS);
@@ -157,7 +168,7 @@ export class BasePaymentMaker implements PaymentMaker {
       });
       const hash = await this.signingClient.sendTransaction({
         chain: base,
-        account: this.account,
+        account: this.signingClient.account!,
         to: USDC_CONTRACT_ADDRESS_BASE,
         data: data,
         value: parseEther('0'),
