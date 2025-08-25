@@ -224,15 +224,25 @@ export class BasePaymentMaker implements PaymentMaker {
       const timestamp = Math.floor(Date.now() / 1000);
       const nonce = Math.random().toString(36).substring(2, 15);
       
-      const message = `PayMCP Authorization Request
-
-Wallet: ${this.signingClient.account!.address}
-Timestamp: ${timestamp}
-Nonce: ${nonce}
-${codeChallenge ? `Code Challenge: ${codeChallenge}` : ''}
-${paymentRequestId ? `Payment Request ID: ${paymentRequestId}` : ''}
-
-Sign this message to prove you control this wallet.`;
+      const messageParts = [
+        'PayMCP Authorization Request',
+        '',
+        `Wallet: ${this.signingClient.account!.address}`,
+        `Timestamp: ${timestamp}`,
+        `Nonce: ${nonce}`
+      ];
+      
+      if (codeChallenge) {
+        messageParts.push(`Code Challenge: ${codeChallenge}`);
+      }
+      
+      if (paymentRequestId) {
+        messageParts.push(`Payment Request ID: ${paymentRequestId}`);
+      }
+      
+      messageParts.push('', '', 'Sign this message to prove you control this wallet.');
+      
+      const message = messageParts.join('\n');
 
       console.log('Message to sign:', message);
 
