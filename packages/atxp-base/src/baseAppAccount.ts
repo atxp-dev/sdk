@@ -7,7 +7,7 @@ import { getAddress, createPublicClient, http, Account as ViemAccount } from 'vi
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
-import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
+// import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { Logger } from '@atxp/common';
 
 const DEFAULT_ALLOWANCE = 10n;

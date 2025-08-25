@@ -22,11 +22,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@account-abstraction/contracts": "^0.8.0",
     "@atxp/client": "0.2.10",
     "@atxp/common": "0.2.10",
     "bignumber.js": "^9.3.0",
-
     "viem": "^2.34.0"
   },
   "devDependencies": {

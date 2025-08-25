@@ -3,7 +3,7 @@ import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { encodeFunctionData, getAddress, Account, WalletClient } from 'viem';
 import { SpendPermission } from './types.js';
-import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
+// import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 
 export class BaseAppPaymentMaker extends BasePaymentMaker {
   //private spendPermission: SpendPermission;
