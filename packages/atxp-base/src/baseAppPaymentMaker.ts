@@ -4,13 +4,17 @@ import { BigNumber } from 'bignumber.js';
 import { encodeFunctionData, /*getAddress, Account,*/ WalletClient } from 'viem';
 //import { SpendPermission } from './types.js';
 import { validatePaymasterCapabilities } from './paymasterHelpers.js';
+import { encodeFunctionData, getAddress, Account, WalletClient } from 'viem';
+import { SpendPermission } from './types.js';
+import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 
 export class BaseAppPaymentMaker extends BasePaymentMaker {
   constructor(
     baseRPCUrl: string, 
-    //spendPermission: SpendPermission, 
+    spendPermission: SpendPermission, 
     //account: Account,
     walletClient: WalletClient,
+    smartWallet: EphemeralSmartWallet,
     logger?: Logger
   ) {
     //if (!spendPermission) {

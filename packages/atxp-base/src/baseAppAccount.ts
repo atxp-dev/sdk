@@ -57,9 +57,10 @@ export class BaseAppAccount implements Account {
     // Try to load existing permission
     const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
     if (existingData) {
-      const smartWallet = await toEphemeralSmartWallet(existingData.privateKey, config.apiKey);
-      const account = privateKeyToAccount(existingData.privateKey);
-      return new BaseAppAccount(baseRPCUrl, existingData.permission, account, smartWallet, logger);
+      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey, config.apiKey);
+      //const account = privateKeyToAccount(existingData.privateKey);
+      // The constructor now expects a WalletClient, not individual parameters
+      return new BaseAppAccount(baseRPCUrl, existingData.permission, ephemeralSmartWallet, logger);
     }
 
     const sdk = createBaseAccountSDK({
@@ -101,7 +102,7 @@ export class BaseAppAccount implements Account {
     }
     
     return new BaseAppAccount(baseRPCUrl, walletClient, config.apiKey, logger);
-    return new BaseAppAccount(baseRPCUrl, smartWallet.account, logger);
+    return new BaseAppAccount(baseRPCUrl, permission, smartWallet, logger);
   }
 
   private static loadSavedWalletAndPermission(
@@ -323,21 +324,24 @@ export class BaseAppAccount implements Account {
   constructor(
     baseRPCUrl: string, 
     //account: ViemAccount, 
-    walletClient: WalletClient,
+    //walletClient: WalletClient,
     apiKey: string,
+    //walletClient: WalletClient,
+    spendPermission: SpendPermission,
+    ephemeralSmartWallet: EphemeralSmartWallet,
     logger?: Logger
   ) {
     if (!baseRPCUrl) {
       throw new Error('Base RPC URL is required');
     }
-    if (!walletClient) {
+    if (!ephemeralSmartWallet) {
       throw new Error('Wallet client is required');
     }
 
-    this.accountId = walletClient.account!.address;
+    this.accountId = ephemeralSmartWallet.address;
 
     this.paymentMakers = {
-      'base': new BaseAppPaymentMaker(baseRPCUrl, walletClient, logger),
+      'base': new BaseAppPaymentMaker(baseRPCUrl, spendPermission, ephemeralSmartWallet, logger),
     }
   }
 
