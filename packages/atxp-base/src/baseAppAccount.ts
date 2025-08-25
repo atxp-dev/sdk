@@ -7,8 +7,10 @@ import { getAddress, createPublicClient, http, Account as ViemAccount } from 'vi
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
-// import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
+import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { Logger } from '@atxp/common';
+import { createBaseAccountSDK } from "@base-org/account";
+import { requestSpendPermission } from "@base-org/account/spend-permission";
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
@@ -41,13 +43,12 @@ export class BaseAppAccount implements Account {
         'Get your API key from https://portal.cdp.coinbase.com/'
       );
     }
-    
-    /*
+
     // Initialize storage
     const baseStorage = config?.storage || new BrowserStorage();
     const storage = new IntermediaryStorage(baseStorage);
     const storageKey = this.toStorageKey(userWalletAddress);
-    
+
     // Try to load existing permission
     const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
     if (existingData) {
@@ -56,42 +57,40 @@ export class BaseAppAccount implements Account {
       return new BaseAppAccount(baseRPCUrl, existingData.permission, account, smartWallet, logger);
     }
 
-    // Create new wallet and permission
+    const sdk = createBaseAccountSDK({
+      appName: config?.appName,
+      appChainIds: [base.id],
+      paymasterUrls: {
+        [base.id]: 'https://api.developer.coinbase.com/rpc/v1/base/snPdXqIzOGhRkGNJvEHM5bl9Hm3yRO3m',
+      }
+    });
+    const provider = sdk.getProvider();
+    await sdk.getProvider().request({ method: 'wallet_connect' });
+
     const privateKey = generatePrivateKey();
     const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
     console.log('Generated ephemeral wallet:', smartWallet.address);
-    // Deploy smart wallet
-    //await this.deploySmartWallet(privateKey, config.apiKey);
-    
-    // Check USDC allowance before creating smart wallet
-    // TODO: We probably need to keep this - it's stored on-chain, so doesn't wipe when we clear storage
-    //await this.checkAndRequestUSDCApproval(baseRPCUrl, userWalletAddress, walletClient);
+    await this.deploySmartWallet(smartWallet, config.apiKey);
 
-    // Create spend permission
-    const permission = await this.createSpendPermission(
-      userWalletAddress,
-      walletClient,
-      smartWallet.address,
-      config
-    );
+    const permission = await requestSpendPermission({
+      account: userWalletAddress,
+      spender: smartWallet.address,
+      token: USDC_CONTRACT_ADDRESS_BASE,
+      chainId: base.id,
+      allowance: config?.allowance ?? DEFAULT_ALLOWANCE,
+      periodInDays: config?.periodInDays ?? DEFAULT_PERIOD_IN_DAYS,
+      provider,
+    });
+    
+    console.log('Permission:', permission);
 
     // Save wallet and permission
     storage.set(storageKey, {privateKey, permission});
 
-    */
-
-    // TODO: TEMPORARY HACK- USE MAIN ACCOUNT TO PAY
-    //const account = privateKeyToAccount(privateKey);
-    const account = walletClient.account;
-    if (!account) {
-      throw new Error('Account is required');
-    }
-    console.log('walletClient:', walletClient);
     //return new BaseAppAccount(baseRPCUrl, permission, account, smartWallet, logger);
-    return new BaseAppAccount(baseRPCUrl, walletClient, logger);
+    return new BaseAppAccount(baseRPCUrl, smartWallet.account, logger);
   }
 
-  /*
   private static loadSavedWalletAndPermission(
     permissionStorage: IntermediaryStorage,
     storageKey: string
@@ -110,6 +109,7 @@ export class BaseAppAccount implements Account {
     return storedData;
   }
 
+  /*
   private static async checkAndRequestUSDCApproval(
     baseRPCUrl: string,
     userWalletAddress: string,
@@ -250,14 +250,13 @@ export class BaseAppAccount implements Account {
       createdAt: now,
     };
   }
+    */
 
   private static async deploySmartWallet(
-    privateKey: `0x${string}`,
+    smartWallet: EphemeralSmartWallet,
     apiKey: string
   ): Promise<void> {
     console.log('Deploying smart wallet to enable spend permissions...');
-    
-    const smartWallet = await toEphemeralSmartWallet(privateKey, apiKey);
     
     const deployTx = await smartWallet.client.sendUserOperation({
       calls: [{
@@ -278,6 +277,8 @@ export class BaseAppAccount implements Account {
     
     console.log('✅ Smart wallet deployed successfully at:', smartWallet.address);
   }
+
+  /*
 
   constructor(
     baseRPCUrl: string, 
