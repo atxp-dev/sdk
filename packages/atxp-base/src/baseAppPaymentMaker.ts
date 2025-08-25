@@ -1,8 +1,8 @@
 import { BasePaymentMaker, USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { encodeFunctionData, getAddress, Account, WalletClient } from 'viem';
-import { SpendPermission } from './types.js';
+import { encodeFunctionData, /*getAddress, Account,*/ WalletClient } from 'viem';
+//import { SpendPermission } from './types.js';
 import { type PaymasterSmartWallet } from './paymasterHelpers.js';
 
 export class BaseAppPaymentMaker extends BasePaymentMaker {
@@ -22,6 +22,7 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     super(baseRPCUrl, walletClient, logger);
     //this.spendPermission = spendPermission;
     this.smartWallet = smartWallet;
+    this.isWebAuthn = true; // BaseAppPaymentMaker uses WebAuthn/Smart Wallet auth
   }
 
   // Override makePayment to use paymaster smart wallet when available
@@ -92,7 +93,7 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
       this.logger.info(`Paymaster-sponsored payment confirmed: ${receipt.receipt.transactionHash}`);
       return receipt.receipt.transactionHash;
     } catch (error) {
-      console.error('Paymaster transaction failed:', error);
+      this.logger.error(`Paymaster transaction failed: ${error}`);
       throw error;
     }
   }

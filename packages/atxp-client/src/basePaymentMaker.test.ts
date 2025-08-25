@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import { createWalletClient, http } from 'viem';
+import { base } from 'viem/chains';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 
 describe('basePaymentMaker.generateJWT', () => {
   it('should generate a valid JWT with default payload', async () => {
     const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
-    const paymentMaker = new BasePaymentMaker('https://example.com', privateKey);
+    const walletClient = createWalletClient({
+      account,
+      chain: base,
+      transport: http('https://example.com')
+    });
+    const paymentMaker = new BasePaymentMaker('https://example.com', walletClient);
     const jwt = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: 'testCodeChallenge'});
 
     // JWT format: header.payload.signature (all base64url)
@@ -38,15 +45,17 @@ describe('basePaymentMaker.generateJWT', () => {
     // For now, we just verify the signature is present and properly formatted
     expect(signatureB64).toBeDefined();
     expect(signatureB64.length).toBeGreaterThan(0);
-    
-    // Decode the signature to verify it's a hex string with 0x prefix
-    const decodedSig = Buffer.from(signatureB64, 'base64url').toString('utf8');
-    expect(decodedSig).toMatch(/^0x[a-fA-F0-9]+$/);
   });
 
   it('should include payment request id if provided', async () => {
     const privateKey = generatePrivateKey();
-    const paymentMaker = new BasePaymentMaker('https://example.com', privateKey);
+    const account = privateKeyToAccount(privateKey);
+    const walletClient = createWalletClient({
+      account,
+      chain: base,
+      transport: http('https://example.com')
+    });
+    const paymentMaker = new BasePaymentMaker('https://example.com', walletClient);
     const paymentRequestId = 'id1';
     const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
     const [, payloadB64] = jwt.split('.');

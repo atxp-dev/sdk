@@ -1,7 +1,6 @@
 import { 
   http, 
   createPublicClient,
-  type Account,
   type Address,
   type WalletClient,
 } from 'viem';
@@ -48,7 +47,8 @@ export async function createPaymasterSmartWallet(
   // Create the Coinbase smart wallet
   const account = await toCoinbaseSmartAccount({
     client: publicClient,
-    owners: [walletClient.account as any], // The account from WalletClient should work here
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    owners: [walletClient.account as any], // Type mismatch between viem Account types
     version: '1',
   });
   
