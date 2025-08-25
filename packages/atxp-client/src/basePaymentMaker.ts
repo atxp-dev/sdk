@@ -4,16 +4,16 @@ import { Logger, Currency } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
-  createWalletClient,
-  http,
+  //createWalletClient,
+  //http,
   parseEther,
   publicActions,
   encodeFunctionData,
   WalletClient,
   PublicActions,
-  Account,
-  decodeAbiParameters,
-  parseSignature,
+  //Account,
+  //decodeAbiParameters,
+  //parseSignature,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
@@ -31,7 +31,7 @@ function toBase64Url(data: string): string {
   // Convert base64 to base64url
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
-
+/*
 // Helper function to convert P-256 public key bytes to PEM format
 function p256PublicKeyToPEM(publicKeyBytes: string): string {
   // Remove 0x prefix if present
@@ -144,6 +144,7 @@ function extractSignatureFromWebAuthn(webAuthnSignature: string): string {
   
   return `0x${r}${s}`;
 }
+  */
 
 export const USDC_CONTRACT_ADDRESS_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
 const USDC_DECIMALS = 6;
