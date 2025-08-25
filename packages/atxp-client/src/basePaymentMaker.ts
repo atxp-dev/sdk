@@ -213,6 +213,7 @@ export class BasePaymentMaker implements PaymentMaker {
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
+    // TODO: Delete isWebAuthn and the entire EIP-1271 block below - we only do payments with EOA wallets
     if (this.isWebAuthn) {
       // For WebAuthn/Coinbase Smart Wallets, use EIP-1271 instead of JWT
       this.logger.info('=== EIP-1271 Authentication Mode ===');
@@ -298,16 +299,10 @@ export class BasePaymentMaker implements PaymentMaker {
       });
 
       // For ES256K, signature is typically 65 bytes (r,s,v)
-      let signature: string;
-      if (typeof Buffer !== 'undefined') {
-        signature = Buffer.from(signResult.slice(2), 'hex').toString('base64url');
-      } else {
-        // Browser environment
-        const hexStr = signResult.slice(2);
-        const bytes = new Uint8Array(hexStr.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-        const base64 = btoa(String.fromCharCode(...bytes));
-        signature = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-      }
+      // Server expects the hex signature string (with 0x prefix) to be base64url encoded
+      // This creates: base64url("0x6eb2565...") not base64url(rawBytes)
+      // Pass the hex string directly to toBase64Url which will UTF-8 encode and base64url it
+      const signature = toBase64Url(signResult);
 
       const jwt = `${header}.${payload}.${signature}`;
       this.logger.info(`Generated ES256K JWT: ${jwt}`);

@@ -1,21 +1,19 @@
 import type { Account, PaymentMaker } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
+import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import type { WalletClient } from 'viem';
-import { IStorage, BrowserStorage } from './storage.js';
-// import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
-import { validatePaymasterCapabilities } from './paymasterHelpers.js';
-import { ConsoleLogger, Logger } from '@atxp/common';
 import { getAddress, createPublicClient, http, Account as ViemAccount } from 'viem';
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
 import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
-import { Logger } from '@atxp/common';
+import { ConsoleLogger, Logger } from '@atxp/common';
 import { createBaseAccountSDK } from "@base-org/account";
 import { requestSpendPermission } from "@base-org/account/spend-permission";
 
-// const DEFAULT_ALLOWANCE = 10n;
-// const DEFAULT_PERIOD_IN_DAYS = 7;
+const DEFAULT_ALLOWANCE = 10n;
+const DEFAULT_PERIOD_IN_DAYS = 7;
 
 export class BaseAppAccount implements Account {
   accountId: string;
@@ -35,12 +33,10 @@ export class BaseAppAccount implements Account {
       periodInDays?: number;
       storage?: IStorage<string>;
       apiKey: string;
-      usePaymaster?: boolean; // Defaults to true - set to false to disable paymaster sponsorship
     },
     logger?: Logger,
   ): Promise<BaseAppAccount> {
     logger = logger || new ConsoleLogger();
-
     // Validate smart wallet configuration
     if (!config.apiKey) {
       throw new Error(
@@ -93,15 +89,7 @@ export class BaseAppAccount implements Account {
     // Save wallet and permission
     storage.set(storageKey, {privateKey, permission});
 
-    */
-
-    // Validate paymaster capabilities if enabled (defaults to true)
-    if (config.usePaymaster !== false) {
-      await validatePaymasterCapabilities(walletClient);
-      logger?.info(`Validated paymaster capabilities for wallet: ${walletClient.account!.address}`);
-    }
-    
-    return new BaseAppAccount(baseRPCUrl, walletClient, config.apiKey, logger);
+    //return new BaseAppAccount(baseRPCUrl, permission, account, smartWallet, logger);
     return new BaseAppAccount(baseRPCUrl, permission, smartWallet, logger);
   }
 
@@ -129,7 +117,7 @@ export class BaseAppAccount implements Account {
     userWalletAddress: string,
     walletClient: WalletClient
   ): Promise<void> {
-    const USDC_CONTRACT = getAddress(USDC_CONTRACT_ADDRESS_BASE);
+    const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
     const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
     
     const publicClient = createPublicClient({
@@ -325,8 +313,6 @@ export class BaseAppAccount implements Account {
     baseRPCUrl: string, 
     //account: ViemAccount, 
     //walletClient: WalletClient,
-    apiKey: string,
-    //walletClient: WalletClient,
     spendPermission: SpendPermission,
     ephemeralSmartWallet: EphemeralSmartWallet,
     logger?: Logger
@@ -357,6 +343,6 @@ export class BaseAppAccount implements Account {
     storage = storage || new BrowserStorage();
 
     storage.delete(this.toStorageKey(userWalletAddress));
-    // Data cleared from storage
+    console.log(`All ATXP-related data cleared from storage for ${userWalletAddress}`);
   }
 }

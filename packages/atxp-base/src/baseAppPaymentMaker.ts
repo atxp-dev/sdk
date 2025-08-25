@@ -1,106 +1,36 @@
-import { BasePaymentMaker, USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
+import { BasePaymentMaker } from '@atxp/client';
 import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { encodeFunctionData, /*getAddress, Account,*/ WalletClient } from 'viem';
-//import { SpendPermission } from './types.js';
-import { validatePaymasterCapabilities } from './paymasterHelpers.js';
-import { encodeFunctionData, getAddress, Account, WalletClient } from 'viem';
+import { encodeFunctionData, getAddress, Account, WalletClient, http, createWalletClient } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
+import { base } from 'viem/chains';
 
 export class BaseAppPaymentMaker extends BasePaymentMaker {
+  //private spendPermission: SpendPermission;
+  //private smartWallet: EphemeralSmartWallet;
+
   constructor(
     baseRPCUrl: string, 
     spendPermission: SpendPermission, 
     //account: Account,
-    walletClient: WalletClient,
+    //walletClient: WalletClient,
     smartWallet: EphemeralSmartWallet,
     logger?: Logger
   ) {
     //if (!spendPermission) {
       //throw new Error('Spend permission is required');
     //}
-    super(baseRPCUrl, walletClient, logger);
-    //this.spendPermission = spendPermission;
-    this.isWebAuthn = true; // BaseAppPaymentMaker uses WebAuthn/Smart Wallet auth
-  }
-
-  // Override makePayment to use paymaster-sponsored transactions
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
-    // Validate paymaster capabilities
-    await validatePaymasterCapabilities(this.signingClient);
-
-    // Use paymaster-sponsored transaction
-    if (currency !== 'USDC') {
-      throw new Error('Only USDC currency is supported; received ' + currency);
-    }
-
-    const amountBigInt = this.convertAmountToBigInt(amount);
-    
-    this.logger.info(`Making paymaster-sponsored payment of ${amount} ${currency} to ${receiver} on Base`);
-    
-    return await this.executePaymasterTransaction(amountBigInt, receiver);
-  }
-
-  private convertAmountToBigInt(amount: BigNumber): bigint {
-    // Convert USDC amount to its smallest unit (6 decimals)
-    const USDC_DECIMALS = 6;
-    const amountInMicroUsdc = amount.multipliedBy(10 ** USDC_DECIMALS);
-    return BigInt(amountInMicroUsdc.toFixed(0));
-  }
-
-  private async executePaymasterTransaction(amountBigInt: bigint, receiver: string): Promise<string> {
-    
-    // Prepare USDC transfer call
-    const transferCalldata = encodeFunctionData({
-      abi: [{
-        inputs: [
-          { name: 'to', type: 'address' },
-          { name: 'amount', type: 'uint256' }
-        ],
-        name: 'transfer',
-        outputs: [{ name: '', type: 'bool' }],
-        stateMutability: 'nonpayable',
-        type: 'function'
-      }],
-      functionName: 'transfer',
-      args: [receiver as `0x${string}`, amountBigInt]
+    const client = createWalletClient({
+      account: smartWallet.signer,
+      chain: base,
+      transport: http(baseRPCUrl)
     });
-
-    try {
-      this.logger.info('Using EIP-5792 sendCalls with native paymaster support');
-      
-      // Use sendCalls for the transaction
-      const result = await this.signingClient.sendCalls({
-        calls: [{
-          to: USDC_CONTRACT_ADDRESS_BASE,
-          data: transferCalldata,
-          value: 0n
-        }],
-        capabilities: {
-          // The wallet should use its configured paymaster
-          paymasterService: {
-            url: `https://api.developer.coinbase.com/rpc/v1/base`
-          }
-        }
-      });
-
-      // Extract the id from the result
-      const callsId = typeof result === 'string' ? result : result.id;
-      
-      this.logger.info(`Paymaster-sponsored sendCalls initiated: ${callsId}`);
-
-      // Wait for the calls to be confirmed
-      const status = await this.signingClient.waitForCallsStatus({ id: callsId });
-
-      this.logger.info(`Paymaster-sponsored payment confirmed with status: ${JSON.stringify(status)}`);
-      
-      // For EIP-5792, return the calls ID as the transaction identifier
-      return callsId;
-    } catch (error) {
-      this.logger.error(`Paymaster transaction failed: ${error}`);
-      throw error;
-    }
+    // TODO: Probably wrong
+    super(baseRPCUrl, client, logger);
+    this.isWebAuthn = false;
+    //this.spendPermission = spendPermission;
+    //this.smartWallet = smartWallet;
   }
 
 
