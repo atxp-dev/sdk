@@ -211,77 +211,99 @@ export class BasePaymentMaker implements PaymentMaker {
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
-    // Use ES256 for WebAuthn compatibility (P-256 curve)
-    // TODO: Detect wallet type and use ES256K for regular Ethereum wallets
+    // TODO: Detect wallet type properly
     const isWebAuthn = true; // TODO: Detect if using WebAuthn/Coinbase Smart Wallet
-    const headerObj = { alg: isWebAuthn ? 'ES256' : 'ES256K' };
     
-    // For WebAuthn with ES256, the server will fetch the P-256 key from the smart wallet
     if (isWebAuthn) {
-      console.log('\n=== WebAuthn Mode ===');
-      console.log('Using ES256 algorithm');
-      console.log('Server will fetch P-256 key from smart wallet at:', this.signingClient.account!.address);
-    }
-    
-    const payloadObj = {
-      sub: this.signingClient.account!.address,
-      iss: 'accounts.atxp.ai',
-      aud: 'https://auth.atxp.ai',
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 60 * 60,
-      ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
-      ...(paymentRequestId ? { payment_request_id: paymentRequestId } : {}),
-    } as Record<string, unknown>;
+      // For WebAuthn/Coinbase Smart Wallets, use EIP-1271 instead of JWT
+      console.log('\n=== EIP-1271 Authentication Mode ===');
+      console.log('Using EIP-1271 signature verification for smart wallet');
+      
+      // Create a structured message for signing
+      const timestamp = Math.floor(Date.now() / 1000);
+      const nonce = Math.random().toString(36).substring(2, 15);
+      
+      const message = `PayMCP Authorization Request
 
-    const header = toBase64Url(JSON.stringify(headerObj));
-    const payload = toBase64Url(JSON.stringify(payloadObj));
-    const message = `${header}.${payload}`;
+Wallet: ${this.signingClient.account!.address}
+Timestamp: ${timestamp}
+Nonce: ${nonce}
+${codeChallenge ? `Code Challenge: ${codeChallenge}` : ''}
+${paymentRequestId ? `Payment Request ID: ${paymentRequestId}` : ''}
 
-    // For Ethereum wallets, we need to use personal_sign format
-    const messageBytes = typeof Buffer !== 'undefined'
-      ? Buffer.from(message, 'utf8')
-      : new TextEncoder().encode(message);
-    const signResult = await this.signingClient.signMessage({
-      account: this.signingClient.account!,
-      message: { raw: messageBytes },
-    });
-    console.log('\n=== SignMessage Result ===');
-    console.log('signResult type:', typeof signResult);
-    console.log('signResult length:', signResult.length);
-    console.log('signResult:', signResult);
-    
-    // Extract the actual signature if it's a WebAuthn signature
-    let signatureRaw: string = signResult as string;
-    if (signResult.length > 130) { // More than 65 bytes when hex-encoded
-      console.log('\nDetected WebAuthn signature (length > 130)');
-      // This is a WebAuthn signature, extract the r,s values
-      signatureRaw = extractSignatureFromWebAuthn(signResult);
-      console.log('\nExtracted signature:', signatureRaw);
+Sign this message to prove you control this wallet.`;
+
+      console.log('Message to sign:', message);
+
+      // Sign the message with the wallet (triggers WebAuthn/fingerprint)
+      const signature = await this.signingClient.signMessage({
+        account: this.signingClient.account!,
+        message: message,
+      });
+      
+      console.log('Signature (WebAuthn response):', signature.substring(0, 100) + '...');
+
+      // Create the auth data object
+      const authData = {
+        type: 'EIP1271_AUTH',
+        walletAddress: this.signingClient.account!.address,
+        message: message,
+        signature: signature,
+        timestamp: timestamp,
+        nonce: nonce,
+        ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
+        ...(paymentRequestId ? { payment_request_id: paymentRequestId } : {}),
+      };
+
+      // Serialize as base64url for transmission (similar to JWT format)
+      const serialized = toBase64Url(JSON.stringify(authData));
+      console.log('Serialized auth data length:', serialized.length);
+      console.log('Serialized auth data:', serialized);
+      
+      return serialized;
     } else {
-      console.log('\nUsing standard signature (length <= 130)');
-    }
-    
-    // For ES256, we need to encode the raw r||s values (64 bytes) as base64url
-    // The signature needs to be base64url encoded binary data
-    let signature: string;
-    const base64Signature = typeof Buffer !== 'undefined' 
-      ? Buffer.from(signatureRaw).toString('base64')
-      : btoa(signatureRaw);
-    // Convert base64 to base64url
-    signature = base64Signature.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      // Original JWT logic for regular wallets
+      const headerObj = { alg: 'ES256K' };
+      
+      const payloadObj = {
+        sub: this.signingClient.account!.address,
+        iss: 'accounts.atxp.ai',
+        aud: 'https://auth.atxp.ai',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 60 * 60,
+        ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
+        ...(paymentRequestId ? { payment_request_id: paymentRequestId } : {}),
+      } as Record<string, unknown>;
 
-    const jwt = `${header}.${payload}.${signature}`;
-    console.log('\n=== Final JWT Construction ===');
-    console.log('Algorithm:', headerObj.alg);
-    console.log('sub:', this.signingClient.account!.address);
-    console.log('code_challenge:', codeChallenge);
-    console.log('payment_request_id:', paymentRequestId);
-    console.log('JWT header:', header);
-    console.log('JWT payload:', payload);
-    console.log('JWT signature (first 50 chars):', signature.substring(0, 50) + '...');
-    console.log('Complete JWT:', jwt);
-    console.log('=== End JWT Debug ===\n');
-    return jwt;
+      const header = toBase64Url(JSON.stringify(headerObj));
+      const payload = toBase64Url(JSON.stringify(payloadObj));
+      const message = `${header}.${payload}`;
+
+      const messageBytes = typeof Buffer !== 'undefined'
+        ? Buffer.from(message, 'utf8')
+        : new TextEncoder().encode(message);
+      
+      const signResult = await this.signingClient.signMessage({
+        account: this.signingClient.account!,
+        message: { raw: messageBytes },
+      });
+
+      // For ES256K, signature is typically 65 bytes (r,s,v)
+      let signature: string;
+      if (typeof Buffer !== 'undefined') {
+        signature = Buffer.from(signResult.slice(2), 'hex').toString('base64url');
+      } else {
+        // Browser environment
+        const hexStr = signResult.slice(2);
+        const bytes = new Uint8Array(hexStr.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+        const base64 = btoa(String.fromCharCode(...bytes));
+        signature = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      }
+
+      const jwt = `${header}.${payload}.${signature}`;
+      console.log('Generated ES256K JWT:', jwt);
+      return jwt;
+    }
   }
 
   async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
