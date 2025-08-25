@@ -24,7 +24,23 @@ export const isWebEnvironment = isBrowser || isNextJS;
 // Helper to load modules in both CommonJS and ESM environments
 function loadModule(moduleId: string): any {
   try {
-    // Try to use eval('require') to prevent bundler static analysis
+    // First try standard require if available (CommonJS environment)
+    if (typeof require !== 'undefined') {
+      return require(moduleId);
+    }
+    
+    // Check if we're in a Node.js environment where createRequire might be available
+    if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+      try {
+        const { createRequire } = eval('require')('module');
+        const require = createRequire(import.meta.url || 'file:///dummy');
+        return require(moduleId);
+      } catch {
+        // Fall through to eval require
+      }
+    }
+    
+    // Fall back to eval('require') to prevent bundler static analysis
     const requireFunc = (0, eval)('require');
     return requireFunc(moduleId);
   } catch {
@@ -113,7 +129,7 @@ function createBrowserCrypto(): PlatformCrypto {
   return {
     digest: async (data: Uint8Array) => {
       if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
-        const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data);
+        const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data as BufferSource);
         return new Uint8Array(hashBuffer);
       }
       throw new Error('Web Crypto API not available in this browser environment');
@@ -138,21 +154,48 @@ function createNodeCrypto(): PlatformCrypto {
   
   return {
     digest: async (data: Uint8Array) => {
+      // Prefer Web Crypto API if available (works in Node.js 16+ and browsers)
+      if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
+        try {
+          const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data as BufferSource);
+          return new Uint8Array(hashBuffer);
+        } catch {
+          // Fall through to Node.js crypto
+        }
+      }
+      
+      // Fall back to Node.js crypto module
       if (!cryptoModule) {
-        cryptoModule = await loadModuleAsync('crypto');
+        // Try node:crypto first, then fallback to crypto
+        try {
+          cryptoModule = await loadModuleAsync('node:crypto');
+        } catch {
+          cryptoModule = await loadModuleAsync('crypto');
+        }
       }
       return new Uint8Array(cryptoModule.createHash('sha256').update(data).digest());
     },
     randomUUID: () => {
-      // randomUUID is synchronous, so we need sync loading
+      // Prefer Web Crypto API if available (works in Node.js 16+ and browsers)
+      if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.randomUUID) {
+        return globalThis.crypto.randomUUID();
+      }
+      
+      // Fall back to Node.js crypto module (requires sync loading)
       try {
-        const crypto = loadModule('crypto');
+        // Try node:crypto first, then fallback to crypto
+        let crypto: any;
+        try {
+          crypto = loadModule('node:crypto');
+        } catch {
+          crypto = loadModule('crypto');
+        }
         return crypto.randomUUID();
       } catch {
         throw new Error('randomUUID requires synchronous module loading (CommonJS)');
       }
     },
-    toHex: (data: Uint8Array) => Buffer.from(data).toString('hex'),
+    toHex: (data: Uint8Array) => Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(''),
   };
 }
 
