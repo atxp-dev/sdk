@@ -8,6 +8,7 @@ import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
 // import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
+import { createPaymasterSmartWallet, type PaymasterSmartWallet } from './paymasterHelpers.js';
 import { Logger } from '@atxp/common';
 
 const DEFAULT_ALLOWANCE = 10n;
@@ -16,6 +17,7 @@ const DEFAULT_PERIOD_IN_DAYS = 7;
 export class BaseAppAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
+  private smartWallet?: PaymasterSmartWallet;
 
   private static toStorageKey(userWalletAddress: string): string {
     return `atxp-base-permission-${userWalletAddress}`;
@@ -31,6 +33,7 @@ export class BaseAppAccount implements Account {
       periodInDays?: number;
       storage?: IStorage<string>;
       apiKey: string;
+      usePaymaster?: boolean; // Defaults to true - set to false to disable paymaster sponsorship
     },
     logger?: Logger,
   ): Promise<BaseAppAccount> {
@@ -80,15 +83,14 @@ export class BaseAppAccount implements Account {
 
     */
 
-    // TODO: TEMPORARY HACK- USE MAIN ACCOUNT TO PAY
-    //const account = privateKeyToAccount(privateKey);
-    const account = walletClient.account;
-    if (!account) {
-      throw new Error('Account is required');
+    // Create paymaster smart wallet if enabled (defaults to true)
+    let smartWallet: PaymasterSmartWallet | undefined;
+    if (config.usePaymaster !== false) {
+      smartWallet = await createPaymasterSmartWallet(walletClient, config.apiKey);
+      console.log('Created smart wallet with paymaster at:', smartWallet.address);
     }
-    console.log('walletClient:', walletClient);
-    //return new BaseAppAccount(baseRPCUrl, permission, account, smartWallet, logger);
-    return new BaseAppAccount(baseRPCUrl, walletClient, logger);
+    
+    return new BaseAppAccount(baseRPCUrl, walletClient, config.apiKey, smartWallet, logger);
   }
 
   /*
@@ -115,7 +117,7 @@ export class BaseAppAccount implements Account {
     userWalletAddress: string,
     walletClient: WalletClient
   ): Promise<void> {
-    const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
+    const USDC_CONTRACT = getAddress(USDC_CONTRACT_ADDRESS_BASE);
     const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
     
     const publicClient = createPublicClient({
@@ -310,6 +312,8 @@ export class BaseAppAccount implements Account {
     baseRPCUrl: string, 
     //account: ViemAccount, 
     walletClient: WalletClient,
+    apiKey: string,
+    smartWallet?: PaymasterSmartWallet,
     logger?: Logger
   ) {
     if (!baseRPCUrl) {
@@ -319,10 +323,11 @@ export class BaseAppAccount implements Account {
       throw new Error('Wallet client is required');
     }
 
-    this.accountId = walletClient!.account!.address;
+    this.accountId = smartWallet ? smartWallet.address : walletClient!.account!.address;
+    this.smartWallet = smartWallet;
 
     this.paymentMakers = {
-      'base': new BaseAppPaymentMaker(baseRPCUrl, walletClient, logger),
+      'base': new BaseAppPaymentMaker(baseRPCUrl, walletClient, smartWallet, logger),
     }
   }
 
