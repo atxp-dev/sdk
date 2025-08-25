@@ -73,6 +73,9 @@ export class BaseAppAccount implements Account {
     const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
     console.log('Generated ephemeral wallet:', smartWallet.address);
     await this.deploySmartWallet(smartWallet, config.apiKey);
+    
+    // Check and request USDC approval for SpendPermissionManager if needed
+    await this.checkAndRequestUSDCApproval(baseRPCUrl, userWalletAddress, walletClient);
 
     const permission = await requestSpendPermission({
       account: userWalletAddress,
@@ -111,7 +114,6 @@ export class BaseAppAccount implements Account {
     return storedData;
   }
 
-  /*
   private static async checkAndRequestUSDCApproval(
     baseRPCUrl: string,
     userWalletAddress: string,
@@ -140,6 +142,11 @@ export class BaseAppAccount implements Account {
       functionName: 'allowance',
       args: [userWalletAddress as `0x${string}`, SPEND_PERMISSION_MANAGER],
     });
+    
+    console.log(`USDC allowance check:
+  - Owner (main wallet): ${userWalletAddress}
+  - Spender (SpendPermissionManager): ${SPEND_PERMISSION_MANAGER}
+  - Current allowance: ${allowance} (${allowance === 0n ? 'NOT APPROVED' : 'APPROVED'})`);
     
     console.log('USDC allowance for SpendPermissionManager:', allowance);
     
@@ -252,7 +259,6 @@ export class BaseAppAccount implements Account {
       createdAt: now,
     };
   }
-    */
 
   private static async deploySmartWallet(
     smartWallet: EphemeralSmartWallet,

@@ -1,51 +1,112 @@
 import { BasePaymentMaker } from '@atxp/client';
 import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { encodeFunctionData, getAddress, Account, WalletClient, http, createWalletClient } from 'viem';
+import { encodeFunctionData, getAddress, Account, WalletClient, http, createWalletClient, createPublicClient } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { base } from 'viem/chains';
 
 export class BaseAppPaymentMaker extends BasePaymentMaker {
-  //private spendPermission: SpendPermission;
-  //private smartWallet: EphemeralSmartWallet;
+  private spendPermission: SpendPermission;
+  private smartWallet: EphemeralSmartWallet;
+  private baseRPCUrl: string;
 
   constructor(
     baseRPCUrl: string, 
     spendPermission: SpendPermission, 
-    //account: Account,
-    //walletClient: WalletClient,
     smartWallet: EphemeralSmartWallet,
     logger?: Logger
   ) {
-    //if (!spendPermission) {
-      //throw new Error('Spend permission is required');
-    //}
+    if (!spendPermission) {
+      throw new Error('Spend permission is required');
+    }
     const client = createWalletClient({
       account: smartWallet.signer,
       chain: base,
       transport: http(baseRPCUrl)
     });
-    // TODO: Probably wrong
     super(baseRPCUrl, client, logger);
     this.isWebAuthn = false;
-    //this.spendPermission = spendPermission;
-    //this.smartWallet = smartWallet;
+    this.spendPermission = spendPermission;
+    this.smartWallet = smartWallet;
+    this.baseRPCUrl = baseRPCUrl;
   }
 
 
   // override makePayment to use spend permissions
-  /*async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
     this.validatePaymentRequest(currency);
+    
+    // Check the balance of the user's wallet (not the smart wallet)
+    await this.checkUserBalance(amount, currency);
     
     const amountBigInt = this.convertAmountToBigInt(amount);
     
-    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ephemeral wallet on Base`);
+    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ${receiver} on Base`);
     
     this.logPaymentDetails(amountBigInt, receiver);
     
     // Execute the payment transaction
     return await this.executePaymentTransaction(amountBigInt, receiver);
+  }
+  
+  private async checkUserBalance(amount: BigNumber, currency: Currency): Promise<void> {
+    const publicClient = createPublicClient({
+      chain: base,
+      transport: http(this.baseRPCUrl)
+    });
+    
+    const USDC_DECIMALS = 6;
+    const USDC_ADDRESS = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
+    const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
+    
+    const ERC20_ABI = [{
+      inputs: [{ name: 'account', type: 'address' }],
+      name: 'balanceOf',
+      outputs: [{ name: '', type: 'uint256' }],
+      stateMutability: 'view',
+      type: 'function'
+    }, {
+      inputs: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' }
+      ],
+      name: 'allowance',
+      outputs: [{ name: '', type: 'uint256' }],
+      stateMutability: 'view',
+      type: 'function'
+    }];
+    
+    const userAddress = this.spendPermission.permission.account;
+    
+    // Check USDC allowance
+    const allowance = await publicClient.readContract({
+      address: USDC_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [userAddress as `0x${string}`, SPEND_PERMISSION_MANAGER],
+    }) as bigint;
+    
+    console.log(`Pre-payment USDC allowance check:
+  - Owner (main wallet): ${userAddress}
+  - Spender (SpendPermissionManager): ${SPEND_PERMISSION_MANAGER}
+  - Current allowance: ${allowance} (${allowance === 0n ? 'NOT APPROVED - THIS WILL CAUSE PAYMENT TO FAIL' : 'APPROVED'})`);
+    
+    // Check balance
+    const balanceRaw = await publicClient.readContract({
+      address: USDC_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [userAddress as `0x${string}`],
+    }) as bigint;
+    
+    const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** USDC_DECIMALS);
+    
+    if (balance.lt(amount)) {
+      const { InsufficientFundsError: InsufficientFundsErrorClass } = await import('@atxp/client');
+      this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
+      throw new InsufficientFundsErrorClass(currency, amount, balance, 'base');
+    }
   }
 
   private validatePaymentRequest(currency: Currency): void {
@@ -64,22 +125,37 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
 
   private logPaymentDetails(amountBigInt: bigint, receiver: string): void {
     const now = Math.floor(Date.now() / 1000);
-    console.log('Spend permission details:', {
-      account: this.spendPermission.permission.account,
-      spender: this.spendPermission.permission.spender,
-      token: this.spendPermission.permission.token,
-      allowance: this.spendPermission.permission.allowance,
-      amount: amountBigInt.toString(),
-      receiver,
-      smartWallet: this.smartWallet?.address,
-      currentTime: now,
-      start: this.spendPermission.permission.start,
-      end: this.spendPermission.permission.end,
-      isValid: now >= Number(this.spendPermission.permission.start) && now <= Number(this.spendPermission.permission.end),
-      salt: this.spendPermission.permission.salt,
-      extraData: this.spendPermission.permission.extraData,
-      signature: this.spendPermission.signature
-    });
+    const start = Number(this.spendPermission.permission.start);
+    const end = Number(this.spendPermission.permission.end);
+    
+    console.log('=== SPEND PERMISSION VALIDATION ===');
+    console.log('Smart Wallet Details:');
+    console.log('  - Contract Address:', this.smartWallet.address);
+    console.log('  - Signer Address:', this.smartWallet.signer.address);
+    console.log('  - Account in client:', this.signingClient.account?.address);
+    
+    console.log('\nSpend Permission:');
+    console.log('  - Account (fund owner):', this.spendPermission.permission.account);
+    console.log('  - Spender (authorized):', this.spendPermission.permission.spender);
+    console.log('  - Spender matches smart wallet?', this.spendPermission.permission.spender === this.smartWallet.address);
+    
+    console.log('\nAmount Details:');
+    console.log('  - Token:', this.spendPermission.permission.token);
+    console.log('  - Allowance:', this.spendPermission.permission.allowance, `(${Number(this.spendPermission.permission.allowance) / 1e6} USDC)`);
+    console.log('  - Requested:', amountBigInt.toString(), `(${Number(amountBigInt) / 1e6} USDC)`);
+    console.log('  - Receiver:', receiver);
+    
+    console.log('\nTiming:');
+    console.log('  - Current time:', now, new Date(now * 1000).toISOString());
+    console.log('  - Start time:', start, new Date(start * 1000).toISOString());
+    console.log('  - End time:', end, new Date(end * 1000).toISOString());
+    console.log('  - Is time valid?', now >= start && now <= end);
+    
+    console.log('\nOther:');
+    console.log('  - Salt:', this.spendPermission.permission.salt);
+    console.log('  - Extra data:', this.spendPermission.permission.extraData);
+    console.log('  - Signature length:', this.spendPermission.signature.length);
+    console.log('=== END VALIDATION ===');
   }
 
   private async executePaymentTransaction(amountBigInt: bigint, receiver: string): Promise<string> {
@@ -240,5 +316,5 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
         smartWallet: this.smartWallet.address
       });
     }
-  }*/
+  }
 }
