@@ -4,7 +4,7 @@ import type { WalletClient } from 'viem';
 import { IStorage, BrowserStorage } from './storage.js';
 // import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { createPaymasterSmartWallet, type PaymasterSmartWallet } from './paymasterHelpers.js';
-import { Logger } from '@atxp/common';
+import { ConsoleLogger, Logger } from '@atxp/common';
 
 // const DEFAULT_ALLOWANCE = 10n;
 // const DEFAULT_PERIOD_IN_DAYS = 7;
@@ -32,6 +32,8 @@ export class BaseAppAccount implements Account {
     },
     logger?: Logger,
   ): Promise<BaseAppAccount> {
+    logger = logger || new ConsoleLogger();
+
     // Validate smart wallet configuration
     if (!config.apiKey) {
       throw new Error(
