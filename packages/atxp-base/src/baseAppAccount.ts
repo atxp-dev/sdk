@@ -1,18 +1,13 @@
 import type { Account, PaymentMaker } from '@atxp/client';
-import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
-import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import type { WalletClient } from 'viem';
-import { getAddress, createPublicClient, http, Account as ViemAccount } from 'viem';
-import { base } from 'viem/chains';
-import { SpendPermission } from './types.js';
-import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
+import { IStorage, BrowserStorage } from './storage.js';
 // import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { createPaymasterSmartWallet, type PaymasterSmartWallet } from './paymasterHelpers.js';
 import { Logger } from '@atxp/common';
 
-const DEFAULT_ALLOWANCE = 10n;
-const DEFAULT_PERIOD_IN_DAYS = 7;
+// const DEFAULT_ALLOWANCE = 10n;
+// const DEFAULT_PERIOD_IN_DAYS = 7;
 
 export class BaseAppAccount implements Account {
   accountId: string;
@@ -87,7 +82,7 @@ export class BaseAppAccount implements Account {
     let smartWallet: PaymasterSmartWallet | undefined;
     if (config.usePaymaster !== false) {
       smartWallet = await createPaymasterSmartWallet(walletClient, config.apiKey);
-      console.log('Created smart wallet with paymaster at:', smartWallet.address);
+      logger?.info(`Created smart wallet with paymaster at: ${smartWallet.address}`);
     }
     
     return new BaseAppAccount(baseRPCUrl, walletClient, config.apiKey, smartWallet, logger);
@@ -343,6 +338,6 @@ export class BaseAppAccount implements Account {
     storage = storage || new BrowserStorage();
 
     storage.delete(this.toStorageKey(userWalletAddress));
-    console.log(`All ATXP-related data cleared from storage for ${userWalletAddress}`);
+    // Data cleared from storage
   }
 }

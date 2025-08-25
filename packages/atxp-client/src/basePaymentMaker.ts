@@ -15,7 +15,7 @@ import {
   //decodeAbiParameters,
   //parseSignature,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+// import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { BigNumber } from "bignumber.js";
 
@@ -184,6 +184,7 @@ export class BasePaymentMaker implements PaymentMaker {
   protected signingClient: ExtendedWalletClient;
   //protected account: Account;
   protected logger: Logger;
+  protected isWebAuthn: boolean = false; // Default to standard EOA auth
 
   /*
   static fromSecretKey(baseRPCUrl: string, sourceSecretKey: Hex, logger?: Logger): BasePaymentMaker {
@@ -212,13 +213,10 @@ export class BasePaymentMaker implements PaymentMaker {
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
-    // TODO: Detect wallet type properly
-    const isWebAuthn = true; // TODO: Detect if using WebAuthn/Coinbase Smart Wallet
-    
-    if (isWebAuthn) {
+    if (this.isWebAuthn) {
       // For WebAuthn/Coinbase Smart Wallets, use EIP-1271 instead of JWT
-      console.log('\n=== EIP-1271 Authentication Mode ===');
-      console.log('Using EIP-1271 signature verification for smart wallet');
+      this.logger.info('=== EIP-1271 Authentication Mode ===');
+      this.logger.info('Using EIP-1271 signature verification for smart wallet');
       
       // Create a structured message for signing
       const timestamp = Math.floor(Date.now() / 1000);
@@ -244,7 +242,7 @@ export class BasePaymentMaker implements PaymentMaker {
       
       const message = messageParts.join('\n');
 
-      console.log('Message to sign:', message);
+      this.logger.info(`Message to sign: ${message}`);
 
       // Sign the message with the wallet (triggers WebAuthn/fingerprint)
       const signature = await this.signingClient.signMessage({
@@ -252,7 +250,7 @@ export class BasePaymentMaker implements PaymentMaker {
         message: message,
       });
       
-      console.log('Signature (WebAuthn response):', signature.substring(0, 100) + '...');
+      this.logger.info(`Signature (WebAuthn response): ${signature.substring(0, 100)}...`);
 
       // Create the auth data object
       const authData = {
@@ -268,8 +266,8 @@ export class BasePaymentMaker implements PaymentMaker {
 
       // Serialize as base64url for transmission (similar to JWT format)
       const serialized = toBase64Url(JSON.stringify(authData));
-      console.log('Serialized auth data length:', serialized.length);
-      console.log('Serialized auth data:', serialized);
+      this.logger.info(`Serialized auth data length: ${serialized.length}`);
+      this.logger.info(`Serialized auth data: ${serialized}`);
       
       return serialized;
     } else {
@@ -312,7 +310,7 @@ export class BasePaymentMaker implements PaymentMaker {
       }
 
       const jwt = `${header}.${payload}.${signature}`;
-      console.log('Generated ES256K JWT:', jwt);
+      this.logger.info(`Generated ES256K JWT: ${jwt}`);
       return jwt;
     }
   }

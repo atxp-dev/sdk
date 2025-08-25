@@ -2,11 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { BigNumber } from 'bignumber.js';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import { createWalletClient, http } from 'viem';
+import { base } from 'viem/chains';
 
 // Mock viem functions
 vi.mock('viem', () => ({
   createWalletClient: vi.fn(() => ({
+    account: {
+      address: '0xtest-address',
+    },
     extend: vi.fn(() => ({
+      account: {
+        address: '0xtest-address',
+      },
       signMessage: vi.fn(),
       sendTransaction: vi.fn(),
       waitForTransactionReceipt: vi.fn(),
@@ -46,19 +55,28 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     
     // Create a mock signing client
     mockSigningClient = {
+      account: {
+        address: '0xtest-address',
+      },
       signMessage: vi.fn(),
       sendTransaction: vi.fn(),
       waitForTransactionReceipt: vi.fn(),
       readContract: vi.fn(),
     };
 
+    const walletClient = {
+      account: {
+        address: '0xtest-address',
+      },
+      extend: vi.fn(() => mockSigningClient),
+    } as any;
+    
     paymentMaker = new BasePaymentMaker(
       'https://fake-rpc.com',
-      '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+      walletClient,
     );
 
-    // Inject our mock signing client (using any here is acceptable for testing internal state)
-    (paymentMaker as any).signingClient = mockSigningClient;
+    // Mock signing client is already injected via the walletClient.extend() mock
   });
 
   it('should throw InsufficientFundsError when balance is less than required', async () => {
@@ -91,7 +109,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
       address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       abi: expect.any(Array),
       functionName: 'balanceOf',
-      args: ['0x1234567890abcdef1234567890abcdef12345678'],
+      args: ['0xtest-address'],
     });
 
     // Verify transaction was not attempted
