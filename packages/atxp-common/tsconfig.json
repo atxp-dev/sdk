@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2020",
     "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ES2022", "DOM"],
+    "moduleResolution": "node",
+    "lib": ["ES2020", "DOM"],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
@@ -15,12 +15,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
-    "composite": true,
-    "allowImportingTsExtensions": false,
-    "noEmit": false,
-    "exactOptionalPropertyTypes": false,
-    "noUncheckedIndexedAccess": false
+    "composite": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.expo.test.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
