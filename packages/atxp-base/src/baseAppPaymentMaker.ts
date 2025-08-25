@@ -1,20 +1,19 @@
-import { BasePaymentMaker } from '@atxp/client';
+import { BasePaymentMaker, USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { encodeFunctionData, getAddress, Account, WalletClient } from 'viem';
 import { SpendPermission } from './types.js';
-// import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
+import { type PaymasterSmartWallet } from './paymasterHelpers.js';
 
 export class BaseAppPaymentMaker extends BasePaymentMaker {
-  //private spendPermission: SpendPermission;
-  //private smartWallet: EphemeralSmartWallet;
+  private smartWallet?: PaymasterSmartWallet;
 
   constructor(
     baseRPCUrl: string, 
     //spendPermission: SpendPermission, 
     //account: Account,
     walletClient: WalletClient,
-    //smartWallet: EphemeralSmartWallet,
+    smartWallet?: PaymasterSmartWallet,
     logger?: Logger
   ) {
     //if (!spendPermission) {
@@ -22,7 +21,80 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     //}
     super(baseRPCUrl, walletClient, logger);
     //this.spendPermission = spendPermission;
-    //this.smartWallet = smartWallet;
+    this.smartWallet = smartWallet;
+  }
+
+  // Override makePayment to use paymaster smart wallet when available
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
+    // If no smart wallet, use regular payment from parent class
+    if (!this.smartWallet) {
+      return super.makePayment(amount, currency, receiver);
+    }
+
+    // Use paymaster-sponsored transaction
+    if (currency !== 'USDC') {
+      throw new Error('Only USDC currency is supported; received ' + currency);
+    }
+
+    const amountBigInt = this.convertAmountToBigInt(amount);
+    
+    this.logger.info(`Making paymaster-sponsored payment of ${amount} ${currency} to ${receiver} on Base`);
+    
+    return await this.executePaymasterTransaction(amountBigInt, receiver);
+  }
+
+  private convertAmountToBigInt(amount: BigNumber): bigint {
+    // Convert USDC amount to its smallest unit (6 decimals)
+    const USDC_DECIMALS = 6;
+    const amountInMicroUsdc = amount.multipliedBy(10 ** USDC_DECIMALS);
+    return BigInt(amountInMicroUsdc.toFixed(0));
+  }
+
+  private async executePaymasterTransaction(amountBigInt: bigint, receiver: string): Promise<string> {
+    
+    // Prepare USDC transfer call
+    const transferCalldata = encodeFunctionData({
+      abi: [{
+        inputs: [
+          { name: 'to', type: 'address' },
+          { name: 'amount', type: 'uint256' }
+        ],
+        name: 'transfer',
+        outputs: [{ name: '', type: 'bool' }],
+        stateMutability: 'nonpayable',
+        type: 'function'
+      }],
+      functionName: 'transfer',
+      args: [receiver as `0x${string}`, amountBigInt]
+    });
+
+    try {
+      // Send user operation with paymaster sponsorship
+      const userOpHash = await this.smartWallet!.bundlerClient.sendUserOperation({
+        calls: [{
+          to: USDC_CONTRACT_ADDRESS_BASE,
+          data: transferCalldata,
+          value: 0n
+        }],
+      });
+
+      this.logger.info(`Paymaster-sponsored UserOperation sent: ${userOpHash}`);
+
+      // Wait for the operation to be confirmed
+      const receipt = await this.smartWallet!.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash
+      });
+
+      if (!receipt.success) {
+        throw new Error(`UserOperation failed: ${userOpHash}`);
+      }
+
+      this.logger.info(`Paymaster-sponsored payment confirmed: ${receipt.receipt.transactionHash}`);
+      return receipt.receipt.transactionHash;
+    } catch (error) {
+      console.error('Paymaster transaction failed:', error);
+      throw error;
+    }
   }
 
 
