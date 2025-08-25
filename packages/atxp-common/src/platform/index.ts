@@ -26,6 +26,7 @@ function loadModule(moduleId: string): any {
   try {
     // First try standard require if available (CommonJS environment)
     if (typeof require !== 'undefined') {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       return require(moduleId);
     }
     

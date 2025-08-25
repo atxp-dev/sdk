@@ -17,7 +17,8 @@ const TEST_DATA_HASH = '916f0027a575074ce72a331777c3478d6513f786a591bd892da1a577
 const TEST_HEX_OUTPUT = 'ff8040';
 
 // Test script that will be run in external projects
-const CONSUMER_TEST_SCRIPT = `#!/usr/bin/env node
+// Generate the consumer test script dynamically
+const createConsumerTestScript = () => `#!/usr/bin/env node
 
 async function testCrypto() {
   try {
@@ -58,7 +59,7 @@ async function testCrypto() {
 }
 
 testCrypto().catch(e => { console.error('CRASHED:', e.message); process.exit(1); });
-`;
+`.replace(/\$\{TEST_DATA_HASH\}/g, TEST_DATA_HASH).replace(/\$\{TEST_HEX_OUTPUT\}/g, TEST_HEX_OUTPUT);
 
 describe('Package Manager Integration Tests', () => {
   let testDir: string;
@@ -122,7 +123,7 @@ describe('Package Manager Integration Tests', () => {
         writeFileSync(join(projectDir, 'package.json'), JSON.stringify(packageJson, null, 2));
         
         // Create test script
-        writeFileSync(join(projectDir, 'test.js'), CONSUMER_TEST_SCRIPT);
+        writeFileSync(join(projectDir, 'test.js'), createConsumerTestScript());
         
         // Install package with specific package manager
         const installCmd = packageManager === 'npm' 
@@ -174,7 +175,7 @@ describe('Package Manager Integration Tests', () => {
         scripts: { test: 'bun run test.js' }
       };
       writeFileSync(join(projectDir, 'package.json'), JSON.stringify(packageJson, null, 2));
-      writeFileSync(join(projectDir, 'test.js'), CONSUMER_TEST_SCRIPT);
+      writeFileSync(join(projectDir, 'test.js'), createConsumerTestScript());
       
       console.log('Installing with bun...');
       execSync(`bun add "${packageTarball}"`, { cwd: projectDir, stdio: 'inherit' });
