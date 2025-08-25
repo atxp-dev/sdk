@@ -3,17 +3,14 @@ import { Logger, Currency } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { encodeFunctionData, /*getAddress, Account,*/ WalletClient } from 'viem';
 //import { SpendPermission } from './types.js';
-import { type PaymasterSmartWallet } from './paymasterHelpers.js';
+import { validatePaymasterCapabilities } from './paymasterHelpers.js';
 
 export class BaseAppPaymentMaker extends BasePaymentMaker {
-  private smartWallet?: PaymasterSmartWallet;
-
   constructor(
     baseRPCUrl: string, 
     //spendPermission: SpendPermission, 
     //account: Account,
     walletClient: WalletClient,
-    smartWallet?: PaymasterSmartWallet,
     logger?: Logger
   ) {
     //if (!spendPermission) {
@@ -21,16 +18,13 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     //}
     super(baseRPCUrl, walletClient, logger);
     //this.spendPermission = spendPermission;
-    this.smartWallet = smartWallet;
     this.isWebAuthn = true; // BaseAppPaymentMaker uses WebAuthn/Smart Wallet auth
   }
 
-  // Override makePayment to use paymaster smart wallet when available
+  // Override makePayment to use paymaster-sponsored transactions
   async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
-    // If no smart wallet, use regular payment from parent class
-    if (!this.smartWallet) {
-      return super.makePayment(amount, currency, receiver);
-    }
+    // Validate paymaster capabilities
+    await validatePaymasterCapabilities(this.signingClient);
 
     // Use paymaster-sponsored transaction
     if (currency !== 'USDC') {
@@ -70,28 +64,35 @@ export class BaseAppPaymentMaker extends BasePaymentMaker {
     });
 
     try {
-      // Send user operation with paymaster sponsorship
-      const userOpHash = await this.smartWallet!.bundlerClient.sendUserOperation({
+      this.logger.info('Using EIP-5792 sendCalls with native paymaster support');
+      
+      // Use sendCalls for the transaction
+      const result = await this.signingClient.sendCalls({
         calls: [{
           to: USDC_CONTRACT_ADDRESS_BASE,
           data: transferCalldata,
           value: 0n
         }],
+        capabilities: {
+          // The wallet should use its configured paymaster
+          paymasterService: {
+            url: `https://api.developer.coinbase.com/rpc/v1/base`
+          }
+        }
       });
 
-      this.logger.info(`Paymaster-sponsored UserOperation sent: ${userOpHash}`);
+      // Extract the id from the result
+      const callsId = typeof result === 'string' ? result : result.id;
+      
+      this.logger.info(`Paymaster-sponsored sendCalls initiated: ${callsId}`);
 
-      // Wait for the operation to be confirmed
-      const receipt = await this.smartWallet!.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash
-      });
+      // Wait for the calls to be confirmed
+      const status = await this.signingClient.waitForCallsStatus({ id: callsId });
 
-      if (!receipt.success) {
-        throw new Error(`UserOperation failed: ${userOpHash}`);
-      }
-
-      this.logger.info(`Paymaster-sponsored payment confirmed: ${receipt.receipt.transactionHash}`);
-      return receipt.receipt.transactionHash;
+      this.logger.info(`Paymaster-sponsored payment confirmed with status: ${JSON.stringify(status)}`);
+      
+      // For EIP-5792, return the calls ID as the transaction identifier
+      return callsId;
     } catch (error) {
       this.logger.error(`Paymaster transaction failed: ${error}`);
       throw error;

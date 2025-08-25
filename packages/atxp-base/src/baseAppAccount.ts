@@ -3,7 +3,7 @@ import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import type { WalletClient } from 'viem';
 import { IStorage, BrowserStorage } from './storage.js';
 // import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
-import { createPaymasterSmartWallet, type PaymasterSmartWallet } from './paymasterHelpers.js';
+import { validatePaymasterCapabilities } from './paymasterHelpers.js';
 import { ConsoleLogger, Logger } from '@atxp/common';
 
 // const DEFAULT_ALLOWANCE = 10n;
@@ -12,7 +12,6 @@ import { ConsoleLogger, Logger } from '@atxp/common';
 export class BaseAppAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
-  private smartWallet?: PaymasterSmartWallet;
 
   private static toStorageKey(userWalletAddress: string): string {
     return `atxp-base-permission-${userWalletAddress}`;
@@ -80,14 +79,13 @@ export class BaseAppAccount implements Account {
 
     */
 
-    // Create paymaster smart wallet if enabled (defaults to true)
-    let smartWallet: PaymasterSmartWallet | undefined;
+    // Validate paymaster capabilities if enabled (defaults to true)
     if (config.usePaymaster !== false) {
-      smartWallet = await createPaymasterSmartWallet(walletClient, config.apiKey);
-      logger?.info(`Created smart wallet with paymaster at: ${smartWallet.address}`);
+      await validatePaymasterCapabilities(walletClient);
+      logger?.info(`Validated paymaster capabilities for wallet: ${walletClient.account!.address}`);
     }
     
-    return new BaseAppAccount(baseRPCUrl, walletClient, config.apiKey, smartWallet, logger);
+    return new BaseAppAccount(baseRPCUrl, walletClient, config.apiKey, logger);
   }
 
   /*
@@ -310,7 +308,6 @@ export class BaseAppAccount implements Account {
     //account: ViemAccount, 
     walletClient: WalletClient,
     apiKey: string,
-    smartWallet?: PaymasterSmartWallet,
     logger?: Logger
   ) {
     if (!baseRPCUrl) {
@@ -320,11 +317,10 @@ export class BaseAppAccount implements Account {
       throw new Error('Wallet client is required');
     }
 
-    this.accountId = smartWallet ? smartWallet.address : walletClient!.account!.address;
-    this.smartWallet = smartWallet;
+    this.accountId = walletClient.account!.address;
 
     this.paymentMakers = {
-      'base': new BaseAppPaymentMaker(baseRPCUrl, walletClient, smartWallet, logger),
+      'base': new BaseAppPaymentMaker(baseRPCUrl, walletClient, logger),
     }
   }
 

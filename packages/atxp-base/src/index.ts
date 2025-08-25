@@ -8,7 +8,4 @@ export {
   BrowserStorage,
   MemoryStorage 
 } from './storage.js';
-export {
-  createPaymasterSmartWallet,
-  type PaymasterSmartWallet
-} from './paymasterHelpers.js';
+export { validatePaymasterCapabilities } from './paymasterHelpers.js';
