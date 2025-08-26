@@ -1,7 +1,7 @@
 import type { PaymentMaker } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { Address, parseEther } from 'viem';
+import { Address, parseEther, encodeFunctionData } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { base } from 'viem/chains';
@@ -18,6 +18,21 @@ function toBase64Url(data: string): string {
 }
 
 const USDC_DECIMALS = 6;
+const USDC_CONTRACT_ADDRESS_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+
+// Minimal ERC20 ABI for transfer function
+const ERC20_ABI = [
+  {
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    name: 'transfer',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  }
+] as const;
 
 /**
  * Wait for a transaction to be confirmed with the specified number of confirmations
@@ -132,21 +147,34 @@ export class BaseAppPaymentMaker implements PaymentMaker {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
 
-    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ephemeral wallet on Base`);
+    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ${receiver} on Base`);
 
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
     const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
     const spendCalls = await prepareSpendCallData(this.spendPermission, amountInUSDCUnits);
-    this.logger.info(`spendCalls: ${JSON.stringify(spendCalls)}`);
+    
+    // Add a second call to transfer USDC from the smart wallet to the receiver
+    const transferCall = {
+      to: USDC_CONTRACT_ADDRESS_BASE as `0x${string}`,
+      data: encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: "transfer",
+        args: [receiver as Address, amountInUSDCUnits],
+      }),
+      value: '0x0' as `0x${string}`
+    };
+    
+    // Combine spend permission calls with the transfer call
+    const allCalls = [...spendCalls, transferCall];
+    
+    this.logger.info(`Executing ${allCalls.length} calls (${spendCalls.length} spend permission + 1 transfer)`);
     const hash = await this.smartWallet.client.sendUserOperation({ 
       account: this.smartWallet.account, 
-      calls: spendCalls.map(call => {
+      calls: allCalls.map(call => {
         return {
-          chain: base,
-          to: call.to,
-          data: call.data,
-          value: parseEther('0'),
-          account: this.smartWallet.account
+          to: call.to as `0x${string}`,
+          data: call.data as `0x${string}`,
+          value: BigInt(call.value || '0x0')
         }
       })
     }) 
