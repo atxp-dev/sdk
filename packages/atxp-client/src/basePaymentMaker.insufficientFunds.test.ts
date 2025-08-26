@@ -2,9 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { BigNumber } from 'bignumber.js';
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { createWalletClient, http } from 'viem';
-import { base } from 'viem/chains';
 import { USDC_CONTRACT_ADDRESS_BASE } from './baseAccount.js';
 
 // Mock viem functions

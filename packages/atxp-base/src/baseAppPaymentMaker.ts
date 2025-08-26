@@ -41,6 +41,7 @@ async function waitForTransactionConfirmations(
     const publicClient = smartWallet.client.account?.client;
     if (publicClient && 'waitForTransactionReceipt' in publicClient) {
       logger.info(`Waiting for ${confirmations} confirmations...`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (publicClient as any).waitForTransactionReceipt({
         hash: txHash,
         confirmations: confirmations
@@ -129,6 +130,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return encodedAuth;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
