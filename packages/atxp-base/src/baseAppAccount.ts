@@ -12,6 +12,7 @@ import { requestSpendPermission } from "@base-org/account/spend-permission";
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
+const PAYMASTER_URL = 'https://api.developer.coinbase.com/rpc/v1/base/snPdXqIzOGhRkGNJvEHM5bl9Hm3yRO3m';
 
 export class BaseAppAccount implements Account {
   accountId: string;
@@ -56,7 +57,7 @@ export class BaseAppAccount implements Account {
       appName: config?.appName,
       appChainIds: [base.id],
       paymasterUrls: {
-        [base.id]: 'https://api.developer.coinbase.com/rpc/v1/base/snPdXqIzOGhRkGNJvEHM5bl9Hm3yRO3m',
+        [base.id]: PAYMASTER_URL
       }
     });
     const provider = sdk.getProvider();
@@ -64,8 +65,9 @@ export class BaseAppAccount implements Account {
 
     const privateKey = generatePrivateKey();
     const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
-    console.log('Generated ephemeral wallet:', smartWallet.address);
+    logger.info(`Generated ephemeral wallet: ${smartWallet.address}`);
     await this.deploySmartWallet(smartWallet);
+    logger.info(`Deployed smart wallet: ${smartWallet.address}`);
 
     const permission = await requestSpendPermission({
       account: config.userWalletAddress,
@@ -77,8 +79,6 @@ export class BaseAppAccount implements Account {
       provider,
     });
     
-    console.log('Permission:', permission);
-
     // Save wallet and permission
     storage.set(storageKey, {privateKey, permission});
 
@@ -106,8 +106,6 @@ export class BaseAppAccount implements Account {
   private static async deploySmartWallet(
     smartWallet: EphemeralSmartWallet,
   ): Promise<void> {
-    console.log('Deploying smart wallet to enable spend permissions...');
-    
     const deployTx = await smartWallet.client.sendUserOperation({
       calls: [{
         to: smartWallet.address,
@@ -124,8 +122,6 @@ export class BaseAppAccount implements Account {
     if (!receipt.success) {
       throw new Error(`Smart wallet deployment failed. Receipt: ${JSON.stringify(receipt)}`);
     }
-    
-    console.log('✅ Smart wallet deployed successfully at:', smartWallet.address);
   }
 
   constructor(
@@ -151,6 +147,5 @@ export class BaseAppAccount implements Account {
     storage = storage || new BrowserStorage();
 
     storage.delete(this.toStorageKey(userWalletAddress));
-    console.log(`All ATXP-related data cleared from storage for ${userWalletAddress}`);
   }
 }

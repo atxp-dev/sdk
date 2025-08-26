@@ -8,4 +8,3 @@ export {
   BrowserStorage,
   MemoryStorage 
 } from './storage.js';
-export { validatePaymasterCapabilities } from './paymasterHelpers.js';
