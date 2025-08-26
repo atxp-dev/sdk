@@ -33,14 +33,19 @@ jobs:
         registry-url: 'https://registry.npmjs.org'  # Added this line
 
     - name: Install dependencies with rollup workaround
+      run: npm ci
+      continue-on-error: true
+      id: npm-ci
+      env: 
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    
+    - name: Fallback install if npm ci failed  
+      if: steps.npm-ci.outcome == 'failure'
       run: |
-        # Try normal install first
-        if ! npm ci; then
-          echo "npm ci failed, applying rollup optional dependency workaround..."
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
-          npm install
-        fi
+        echo "npm ci failed, applying rollup optional dependency workaround..."
+        npm cache clean --force
+        rm -rf node_modules package-lock.json
+        npm install
       env: 
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 

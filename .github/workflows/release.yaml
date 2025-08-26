@@ -28,15 +28,18 @@ jobs:
           scope: '@atxp'
       
       - name: Install dependencies with rollup workaround
-        run: |
-          # Try normal install first
-          if ! npm ci; then
-            echo "npm ci failed, applying rollup optional dependency workaround..."
-            npm cache clean --force
-            rm -rf node_modules package-lock.json
-            npm install
-          fi
+        run: npm ci
+        continue-on-error: true
+        id: npm-ci
         # Removed NPM_TOKEN from env here - not needed for install
+      
+      - name: Fallback install if npm ci failed
+        if: steps.npm-ci.outcome == 'failure'
+        run: |
+          echo "npm ci failed, applying rollup optional dependency workaround..."
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+          npm install
       
       - name: Build (if needed)
         run: npm run build
