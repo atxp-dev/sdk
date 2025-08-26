@@ -1,244 +1,171 @@
-import { BasePaymentMaker } from '@atxp/client';
-import { Logger, Currency } from '@atxp/common';
+import type { PaymentMaker } from '@atxp/client';
+import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { encodeFunctionData, getAddress, Account, WalletClient, http, createWalletClient } from 'viem';
+import { encodeFunctionData, Address, getAddress, Account, WalletClient, http, createWalletClient, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { base } from 'viem/chains';
+import { prepareSpendCallData } from '@base-org/account/spend-permission';
 
-export class BaseAppPaymentMaker extends BasePaymentMaker {
-  //private spendPermission: SpendPermission;
-  //private smartWallet: EphemeralSmartWallet;
+// Helper function to convert to base64url that works in both Node.js and browsers
+function toBase64Url(data: string): string {
+  // Convert string to base64
+  const base64 = typeof Buffer !== 'undefined' 
+    ? Buffer.from(data).toString('base64')
+    : btoa(data);
+  // Convert base64 to base64url
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+const USDC_CONTRACT_ADDRESS_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
+const USDC_DECIMALS = 6;
+const ERC20_ABI = [
+  {
+    constant: false,
+    inputs: [
+      { name: "_to", type: "address" },
+      { name: "_value", type: "uint256" },
+    ],
+    name: "transfer",
+    outputs: [{ name: "", type: "bool" }],
+    type: "function",
+  },
+  {
+      "constant": true,
+      "inputs": [
+          {
+              "name": "_owner",
+              "type": "address"
+          }
+      ],
+      "name": "balanceOf",
+      "outputs": [
+          {
+              "name": "balance",
+              "type": "uint256"
+          }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+  }
+];
+
+export class BaseAppPaymentMaker implements PaymentMaker {
+  private logger: Logger;
+  private baseRPCUrl: string;
+  private spendPermission: SpendPermission;
+  private smartWallet: EphemeralSmartWallet;
 
   constructor(
     baseRPCUrl: string, 
-    spendPermission: SpendPermission, 
-    //account: Account,
-    //walletClient: WalletClient,
+    spendPermission: SpendPermission,
     smartWallet: EphemeralSmartWallet,
     logger?: Logger
   ) {
-    //if (!spendPermission) {
-      //throw new Error('Spend permission is required');
-    //}
-    const client = createWalletClient({
-      account: smartWallet.signer,
-      chain: base,
-      transport: http(baseRPCUrl)
+    if (!spendPermission) {
+      throw new Error('Spend permission is required');
+    }
+    if (!smartWallet) {
+      throw new Error('Smart wallet is required');
+    }
+    this.baseRPCUrl = baseRPCUrl;
+    this.logger = logger ?? new ConsoleLogger();
+    this.spendPermission = spendPermission;
+    this.smartWallet = smartWallet;
+  }
+
+  async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
+    const headerObj = { alg: 'ES256K' };
+    
+    const payloadObj = {
+      sub: this.smartWallet.account.address,
+      iss: 'accounts.atxp.ai',
+      aud: 'https://auth.atxp.ai',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 60 * 60,
+      ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
+      ...(paymentRequestId ? { payment_request_id: paymentRequestId } : {}),
+    } as Record<string, unknown>;
+
+    const header = toBase64Url(JSON.stringify(headerObj));
+    const payload = toBase64Url(JSON.stringify(payloadObj));
+    const message = `${header}.${payload}`;
+
+    const messageBytes = typeof Buffer !== 'undefined'
+      ? Buffer.from(message, 'utf8')
+      : new TextEncoder().encode(message);
+    
+    const signResult = await this.smartWallet.account.signMessage({
+      message: { raw: messageBytes },
     });
-    // TODO: Probably wrong
-    super(baseRPCUrl, client, logger);
-    this.isWebAuthn = false;
-    //this.spendPermission = spendPermission;
-    //this.smartWallet = smartWallet;
+
+    // For ES256K, signature is typically 65 bytes (r,s,v)
+    // Server expects the hex signature string (with 0x prefix) to be base64url encoded
+    // This creates: base64url("0x6eb2565...") not base64url(rawBytes)
+    // Pass the hex string directly to toBase64Url which will UTF-8 encode and base64url it
+    const signature = toBase64Url(signResult);
+
+    const jwt = `${header}.${payload}.${signature}`;
+    this.logger.info(`Generated ES256K JWT: ${jwt}`);
+    return jwt;
   }
 
-
-  // override makePayment to use spend permissions
-  /*async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
-    this.validatePaymentRequest(currency);
-    
-    const amountBigInt = this.convertAmountToBigInt(amount);
-    
-    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ephemeral wallet on Base`);
-    
-    this.logPaymentDetails(amountBigInt, receiver);
-    
-    // Execute the payment transaction
-    return await this.executePaymentTransaction(amountBigInt, receiver);
-  }
-
-  private validatePaymentRequest(currency: Currency): void {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
-  }
 
-  private convertAmountToBigInt(amount: BigNumber): bigint {
-    // Convert USDC amount to its smallest unit (6 decimals)
-    // 0.01 USDC = 10,000 micro-USDC
-    const USDC_DECIMALS = 6;
-    const amountInMicroUsdc = amount.multipliedBy(10 ** USDC_DECIMALS);
-    return BigInt(amountInMicroUsdc.toFixed(0));
-  }
+    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ephemeral wallet on Base`);
 
-  private logPaymentDetails(amountBigInt: bigint, receiver: string): void {
-    const now = Math.floor(Date.now() / 1000);
-    console.log('Spend permission details:', {
-      account: this.spendPermission.permission.account,
-      spender: this.spendPermission.permission.spender,
-      token: this.spendPermission.permission.token,
-      allowance: this.spendPermission.permission.allowance,
-      amount: amountBigInt.toString(),
-      receiver,
-      smartWallet: this.smartWallet?.address,
-      currentTime: now,
-      start: this.spendPermission.permission.start,
-      end: this.spendPermission.permission.end,
-      isValid: now >= Number(this.spendPermission.permission.start) && now <= Number(this.spendPermission.permission.end),
-      salt: this.spendPermission.permission.salt,
-      extraData: this.spendPermission.permission.extraData,
-      signature: this.spendPermission.signature
-    });
-  }
-
-  private async executePaymentTransaction(amountBigInt: bigint, receiver: string): Promise<string> {
-    const spendPermissionCalldata = this.prepareSpendPermissionCall(amountBigInt);
-    const usdcTransferCalldata = this.prepareUSDCTransferCall(amountBigInt, receiver);
-
-    try {
-      const userOpHash = await this.sendUserOperation(spendPermissionCalldata, usdcTransferCalldata);
-      return await this.waitForUserOperation(userOpHash);
-    } catch (error) {
-      this.handleTransactionError(error, amountBigInt, receiver);
-      throw error;
-    }
-  }
-
-  private prepareSpendPermissionCall(amountBigInt: bigint): `0x${string}` {
-    const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
-    
-    return encodeFunctionData({
-      abi: [{
-        inputs: [
-          { name: 'spendPermission', type: 'tuple', components: [
-            { name: 'account', type: 'address' },
-            { name: 'spender', type: 'address' },
-            { name: 'token', type: 'address' },
-            { name: 'allowance', type: 'uint160' },
-            { name: 'period', type: 'uint48' },
-            { name: 'start', type: 'uint48' },
-            { name: 'end', type: 'uint48' },
-            { name: 'salt', type: 'uint256' },
-            { name: 'extraData', type: 'bytes' }
-          ]},
-          { name: 'signature', type: 'bytes' },
-          { name: 'amount', type: 'uint160' }
-        ],
-        name: 'spend',
-        outputs: [],
-        stateMutability: 'nonpayable',
-        type: 'function'
-      }],
-      functionName: 'spend',
-      args: [
-        {
-          account: this.spendPermission.permission.account as `0x${string}`,
-          spender: this.spendPermission.permission.spender as `0x${string}`,
-          token: this.spendPermission.permission.token as `0x${string}`,
-          allowance: BigInt(this.spendPermission.permission.allowance),
-          period: Number(this.spendPermission.permission.period),
-          start: Number(this.spendPermission.permission.start),
-          end: Number(this.spendPermission.permission.end),
-          salt: BigInt(this.spendPermission.permission.salt),
-          extraData: this.spendPermission.permission.extraData as `0x${string}`
-        },
-        this.spendPermission.signature as `0x${string}`,
-        amountBigInt
-      ]
-    });
-  }
-
-  private prepareUSDCTransferCall(amountBigInt: bigint, receiver: string): `0x${string}` {
-    const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
-    
-    const USDC_ABI = [{
-      inputs: [
-        { name: 'to', type: 'address' },
-        { name: 'amount', type: 'uint256' }
-      ],
-      name: 'transfer',
-      outputs: [{ name: '', type: 'bool' }],
-      stateMutability: 'nonpayable',
-      type: 'function'
-    }];
-
-    return encodeFunctionData({
-      abi: USDC_ABI,
-      functionName: 'transfer',
-      args: [receiver as `0x${string}`, amountBigInt]
-    });
-  }
-
-  private async sendUserOperation(
-    spendPermissionCalldata: `0x${string}`,
-    usdcTransferCalldata: `0x${string}`
-  ): Promise<`0x${string}`> {
-    const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
-    const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
-
-    const userOpHash = await this.smartWallet.client.sendUserOperation({
-      calls: [
-        {
-          to: SPEND_PERMISSION_MANAGER,
-          data: spendPermissionCalldata,
-          value: 0n
-        },
-        {
-          to: USDC_CONTRACT,
-          data: usdcTransferCalldata,
-          value: 0n
+    const spendCalls = await prepareSpendCallData(this.spendPermission, BigInt(amount.toString()));
+    const hash = await this.smartWallet.client.sendUserOperation({ 
+      account: this.smartWallet.account, 
+      calls: spendCalls.map(call => {
+        return {
+          chain: base,
+          to: call.to,
+          data: call.data,
+          value: parseEther('0'),
+          account: this.smartWallet.account
         }
-      ],
-      paymaster: true
-    });
-
-    this.logger.info(`Smart wallet UserOperation sent: ${userOpHash}`);
-    return userOpHash;
-  }
-
-  private async waitForUserOperation(userOpHash: `0x${string}`): Promise<string> {
-    const receipt = await this.smartWallet.client.waitForUserOperationReceipt({
-      hash: userOpHash
-    });
-
-    if (!receipt.success) {
-      throw new Error(`UserOperation failed: ${userOpHash}`);
+      })
+    }) 
+     
+    const receipt = await this.smartWallet.client.waitForUserOperationReceipt({ hash })
+    if (!receipt) {
+      throw new Error('User operation failed');
     }
+    this.logger.info(`User operation successful: ${receipt.userOpHash}`);
 
-    this.logger.info(`UserOperation confirmed: ${userOpHash}`);
-    return receipt.receipt.transactionHash;
-  }
-
-  private handleTransactionError(error: unknown, amountBigInt: bigint, receiver: string): void {
-    console.error('UserOperation failed:', error);
-    
-    // Add detailed debugging for spend permission errors
-    if (error instanceof Error && error.message.includes('Execution reverted')) {
-      console.error('=== SPEND PERMISSION DEBUGGING ===');
-      console.error('Spend permission details:');
-      console.error('- Account:', this.spendPermission.permission.account);
-      console.error('- Spender:', this.spendPermission.permission.spender);
-      console.error('- Token:', this.spendPermission.permission.token);
-      console.error('- Allowance:', this.spendPermission.permission.allowance);
-      console.error('- Amount:', amountBigInt.toString());
-      console.error('- Receiver:', receiver);
-      console.error('- Smart Wallet:', this.smartWallet.address);
-      console.error('- Current Time:', Math.floor(Date.now() / 1000));
-      console.error('- Start:', Number(this.spendPermission.permission.start));
-      console.error('- End:', Number(this.spendPermission.permission.end));
-      console.error('- Is Valid:', Number(this.spendPermission.permission.start) <= Math.floor(Date.now() / 1000) && Math.floor(Date.now() / 1000) <= Number(this.spendPermission.permission.end));
-      console.error('- Salt:', this.spendPermission.permission.salt);
-      console.error('- Extra Data:', this.spendPermission.permission.extraData);
-      console.error('- Signature Length:', this.spendPermission.signature.length);
-      console.error('- Signature Preview:', this.spendPermission.signature.substring(0, 100) + '...');
-      console.error('=== END DEBUGGING ===');
-    }
-    
-    // Try to decode the specific error
-    if (error instanceof Error && error.message.includes('execution reverted')) {
-      console.error('The transaction reverted. Possible reasons:');
-      console.error('1. The SpendPermissionManager rejected the spend permission');
-      console.error('2. The permission signature might be invalid');
-      console.error('3. The permission might have already been used (check salt)');
-      console.error('4. The smart wallet might not be the correct spender');
+    // now send the payment to the receiver
+    this.logger.info(`Sending payment to receiver: ${receiver}`);
+    // Convert amount to USDC units (6 decimals) as BigInt
+    const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
       
-      // Log the permission details again for debugging
-      console.error('Permission was:', {
-        account: this.spendPermission.permission.account,
-        spender: this.spendPermission.permission.spender,
-        smartWallet: this.smartWallet.address
-      });
+    const data = encodeFunctionData({
+      abi: ERC20_ABI,
+      functionName: "transfer",
+      args: [receiver as Address, amountInUSDCUnits],
+    });
+    const txHash = await this.smartWallet.client.sendUserOperation({
+      account: this.smartWallet.account,
+      calls: [{
+        to: USDC_CONTRACT_ADDRESS_BASE,
+        data: data,
+        value: parseEther('0'),
+      }]
+    });
+    
+    // Wait for transaction confirmation with more blocks to ensure propagation
+    this.logger.info(`Waiting for transaction confirmation: ${txHash}`);
+    const txReceipt = await this.smartWallet.client.waitForUserOperationReceipt({ hash});
+    
+    if (!txReceipt) {
+      throw new Error('User operation failed');
     }
-  }*/
+    this.logger.info(`User operation successful: ${txReceipt.userOpHash}`);
+        
+    return hash;
+  }
 }
