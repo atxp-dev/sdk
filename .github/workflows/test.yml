@@ -33,7 +33,7 @@ jobs:
         registry-url: 'https://registry.npmjs.org'  # Added this line
 
     - name: Install dependencies with rollup workaround
-      run: npm ci
+      run: npm ci --include=optional
       continue-on-error: true
       id: npm-ci
       env: 
@@ -45,7 +45,7 @@ jobs:
         echo "npm ci failed, applying rollup optional dependency workaround..."
         npm cache clean --force
         rm -rf node_modules package-lock.json
-        npm install
+        npm install --include=optional
       env: 
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -57,6 +57,13 @@ jobs:
 
     - name: Run lint
       run: npm run lint
+
+    - name: Verify Rollup installation
+      run: |
+        echo "Checking for Rollup platform binaries..."
+        ls -la node_modules/@rollup/ | grep rollup- || echo "No @rollup packages found in root"
+        echo "Checking Rollup version..."
+        npm ls rollup || true
 
     - name: Run tests
       run: npm test

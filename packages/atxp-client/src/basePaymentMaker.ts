@@ -4,22 +4,29 @@ import { Logger, Currency } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
-  createWalletClient,
-  http,
   parseEther,
   publicActions,
   encodeFunctionData,
   WalletClient,
   PublicActions,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { BigNumber } from "bignumber.js";
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseAccount.js';
 
 // Type for the extended wallet client with public actions
 type ExtendedWalletClient = WalletClient & PublicActions;
 
-const USDC_CONTRACT_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
+// Helper function to convert to base64url that works in both Node.js and browsers
+function toBase64Url(data: string): string {
+  // Convert string to base64
+  const base64 = typeof Buffer !== 'undefined' 
+    ? Buffer.from(data).toString('base64')
+    : btoa(data);
+  // Convert base64 to base64url
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
 const USDC_DECIMALS = 6;
 const ERC20_ABI = [
   {
@@ -54,31 +61,29 @@ const ERC20_ABI = [
 ];
 
 export class BasePaymentMaker implements PaymentMaker {
-  private signingClient: ExtendedWalletClient;
-  private account: ReturnType<typeof privateKeyToAccount>;
-  private logger: Logger;
+  protected signingClient: ExtendedWalletClient;
+  protected logger: Logger;
 
-  constructor(baseRPCUrl: string, sourceSecretKey: Hex, logger?: Logger) {
+  constructor(baseRPCUrl: string, walletClient: WalletClient, logger?: Logger) {
     if (!baseRPCUrl) {
-      throw new Error('Base RPC URL is required');
+      throw new Error('baseRPCUrl was empty');
     }
-    if (!sourceSecretKey) {
-      throw new Error('Source secret key is required');
+    if (!walletClient) {
+      throw new Error('walletClient was empty');
+    }
+    if(!walletClient.account) {
+      throw new Error('walletClient.account was empty');
     }
 
-    this.account = privateKeyToAccount(sourceSecretKey);
-    this.signingClient = createWalletClient({
-      account: this.account,
-      chain: base,
-      transport: http(baseRPCUrl),
-    }).extend(publicActions) as ExtendedWalletClient;
+    this.signingClient = walletClient.extend(publicActions) as ExtendedWalletClient;
     this.logger = logger ?? new ConsoleLogger();
   }
-  
-  generateJWT = async({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> => {
-    const headerObj = { alg: 'ES256K' }; // this value is specific to Base
+
+  async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
+    const headerObj = { alg: 'ES256K' };
+    
     const payloadObj = {
-      sub: this.account.address,
+      sub: this.signingClient.account!.address,
       iss: 'accounts.atxp.ai',
       aud: 'https://auth.atxp.ai',
       iat: Math.floor(Date.now() / 1000),
@@ -87,39 +92,44 @@ export class BasePaymentMaker implements PaymentMaker {
       ...(paymentRequestId ? { payment_request_id: paymentRequestId } : {}),
     } as Record<string, unknown>;
 
-    const header = Buffer.from(JSON.stringify(headerObj)).toString('base64url');
-    const payload = Buffer.from(JSON.stringify(payloadObj)).toString('base64url');
+    const header = toBase64Url(JSON.stringify(headerObj));
+    const payload = toBase64Url(JSON.stringify(payloadObj));
     const message = `${header}.${payload}`;
 
-    // For Ethereum wallets, we need to use personal_sign format
-    const messageBytes = Buffer.from(message, 'utf8');
+    const messageBytes = typeof Buffer !== 'undefined'
+      ? Buffer.from(message, 'utf8')
+      : new TextEncoder().encode(message);
+    
     const signResult = await this.signingClient.signMessage({
-      account: this.account,
+      account: this.signingClient.account!,
       message: { raw: messageBytes },
     });
-    
-    // The paymcp server expects ES256K signatures as hex strings with 0x prefix
-    // The signResult from viem is already in hex format with 0x prefix (65 bytes)
-    // We encode the hex string itself (including 0x) as base64url
-    const signature = Buffer.from(signResult, 'utf8').toString('base64url');
 
-    return `${header}.${payload}.${signature}`;
+    // For ES256K, signature is typically 65 bytes (r,s,v)
+    // Server expects the hex signature string (with 0x prefix) to be base64url encoded
+    // This creates: base64url("0x6eb2565...") not base64url(rawBytes)
+    // Pass the hex string directly to toBase64Url which will UTF-8 encode and base64url it
+    const signature = toBase64Url(signResult);
+
+    const jwt = `${header}.${payload}.${signature}`;
+    this.logger.info(`Generated ES256K JWT: ${jwt}`);
+    return jwt;
   }
 
-  makePayment = async (amount: BigNumber, currency: Currency, receiver: string): Promise<string> => {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
     }
 
-    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base`);
+    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base from ${this.signingClient.account!.address}`);
 
     try {
       // Check balance before attempting payment
       const balanceRaw = await this.signingClient.readContract({
-        address: USDC_CONTRACT_ADDRESS as Address,
+        address: USDC_CONTRACT_ADDRESS_BASE as Address,
         abi: ERC20_ABI,
         functionName: 'balanceOf',
-        args: [this.account.address],
+        args: [this.signingClient.account!.address],
       }) as bigint;
       
       const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** USDC_DECIMALS);
@@ -139,8 +149,8 @@ export class BasePaymentMaker implements PaymentMaker {
       });
       const hash = await this.signingClient.sendTransaction({
         chain: base,
-        account: this.account,
-        to: USDC_CONTRACT_ADDRESS,
+        account: this.signingClient.account!,
+        to: USDC_CONTRACT_ADDRESS_BASE,
         data: data,
         value: parseEther('0'),
       });

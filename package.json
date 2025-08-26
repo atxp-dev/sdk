@@ -4,7 +4,12 @@
   "description": "ATXP SDK Monorepo - Authorization Token Exchange Protocol packages",
   "license": "MIT",
   "workspaces": [
-    "packages/*"
+    "packages/atxp-common",
+    "packages/atxp-sqlite",
+    "packages/atxp-redis",
+    "packages/atxp-server",
+    "packages/atxp-client",
+    "packages/atxp-base"
   ],
   "repository": {
     "type": "git",
@@ -19,8 +24,8 @@
     "authorization"
   ],
   "scripts": {
-    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
-    "build": "npm run build -w packages/atxp-common && npm run build -w packages/atxp-sqlite && npm run build -w packages/atxp-redis && npm run build -w packages/atxp-server && npm run build -w packages/atxp-client",
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo packages/*/node_modules",
+    "build": "npm run build --workspaces --if-present",
     "build:dev": "tsc",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
@@ -49,5 +54,14 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^3.0.9"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.40.2",
+    "@rollup/rollup-linux-x64-musl": "4.40.2",
+    "@rollup/rollup-darwin-x64": "4.40.2",
+    "@rollup/rollup-win32-x64-msvc": "4.40.2",
+    "@rollup/rollup-darwin-arm64": "4.40.2",
+    "@rollup/rollup-linux-arm64-gnu": "4.40.2",
+    "@rollup/rollup-linux-arm64-musl": "4.40.2"
   }
 }

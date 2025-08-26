@@ -37,25 +37,25 @@ describe('InsufficientFundsError', () => {
 
   it('should work without network', () => {
     const error = new InsufficientFundsError(
-      'ETH',
+      'USDC' as const,
       new BigNumber('1.5'),
       new BigNumber('0.8')
     );
     
     expect(error.message).toBe(
-      'Payment failed due to insufficient ETH funds. Required: 1.5, Available: 0.8. Please ensure your account has adequate balance before retrying.'
+      'Payment failed due to insufficient USDC funds. Required: 1.5, Available: 0.8. Please ensure your account has adequate balance before retrying.'
     );
     expect(error.network).toBeUndefined();
   });
 
   it('should work with minimal parameters', () => {
     const error = new InsufficientFundsError(
-      'BTC',
+      'USDC' as const,
       new BigNumber('0.001')
     );
     
     expect(error.message).toBe(
-      'Payment failed due to insufficient BTC funds. Required: 0.001. Please ensure your account has adequate balance before retrying.'
+      'Payment failed due to insufficient USDC funds. Required: 0.001. Please ensure your account has adequate balance before retrying.'
     );
     expect(error.available).toBeUndefined();
     expect(error.network).toBeUndefined();

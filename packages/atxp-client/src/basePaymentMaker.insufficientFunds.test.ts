@@ -2,11 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { BigNumber } from 'bignumber.js';
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseAccount.js';
 
 // Mock viem functions
 vi.mock('viem', () => ({
   createWalletClient: vi.fn(() => ({
+    account: {
+      address: '0xtest-address',
+    },
     extend: vi.fn(() => ({
+      account: {
+        address: '0xtest-address',
+      },
       signMessage: vi.fn(),
       sendTransaction: vi.fn(),
       waitForTransactionReceipt: vi.fn(),
@@ -30,6 +37,9 @@ vi.mock('viem/chains', () => ({
 }));
 
 interface MockSigningClient {
+  account: {
+    address: string;
+  };
   signMessage: ReturnType<typeof vi.fn>;
   sendTransaction: ReturnType<typeof vi.fn>;
   waitForTransactionReceipt: ReturnType<typeof vi.fn>;
@@ -46,19 +56,28 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     
     // Create a mock signing client
     mockSigningClient = {
+      account: {
+        address: '0xtest-address',
+      },
       signMessage: vi.fn(),
       sendTransaction: vi.fn(),
       waitForTransactionReceipt: vi.fn(),
       readContract: vi.fn(),
     };
 
+    const walletClient = {
+      account: {
+        address: '0xtest-address',
+      },
+      extend: vi.fn(() => mockSigningClient),
+    } as any;
+    
     paymentMaker = new BasePaymentMaker(
       'https://fake-rpc.com',
-      '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+      walletClient,
     );
 
-    // Inject our mock signing client (using any here is acceptable for testing internal state)
-    (paymentMaker as any).signingClient = mockSigningClient;
+    // Mock signing client is already injected via the walletClient.extend() mock
   });
 
   it('should throw InsufficientFundsError when balance is less than required', async () => {
@@ -88,10 +107,10 @@ describe('BasePaymentMaker insufficient funds handling', () => {
 
     // Verify balance was checked
     expect(mockSigningClient.readContract).toHaveBeenCalledWith({
-      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      address: USDC_CONTRACT_ADDRESS_BASE,
       abi: expect.any(Array),
       functionName: 'balanceOf',
-      args: ['0x1234567890abcdef1234567890abcdef12345678'],
+      args: ['0xtest-address'],
     });
 
     // Verify transaction was not attempted
@@ -124,11 +143,11 @@ describe('BasePaymentMaker insufficient funds handling', () => {
 
   it('should throw PaymentNetworkError for unsupported currency', async () => {
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'ETH', '0xreceiver')
+      paymentMaker.makePayment(new BigNumber('10'), 'ETH' as any, '0xreceiver')
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'ETH', '0xreceiver');
+      await paymentMaker.makePayment(new BigNumber('10'), 'ETH' as any, '0xreceiver');
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
       

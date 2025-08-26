@@ -63,6 +63,12 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     
     mockConnection = {
       // Mock connection methods
+      getTokenAccountBalance: vi.fn(),
+      sendTransaction: vi.fn().mockResolvedValue('TransactionSignature123'),
+      getLatestBlockhash: vi.fn().mockResolvedValue({
+        blockhash: 'mockedBlockhash',
+        lastValidBlockHeight: 100
+      })
     };
 
     paymentMaker = new SolanaPaymentMaker(
@@ -137,23 +143,24 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     expect(sendAndConfirmTransaction).toHaveBeenCalled();
   });
 
-  it('should throw PaymentNetworkError for unsupported currency', async () => {
-    await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'SOL', 'ReceiverPublicKey')
-    ).rejects.toThrow(PaymentNetworkError);
-
-    try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'SOL', 'ReceiverPublicKey');
-    } catch (error) {
-      expect(error).toBeInstanceOf(PaymentNetworkError);
-      
-      if (error instanceof PaymentNetworkError) {
-        expect(error.message).toContain('Only USDC currency is supported');
+  it('should successfully process USDC payments', async () => {
+    // Mock sufficient balance for USDC
+    vi.mocked(getAssociatedTokenAddress).mockResolvedValue('AssociatedTokenAddress' as any);
+    vi.mocked(sendAndConfirmTransaction).mockResolvedValue('TransactionSignature123');
+    mockConnection.getTokenAccountBalance.mockResolvedValue({
+      value: {
+        amount: '15000000', // 15 USDC (6 decimals)
+        decimals: 6,
+        uiAmount: 15,
+        uiAmountString: '15'
       }
-    }
+    });
 
-    // Verify balance check was not attempted
-    expect(getAssociatedTokenAddress).not.toHaveBeenCalled();
+    const result = await paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey');
+
+    expect(result).toBe('TransactionSignature123');
+    expect(getAssociatedTokenAddress).toHaveBeenCalled();
+    expect(sendAndConfirmTransaction).toHaveBeenCalled();
   });
 
   it('should wrap unexpected errors in PaymentNetworkError', async () => {

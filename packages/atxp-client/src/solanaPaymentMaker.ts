@@ -56,7 +56,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
 
     const receiverKey = new PublicKey(receiver);
 
-    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Solana`);
+    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Solana from ${this.source.publicKey.toBase58()}`);
 
     try {
       // Check balance before attempting payment
