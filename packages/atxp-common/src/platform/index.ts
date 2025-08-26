@@ -182,7 +182,7 @@ function createNodeCrypto(): PlatformCrypto {
         return globalThis.crypto.randomUUID();
       }
       
-      // Fall back to Node.js crypto module (requires sync loading)
+      // Try Node.js crypto module if available (CommonJS environments)
       try {
         // Try node:crypto first, then fallback to crypto
         let crypto: any;
@@ -193,7 +193,12 @@ function createNodeCrypto(): PlatformCrypto {
         }
         return crypto.randomUUID();
       } catch {
-        throw new Error('randomUUID requires synchronous module loading (CommonJS)');
+        // Fallback to Math.random() based UUID generation (RFC 4122 compliant)
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
       }
     },
     toHex: (data: Uint8Array) => Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(''),
