@@ -1,5 +1,4 @@
-import { type PaymentMaker } from '@atxp/client';
-import { USDC_CONTRACT_ADDRESS_BASE } from './baseAppAccount.js';
+import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { Address, encodeFunctionData, Hex } from 'viem';
 import { SpendPermission } from './types.js';

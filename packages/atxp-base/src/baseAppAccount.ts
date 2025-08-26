@@ -1,15 +1,15 @@
-import type { Account, PaymentMaker, Hex } from '@atxp/client';
+import type { Account, PaymentMaker } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
+import { Hex } from '@atxp/client';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
 import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { ConsoleLogger, Logger } from '@atxp/common';
 import { createBaseAccountSDK } from "@base-org/account";
 import { requestSpendPermission } from "@base-org/account/spend-permission";
-
-export const USDC_CONTRACT_ADDRESS_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
