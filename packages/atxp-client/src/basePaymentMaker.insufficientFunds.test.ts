@@ -37,6 +37,9 @@ vi.mock('viem/chains', () => ({
 }));
 
 interface MockSigningClient {
+  account: {
+    address: string;
+  };
   signMessage: ReturnType<typeof vi.fn>;
   sendTransaction: ReturnType<typeof vi.fn>;
   waitForTransactionReceipt: ReturnType<typeof vi.fn>;
@@ -140,11 +143,11 @@ describe('BasePaymentMaker insufficient funds handling', () => {
 
   it('should throw PaymentNetworkError for unsupported currency', async () => {
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'ETH', '0xreceiver')
+      paymentMaker.makePayment(new BigNumber('10'), 'ETH' as any, '0xreceiver')
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'ETH', '0xreceiver');
+      await paymentMaker.makePayment(new BigNumber('10'), 'ETH' as any, '0xreceiver');
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
       

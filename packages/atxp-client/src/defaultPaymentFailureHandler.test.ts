@@ -113,14 +113,14 @@ describe('Default Payment Failure Handler', () => {
 
     it('should handle different currencies and amounts', async () => {
       const payment = createTestPayment({
-        network: 'ethereum',
-        currency: 'ETH',
+        network: 'ethereum' as any,
+        currency: 'ETH' as any,
         amount: new BigNumber('2.5'),
         accountId: 'trader-123',
       });
 
       const error = new InsufficientFundsError(
-        'ETH',
+        'ETH' as any,
         new BigNumber('2.5'),
         new BigNumber('0.001'),
         'ethereum'
@@ -166,7 +166,7 @@ describe('Default Payment Failure Handler', () => {
 
     it('should handle network error with different networks', async () => {
       const payment = createTestPayment({
-        network: 'polygon',
+        network: 'polygon' as any,
       });
 
       const error = new PaymentNetworkError('Transaction reverted');
@@ -274,11 +274,11 @@ describe('Default Payment Failure Handler', () => {
     it('should handle small decimal amounts correctly', async () => {
       const payment = createTestPayment({
         amount: new BigNumber('0.000001'),
-        currency: 'BTC',
+        currency: 'USDC' as const,
       });
 
       const error = new InsufficientFundsError(
-        'BTC',
+        'USDC' as const,
         new BigNumber('0.000001'),
         new BigNumber('0.0000005'),
         'bitcoin'
@@ -286,8 +286,8 @@ describe('Default Payment Failure Handler', () => {
 
       await defaultHandler({ payment, error });
 
-      expect(mockLogger.info).toHaveBeenCalledWith('Required: 0.000001 BTC');
-      expect(mockLogger.info).toHaveBeenCalledWith('Available: 5e-7 BTC');
+      expect(mockLogger.info).toHaveBeenCalledWith('Required: 0.000001 USDC');
+      expect(mockLogger.info).toHaveBeenCalledWith('Available: 5e-7 USDC');
     });
 
     it('should handle large amounts correctly', async () => {

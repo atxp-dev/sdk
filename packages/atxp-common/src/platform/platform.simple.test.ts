@@ -40,7 +40,7 @@ describe('Platform Detection Logic', () => {
       expect(uuid.length).toBeGreaterThan(30); // UUIDs are typically 36 chars
     } catch (error) {
       // Expected in vitest ESM environment - the fix works in actual runtime
-      expect(error.message).toContain('synchronous module loading');
+      expect((error as Error).message).toContain('synchronous module loading');
     }
   });
 

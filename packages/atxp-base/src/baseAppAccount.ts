@@ -23,9 +23,9 @@ export class BaseAppAccount implements Account {
   }
 
   static async initialize(config: {
-      userWalletAddress: string, 
-      appName: string;
+      walletAddress: string, 
       apiKey: string;
+      appName: string;
       allowance?: bigint;
       periodInDays?: number;
       storage?: IStorage<string>;
@@ -44,7 +44,7 @@ export class BaseAppAccount implements Account {
     // Initialize storage
     const baseStorage = config?.storage || new BrowserStorage();
     const storage = new IntermediaryStorage(baseStorage);
-    const storageKey = this.toStorageKey(config.userWalletAddress);
+    const storageKey = this.toStorageKey(config.walletAddress);
 
     // Try to load existing permission
     const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
@@ -70,7 +70,7 @@ export class BaseAppAccount implements Account {
     logger.info(`Deployed smart wallet: ${smartWallet.address}`);
 
     const permission = await requestSpendPermission({
-      account: config.userWalletAddress,
+      account: config.walletAddress,
       spender: smartWallet.address,
       token: USDC_CONTRACT_ADDRESS_BASE,
       chainId: base.id,

@@ -1,20 +1,47 @@
 import { describe, it, expect } from 'vitest';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { createWalletClient, http } from 'viem';
-import { base } from 'viem/chains';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
-// import { SpendPermission } from './types.js';
+import type { SpendPermission } from './types.js';
+import type { EphemeralSmartWallet } from './smartWalletHelpers.js';
 
 describe('basePaymentMaker.generateJWT', () => {
   it('should generate EIP-1271 auth data with default payload', async () => {
     const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
-    const walletClient = createWalletClient({
-      account,
-      chain: base,
-      transport: http('https://example.com')
-    });
-    const paymentMaker = new BaseAppPaymentMaker('https://example.com', walletClient);
+    
+    // Create mock SpendPermission
+    const mockSpendPermission: SpendPermission = {
+      signature: '0xmocksignature',
+      permission: {
+        account: account.address,
+        spender: '0xspender',
+        token: '0xtoken',
+        allowance: '1000000',
+        period: 86400,
+        start: Math.floor(Date.now() / 1000),
+        end: Math.floor(Date.now() / 1000) + 86400,
+        salt: '1',
+        extraData: '0x'
+      }
+    };
+    
+    // Create mock EphemeralSmartWallet
+    const mockSmartWallet: EphemeralSmartWallet = {
+      address: account.address,
+      account: {
+        address: account.address,
+        signMessage: async (_message: any) => '0xmocksignature'
+      },
+      signer: {
+        address: account.address,
+        signMessage: async (_message: any) => '0xmocksignature',
+        signTypedData: async (_params: any) => '0xmocksignature',
+        signTransaction: async (_tx: any) => '0xmocksignature',
+        getAddress: async () => account.address
+      }
+    } as any;
+    
+    const paymentMaker = new BaseAppPaymentMaker(mockSpendPermission, mockSmartWallet);
     const authData = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: 'testCodeChallenge'});
 
     // Should return base64-encoded EIP-1271 auth data
@@ -37,12 +64,40 @@ describe('basePaymentMaker.generateJWT', () => {
   it('should include payment request id if provided', async () => {
     const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
-    const walletClient = createWalletClient({
-      account,
-      chain: base,
-      transport: http('https://example.com')
-    });
-    const paymentMaker = new BaseAppPaymentMaker('https://example.com', walletClient);
+    
+    // Create mock SpendPermission
+    const mockSpendPermission: SpendPermission = {
+      signature: '0xmocksignature',
+      permission: {
+        account: account.address,
+        spender: '0xspender',
+        token: '0xtoken',
+        allowance: '1000000',
+        period: 86400,
+        start: Math.floor(Date.now() / 1000),
+        end: Math.floor(Date.now() / 1000) + 86400,
+        salt: '1',
+        extraData: '0x'
+      }
+    };
+    
+    // Create mock EphemeralSmartWallet
+    const mockSmartWallet: EphemeralSmartWallet = {
+      address: account.address,
+      account: {
+        address: account.address,
+        signMessage: async (_message: any) => '0xmocksignature'
+      },
+      signer: {
+        address: account.address,
+        signMessage: async (_message: any) => '0xmocksignature',
+        signTypedData: async (_params: any) => '0xmocksignature',
+        signTransaction: async (_tx: any) => '0xmocksignature',
+        getAddress: async () => account.address
+      }
+    } as any;
+    
+    const paymentMaker = new BaseAppPaymentMaker(mockSpendPermission, mockSmartWallet);
     const paymentRequestId = 'id1';
     const authData = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
     
