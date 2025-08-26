@@ -19,7 +19,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --testTimeout=120000 src/**/*.integration.test.ts",
+    "test:package-managers": "vitest run --testTimeout=120000 src/platform/packageManager.integration.test.ts"
   },
   "dependencies": {
     "bignumber.js": "^9.3.0",

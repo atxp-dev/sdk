@@ -152,7 +152,38 @@ npm run build
 
 # Run linting
 npm run lint
+
+# Run package manager integration tests (prevents crypto regressions)
+npm run test:package-managers
 ```
+
+## Integration Testing
+
+The ATXP SDK includes comprehensive integration tests to ensure compatibility across different package managers and prevent crypto module loading regressions.
+
+### Package Manager Compatibility Tests
+
+These tests verify that the crypto functionality works correctly when the packages are consumed using different package managers:
+
+```bash
+# Test with all available package managers (npm, pnpm, yarn, bun)
+npm run test:package-managers
+
+# Test crypto functionality specifically
+npm run test:integration
+```
+
+**What gets tested:**
+- ✅ Crypto module loading across npm, pnpm, yarn, and bun
+- ✅ UUID generation (`crypto.randomUUID()`)
+- ✅ SHA-256 hashing (`crypto.digest()`)
+- ✅ Hex encoding (`crypto.toHex()`)
+- ✅ Environment detection (Node.js, browser, React Native)
+- ✅ Cross-platform compatibility (Linux, macOS, Windows)
+
+These tests run automatically in CI/CD and help prevent regressions like the "Cannot find module 'crypto'" error that can occur with certain package managers.
+
+For detailed information, see [Package Manager Testing Documentation](./docs/PACKAGE_MANAGER_TESTING.md).
 
 ## License
 

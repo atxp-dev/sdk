@@ -27,9 +27,19 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           scope: '@atxp'
       
-      - name: Install dependencies
+      - name: Install dependencies with rollup workaround
         run: npm ci
+        continue-on-error: true
+        id: npm-ci
         # Removed NPM_TOKEN from env here - not needed for install
+      
+      - name: Fallback install if npm ci failed
+        if: steps.npm-ci.outcome == 'failure'
+        run: |
+          echo "npm ci failed, applying rollup optional dependency workaround..."
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+          npm install
       
       - name: Build (if needed)
         run: npm run build
