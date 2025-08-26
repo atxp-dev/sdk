@@ -61,7 +61,7 @@ export class BaseAppAccount implements Account {
       }
     });
     const provider = sdk.getProvider();
-    await sdk.getProvider().request({ method: 'wallet_connect' });
+    await provider.request({ method: 'wallet_connect' });
 
     const privateKey = generatePrivateKey();
     const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
