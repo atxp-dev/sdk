@@ -24,7 +24,7 @@
     "authorization"
   ],
   "scripts": {
-    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo packages/*/node_modules",
     "build": "npm run build --workspaces --if-present",
     "build:dev": "tsc",
     "typecheck": "npm run typecheck --workspaces --if-present",
