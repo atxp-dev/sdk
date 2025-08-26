@@ -1,9 +1,7 @@
 import type { Account, PaymentMaker } from '@atxp/client';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
-import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
-import type { WalletClient } from 'viem';
-import { getAddress, createPublicClient, http, Account as ViemAccount } from 'viem';
+import { generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
@@ -23,20 +21,17 @@ export class BaseAppAccount implements Account {
     return `atxp-base-permission-${userWalletAddress}`;
   }
 
-  static async initialize(
-    baseRPCUrl: string, 
-    userWalletAddress: string, 
-    walletClient: WalletClient,
-    config: {
+  static async initialize(config: {
+      userWalletAddress: string, 
       appName: string;
+      apiKey: string;
       allowance?: bigint;
       periodInDays?: number;
       storage?: IStorage<string>;
-      apiKey: string;
+      logger?: Logger
     },
-    logger?: Logger,
   ): Promise<BaseAppAccount> {
-    logger = logger || new ConsoleLogger();
+    const logger = config.logger || new ConsoleLogger();
     // Validate smart wallet configuration
     if (!config.apiKey) {
       throw new Error(
@@ -48,15 +43,13 @@ export class BaseAppAccount implements Account {
     // Initialize storage
     const baseStorage = config?.storage || new BrowserStorage();
     const storage = new IntermediaryStorage(baseStorage);
-    const storageKey = this.toStorageKey(userWalletAddress);
+    const storageKey = this.toStorageKey(config.userWalletAddress);
 
     // Try to load existing permission
     const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
     if (existingData) {
       const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey, config.apiKey);
-      //const account = privateKeyToAccount(existingData.privateKey);
-      // The constructor now expects a WalletClient, not individual parameters
-      return new BaseAppAccount(baseRPCUrl, existingData.permission, ephemeralSmartWallet, logger);
+      return new BaseAppAccount(existingData.permission, ephemeralSmartWallet, logger);
     }
 
     const sdk = createBaseAccountSDK({
@@ -72,10 +65,10 @@ export class BaseAppAccount implements Account {
     const privateKey = generatePrivateKey();
     const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
     console.log('Generated ephemeral wallet:', smartWallet.address);
-    await this.deploySmartWallet(smartWallet, config.apiKey);
+    await this.deploySmartWallet(smartWallet);
 
     const permission = await requestSpendPermission({
-      account: userWalletAddress,
+      account: config.userWalletAddress,
       spender: smartWallet.address,
       token: USDC_CONTRACT_ADDRESS_BASE,
       chainId: base.id,
@@ -89,8 +82,7 @@ export class BaseAppAccount implements Account {
     // Save wallet and permission
     storage.set(storageKey, {privateKey, permission});
 
-    //return new BaseAppAccount(baseRPCUrl, permission, account, smartWallet, logger);
-    return new BaseAppAccount(baseRPCUrl, permission, smartWallet, logger);
+    return new BaseAppAccount(permission, smartWallet, logger);
   }
 
   private static loadSavedWalletAndPermission(
@@ -111,152 +103,8 @@ export class BaseAppAccount implements Account {
     return storedData;
   }
 
-  /*
-  private static async checkAndRequestUSDCApproval(
-    baseRPCUrl: string,
-    userWalletAddress: string,
-    walletClient: WalletClient
-  ): Promise<void> {
-    const USDC_CONTRACT = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
-    const SPEND_PERMISSION_MANAGER = getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
-    
-    const publicClient = createPublicClient({
-      chain: base,
-      transport: http(baseRPCUrl)
-    });
-    
-    const allowance = await publicClient.readContract({
-      address: USDC_CONTRACT,
-      abi: [{
-        name: 'allowance',
-        type: 'function',
-        stateMutability: 'view',
-        inputs: [
-          { name: 'owner', type: 'address' },
-          { name: 'spender', type: 'address' }
-        ],
-        outputs: [{ name: '', type: 'uint256' }],
-      }],
-      functionName: 'allowance',
-      args: [userWalletAddress as `0x${string}`, SPEND_PERMISSION_MANAGER],
-    });
-    
-    console.log('USDC allowance for SpendPermissionManager:', allowance);
-    
-    if (allowance === 0n) {
-      try {
-        const hash = await walletClient.writeContract({
-          address: USDC_CONTRACT,
-          abi: [{
-            name: 'approve',
-            type: 'function',
-            stateMutability: 'nonpayable',
-            inputs: [
-              { name: 'spender', type: 'address' },
-              { name: 'amount', type: 'uint256' }
-            ],
-            outputs: [{ name: '', type: 'bool' }],
-          }],
-          functionName: 'approve',
-          args: [SPEND_PERMISSION_MANAGER, BigInt(10 ** 9)], // Approve 1000 USDC
-          chain: base,
-          account: userWalletAddress as `0x${string}`,
-        });
-        
-        console.log('Approval transaction sent:', hash);
-        
-        // Wait for approval
-        await publicClient.waitForTransactionReceipt({ hash });
-        console.log('SpendPermissionManager approved successfully');
-      } catch (approveError) {
-        console.error('Failed to approve SpendPermissionManager:', approveError);
-        throw new Error('SpendPermissionManager must be approved to spend USDC. Please approve the contract at 0xf85210B21cC50302F477BA56686d2019dC9b67Ad');
-      }
-    }
-  }
-
-  private static async createSpendPermission(
-    userWalletAddress: string,
-    walletClient: WalletClient,
-    //privateKey: `0x${string}`,
-    spenderAddress: string,
-    config: {
-      appName: string;
-      allowance?: bigint;
-      periodInDays?: number;
-      apiKey: string;
-    }
-  ): Promise<SpendPermission> {
-    //const spenderAddress = await getSmartWalletAddress(privateKey, config.apiKey);
-
-    const now = Math.floor(Date.now() / 1000);
-    const period = (config?.periodInDays ?? DEFAULT_PERIOD_IN_DAYS) * 24 * 60 * 60;
-    const end = now + period;
-    
-    const domain = {
-      name: 'SpendPermissionManager',
-      version: '1',
-      chainId: base.id,
-      verifyingContract: getAddress('0xf85210B21cC50302F477BA56686d2019dC9b67Ad'),
-    };
-
-    const types = {
-      SpendPermission: [
-        { name: 'account', type: 'address' },
-        { name: 'spender', type: 'address' },
-        { name: 'token', type: 'address' },
-        { name: 'allowance', type: 'uint160' },
-        { name: 'period', type: 'uint48' },
-        { name: 'start', type: 'uint48' },
-        { name: 'end', type: 'uint48' },
-        { name: 'salt', type: 'uint256' },
-        { name: 'extraData', type: 'bytes' },
-      ],
-    };
-
-    const permissionData = {
-      account: userWalletAddress,
-      spender: spenderAddress,
-      token: USDC_CONTRACT_ADDRESS_BASE,
-      allowance: (config?.allowance ?? DEFAULT_ALLOWANCE).toString(),
-      period: period,
-      start: now,
-      end: end,
-      salt: BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)).toString(),
-      extraData: '0x',
-    };
-
-    // Sign the permission using wagmi wallet client
-    console.log('Requesting signature from wallet for address:', userWalletAddress);
-    const signature = await walletClient.signTypedData({
-      account: userWalletAddress as `0x${string}`,
-      domain,
-      types,
-      primaryType: 'SpendPermission',
-      message: permissionData,
-    });
-
-    console.log(`Signed SpendPermission for ${userWalletAddress} with spender ${spenderAddress}`);
-
-    return {
-      signature,
-      permission: {
-        ...permissionData,
-        allowance: permissionData.allowance.toString(),
-        period: permissionData.period,
-        start: permissionData.start,
-        end: permissionData.end,
-        salt: permissionData.salt.toString(),
-      },
-      chainId: base.id,
-      createdAt: now,
-    };
-  }
-    */
-
   private static async deploySmartWallet(
     smartWallet: EphemeralSmartWallet,
-    apiKey: string
   ): Promise<void> {
     console.log('Deploying smart wallet to enable spend permissions...');
     
@@ -280,46 +128,11 @@ export class BaseAppAccount implements Account {
     console.log('✅ Smart wallet deployed successfully at:', smartWallet.address);
   }
 
-  /*
-
   constructor(
-    baseRPCUrl: string, 
-    spendPermission: SpendPermission, 
-    account: ViemAccount, 
-    smartWallet: EphemeralSmartWallet,
-    logger?: Logger
-  ) {
-    if (!baseRPCUrl) {
-      throw new Error('Base RPC URL is required');
-    }
-    if (!account) {
-      throw new Error('Account is required');
-    }
-    if (!spendPermission) {
-      throw new Error('Spend permission is required');
-    }
-    if (!smartWallet) {
-      throw new Error('Smart wallet required');
-    }
-
-    this.accountId = spendPermission.permission.spender;
-
-    this.paymentMakers = {
-      'base': new BaseAppPaymentMaker(baseRPCUrl, spendPermission, account, smartWallet, logger),
-    }
-  }*/
-
-  constructor(
-    baseRPCUrl: string, 
-    //account: ViemAccount, 
-    //walletClient: WalletClient,
     spendPermission: SpendPermission,
     ephemeralSmartWallet: EphemeralSmartWallet,
     logger?: Logger
   ) {
-    if (!baseRPCUrl) {
-      throw new Error('Base RPC URL is required');
-    }
     if (!ephemeralSmartWallet) {
       throw new Error('Wallet client is required');
     }
@@ -327,15 +140,10 @@ export class BaseAppAccount implements Account {
     this.accountId = ephemeralSmartWallet.address;
 
     this.paymentMakers = {
-      'base': new BaseAppPaymentMaker(baseRPCUrl, spendPermission, ephemeralSmartWallet, logger),
+      'base': new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger),
     }
   }
 
-  /**
-   * Clear all ATXP-related data from storage
-   * This includes spend permissions and any OAuth tokens
-   * @param storage Optional storage implementation (defaults to browser localStorage)
-   */
   static clearAllStoredData(userWalletAddress: string, storage?: IStorage<string>): void {
     if (typeof window === 'undefined' && !storage) {
       throw new Error('clearAllStoredData requires a storage to be provided outside of browser environments');

@@ -4,18 +4,12 @@ import { Logger, Currency } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
-  //createWalletClient,
-  //http,
   parseEther,
   publicActions,
   encodeFunctionData,
   WalletClient,
   PublicActions,
-  //Account,
-  //decodeAbiParameters,
-  //parseSignature,
 } from "viem";
-// import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { BigNumber } from "bignumber.js";
 import { USDC_CONTRACT_ADDRESS_BASE } from './baseAccount.js';
@@ -68,7 +62,6 @@ const ERC20_ABI = [
 
 export class BasePaymentMaker implements PaymentMaker {
   protected signingClient: ExtendedWalletClient;
-  //protected account: Account;
   protected logger: Logger;
 
   constructor(baseRPCUrl: string, walletClient: WalletClient, logger?: Logger) {
@@ -83,16 +76,10 @@ export class BasePaymentMaker implements PaymentMaker {
     }
 
     this.signingClient = walletClient.extend(publicActions) as ExtendedWalletClient;
-    //this.publicClient = createWalletClient({
-      //account: this.account,
-      //chain: base,
-      //transport: http(baseRPCUrl),
-    //}).extend(publicActions) as ExtendedWalletClient;
     this.logger = logger ?? new ConsoleLogger();
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
-    // Original JWT logic for regular wallets
     const headerObj = { alg: 'ES256K' };
     
     const payloadObj = {

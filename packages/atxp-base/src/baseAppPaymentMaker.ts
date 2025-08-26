@@ -1,10 +1,8 @@
 import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
-import { BigNumber } from 'bignumber.js';
-import { Address, parseEther, encodeFunctionData } from 'viem';
+import { Address, encodeFunctionData } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
-import { base } from 'viem/chains';
 import { prepareSpendCallData } from '@base-org/account/spend-permission';
 
 // Helper function to convert to base64url that works in both Node.js and browsers
@@ -33,13 +31,6 @@ const ERC20_ABI = [
   }
 ] as const;
 
-/**
- * Wait for a transaction to be confirmed with the specified number of confirmations
- * @param smartWallet The smart wallet instance
- * @param txHash The transaction hash to wait for
- * @param confirmations Number of confirmations to wait for
- * @param logger Logger instance for logging
- */
 async function waitForTransactionConfirmations(
   smartWallet: EphemeralSmartWallet,
   txHash: string,
@@ -66,12 +57,10 @@ async function waitForTransactionConfirmations(
 
 export class BaseAppPaymentMaker implements PaymentMaker {
   private logger: Logger;
-  private baseRPCUrl: string;
   private spendPermission: SpendPermission;
   private smartWallet: EphemeralSmartWallet;
 
   constructor(
-    baseRPCUrl: string, 
     spendPermission: SpendPermission,
     smartWallet: EphemeralSmartWallet,
     logger?: Logger
@@ -82,7 +71,6 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     if (!smartWallet) {
       throw new Error('Smart wallet is required');
     }
-    this.baseRPCUrl = baseRPCUrl;
     this.logger = logger ?? new ConsoleLogger();
     this.spendPermission = spendPermission;
     this.smartWallet = smartWallet;
@@ -141,7 +129,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return encodedAuth;
   }
 
-  async makePayment(amount: BigNumber, currency: string, receiver: string, memo: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
