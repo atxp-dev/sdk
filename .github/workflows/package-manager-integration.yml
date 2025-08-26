@@ -33,12 +33,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: 'npm'
       
-      - name: Clear npm cache and install dependencies
+      - name: Install dependencies with rollup workaround
         run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
-          npm install
+          # Try normal install first
+          if ! npm ci; then
+            echo "npm ci failed, applying rollup optional dependency workaround..."
+            npm cache clean --force
+            rm -rf node_modules package-lock.json
+            npm install
+          fi
       
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -93,12 +98,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: 'npm'
       
-      - name: Clear npm cache and install dependencies
+      - name: Install dependencies with rollup workaround
         run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
-          npm install
+          # Try normal install first
+          if ! npm ci; then
+            echo "npm ci failed, applying rollup optional dependency workaround..."
+            npm cache clean --force
+            rm -rf node_modules package-lock.json
+            npm install
+          fi
       
       - name: Setup pnpm
         uses: pnpm/action-setup@v4

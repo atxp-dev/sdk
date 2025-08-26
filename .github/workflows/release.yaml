@@ -23,14 +23,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+          cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
           scope: '@atxp'
       
-      - name: Clear npm cache and install dependencies
+      - name: Install dependencies with rollup workaround
         run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
-          npm install
+          # Try normal install first
+          if ! npm ci; then
+            echo "npm ci failed, applying rollup optional dependency workaround..."
+            npm cache clean --force
+            rm -rf node_modules package-lock.json
+            npm install
+          fi
         # Removed NPM_TOKEN from env here - not needed for install
       
       - name: Build (if needed)
