@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execSync } from 'child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -111,7 +111,7 @@ describe('Package Manager Integration Tests', () => {
       
       try {
         // Create test project directory
-        execSync(`mkdir -p "${projectDir}"`);
+        mkdirSync(projectDir, { recursive: true });
         
         // Create package.json
         const packageJson = {
@@ -166,7 +166,7 @@ describe('Package Manager Integration Tests', () => {
     const projectDir = join(testDir, 'test-bun');
     
     try {
-      execSync(`mkdir -p "${projectDir}"`);
+      mkdirSync(projectDir, { recursive: true });
       
       const packageJson = {
         name: 'atxp-bun-test',
