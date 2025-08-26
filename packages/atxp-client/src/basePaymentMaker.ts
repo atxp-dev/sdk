@@ -18,6 +18,7 @@ import {
 // import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { BigNumber } from "bignumber.js";
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseAccount.js';
 
 // Type for the extended wallet client with public actions
 type ExtendedWalletClient = WalletClient & PublicActions;
@@ -32,7 +33,6 @@ function toBase64Url(data: string): string {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-export const USDC_CONTRACT_ADDRESS_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
 const USDC_DECIMALS = 6;
 const ERC20_ABI = [
   {

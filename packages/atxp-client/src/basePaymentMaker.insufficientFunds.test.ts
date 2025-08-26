@@ -5,6 +5,7 @@ import { BigNumber } from 'bignumber.js';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { createWalletClient, http } from 'viem';
 import { base } from 'viem/chains';
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseAccount.js';
 
 // Mock viem functions
 vi.mock('viem', () => ({
@@ -106,7 +107,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
 
     // Verify balance was checked
     expect(mockSigningClient.readContract).toHaveBeenCalledWith({
-      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      address: USDC_CONTRACT_ADDRESS_BASE,
       abi: expect.any(Array),
       functionName: 'balanceOf',
       args: ['0xtest-address'],

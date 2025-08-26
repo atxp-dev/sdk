@@ -1,4 +1,4 @@
-import type { PaymentMaker } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { Address, parseEther, encodeFunctionData } from 'viem';
@@ -18,7 +18,6 @@ function toBase64Url(data: string): string {
 }
 
 const USDC_DECIMALS = 6;
-const USDC_CONTRACT_ADDRESS_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 // Minimal ERC20 ABI for transfer function
 const ERC20_ABI = [
@@ -142,7 +141,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return encodedAuth;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: string, receiver: string, memo: string): Promise<string> {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
