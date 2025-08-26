@@ -54,5 +54,14 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^3.0.9"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.40.2",
+    "@rollup/rollup-linux-x64-musl": "4.40.2",
+    "@rollup/rollup-darwin-x64": "4.40.2",
+    "@rollup/rollup-win32-x64-msvc": "4.40.2",
+    "@rollup/rollup-darwin-arm64": "4.40.2",
+    "@rollup/rollup-linux-arm64-gnu": "4.40.2",
+    "@rollup/rollup-linux-arm64-musl": "4.40.2"
   }
 }
