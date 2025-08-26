@@ -3,6 +3,7 @@ import {
   createPublicClient, 
   type Account,
   type Address,
+  type Hex,
 } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -28,7 +29,7 @@ export interface EphemeralSmartWallet {
  * Creates an ephemeral smart wallet with paymaster support
  */
 export async function toEphemeralSmartWallet(
-  privateKey: `0x${string}`,
+  privateKey: Hex,
   apiKey: string
 ): Promise<EphemeralSmartWallet> {
   const signer = privateKeyToAccount(privateKey);

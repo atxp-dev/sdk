@@ -3,6 +3,7 @@ import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
+import { Hex } from '@atxp/client';
 import { SpendPermission } from './types.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
 import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
@@ -110,7 +111,7 @@ export class BaseAppAccount implements Account {
       calls: [{
         to: smartWallet.address,
         value: 0n,
-        data: '0x' as `0x${string}`
+        data: '0x' as Hex
       }],
       paymaster: true
     });

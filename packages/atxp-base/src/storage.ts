@@ -1,11 +1,12 @@
 import { SpendPermission } from './types.js';
+import { Hex } from '@atxp/client';
 
 /**
  * Stored permission data structure
  */
 export interface Intermediary {
   /** Ephemeral wallet private key */
-  privateKey: `0x${string}`;
+  privateKey: Hex;
   /** Spend permission from Base */
   permission: SpendPermission;
 }

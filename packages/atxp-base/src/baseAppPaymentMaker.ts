@@ -1,6 +1,6 @@
 import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
-import { Address, encodeFunctionData } from 'viem';
+import { Address, encodeFunctionData, Hex } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { prepareSpendCallData } from '@base-org/account/spend-permission';
@@ -144,13 +144,13 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     
     // Add a second call to transfer USDC from the smart wallet to the receiver
     const transferCall = {
-      to: USDC_CONTRACT_ADDRESS_BASE as `0x${string}`,
+      to: USDC_CONTRACT_ADDRESS_BASE as Hex,
       data: encodeFunctionData({
         abi: ERC20_ABI,
         functionName: "transfer",
         args: [receiver as Address, amountInUSDCUnits],
       }),
-      value: '0x0' as `0x${string}`
+      value: '0x0' as Hex
     };
     
     // Combine spend permission calls with the transfer call
@@ -161,8 +161,8 @@ export class BaseAppPaymentMaker implements PaymentMaker {
       account: this.smartWallet.account, 
       calls: allCalls.map(call => {
         return {
-          to: call.to as `0x${string}`,
-          data: call.data as `0x${string}`,
+          to: call.to as Hex,
+          data: call.data as Hex,
           value: BigInt(call.value || '0x0')
         }
       })
