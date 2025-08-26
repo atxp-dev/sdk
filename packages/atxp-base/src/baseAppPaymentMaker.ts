@@ -1,7 +1,7 @@
 import type { PaymentMaker } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { encodeFunctionData, Address, getAddress, Account, WalletClient, http, createWalletClient, parseEther } from 'viem';
+import { Address, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { base } from 'viem/chains';
@@ -17,39 +17,38 @@ function toBase64Url(data: string): string {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-const USDC_CONTRACT_ADDRESS_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
 const USDC_DECIMALS = 6;
-const ERC20_ABI = [
-  {
-    constant: false,
-    inputs: [
-      { name: "_to", type: "address" },
-      { name: "_value", type: "uint256" },
-    ],
-    name: "transfer",
-    outputs: [{ name: "", type: "bool" }],
-    type: "function",
-  },
-  {
-      "constant": true,
-      "inputs": [
-          {
-              "name": "_owner",
-              "type": "address"
-          }
-      ],
-      "name": "balanceOf",
-      "outputs": [
-          {
-              "name": "balance",
-              "type": "uint256"
-          }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
+
+/**
+ * Wait for a transaction to be confirmed with the specified number of confirmations
+ * @param smartWallet The smart wallet instance
+ * @param txHash The transaction hash to wait for
+ * @param confirmations Number of confirmations to wait for
+ * @param logger Logger instance for logging
+ */
+async function waitForTransactionConfirmations(
+  smartWallet: EphemeralSmartWallet,
+  txHash: string,
+  confirmations: number,
+  logger: Logger
+): Promise<void> {
+  try {
+    const publicClient = smartWallet.client.account?.client;
+    if (publicClient && 'waitForTransactionReceipt' in publicClient) {
+      logger.info(`Waiting for ${confirmations} confirmations...`);
+      await (publicClient as any).waitForTransactionReceipt({
+        hash: txHash,
+        confirmations: confirmations
+      });
+      logger.info(`Transaction confirmed with ${confirmations} confirmations`);
+    } else {
+      logger.warn('Unable to wait for confirmations: client does not support waitForTransactionReceipt');
+    }
+  } catch (error) {
+    logger.warn(`Could not wait for additional confirmations: ${error}`);
+    // Continue anyway - the transaction is already mined
   }
-];
+}
 
 export class BaseAppPaymentMaker implements PaymentMaker {
   private logger: Logger;
@@ -156,34 +155,22 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     if (!receipt) {
       throw new Error('User operation failed');
     }
-    this.logger.info(`User operation successful: ${receipt.userOpHash}`);
-
-    // now send the payment to the receiver
-    this.logger.info(`Sending payment to receiver: ${receiver}`);
-      
-    const data = encodeFunctionData({
-      abi: ERC20_ABI,
-      functionName: "transfer",
-      args: [receiver as Address, amountInUSDCUnits],
-    });
-    const txHash = await this.smartWallet.client.sendUserOperation({
-      account: this.smartWallet.account,
-      calls: [{
-        to: USDC_CONTRACT_ADDRESS_BASE,
-        data: data,
-        value: parseEther('0'),
-      }]
-    });
     
-    // Wait for transaction confirmation with more blocks to ensure propagation
-    this.logger.info(`Waiting for transaction confirmation: ${txHash}`);
-    const txReceipt = await this.smartWallet.client.waitForUserOperationReceipt({ hash});
+    // The receipt contains the actual transaction hash that was mined on chain
+    const txHash = receipt.receipt.transactionHash;
     
-    if (!txReceipt) {
-      throw new Error('User operation failed');
+    if (!txHash) {
+      throw new Error('User operation was executed but no transaction hash was returned. This should not happen.');
     }
-    this.logger.info(`User operation successful: ${txReceipt.userOpHash}`);
-        
-    return hash;
+    
+    this.logger.info(`Spend permission executed successfully. UserOp: ${receipt.userOpHash}, TxHash: ${txHash}`);
+    
+    // Wait for additional confirmations to ensure the transaction is well-propagated
+    // This helps avoid the "Transaction receipt could not be found" error
+    await waitForTransactionConfirmations(this.smartWallet, txHash, 3, this.logger);
+    
+    // Return the actual transaction hash, not the user operation hash
+    // The payment verification system needs the on-chain transaction hash
+    return txHash;
   }
 }
