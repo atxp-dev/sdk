@@ -135,7 +135,10 @@ export class BaseAppPaymentMaker implements PaymentMaker {
 
     this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ephemeral wallet on Base`);
 
-    const spendCalls = await prepareSpendCallData(this.spendPermission, BigInt(amount.toString()));
+    // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
+    const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
+    const spendCalls = await prepareSpendCallData(this.spendPermission, amountInUSDCUnits);
+    this.logger.info(`spendCalls: ${JSON.stringify(spendCalls)}`);
     const hash = await this.smartWallet.client.sendUserOperation({ 
       account: this.smartWallet.account, 
       calls: spendCalls.map(call => {
@@ -157,8 +160,6 @@ export class BaseAppPaymentMaker implements PaymentMaker {
 
     // now send the payment to the receiver
     this.logger.info(`Sending payment to receiver: ${receiver}`);
-    // Convert amount to USDC units (6 decimals) as BigInt
-    const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
       
     const data = encodeFunctionData({
       abi: ERC20_ABI,
