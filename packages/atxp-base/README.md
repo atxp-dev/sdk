@@ -45,7 +45,7 @@ You can reset the BaseAppAccount state for a user by:
 BaseAppAccount.clearAllStoredData(address);
 ```
 
-This will wipe any existing spend permission and ephemeral wallet for the given address. It will be automatically re-created the next time you call `BaseApAccount.iniitalize` for that address.
+This will wipe any existing spend permission and ephemeral wallet for the given address. It will be automatically re-created the next time you call `BaseAppAccount.iniitalize` for that address.
 
 **Note that this will change the accountId of the user in called MCP servers, so this is recommended mainly for development flows**
 
