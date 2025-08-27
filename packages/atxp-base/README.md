@@ -67,5 +67,4 @@ When an MCP request requires payment, `BaseAppAccount` will:
 1. Use the ephemeral wallet to make a payment from the user's wallet to the destiniation using the Spend Permission
 2. It will use ATXP's paymaster, so all gas fees are paid by ATXP.
 
-The ephemeral wallet never holds any ETH or USDC
-
+The ephemeral wallet never holds any ETH or USDC.
