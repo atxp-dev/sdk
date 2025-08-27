@@ -4,6 +4,7 @@ import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { getSpendPermissionModule } from './spendPermissionUtils.js';
+import { createMemoCall } from './memoUtils.js';
 
 // Helper function to convert to base64url that works in both Node.js and browsers
 function toBase64Url(data: string): string {
@@ -130,13 +131,12 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return encodedAuth;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
 
-    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ${receiver} on Base`);
+    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ${receiver} on Base with memo: ${memo}`);
 
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
     const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
@@ -155,10 +155,13 @@ export class BaseAppPaymentMaker implements PaymentMaker {
       value: '0x0' as Hex
     };
     
-    // Combine spend permission calls with the transfer call
-    const allCalls = [...spendCalls, transferCall];
+    // Add a memo call to include the memo in the transaction
+    const memoCall = createMemoCall(memo);
     
-    this.logger.info(`Executing ${allCalls.length} calls (${spendCalls.length} spend permission + 1 transfer)`);
+    // Combine spend permission calls with the transfer call and optional memo call
+    const allCalls = memoCall ? [...spendCalls, transferCall, memoCall] : [...spendCalls, transferCall];
+    
+    this.logger.info(`Executing ${allCalls.length} calls (${spendCalls.length} spend permission + 1 transfer${memoCall ? ' + 1 memo' : ''})`);
     const hash = await this.smartWallet.client.sendUserOperation({ 
       account: this.smartWallet.account, 
       calls: allCalls.map(call => {
