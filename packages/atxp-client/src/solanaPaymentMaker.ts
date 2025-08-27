@@ -49,7 +49,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '');
   }
 
-  makePayment = async (amount: BigNumber, currency: Currency, receiver: string): Promise<string> => {
+  makePayment = async (amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> => {
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkError('Only USDC currency is supported; received ' + currency);
     }
@@ -88,6 +88,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
           amount: amount,
           recipient: receiverKey,
           splToken: USDC_MINT,
+          memo,
         }
       );
       
