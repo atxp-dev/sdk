@@ -54,7 +54,7 @@ export function decodeMemoData(data: Hex): string | null {
     
     const buffer = Buffer.from(hexString, 'hex');
     return buffer.toString('utf8');
-  } catch (error) {
+  } catch {
     return null;
   }
 }
