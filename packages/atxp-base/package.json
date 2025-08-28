@@ -1,6 +1,6 @@
 {
   "name": "@atxp/base",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "description": "ATXP for Base Mini Apps",
   "license": "MIT",
   "repository": {
@@ -22,8 +22,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@atxp/client": "0.2.16",
-    "@atxp/common": "0.2.16",
+    "@atxp/client": "0.2.17",
+    "@atxp/common": "0.2.17",
     "@base-org/account": "^2.0.2",
     "bignumber.js": "^9.3.0",
     "viem": "^2.34.0"
