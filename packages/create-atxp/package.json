@@ -17,6 +17,11 @@
     "index.js"
   ],
   "scripts": {
+    "build": "echo 'create-atxp package ready'",
+    "typecheck": "echo 'create-atxp package ready'",
+    "lint": "echo 'create-atxp package ready'",
+    "lint:fix": "echo 'create-atxp package ready'",
+    "test": "echo 'create-atxp package ready'",
     "prepublishOnly": "echo 'create-atxp package ready'"
   },
   "keywords": [
