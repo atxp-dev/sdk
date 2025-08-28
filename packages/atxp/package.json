@@ -1,6 +1,6 @@
 {
   "name": "atxp",
-  "version": "0.2.16",
+  "version": "1.0.1",
   "description": "ATXP CLI tool and project creator",
   "main": "dist/index.js",
   "bin": {
@@ -8,8 +8,7 @@
   },
   "type": "module",
   "files": [
-    "dist/**/*",
-    "template/**/*"
+    "dist/**/*"
   ],
   "scripts": {
     "build": "tsc",
