@@ -3,16 +3,25 @@ import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
+import { spawn } from 'child_process';
+import os from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 interface ProjectAnswers {
   projectName: string;
-  template: 'basic' | 'server' | 'full';
-  network: 'devnet' | 'testnet' | 'mainnet';
+  template: 'agent';
   initGit: boolean;
 }
+
+// Template repositories
+const TEMPLATES = {
+  agent: {
+    url: 'https://github.com/atxp-dev/agent-demo.git',
+    humanText: 'Agent Demo (Full-stack web agent)'
+  }
+};
 
 export async function createProject(): Promise<void> {
   try {
@@ -35,23 +44,11 @@ export async function createProject(): Promise<void> {
         type: 'list',
         name: 'template',
         message: 'Choose a template:',
-        choices: [
-          { name: 'Basic Client Demo (CLI client example)', value: 'basic' },
-          { name: 'Server Demo (MCP server with payments)', value: 'server' },
-          { name: 'Full Stack Demo (Client + Server)', value: 'full' }
-        ],
-        default: 'basic'
-      },
-      {
-        type: 'list',
-        name: 'network',
-        message: 'Which Solana network?',
-        choices: [
-          { name: 'Devnet (for testing)', value: 'devnet' },
-          { name: 'Testnet', value: 'testnet' },
-          { name: 'Mainnet', value: 'mainnet' }
-        ],
-        default: 'devnet'
+        choices: Object.entries(TEMPLATES).map(([key, template]) => ({
+          name: template.humanText,
+          value: key
+        })),
+        default: 'agent'
       },
       {
         type: 'confirm',
@@ -61,32 +58,32 @@ export async function createProject(): Promise<void> {
       }
     ]);
 
-    const { projectName, template, network, initGit } = answers;
+    const { projectName, template, initGit } = answers;
     const projectPath = path.resolve(process.cwd(), projectName);
 
     // Check if directory already exists
     if (await fs.pathExists(projectPath)) {
-      console.error(chalk.red(`❌ Directory "${projectName}" already exists`));
+      console.error(chalk.red(`Directory "${projectName}" already exists`));
       process.exit(1);
     }
 
-    console.log(chalk.blue(`📁 Creating project at ${projectPath}`));
+    console.log(chalk.blue(`Creating project at ${projectPath}`));
 
     // Create project directory
     await fs.ensureDir(projectPath);
 
-    // Copy template files
-    const templatePath = path.join(__dirname, '..', 'template', template);
-    if (await fs.pathExists(templatePath)) {
-      await fs.copy(templatePath, projectPath);
-    } else {
-      // Fallback to basic template
-      await fs.copy(path.join(__dirname, '..', 'template', 'basic'), projectPath);
-    }
+    // Clone template from GitHub
+    await cloneTemplate(template, projectPath);
 
-    // Create .env file with network-specific settings
-    const envContent = generateEnvFile(network);
-    await fs.writeFile(path.join(projectPath, '.env'), envContent);
+    // Copy .env file from env.example if it exists
+    const envExamplePath = path.join(projectPath, 'env.example');
+    const envPath = path.join(projectPath, '.env');
+    if (await fs.pathExists(envExamplePath)) {
+      await fs.copy(envExamplePath, envPath);
+      console.log(chalk.green('Environment file created from template'));
+    } else {
+      console.log(chalk.yellow('No env.example found in template'));
+    }
 
     // Update package.json with project name
     const packageJsonPath = path.join(projectPath, 'package.json');
@@ -96,52 +93,63 @@ export async function createProject(): Promise<void> {
       await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
     }
 
+    // Remove .git directory from template (if it exists)
+    const gitDir = path.join(projectPath, '.git');
+    if (await fs.pathExists(gitDir)) {
+      await fs.remove(gitDir);
+    }
+
     // Initialize git if requested
     if (initGit) {
       const { execSync } = await import('child_process');
       try {
         execSync('git init', { cwd: projectPath, stdio: 'ignore' });
-        console.log(chalk.green('✅ Git repository initialized'));
+        console.log(chalk.green('Git repository initialized'));
       } catch (error) {
-        console.log(chalk.yellow('⚠️  Could not initialize git repository'));
+        console.log(chalk.yellow('Could not initialize git repository'));
       }
     }
 
-    console.log(chalk.green('\n🎉 Project created successfully!'));
+    console.log(chalk.green('\nProject created successfully!'));
     console.log(chalk.blue('\nNext steps:'));
     console.log(chalk.white(`  cd ${projectName}`));
     console.log(chalk.white('  npm install'));
     console.log(chalk.white('  npm start'));
-    console.log(chalk.yellow('\n⚠️  Remember to set your SOLANA_PRIVATE_KEY in the .env file!'));
+    console.log(chalk.yellow('\nRemember to configure your environment variables in the .env file!'));
 
   } catch (error) {
-    console.error(chalk.red('❌ Error creating project:'), (error as Error).message);
+    console.error(chalk.red('Error creating project:'), (error as Error).message);
     process.exit(1);
   }
 }
 
-function generateEnvFile(network: 'devnet' | 'testnet' | 'mainnet'): string {
-  const endpoints = {
-    devnet: 'https://api.devnet.solana.com',
-    testnet: 'https://api.testnet.solana.com',
-    mainnet: 'https://api.mainnet-beta.solana.com'
-  };
+async function cloneTemplate(template: string, projectPath: string): Promise<void> {
+  const templateConfig = TEMPLATES[template as keyof typeof TEMPLATES];
+  
+  if (!templateConfig) {
+    throw new Error(`Template "${template}" not found`);
+  }
 
-  return `# ATXP Environment Configuration
-# Generated by npm create atxp
+  return new Promise((resolve, reject) => {
+    console.log(chalk.blue('Downloading template from GitHub...'));
+    
+    const git = spawn('git', ['clone', templateConfig.url, projectPath], {
+      stdio: 'inherit'
+    });
 
-# Solana Configuration
-SOLANA_ENDPOINT=${endpoints[network]}
-SOLANA_PRIVATE_KEY=your_private_key_here
+    git.on('close', (code: number) => {
+      if (code === 0) {
+        console.log(chalk.green('Template downloaded successfully'));
+        resolve();
+      } else {
+        reject(new Error(`Git clone failed with code ${code}`));
+      }
+    });
 
-# ATXP Configuration
-ATXP_AUTH_CLIENT_TOKEN=your_auth_token_here
-
-# Environment
-NODE_ENV=development
-DEBUG=1
-
-# Add your private key and auth token above
-# Never commit this file to version control!
-`;
+    git.on('error', (error: Error) => {
+      reject(new Error(`Failed to clone template: ${error.message}`));
+    });
+  });
 }
+
+
