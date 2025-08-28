@@ -18,7 +18,7 @@ Creates a new project with interactive prompts for:
 ```bash
 npx atxp
 ```
-Starts a demo server and opens your browser to showcase ATXP features.
+Downloads and runs the latest ATXP agent demo from GitHub, showcasing a full web-based agent with MCP servers.
 
 ## What is ATXP?
 
