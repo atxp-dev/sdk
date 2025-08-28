@@ -56,14 +56,14 @@ async function cloneDemoRepo(): Promise<void> {
       }
     });
 
-    git.on('error', (error) => {
-      reject(new Error(`Failed to clone repository: ${error.message}`));
+    git.on('error', (_error) => {
+      reject(new Error(`Failed to clone repository`));
     });
   });
 }
 
 async function updateDemoRepo(): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, _reject) => {
     const git = spawn('git', ['pull'], {
       cwd: DEMO_DIR,
       stdio: isVerbose ? 'inherit' : 'pipe'
@@ -79,7 +79,7 @@ async function updateDemoRepo(): Promise<void> {
       }
     });
 
-    git.on('error', (error) => {
+    git.on('error', (_error) => {
       console.log(chalk.yellow('Could not update demo, using existing version'));
       resolve(); // Don't fail if update fails
     });
@@ -179,7 +179,7 @@ async function startDemo(): Promise<void> {
         try {
           console.log(chalk.blue('Opening browser...'));
           await open(`http://localhost:${DEMO_PORT}`);
-        } catch (error) {
+        } catch {
           console.log(chalk.yellow('Could not open browser automatically'));
           console.log(chalk.white(`Please open http://localhost:${DEMO_PORT} in your browser`));
         }
@@ -217,7 +217,7 @@ async function cleanup(): Promise<void> {
     // Optionally clean up the demo directory
     // Uncomment the next line if you want to remove the demo after each run
     // await fs.remove(DEMO_DIR);
-  } catch (error) {
+  } catch {
     console.log(chalk.yellow('Could not clean up demo directory'));
   }
 }

@@ -1,18 +1,18 @@
 import inquirer from 'inquirer';
 import fs from 'fs-extra';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { spawn } from 'child_process';
-import os from 'os';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 interface ProjectAnswers {
   projectName: string;
   template: 'agent';
   initGit: boolean;
+}
+
+interface PackageJson {
+  name: string;
+  [key: string]: unknown;
 }
 
 // Template repositories
@@ -88,7 +88,7 @@ export async function createProject(): Promise<void> {
     // Update package.json with project name
     const packageJsonPath = path.join(projectPath, 'package.json');
     if (await fs.pathExists(packageJsonPath)) {
-      const packageJson = await fs.readJson(packageJsonPath) as any;
+      const packageJson = await fs.readJson(packageJsonPath) as PackageJson;
       packageJson.name = projectName;
       await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
     }
@@ -105,7 +105,7 @@ export async function createProject(): Promise<void> {
       try {
         execSync('git init', { cwd: projectPath, stdio: 'ignore' });
         console.log(chalk.green('Git repository initialized'));
-      } catch (error) {
+      } catch {
         console.log(chalk.yellow('Could not initialize git repository'));
       }
     }
@@ -146,8 +146,8 @@ async function cloneTemplate(template: string, projectPath: string): Promise<voi
       }
     });
 
-    git.on('error', (error: Error) => {
-      reject(new Error(`Failed to clone template: ${error.message}`));
+    git.on('error', (_error: Error) => {
+      reject(new Error(`Failed to clone template`));
     });
   });
 }

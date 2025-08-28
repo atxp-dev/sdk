@@ -1,6 +1,6 @@
 {
   "name": "atxp",
-  "version": "0.1.0",
+  "version": "0.2.16",
   "description": "ATXP CLI tool and project creator",
   "main": "dist/index.js",
   "bin": {
@@ -14,6 +14,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
