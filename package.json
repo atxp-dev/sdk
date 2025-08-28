@@ -9,7 +9,8 @@
     "packages/atxp-redis",
     "packages/atxp-server",
     "packages/atxp-client",
-    "packages/atxp-base"
+    "packages/atxp-base",
+    "packages/atxp"
   ],
   "repository": {
     "type": "git",

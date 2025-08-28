@@ -1,0 +1,47 @@
+{
+  "name": "atxp",
+  "version": "0.1.0",
+  "description": "ATXP CLI tool and project creator",
+  "main": "dist/index.js",
+  "bin": {
+    "atxp": "./dist/index.js"
+  },
+  "type": "module",
+  "files": [
+    "dist/**/*",
+    "template/**/*"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "atxp",
+    "oauth",
+    "payment",
+    "solana",
+    "cli",
+    "demo",
+    "create"
+  ],
+  "author": "ATXP Team",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "inquirer": "^9.2.12",
+    "ora": "^7.0.1",
+    "fs-extra": "^11.2.0",
+    "open": "^9.1.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
