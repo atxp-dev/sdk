@@ -1,6 +1,6 @@
 {
   "name": "create-atxp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Create ATXP projects - Scaffold new ATXP applications from templates",
   "license": "MIT",
   "repository": {
@@ -17,12 +17,12 @@
     "index.js"
   ],
   "scripts": {
-    "build": "echo 'create-atxp package ready'",
-    "typecheck": "echo 'create-atxp package ready'",
-    "lint": "echo 'create-atxp package ready'",
-    "lint:fix": "echo 'create-atxp package ready'",
-    "test": "echo 'create-atxp package ready'",
-    "prepublishOnly": "echo 'create-atxp package ready'"
+    "build": "echo",
+    "typecheck": "echo",
+    "lint": "echo",
+    "lint:fix": "echo",
+    "test": "echo",
+    "prepublishOnly": "echo"
   },
   "keywords": [
     "atxp",
@@ -31,6 +31,6 @@
     "template"
   ],
   "dependencies": {
-    "atxp": "^1.0.1"
+    "atxp": "^1.0.2"
   }
 }
