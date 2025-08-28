@@ -4,7 +4,6 @@ import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { getSpendPermissionModule } from './spendPermissionUtils.js';
-import { createMemoCall } from './memoUtils.js';
 
 // Helper function to convert to base64url that works in both Node.js and browsers
 function toBase64Url(data: string): string {
@@ -145,23 +144,34 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     const spendCalls = await prepareSpendCallData(this.spendPermission, amountInUSDCUnits);
     
     // Add a second call to transfer USDC from the smart wallet to the receiver
+    let transferCallData = encodeFunctionData({
+      abi: ERC20_ABI,
+      functionName: "transfer",
+      args: [receiver as Address, amountInUSDCUnits],
+    });
+    
+    // Append memo to transfer call data if present
+    // This works because the EVM ignores extra calldata beyond what a function expects.
+    // The ERC20 transfer() function only reads the first 68 bytes (4-byte selector + 32-byte address + 32-byte amount).
+    // Any additional data appended after those 68 bytes is safely ignored by the USDC contract
+    // but remains accessible in the transaction data for payment verification.
+    // This is a well-established pattern used by OpenSea, Uniswap, and other major protocols.
+    if (memo && memo.trim()) {
+      const memoHex = Buffer.from(memo.trim(), 'utf8').toString('hex');
+      transferCallData = (transferCallData + memoHex) as Hex;
+      this.logger.info(`Added memo "${memo.trim()}" to transfer call`);
+    }
+    
     const transferCall = {
       to: USDC_CONTRACT_ADDRESS_BASE as Hex,
-      data: encodeFunctionData({
-        abi: ERC20_ABI,
-        functionName: "transfer",
-        args: [receiver as Address, amountInUSDCUnits],
-      }),
+      data: transferCallData,
       value: '0x0' as Hex
     };
     
-    // Add a memo call to include the memo in the transaction
-    const memoCall = createMemoCall(memo);
+    // Combine spend permission calls with the transfer call
+    const allCalls = [...spendCalls, transferCall];
     
-    // Combine spend permission calls with the transfer call and optional memo call
-    const allCalls = memoCall ? [...spendCalls, transferCall, memoCall] : [...spendCalls, transferCall];
-    
-    this.logger.info(`Executing ${allCalls.length} calls (${spendCalls.length} spend permission + 1 transfer${memoCall ? ' + 1 memo' : ''})`);
+    this.logger.info(`Executing ${allCalls.length} calls (${spendCalls.length} spend permission + 1 transfer)`);
     const hash = await this.smartWallet.client.sendUserOperation({ 
       account: this.smartWallet.account, 
       calls: allCalls.map(call => {

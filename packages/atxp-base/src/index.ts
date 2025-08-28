@@ -9,4 +9,3 @@ export {
   BrowserStorage,
   MemoryStorage 
 } from './storage.js';
-export { createMemoCall, decodeMemoData, type MemoCall } from './memoUtils.js';
