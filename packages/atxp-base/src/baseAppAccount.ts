@@ -42,18 +42,7 @@ export class BaseAppAccount implements Account {
       );
     }
 
-    // Initialize storage
-    const baseStorage = config?.storage || new BrowserStorage();
-    const storage = new IntermediaryStorage(baseStorage);
-    const storageKey = this.toStorageKey(config.walletAddress);
-
-    // Try to load existing permission
-    const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
-    if (existingData) {
-      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey, config.apiKey);
-      return new BaseAppAccount(existingData.permission, ephemeralSmartWallet, logger);
-    }
-
+    // Initialize Base SDK - this must happen before any spend permission operations
     const sdk = createBaseAccountSDK({
       appName: config?.appName,
       appChainIds: [base.id],
@@ -69,6 +58,18 @@ export class BaseAppAccount implements Account {
     } catch (error) {
       // Continue if wallet_connect is not supported
       logger.warn(`wallet_connect not supported, continuing with initialization. ${error}`);
+    }
+
+    // Initialize storage
+    const baseStorage = config?.storage || new BrowserStorage();
+    const storage = new IntermediaryStorage(baseStorage);
+    const storageKey = this.toStorageKey(config.walletAddress);
+
+    // Try to load existing permission
+    const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
+    if (existingData) {
+      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey, config.apiKey);
+      return new BaseAppAccount(existingData.permission, ephemeralSmartWallet, logger);
     }
 
     const privateKey = generatePrivateKey();
