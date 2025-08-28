@@ -1,6 +1,6 @@
 import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
-import { Address, encodeFunctionData, Hex } from 'viem';
+import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { prepareSpendCallData } from '@base-org/account/spend-permission';
@@ -165,7 +165,8 @@ export class BaseAppPaymentMaker implements PaymentMaker {
           data: call.data as Hex,
           value: BigInt(call.value || '0x0')
         }
-      })
+      }),
+      maxPriorityFeePerGas: parseEther('0.000000001')
     }) 
      
     const receipt = await this.smartWallet.client.waitForUserOperationReceipt({ hash })
@@ -184,7 +185,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     
     // Wait for additional confirmations to ensure the transaction is well-propagated
     // This helps avoid the "Transaction receipt could not be found" error
-    await waitForTransactionConfirmations(this.smartWallet, txHash, 3, this.logger);
+    await waitForTransactionConfirmations(this.smartWallet, txHash, 2, this.logger);
     
     // Return the actual transaction hash, not the user operation hash
     // The payment verification system needs the on-chain transaction hash

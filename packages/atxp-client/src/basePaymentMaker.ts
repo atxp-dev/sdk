@@ -153,13 +153,14 @@ export class BasePaymentMaker implements PaymentMaker {
         to: USDC_CONTRACT_ADDRESS_BASE,
         data: data,
         value: parseEther('0'),
+        maxPriorityFeePerGas: parseEther('0.000000001')
       });
       
       // Wait for transaction confirmation with more blocks to ensure propagation
       this.logger.info(`Waiting for transaction confirmation: ${hash}`);
       const receipt = await this.signingClient.waitForTransactionReceipt({ 
         hash: hash as Hex,
-        confirmations: 3  // Wait for 3 confirmations to ensure better propagation
+        confirmations: 1
       });
       
       if (receipt.status === 'reverted') {
