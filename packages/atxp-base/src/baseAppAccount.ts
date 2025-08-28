@@ -62,7 +62,14 @@ export class BaseAppAccount implements Account {
       }
     });
     const provider = sdk.getProvider();
-    await provider.request({ method: 'wallet_connect' });
+    // Some wallets don't support wallet_connect, so 
+    // will just continue if it fails
+    try {
+      await provider.request({ method: 'wallet_connect' });
+    } catch (error) {
+      // Continue if wallet_connect is not supported
+      logger.warn(`wallet_connect not supported, continuing with initialization. ${error}`);
+    }
 
     const privateKey = generatePrivateKey();
     const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
