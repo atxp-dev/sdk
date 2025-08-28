@@ -10,7 +10,8 @@
     "packages/atxp-server",
     "packages/atxp-client",
     "packages/atxp-base",
-    "packages/atxp"
+    "packages/atxp",
+    "packages/create-atxp"
   ],
   "repository": {
     "type": "git",

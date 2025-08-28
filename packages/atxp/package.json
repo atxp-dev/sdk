@@ -1,7 +1,13 @@
 {
   "name": "atxp",
   "version": "1.0.1",
-  "description": "ATXP CLI tool and project creator",
+  "description": "ATXP CLI - Command line tool for creating ATXP projects and running demos",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atxp-dev/sdk.git",
+    "directory": "packages/atxp"
+  },
   "main": "dist/index.js",
   "bin": {
     "atxp": "./dist/index.js"
@@ -27,8 +33,6 @@
     "demo",
     "create"
   ],
-  "author": "ATXP Team",
-  "license": "MIT",
   "dependencies": {
     "chalk": "^5.3.0",
     "inquirer": "^9.2.12",
