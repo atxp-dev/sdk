@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { vi } from 'vitest';
+import { vi, expect } from 'vitest';
 import type { SpendPermission } from './types.js';
 import type { EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
