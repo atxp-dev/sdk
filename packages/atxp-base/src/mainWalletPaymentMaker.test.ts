@@ -44,10 +44,14 @@ describe('MainWalletPaymentMaker', () => {
         ]
       });
 
-      // Should return base64 encoded JWT
-      const decodedJwt = JSON.parse(Buffer.from(jwt, 'base64').toString());
+      // Should return base64url encoded JWT
+      // Decode base64url
+      const base64 = jwt.replace(/-/g, '+').replace(/_/g, '/');
+      const padding = '='.repeat((4 - base64.length % 4) % 4);
+      const decodedJwt = JSON.parse(Buffer.from(base64 + padding, 'base64').toString());
+      
       expect(decodedJwt).toMatchObject({
-        type: 'MAIN_WALLET_AUTH',
+        type: 'EIP1271_AUTH',
         walletAddress: TEST_WALLET_ADDRESS,
         signature: mockSignature,
         payment_request_id: 'test-payment-id',
@@ -67,7 +71,12 @@ describe('MainWalletPaymentMaker', () => {
         codeChallenge: ''
       });
 
-      const decodedJwt = JSON.parse(Buffer.from(jwt, 'base64').toString());
+      // Decode base64url
+      const base64 = jwt.replace(/-/g, '+').replace(/_/g, '/');
+      const padding = '='.repeat((4 - base64.length % 4) % 4);
+      const decodedJwt = JSON.parse(Buffer.from(base64 + padding, 'base64').toString());
+      
+      expect(decodedJwt.type).toBe('EIP1271_AUTH');
       expect(decodedJwt.payment_request_id).toBeUndefined();
       expect(decodedJwt.code_challenge).toBeUndefined();
     });

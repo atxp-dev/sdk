@@ -6,6 +6,19 @@ import { ConsoleLogger, Logger, Currency } from '@atxp/common';
 
 const USDC_DECIMALS = 6;
 
+// Helper function to convert to base64url that works in both Node.js and browsers
+function toBase64Url(data: string): string {
+  // Convert string to base64
+  const base64 = typeof Buffer !== 'undefined' 
+    ? Buffer.from(data).toString('base64')
+    : btoa(data);
+  // Convert base64 to base64url
+  return base64
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
 export type MainWalletProvider = {
   request: (params: { 
     method: string; 
@@ -32,24 +45,29 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     this.logger.info(`paymentRequestId: ${payload.paymentRequestId}`);
     this.logger.info(`walletAddress: ${this.walletAddress}`);
 
-    // Generate auth message
+    // Generate EIP-1271 auth data for main wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
     const nonce = Math.random().toString(36).substring(2, 15);
     
-    let message = `PayMCP Authorization Request\n\n`;
-    message += `Wallet: ${this.walletAddress}\n`;
-    message += `Timestamp: ${timestamp}\n`;
-    message += `Nonce: ${nonce}`;
-    
-    if (payload.paymentRequestId) {
-      message += `\nPayment Request ID: ${payload.paymentRequestId}`;
-    }
+    // Construct the message in the required format - must match BaseAppPaymentMaker exactly
+    const messageParts = [
+      `PayMCP Authorization Request`,
+      ``,
+      `Wallet: ${this.walletAddress}`,
+      `Timestamp: ${timestamp}`,
+      `Nonce: ${nonce}`
+    ];
     
     if (payload.codeChallenge) {
-      message += `\nCode Challenge: ${payload.codeChallenge}`;
+      messageParts.push(`Code Challenge: ${payload.codeChallenge}`);
     }
     
-    message += '\n\n\nSign this message to prove you control this wallet.';
+    if (payload.paymentRequestId) {
+      messageParts.push(`Payment Request ID: ${payload.paymentRequestId}`);
+    }
+    
+    messageParts.push('', '', 'Sign this message to prove you control this wallet.');
+    const message = messageParts.join('\n');
 
     // Sign with the main wallet
     const signature = await this.provider.request({
@@ -57,23 +75,23 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       params: [message, this.walletAddress]
     });
 
-    // Create auth data
+    // Create EIP-1271 auth data
     const authData = {
-      type: 'MAIN_WALLET_AUTH',
+      type: 'EIP1271_AUTH',
       walletAddress: this.walletAddress,
-      message,
-      signature,
-      timestamp,
-      nonce,
-      ...(payload.paymentRequestId && { payment_request_id: payload.paymentRequestId }),
-      ...(payload.codeChallenge && { code_challenge: payload.codeChallenge })
+      message: message,
+      signature: signature,
+      timestamp: timestamp,
+      nonce: nonce,
+      ...(payload.codeChallenge && { code_challenge: payload.codeChallenge }),
+      ...(payload.paymentRequestId && { payment_request_id: payload.paymentRequestId })
     };
 
-    // Base64 encode
-    const jwt = Buffer.from(JSON.stringify(authData)).toString('base64');
-    this.logger.info(`Generated main wallet auth data: ${jwt}`);
+    // Encode as base64url
+    const encodedAuth = toBase64Url(JSON.stringify(authData));
+    this.logger.info(`Generated EIP-1271 auth data: ${encodedAuth}`);
     
-    return jwt;
+    return encodedAuth;
   }
 
   async makePayment(
