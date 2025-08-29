@@ -1,53 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BaseAppAccount } from './baseAppAccount.js';
 import { MemoryStorage } from './storage.js';
-import { generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
-import type { SpendPermission } from './types.js';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import BigNumber from 'bignumber.js';
-
-// Mock the entire @base-org/account module
-vi.mock('@base-org/account', () => ({
-  createBaseAccountSDK: vi.fn(() => ({
-    getProvider: vi.fn(() => ({
-      request: vi.fn()
-    }))
-  }))
-}));
-
-// Mock spend permission module
-vi.mock('@base-org/account/spend-permission', () => ({
-  requestSpendPermission: vi.fn(),
-  prepareSpendCallData: vi.fn()
-}));
-
-// Mock viem/account-abstraction
-vi.mock('viem/account-abstraction', () => ({
-  toCoinbaseSmartAccount: vi.fn(),
-  createBundlerClient: vi.fn()
-}));
-
-// Mock viem http transport
-vi.mock('viem', async () => {
-  const actual = await vi.importActual('viem');
-  return {
-    ...actual,
-    http: vi.fn(() => 'mock-transport'),
-    createPublicClient: vi.fn(() => ({
-      // Mock public client
-    })),
-    encodeFunctionData: vi.fn(() => '0xmockencodeddata')
-  };
-});
+import {
+  TEST_API_KEY,
+  TEST_WALLET_ADDRESS,
+  TEST_SMART_WALLET_ADDRESS,
+  TEST_RECEIVER_ADDRESS,
+  TEST_PRIVATE_KEY,
+  TEST_PAYMASTER_URL,
+  TEST_BUNDLER_URL,
+  setupInitializationMocks,
+  setupPaymentMocks,
+  mockSpendPermission,
+  mockExpiredSpendPermission,
+  mockSmartAccount,
+  mockBundlerClient,
+  mockFailedBundlerClient,
+  mockProvider,
+  mockBaseAccountSDK,
+  mockSpendCalls,
+  getStorageKey
+} from './testHelpers.js';
 
 describe('BaseAppAccount', () => {
   let mockStorage: MemoryStorage;
-  const mockApiKey = 'test-api-key';
-  const mockWalletAddress = '0x1234567890123456789012345678901234567890';
-  const mockSmartWalletAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
-  const mockPrivateKey = generatePrivateKey();
-  const mockPaymasterUrl = 'https://api.developer.coinbase.com/rpc/v1/base/snPdXqIzOGhRkGNJvEHM5bl9Hm3yRO3m';
 
   beforeEach(() => {
     mockStorage = new MemoryStorage();
@@ -60,66 +39,27 @@ describe('BaseAppAccount', () => {
 
   describe('initialize', () => {
     it('should create a new account when no stored data exists', async () => {
-      // Mock imports
-      const { requestSpendPermission } = await import('@base-org/account/spend-permission');
-      const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
-      const { createPublicClient } = await import('viem');
-
-      // Setup mock spend permission
-      const mockSpendPermission: SpendPermission = {
-        signature: '0xmocksignature',
-        permission: {
-          account: mockWalletAddress,
-          spender: mockSmartWalletAddress,
-          token: USDC_CONTRACT_ADDRESS_BASE,
-          allowance: '10000000', // 10 USDC in smallest units
-          period: 604800, // 7 days
-          start: Math.floor(Date.now() / 1000),
-          end: Math.floor(Date.now() / 1000) + 604800,
-          salt: '1',
-          extraData: '0x'
-        }
-      };
-
-      // Mock smart wallet account
-      const mockSmartAccount = {
-        address: mockSmartWalletAddress,
-        signMessage: vi.fn().mockResolvedValue('0xmocksignature')
-      };
-
-      // Mock bundler client
-      const mockBundlerClient = {
-        sendUserOperation: vi.fn().mockResolvedValue('0xoperationhash'),
-        waitForUserOperationReceipt: vi.fn().mockResolvedValue({
-          success: true,
-          receipt: { transactionHash: '0xtxhash' }
-        })
-      };
-
-      // Setup mocks
-      (createPublicClient as any).mockReturnValue({});
-      (toCoinbaseSmartAccount as any).mockResolvedValue(mockSmartAccount);
-      (createBundlerClient as any).mockReturnValue(mockBundlerClient);
-      (requestSpendPermission as any).mockResolvedValue(mockSpendPermission);
+      const bundlerClient = mockBundlerClient();
+      const mocks = await setupInitializationMocks({ bundlerClient });
 
       // Initialize account
       const account = await BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
-        apiKey: mockApiKey,
+        walletAddress: TEST_WALLET_ADDRESS,
+        apiKey: TEST_API_KEY,
         appName: 'Test App',
         storage: mockStorage
       });
 
       // Verify account creation
       expect(account).toBeDefined();
-      expect(account.accountId).toBe(mockSmartWalletAddress);
+      expect(account.accountId).toBe(TEST_SMART_WALLET_ADDRESS);
       expect(account.paymentMakers).toBeDefined();
       expect(account.paymentMakers.base).toBeDefined();
 
       // Verify smart wallet was deployed
-      expect(mockBundlerClient.sendUserOperation).toHaveBeenCalledWith({
+      expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
         calls: [{
-          to: mockSmartWalletAddress,
+          to: TEST_SMART_WALLET_ADDRESS,
           value: 0n,
           data: '0x'
         }],
@@ -127,9 +67,9 @@ describe('BaseAppAccount', () => {
       });
 
       // Verify spend permission was requested
-      expect(requestSpendPermission).toHaveBeenCalledWith({
-        account: mockWalletAddress,
-        spender: mockSmartWalletAddress,
+      expect(mocks.requestSpendPermission).toHaveBeenCalledWith({
+        account: TEST_WALLET_ADDRESS,
+        spender: TEST_SMART_WALLET_ADDRESS,
         token: USDC_CONTRACT_ADDRESS_BASE,
         chainId: base.id,
         allowance: 10n,
@@ -138,202 +78,89 @@ describe('BaseAppAccount', () => {
       });
 
       // Verify data was stored
-      const storageKey = `atxp-base-permission-${mockWalletAddress}`;
+      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
       const storedData = mockStorage.get(storageKey);
       expect(storedData).toBeTruthy();
       const parsedData = JSON.parse(storedData!);
       expect(parsedData.privateKey).toBeDefined();
-      expect(parsedData.permission).toEqual(mockSpendPermission);
+      expect(parsedData.permission).toEqual(mockSpendPermission());
     });
 
     it('should reuse existing account when valid stored data exists', async () => {
-      // Mock imports
-      const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
-      const { createPublicClient } = await import('viem');
-
-      // Setup stored permission that's not expired
-      const mockSpendPermission: SpendPermission = {
-        signature: '0xmocksignature',
-        permission: {
-          account: mockWalletAddress,
-          spender: mockSmartWalletAddress,
-          token: USDC_CONTRACT_ADDRESS_BASE,
-          allowance: '10000000',
-          period: 604800,
-          start: Math.floor(Date.now() / 1000),
-          end: Math.floor(Date.now() / 1000) + 604800, // Not expired
-          salt: '1',
-          extraData: '0x'
-        }
-      };
-
-      // Pre-store the data
-      const storageKey = `atxp-base-permission-${mockWalletAddress}`;
+      // Pre-store valid permission
+      const permission = mockSpendPermission();
+      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
       mockStorage.set(storageKey, JSON.stringify({
-        privateKey: mockPrivateKey,
-        permission: mockSpendPermission
+        privateKey: TEST_PRIVATE_KEY,
+        permission
       }));
 
-      // Mock smart wallet account
-      const mockSmartAccount = {
-        address: mockSmartWalletAddress,
-        signMessage: vi.fn().mockResolvedValue('0xmocksignature')
-      };
-
-      // Mock bundler client
-      const mockBundlerClient = {
-        sendUserOperation: vi.fn(),
-        waitForUserOperationReceipt: vi.fn()
-      };
-
-      // Setup mocks
-      (createPublicClient as any).mockReturnValue({});
-      (toCoinbaseSmartAccount as any).mockResolvedValue(mockSmartAccount);
-      (createBundlerClient as any).mockReturnValue(mockBundlerClient);
+      const bundlerClient = mockBundlerClient();
+      const mocks = await setupInitializationMocks({ bundlerClient });
 
       // Initialize account
       const account = await BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
-        apiKey: mockApiKey,
+        walletAddress: TEST_WALLET_ADDRESS,
+        apiKey: TEST_API_KEY,
         appName: 'Test App',
         storage: mockStorage
       });
 
       // Verify account was loaded from storage
       expect(account).toBeDefined();
-      expect(account.accountId).toBe(mockSmartWalletAddress);
+      expect(account.accountId).toBe(TEST_SMART_WALLET_ADDRESS);
 
       // Verify smart wallet was NOT deployed (reusing existing)
-      expect(mockBundlerClient.sendUserOperation).not.toHaveBeenCalled();
-
-      // Verify no new spend permission was requested
-      const { requestSpendPermission } = await import('@base-org/account/spend-permission');
-      expect(requestSpendPermission).not.toHaveBeenCalled();
+      expect(bundlerClient.sendUserOperation).not.toHaveBeenCalled();
+      expect(mocks.requestSpendPermission).not.toHaveBeenCalled();
     });
 
     it('should create new account when stored permission is expired', async () => {
-      // Mock imports
-      const { requestSpendPermission } = await import('@base-org/account/spend-permission');
-      const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
-      const { createPublicClient } = await import('viem');
-
-      // Setup expired permission
-      const expiredSpendPermission: SpendPermission = {
-        signature: '0xmocksignature',
-        permission: {
-          account: mockWalletAddress,
-          spender: mockSmartWalletAddress,
-          token: USDC_CONTRACT_ADDRESS_BASE,
-          allowance: '10000000',
-          period: 604800,
-          start: Math.floor(Date.now() / 1000) - 1000000,
-          end: Math.floor(Date.now() / 1000) - 1000, // Expired
-          salt: '1',
-          extraData: '0x'
-        }
-      };
-
-      // Pre-store the expired data
-      const storageKey = `atxp-base-permission-${mockWalletAddress}`;
+      // Pre-store expired permission
+      const expiredPermission = mockExpiredSpendPermission();
+      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
       mockStorage.set(storageKey, JSON.stringify({
-        privateKey: mockPrivateKey,
-        permission: expiredSpendPermission
+        privateKey: TEST_PRIVATE_KEY,
+        permission: expiredPermission
       }));
 
-      // Setup new permission
-      const newSpendPermission: SpendPermission = {
-        signature: '0xnewsignature',
-        permission: {
-          account: mockWalletAddress,
-          spender: mockSmartWalletAddress,
-          token: USDC_CONTRACT_ADDRESS_BASE,
-          allowance: '10000000',
-          period: 604800,
-          start: Math.floor(Date.now() / 1000),
-          end: Math.floor(Date.now() / 1000) + 604800,
-          salt: '2',
-          extraData: '0x'
-        }
-      };
-
-      // Mock smart wallet account
-      const mockSmartAccount = {
-        address: mockSmartWalletAddress,
-        signMessage: vi.fn().mockResolvedValue('0xmocksignature')
-      };
-
-      // Mock bundler client
-      const mockBundlerClient = {
-        sendUserOperation: vi.fn().mockResolvedValue('0xoperationhash'),
-        waitForUserOperationReceipt: vi.fn().mockResolvedValue({
-          success: true,
-          receipt: { transactionHash: '0xtxhash' }
-        })
-      };
-
-      // Setup mocks
-      (createPublicClient as any).mockReturnValue({});
-      (toCoinbaseSmartAccount as any).mockResolvedValue(mockSmartAccount);
-      (createBundlerClient as any).mockReturnValue(mockBundlerClient);
-      (requestSpendPermission as any).mockResolvedValue(newSpendPermission);
+      const newPermission = mockSpendPermission({ salt: '2', signature: '0xnewsignature' });
+      const bundlerClient = mockBundlerClient();
+      const mocks = await setupInitializationMocks({ 
+        bundlerClient,
+        spendPermission: newPermission 
+      });
 
       // Initialize account
       const account = await BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
-        apiKey: mockApiKey,
+        walletAddress: TEST_WALLET_ADDRESS,
+        apiKey: TEST_API_KEY,
         appName: 'Test App',
         storage: mockStorage
       });
 
       // Verify new account was created
       expect(account).toBeDefined();
-      expect(mockBundlerClient.sendUserOperation).toHaveBeenCalled();
-      expect(requestSpendPermission).toHaveBeenCalled();
+      expect(bundlerClient.sendUserOperation).toHaveBeenCalled();
+      expect(mocks.requestSpendPermission).toHaveBeenCalled();
 
       // Verify old data was removed and new data stored
       const storedData = mockStorage.get(storageKey);
       expect(storedData).toBeTruthy();
       const parsedData = JSON.parse(storedData!);
-      expect(parsedData.permission).toEqual(newSpendPermission);
+      expect(parsedData.permission).toEqual(newPermission);
     });
 
     it('should use custom allowance and period when provided', async () => {
-      // Mock imports
-      const { requestSpendPermission } = await import('@base-org/account/spend-permission');
-      const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
-      const { createPublicClient } = await import('viem');
-
-      // Mock smart wallet account
-      const mockSmartAccount = {
-        address: mockSmartWalletAddress,
-        signMessage: vi.fn().mockResolvedValue('0xmocksignature')
-      };
-
-      // Mock bundler client
-      const mockBundlerClient = {
-        sendUserOperation: vi.fn().mockResolvedValue('0xoperationhash'),
-        waitForUserOperationReceipt: vi.fn().mockResolvedValue({
-          success: true,
-          receipt: { transactionHash: '0xtxhash' }
-        })
-      };
-
-      // Setup mocks
-      (createPublicClient as any).mockReturnValue({});
-      (toCoinbaseSmartAccount as any).mockResolvedValue(mockSmartAccount);
-      (createBundlerClient as any).mockReturnValue(mockBundlerClient);
-      (requestSpendPermission as any).mockResolvedValue({
-        signature: '0xmocksignature',
-        permission: {} as any
-      });
+      const mocks = await setupInitializationMocks();
 
       // Initialize with custom values
       const customAllowance = 100n;
       const customPeriod = 30;
 
       await BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
-        apiKey: mockApiKey,
+        walletAddress: TEST_WALLET_ADDRESS,
+        apiKey: TEST_API_KEY,
         appName: 'Test App',
         allowance: customAllowance,
         periodInDays: customPeriod,
@@ -341,7 +168,7 @@ describe('BaseAppAccount', () => {
       });
 
       // Verify custom values were used
-      expect(requestSpendPermission).toHaveBeenCalledWith(
+      expect(mocks.requestSpendPermission).toHaveBeenCalledWith(
         expect.objectContaining({
           allowance: customAllowance,
           periodInDays: customPeriod
@@ -351,7 +178,7 @@ describe('BaseAppAccount', () => {
 
     it('should throw error when API key is not provided', async () => {
       await expect(BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
+        walletAddress: TEST_WALLET_ADDRESS,
         apiKey: '',
         appName: 'Test App',
         storage: mockStorage
@@ -359,98 +186,60 @@ describe('BaseAppAccount', () => {
     });
 
     it('should make all required blockchain calls when creating new account', async () => {
-      // Mock imports
-      const { createBaseAccountSDK } = await import('@base-org/account');
-      const { requestSpendPermission } = await import('@base-org/account/spend-permission');
-      const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
-      const { createPublicClient, http } = await import('viem');
+      const provider = mockProvider();
+      const bundlerClient = mockBundlerClient();
+      const smartAccount = mockSmartAccount();
+      const permission = mockSpendPermission();
+      
+      const mocks = await setupInitializationMocks({
+        provider,
+        bundlerClient,
+        smartAccount,
+        spendPermission: permission
+      });
 
-      // Mock provider
-      const mockProvider = {
-        request: vi.fn()
-      };
-      const mockSDK = {
-        getProvider: vi.fn(() => mockProvider)
-      };
-      (createBaseAccountSDK as any).mockReturnValue(mockSDK);
-
-      // Setup mock spend permission
-      const mockSpendPermission: SpendPermission = {
-        signature: '0xmocksignature',
-        permission: {
-          account: mockWalletAddress,
-          spender: mockSmartWalletAddress,
-          token: USDC_CONTRACT_ADDRESS_BASE,
-          allowance: '10000000',
-          period: 604800,
-          start: Math.floor(Date.now() / 1000),
-          end: Math.floor(Date.now() / 1000) + 604800,
-          salt: '1',
-          extraData: '0x'
-        }
-      };
-
-      // Mock smart wallet account
-      const mockSmartAccount = {
-        address: mockSmartWalletAddress,
-        signMessage: vi.fn().mockResolvedValue('0xmocksignature')
-      };
-
-      // Mock bundler client
-      const mockBundlerClient = {
-        sendUserOperation: vi.fn().mockResolvedValue('0xoperationhash'),
-        waitForUserOperationReceipt: vi.fn().mockResolvedValue({
-          success: true,
-          receipt: { transactionHash: '0xtxhash' }
-        })
-      };
-
-      // Setup mocks
-      (createPublicClient as any).mockReturnValue({});
-      (toCoinbaseSmartAccount as any).mockResolvedValue(mockSmartAccount);
-      (createBundlerClient as any).mockReturnValue(mockBundlerClient);
-      (requestSpendPermission as any).mockResolvedValue(mockSpendPermission);
+      const { http } = await import('viem');
 
       // Initialize account
       await BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
-        apiKey: mockApiKey,
+        walletAddress: TEST_WALLET_ADDRESS,
+        apiKey: TEST_API_KEY,
         appName: 'Test App',
         storage: mockStorage
       });
 
       // Verify SDK initialization
-      expect(createBaseAccountSDK).toHaveBeenCalledTimes(1);
-      expect(createBaseAccountSDK).toHaveBeenCalledWith({
+      expect(mocks.createBaseAccountSDK).toHaveBeenCalledTimes(1);
+      expect(mocks.createBaseAccountSDK).toHaveBeenCalledWith({
         appName: 'Test App',
         appChainIds: [base.id],
         paymasterUrls: {
-          [base.id]: mockPaymasterUrl
+          [base.id]: TEST_PAYMASTER_URL
         }
       });
 
       // Verify wallet_connect attempt
-      expect(mockProvider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
+      expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
 
       // Verify public client creation
-      expect(createPublicClient).toHaveBeenCalledWith({
+      expect(mocks.createPublicClient).toHaveBeenCalledWith({
         chain: base,
-        transport: expect.anything() // http transport
+        transport: expect.anything()
       });
-      expect(http).toHaveBeenCalledWith(`https://api.developer.coinbase.com/rpc/v1/base/${mockApiKey}`);
+      expect(http).toHaveBeenCalledWith(`${TEST_BUNDLER_URL}/${TEST_API_KEY}`);
 
       // Verify smart account creation
-      expect(toCoinbaseSmartAccount).toHaveBeenCalledWith({
+      expect(mocks.toCoinbaseSmartAccount).toHaveBeenCalledWith({
         client: expect.anything(),
         owners: [expect.objectContaining({
-          address: expect.any(String) // The ephemeral wallet address
+          address: expect.any(String)
         })],
         version: '1'
       });
 
       // Verify bundler client creation
-      expect(createBundlerClient).toHaveBeenCalledWith({
-        account: mockSmartAccount,
+      expect(mocks.createBundlerClient).toHaveBeenCalledWith({
+        account: smartAccount,
         client: expect.anything(),
         transport: expect.anything(),
         chain: base,
@@ -461,128 +250,93 @@ describe('BaseAppAccount', () => {
       });
 
       // Verify smart wallet deployment
-      expect(mockBundlerClient.sendUserOperation).toHaveBeenCalledTimes(1);
-      expect(mockBundlerClient.sendUserOperation).toHaveBeenCalledWith({
+      expect(bundlerClient.sendUserOperation).toHaveBeenCalledTimes(1);
+      expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
         calls: [{
-          to: mockSmartWalletAddress,
+          to: TEST_SMART_WALLET_ADDRESS,
           value: 0n,
           data: '0x'
         }],
         paymaster: true
       });
-      expect(mockBundlerClient.waitForUserOperationReceipt).toHaveBeenCalledWith({
+      expect(bundlerClient.waitForUserOperationReceipt).toHaveBeenCalledWith({
         hash: '0xoperationhash'
       });
 
       // Verify spend permission request
-      expect(requestSpendPermission).toHaveBeenCalledTimes(1);
-      expect(requestSpendPermission).toHaveBeenCalledWith({
-        account: mockWalletAddress,
-        spender: mockSmartWalletAddress,
+      expect(mocks.requestSpendPermission).toHaveBeenCalledTimes(1);
+      expect(mocks.requestSpendPermission).toHaveBeenCalledWith({
+        account: TEST_WALLET_ADDRESS,
+        spender: TEST_SMART_WALLET_ADDRESS,
         token: USDC_CONTRACT_ADDRESS_BASE,
         chainId: base.id,
         allowance: 10n,
         periodInDays: 7,
-        provider: mockProvider
+        provider: provider
       });
     });
 
     it('should skip deployment and permission when reusing stored account', async () => {
-      // Mock imports
-      const { createBaseAccountSDK } = await import('@base-org/account');
-      const { requestSpendPermission } = await import('@base-org/account/spend-permission');
-      const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
-      const { createPublicClient, http } = await import('viem');
-
-      // Mock provider
-      const mockProvider = {
-        request: vi.fn()
-      };
-      const mockSDK = {
-        getProvider: vi.fn(() => mockProvider)
-      };
-      (createBaseAccountSDK as any).mockReturnValue(mockSDK);
-
-      // Setup stored permission that's not expired
-      const mockSpendPermission: SpendPermission = {
-        signature: '0xmocksignature',
-        permission: {
-          account: mockWalletAddress,
-          spender: mockSmartWalletAddress,
-          token: USDC_CONTRACT_ADDRESS_BASE,
-          allowance: '10000000',
-          period: 604800,
-          start: Math.floor(Date.now() / 1000),
-          end: Math.floor(Date.now() / 1000) + 604800, // Not expired
-          salt: '1',
-          extraData: '0x'
-        }
-      };
-
-      // Pre-store the data
-      const storageKey = `atxp-base-permission-${mockWalletAddress}`;
+      // Pre-store valid permission
+      const permission = mockSpendPermission();
+      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
       mockStorage.set(storageKey, JSON.stringify({
-        privateKey: mockPrivateKey,
-        permission: mockSpendPermission
+        privateKey: TEST_PRIVATE_KEY,
+        permission
       }));
 
-      // Mock smart wallet account
-      const mockSmartAccount = {
-        address: mockSmartWalletAddress,
-        signMessage: vi.fn().mockResolvedValue('0xmocksignature')
-      };
+      const provider = mockProvider();
+      const bundlerClient = mockBundlerClient();
+      const smartAccount = mockSmartAccount();
+      
+      const mocks = await setupInitializationMocks({
+        provider,
+        bundlerClient,
+        smartAccount
+      });
 
-      // Mock bundler client
-      const mockBundlerClient = {
-        sendUserOperation: vi.fn(),
-        waitForUserOperationReceipt: vi.fn()
-      };
-
-      // Setup mocks
-      (createPublicClient as any).mockReturnValue({});
-      (toCoinbaseSmartAccount as any).mockResolvedValue(mockSmartAccount);
-      (createBundlerClient as any).mockReturnValue(mockBundlerClient);
+      const { http } = await import('viem');
 
       // Initialize account
       await BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
-        apiKey: mockApiKey,
+        walletAddress: TEST_WALLET_ADDRESS,
+        apiKey: TEST_API_KEY,
         appName: 'Test App',
         storage: mockStorage
       });
 
       // Verify SDK initialization still happens
-      expect(createBaseAccountSDK).toHaveBeenCalledTimes(1);
-      expect(createBaseAccountSDK).toHaveBeenCalledWith({
+      expect(mocks.createBaseAccountSDK).toHaveBeenCalledTimes(1);
+      expect(mocks.createBaseAccountSDK).toHaveBeenCalledWith({
         appName: 'Test App',
         appChainIds: [base.id],
         paymasterUrls: {
-          [base.id]: mockPaymasterUrl
+          [base.id]: TEST_PAYMASTER_URL
         }
       });
 
       // Verify wallet_connect attempt still happens
-      expect(mockProvider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
+      expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
 
       // Verify public client creation
-      expect(createPublicClient).toHaveBeenCalledWith({
+      expect(mocks.createPublicClient).toHaveBeenCalledWith({
         chain: base,
         transport: expect.anything()
       });
-      expect(http).toHaveBeenCalledWith(`https://api.developer.coinbase.com/rpc/v1/base/${mockApiKey}`);
+      expect(http).toHaveBeenCalledWith(`${TEST_BUNDLER_URL}/${TEST_API_KEY}`);
 
       // Verify smart account creation with stored private key
-      expect(toCoinbaseSmartAccount).toHaveBeenCalledWith({
+      expect(mocks.toCoinbaseSmartAccount).toHaveBeenCalledWith({
         client: expect.anything(),
         owners: [expect.objectContaining({
-          address: expect.any(String) // Should be derived from stored private key
+          address: expect.any(String)
         })],
         version: '1'
       });
 
       // Verify bundler client creation
-      expect(createBundlerClient).toHaveBeenCalledWith({
-        account: mockSmartAccount,
+      expect(mocks.createBundlerClient).toHaveBeenCalledWith({
+        account: smartAccount,
         client: expect.anything(),
         transport: expect.anything(),
         chain: base,
@@ -593,111 +347,45 @@ describe('BaseAppAccount', () => {
       });
 
       // Verify NO smart wallet deployment
-      expect(mockBundlerClient.sendUserOperation).not.toHaveBeenCalled();
-      expect(mockBundlerClient.waitForUserOperationReceipt).not.toHaveBeenCalled();
+      expect(bundlerClient.sendUserOperation).not.toHaveBeenCalled();
+      expect(bundlerClient.waitForUserOperationReceipt).not.toHaveBeenCalled();
 
       // Verify NO new spend permission request
-      expect(requestSpendPermission).not.toHaveBeenCalled();
+      expect(mocks.requestSpendPermission).not.toHaveBeenCalled();
     });
 
     it('should handle wallet_connect failure gracefully', async () => {
-      // Mock imports
-      const { createBaseAccountSDK } = await import('@base-org/account');
-      const { requestSpendPermission } = await import('@base-org/account/spend-permission');
-      const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
-      const { createPublicClient } = await import('viem');
-
       // Mock provider that fails wallet_connect
-      const mockProvider = {
+      const provider = mockProvider({
         request: vi.fn().mockRejectedValue(new Error('Wallet does not support wallet_connect'))
-      };
-      const mockSDK = {
-        getProvider: vi.fn(() => mockProvider)
-      };
-      (createBaseAccountSDK as any).mockReturnValue(mockSDK);
-
-      // Setup other mocks
-      const mockSpendPermission: SpendPermission = {
-        signature: '0xmocksignature',
-        permission: {
-          account: mockWalletAddress,
-          spender: mockSmartWalletAddress,
-          token: USDC_CONTRACT_ADDRESS_BASE,
-          allowance: '10000000',
-          period: 604800,
-          start: Math.floor(Date.now() / 1000),
-          end: Math.floor(Date.now() / 1000) + 604800,
-          salt: '1',
-          extraData: '0x'
-        }
-      };
-
-      const mockSmartAccount = {
-        address: mockSmartWalletAddress,
-        signMessage: vi.fn().mockResolvedValue('0xmocksignature')
-      };
-
-      const mockBundlerClient = {
-        sendUserOperation: vi.fn().mockResolvedValue('0xoperationhash'),
-        waitForUserOperationReceipt: vi.fn().mockResolvedValue({
-          success: true,
-          receipt: { transactionHash: '0xtxhash' }
-        })
-      };
-
-      (createPublicClient as any).mockReturnValue({});
-      (toCoinbaseSmartAccount as any).mockResolvedValue(mockSmartAccount);
-      (createBundlerClient as any).mockReturnValue(mockBundlerClient);
-      (requestSpendPermission as any).mockResolvedValue(mockSpendPermission);
+      });
+      
+      const bundlerClient = mockBundlerClient();
+      const mocks = await setupInitializationMocks({ provider, bundlerClient });
 
       // Initialize account - should not throw despite wallet_connect failure
       const account = await BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
-        apiKey: mockApiKey,
+        walletAddress: TEST_WALLET_ADDRESS,
+        apiKey: TEST_API_KEY,
         appName: 'Test App',
         storage: mockStorage
       });
 
       // Verify initialization continued despite wallet_connect failure
       expect(account).toBeDefined();
-      expect(mockProvider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
-      expect(mockBundlerClient.sendUserOperation).toHaveBeenCalled();
-      expect(requestSpendPermission).toHaveBeenCalled();
+      expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
+      expect(bundlerClient.sendUserOperation).toHaveBeenCalled();
+      expect(mocks.requestSpendPermission).toHaveBeenCalled();
     });
 
     it('should throw when smart wallet deployment fails', async () => {
-      // Mock imports
-      const { createBaseAccountSDK } = await import('@base-org/account');
-      const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
-      const { createPublicClient } = await import('viem');
-
-      // Setup mocks
-      const mockProvider = { request: vi.fn() };
-      const mockSDK = { getProvider: vi.fn(() => mockProvider) };
-      (createBaseAccountSDK as any).mockReturnValue(mockSDK);
-
-      const mockSmartAccount = {
-        address: mockSmartWalletAddress,
-        signMessage: vi.fn().mockResolvedValue('0xmocksignature')
-      };
-
-      // Mock failed deployment
-      const mockBundlerClient = {
-        sendUserOperation: vi.fn().mockResolvedValue('0xoperationhash'),
-        waitForUserOperationReceipt: vi.fn().mockResolvedValue({
-          success: false, // Deployment failed
-          receipt: { transactionHash: '0xtxhash' }
-        })
-      };
-
-      (createPublicClient as any).mockReturnValue({});
-      (toCoinbaseSmartAccount as any).mockResolvedValue(mockSmartAccount);
-      (createBundlerClient as any).mockReturnValue(mockBundlerClient);
+      const bundlerClient = mockFailedBundlerClient({ failureType: 'deployment' });
+      await setupInitializationMocks({ bundlerClient });
 
       // Initialize should throw
       await expect(BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
-        apiKey: mockApiKey,
+        walletAddress: TEST_WALLET_ADDRESS,
+        apiKey: TEST_API_KEY,
         appName: 'Test App',
         storage: mockStorage
       })).rejects.toThrow('Smart wallet deployment failed');
@@ -706,14 +394,14 @@ describe('BaseAppAccount', () => {
 
   describe('clearAllStoredData', () => {
     it('should remove stored data for the given wallet address', () => {
-      const storageKey = `atxp-base-permission-${mockWalletAddress}`;
+      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
       
       // Store some data
       mockStorage.set(storageKey, 'test-data');
       expect(mockStorage.get(storageKey)).toBe('test-data');
 
       // Clear the data
-      BaseAppAccount.clearAllStoredData(mockWalletAddress, mockStorage);
+      BaseAppAccount.clearAllStoredData(TEST_WALLET_ADDRESS, mockStorage);
 
       // Verify data was removed
       expect(mockStorage.get(storageKey)).toBeNull();
@@ -725,7 +413,7 @@ describe('BaseAppAccount', () => {
       (global as any).window = undefined;
 
       expect(() => {
-        BaseAppAccount.clearAllStoredData(mockWalletAddress);
+        BaseAppAccount.clearAllStoredData(TEST_WALLET_ADDRESS);
       }).toThrow('clearAllStoredData requires a storage to be provided outside of browser environments');
 
       // Restore window
@@ -735,71 +423,25 @@ describe('BaseAppAccount', () => {
 
   describe('payment functionality', () => {
     it('should make payment using the ephemeral wallet', async () => {
-      // Mock imports
-      const { prepareSpendCallData } = await import('@base-org/account/spend-permission');
-      const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
-      const { createPublicClient } = await import('viem');
-
-      // Setup mock spend permission
-      const mockSpendPermission: SpendPermission = {
-        signature: '0xmocksignature',
-        permission: {
-          account: mockWalletAddress,
-          spender: mockSmartWalletAddress,
-          token: USDC_CONTRACT_ADDRESS_BASE,
-          allowance: '10000000',
-          period: 604800,
-          start: Math.floor(Date.now() / 1000),
-          end: Math.floor(Date.now() / 1000) + 604800,
-          salt: '1',
-          extraData: '0x'
-        }
-      };
-
       // Pre-store valid data
-      const storageKey = `atxp-base-permission-${mockWalletAddress}`;
+      const permission = mockSpendPermission();
+      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
       mockStorage.set(storageKey, JSON.stringify({
-        privateKey: mockPrivateKey,
-        permission: mockSpendPermission
+        privateKey: TEST_PRIVATE_KEY,
+        permission
       }));
 
-      // Mock smart wallet account
-      const mockSmartAccount = {
-        address: mockSmartWalletAddress,
-        signMessage: vi.fn().mockResolvedValue('0xmocksignature')
-      };
-
-      // Mock bundler client
-      const mockBundlerClient = {
-        sendUserOperation: vi.fn().mockResolvedValue('0xoperationhash'),
-        waitForUserOperationReceipt: vi.fn().mockResolvedValue({
-          success: true,
-          userOpHash: '0xoperationhash',
-          receipt: { transactionHash: '0xtxhash' }
-        }),
-        account: {
-          client: {
-            waitForTransactionReceipt: vi.fn().mockResolvedValue({})
-          }
-        }
-      };
-
-      // Mock spend permission calls
-      const mockSpendCalls = [
-        { to: '0xcontract1', data: '0xdata1', value: '0x0' },
-        { to: '0xcontract2', data: '0xdata2', value: '0x0' }
-      ];
-      (prepareSpendCallData as any).mockResolvedValue(mockSpendCalls);
-
-      // Setup mocks
-      (createPublicClient as any).mockReturnValue({});
-      (toCoinbaseSmartAccount as any).mockResolvedValue(mockSmartAccount);
-      (createBundlerClient as any).mockReturnValue(mockBundlerClient);
+      const bundlerClient = mockBundlerClient();
+      const smartAccount = mockSmartAccount();
+      const spendCalls = mockSpendCalls();
+      
+      await setupInitializationMocks({ bundlerClient, smartAccount });
+      const { prepareSpendCallData } = await setupPaymentMocks({ spendCalls });
 
       // Initialize account
       const account = await BaseAppAccount.initialize({
-        walletAddress: mockWalletAddress,
-        apiKey: mockApiKey,
+        walletAddress: TEST_WALLET_ADDRESS,
+        apiKey: TEST_API_KEY,
         appName: 'Test App',
         storage: mockStorage
       });
@@ -807,14 +449,13 @@ describe('BaseAppAccount', () => {
       // Make a payment
       const paymentMaker = account.paymentMakers.base;
       const amount = new BigNumber(1.5); // 1.5 USDC
-      const receiver = '0x1234567890123456789012345678901234567890';
-      const txHash = await paymentMaker.makePayment(amount, 'USDC', receiver, 'test payment');
+      const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
 
       // Verify payment was made
       expect(txHash).toBe('0xtxhash');
-      expect(prepareSpendCallData).toHaveBeenCalledWith(mockSpendPermission, 1500000n); // 1.5 USDC in smallest units
-      expect(mockBundlerClient.sendUserOperation).toHaveBeenCalledWith({
-        account: mockSmartAccount,
+      expect(prepareSpendCallData).toHaveBeenCalledWith(permission, 1500000n); // 1.5 USDC in smallest units
+      expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
+        account: smartAccount,
         calls: [
           // Spend permission calls
           { to: '0xcontract1', data: '0xdata1', value: 0n },
