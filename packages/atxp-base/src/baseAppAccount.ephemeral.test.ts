@@ -51,7 +51,9 @@ import {
   mockFailedBundlerClient,
   mockProvider,
   mockSpendCalls,
-  getStorageKey
+  getStorageKey,
+  removeTimestamps,
+  expectTimestampAround
 } from './testHelpers.js';
 
 describe('BaseAppAccount', () => {
@@ -112,7 +114,13 @@ describe('BaseAppAccount', () => {
       expect(storedData).toBeTruthy();
       const parsedData = JSON.parse(storedData!);
       expect(parsedData.privateKey).toBeDefined();
-      expect(parsedData.permission).toEqual(mockSpendPermission());
+      
+      // Compare permission structure (toMatchObject ignores extra properties in received)
+      expect(parsedData.permission).toMatchObject(removeTimestamps(mockSpendPermission()));
+      
+      // Verify timestamps are reasonable
+      expectTimestampAround(parsedData.permission.permission.start, 0); // Should be around now
+      expectTimestampAround(parsedData.permission.permission.end, 604800); // Should be ~7 days from now
     });
 
     it('should reuse existing account when valid stored data exists', async () => {
@@ -177,7 +185,11 @@ describe('BaseAppAccount', () => {
       const storedData = mockStorage.get(storageKey);
       expect(storedData).toBeTruthy();
       const parsedData = JSON.parse(storedData!);
-      expect(parsedData.permission).toEqual(newPermission);
+      expect(parsedData.permission).toMatchObject(removeTimestamps(newPermission));
+      
+      // Verify timestamps are reasonable
+      expectTimestampAround(parsedData.permission.permission.start, 0);
+      expectTimestampAround(parsedData.permission.permission.end, 604800);
     });
 
     it('should use custom allowance and period when provided', async () => {
