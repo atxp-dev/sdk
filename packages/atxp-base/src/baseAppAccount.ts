@@ -150,10 +150,15 @@ export class BaseAppAccount implements Account {
   }
 
   static clearAllStoredData(userWalletAddress: string, storage?: IStorage<string>): void {
-    if (typeof window === 'undefined' && !storage) {
-      throw new Error('clearAllStoredData requires a storage to be provided outside of browser environments');
+    // In non-browser environments, require an explicit storage parameter
+    if (!storage) {
+      const browserStorage = new BrowserStorage();
+      // Check if BrowserStorage would work (i.e., we're in a browser)
+      if (typeof window === 'undefined') {
+        throw new Error('clearAllStoredData requires a storage to be provided outside of browser environments');
+      }
+      storage = browserStorage;
     }
-    storage = storage || new BrowserStorage();
 
     storage.delete(this.toStorageKey(userWalletAddress));
   }

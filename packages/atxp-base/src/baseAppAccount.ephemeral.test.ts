@@ -1,4 +1,34 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mock all external modules before imports
+vi.mock('@base-org/account', () => ({
+  createBaseAccountSDK: vi.fn(() => ({
+    getProvider: vi.fn(() => ({
+      request: vi.fn()
+    }))
+  }))
+}));
+
+vi.mock('@base-org/account/spend-permission', () => ({
+  requestSpendPermission: vi.fn(),
+  prepareSpendCallData: vi.fn()
+}));
+
+vi.mock('viem/account-abstraction', () => ({
+  toCoinbaseSmartAccount: vi.fn(),
+  createBundlerClient: vi.fn()
+}));
+
+vi.mock('viem', async () => {
+  const actual = await vi.importActual('viem');
+  return {
+    ...actual,
+    http: vi.fn(() => 'mock-transport'),
+    createPublicClient: vi.fn(() => ({})),
+    encodeFunctionData: vi.fn(() => '0xmockencodeddata')
+  };
+});
+
 import { BaseAppAccount } from './baseAppAccount.js';
 import { MemoryStorage } from './storage.js';
 import { base } from 'viem/chains';

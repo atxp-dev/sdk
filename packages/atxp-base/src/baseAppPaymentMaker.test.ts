@@ -1,4 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
+
+// Mock all external modules before imports
+vi.mock('@base-org/account/spend-permission', () => ({
+  prepareSpendCallData: vi.fn()
+}));
+
+vi.mock('viem', async () => {
+  const actual = await vi.importActual('viem');
+  return {
+    ...actual,
+    encodeFunctionData: vi.fn(() => '0xmockencodeddata')
+  };
+});
+
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import type { SpendPermission } from './types.js';
