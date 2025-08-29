@@ -50,7 +50,6 @@ import {
   mockBundlerClient,
   mockFailedBundlerClient,
   mockProvider,
-  mockBaseAccountSDK,
   mockSpendCalls,
   getStorageKey
 } from './testHelpers.js';

@@ -13,10 +13,7 @@ vi.mock('viem', async () => {
   };
 });
 
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
-import type { SpendPermission } from './types.js';
-import type { EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import { 

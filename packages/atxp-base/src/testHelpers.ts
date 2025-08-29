@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { vi } from 'vitest';
 import type { SpendPermission } from './types.js';
 import type { EphemeralSmartWallet } from './smartWalletHelpers.js';
