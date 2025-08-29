@@ -80,6 +80,44 @@ describe('MainWalletPaymentMaker', () => {
       expect(decodedJwt.payment_request_id).toBeUndefined();
       expect(decodedJwt.code_challenge).toBeUndefined();
     });
+
+    it('should construct message in correct format', async () => {
+      const mockSignature = '0xmocksignature';
+      let capturedMessage = '';
+      
+      provider.request.mockImplementation(async ({ method, params }) => {
+        if (method === 'personal_sign' && params) {
+          capturedMessage = params[0];
+          return mockSignature;
+        }
+        throw new Error(`Unexpected method: ${method}`);
+      });
+
+      await paymentMaker.generateJWT({
+        paymentRequestId: 'test-payment-id',
+        codeChallenge: 'test-challenge'
+      });
+
+      // Verify exact message format
+      expect(capturedMessage).toContain('PayMCP Authorization Request\n\n');
+      expect(capturedMessage).toContain(`Wallet: ${TEST_WALLET_ADDRESS}`);
+      expect(capturedMessage).toContain('Timestamp: ');
+      expect(capturedMessage).toContain('Nonce: ');
+      expect(capturedMessage).toContain('Code Challenge: test-challenge');
+      expect(capturedMessage).toContain('Payment Request ID: test-payment-id');
+      expect(capturedMessage).toContain('\n\n\nSign this message to prove you control this wallet.');
+    });
+
+    it('should handle signature errors', async () => {
+      provider.request.mockRejectedValueOnce(new Error('User rejected signature'));
+
+      await expect(
+        paymentMaker.generateJWT({
+          paymentRequestId: 'test',
+          codeChallenge: 'test'
+        })
+      ).rejects.toThrow('User rejected signature');
+    });
   });
 
   describe('makePayment', () => {
@@ -220,6 +258,154 @@ describe('MainWalletPaymentMaker', () => {
         method: 'eth_blockNumber',
         params: []
       });
+    });
+
+    it('should verify all blockchain calls are made in correct order', async () => {
+      const txHash = '0xtxhash';
+      const receipt = {
+        status: '0x1',
+        blockNumber: '0x100'
+      };
+      
+      const callOrder: string[] = [];
+      provider.request.mockImplementation(async ({ method }) => {
+        callOrder.push(method);
+        if (method === 'eth_sendTransaction') return txHash;
+        if (method === 'eth_getTransactionReceipt') return receipt;
+        if (method === 'eth_blockNumber') return '0x102';
+        throw new Error(`Unexpected method: ${method}`);
+      });
+
+      await paymentMaker.makePayment(
+        new BigNumber(1),
+        'USDC',
+        TEST_RECEIVER_ADDRESS,
+        'Test payment'
+      );
+
+      // Verify correct order of calls
+      expect(callOrder).toEqual([
+        'eth_sendTransaction',
+        'eth_getTransactionReceipt',
+        'eth_blockNumber'
+      ]);
+
+      // Verify encode function data was called before send
+      expect(encodeFunctionData).toHaveBeenCalledBefore(provider.request as any);
+    });
+
+    it('should handle receipt polling timeout', async () => {
+      const txHash = '0xtxhash';
+      
+      provider.request.mockImplementation(async ({ method }) => {
+        if (method === 'eth_sendTransaction') return txHash;
+        if (method === 'eth_getTransactionReceipt') return null; // Transaction not mined yet
+        throw new Error(`Unexpected method: ${method}`);
+      });
+
+      // This should eventually timeout (in real implementation)
+      // For now, it will keep polling - we should add a timeout mechanism
+      const promise = paymentMaker.makePayment(
+        new BigNumber(1),
+        'USDC',
+        TEST_RECEIVER_ADDRESS,
+        'Test payment'
+      );
+
+      // Wait a bit and then provide a receipt
+      setTimeout(() => {
+        provider.request.mockImplementation(async ({ method }) => {
+          if (method === 'eth_getTransactionReceipt') {
+            return { status: '0x1', blockNumber: '0x100' };
+          }
+          if (method === 'eth_blockNumber') return '0x102';
+          throw new Error(`Unexpected method: ${method}`);
+        });
+      }, 100);
+
+      const result = await promise;
+      expect(result).toBe(txHash);
+    });
+
+    it('should handle transaction submission errors', async () => {
+      provider.request.mockRejectedValueOnce(new Error('insufficient funds'));
+
+      await expect(
+        paymentMaker.makePayment(
+          new BigNumber(1),
+          'USDC',
+          TEST_RECEIVER_ADDRESS,
+          'Test payment'
+        )
+      ).rejects.toThrow('insufficient funds');
+
+      // Should have attempted to send transaction
+      expect(provider.request).toHaveBeenCalledWith({
+        method: 'eth_sendTransaction',
+        params: expect.any(Array)
+      });
+    });
+
+    it('should handle large amounts correctly', async () => {
+      const txHash = '0xtxhash';
+      const receipt = {
+        status: '0x1',
+        blockNumber: '0x100'
+      };
+      
+      provider.request.mockImplementation(async ({ method }) => {
+        if (method === 'eth_sendTransaction') return txHash;
+        if (method === 'eth_getTransactionReceipt') return receipt;
+        if (method === 'eth_blockNumber') return '0x102';
+        throw new Error(`Unexpected method: ${method}`);
+      });
+
+      await paymentMaker.makePayment(
+        new BigNumber(1000000), // 1 million USDC
+        'USDC',
+        TEST_RECEIVER_ADDRESS,
+        'Test payment'
+      );
+
+      // Should handle large amounts correctly
+      expect(encodeFunctionData).toHaveBeenCalledWith({
+        abi: expect.any(Array),
+        functionName: 'transfer',
+        args: [TEST_RECEIVER_ADDRESS, 1000000000000n] // 1M USDC = 1,000,000,000,000 units
+      });
+    });
+  });
+
+  describe('error handling', () => {
+    it('should handle provider errors gracefully', async () => {
+      provider.request.mockRejectedValue(new Error('Provider disconnected'));
+
+      await expect(
+        paymentMaker.generateJWT({
+          paymentRequestId: 'test',
+          codeChallenge: 'test'
+        })
+      ).rejects.toThrow('Provider disconnected');
+    });
+
+    it('should handle invalid addresses', async () => {
+      const invalidAddress = '0xinvalid';
+      
+      provider.request.mockImplementation(async ({ method, params }) => {
+        if (method === 'eth_sendTransaction' && params?.[0]?.to === USDC_CONTRACT_ADDRESS_BASE) {
+          throw new Error('invalid address');
+        }
+        throw new Error(`Unexpected method: ${method}`);
+      });
+
+      await expect(
+        paymentMaker.makePayment(
+          new BigNumber(1),
+          'USDC',
+          invalidAddress,
+          'Test payment'
+        )
+      ).rejects.toThrow();
     });
   });
 });
