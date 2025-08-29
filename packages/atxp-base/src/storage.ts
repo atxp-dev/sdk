@@ -53,15 +53,22 @@ export class IntermediaryStorage {
  * Browser localStorage implementation
  */
 export class BrowserStorage implements IStorage<string> {
+  private isAvailable(): boolean {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  }
+
   get(key: string): string | null {
+    if (!this.isAvailable()) return null;
     return localStorage.getItem(key);
   }
 
   set(key: string, value: string): void {
+    if (!this.isAvailable()) return;
     localStorage.setItem(key, value);
   }
 
   delete(key: string): void {
+    if (!this.isAvailable()) return;
     localStorage.removeItem(key);
   }
 }

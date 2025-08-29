@@ -1,6 +1,7 @@
 import type { Account, PaymentMaker } from '@atxp/client';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
+import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
 import { generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { Hex } from '@atxp/client';
@@ -27,6 +28,7 @@ export class BaseAppAccount implements Account {
       walletAddress: string, 
       apiKey: string;
       appName: string;
+      useEphemeralWallet?: boolean;
       allowance?: bigint;
       periodInDays?: number;
       storage?: IStorage<string>;
@@ -34,15 +36,9 @@ export class BaseAppAccount implements Account {
     },
   ): Promise<BaseAppAccount> {
     const logger = config.logger || new ConsoleLogger();
-    // Validate smart wallet configuration
-    if (!config.apiKey) {
-      throw new Error(
-        'Smart wallet API key is required. ' +
-        'Get your API key from https://portal.cdp.coinbase.com/'
-      );
-    }
-
-    // Initialize Base SDK - this must happen before any spend permission operations
+    const useEphemeralWallet = config.useEphemeralWallet ?? true; // Default to true for backward compatibility
+    
+    // Initialize Base SDK
     const sdk = createBaseAccountSDK({
       appName: config?.appName,
       appChainIds: [base.id],
@@ -51,6 +47,7 @@ export class BaseAppAccount implements Account {
       }
     });
     const provider = sdk.getProvider();
+    
     // Some wallets don't support wallet_connect, so 
     // will just continue if it fails
     try {
@@ -58,6 +55,26 @@ export class BaseAppAccount implements Account {
     } catch (error) {
       // Continue if wallet_connect is not supported
       logger.warn(`wallet_connect not supported, continuing with initialization. ${error}`);
+    }
+
+    // If using main wallet mode, return early with main wallet payment maker
+    if (!useEphemeralWallet) {
+      logger.info(`Using main wallet mode for address: ${config.walletAddress}`);
+      return new BaseAppAccount(
+        null, // No spend permission in main wallet mode
+        null, // No ephemeral wallet in main wallet mode
+        logger,
+        config.walletAddress,
+        provider
+      );
+    }
+
+    // Validate smart wallet configuration for ephemeral mode
+    if (!config.apiKey) {
+      throw new Error(
+        'Smart wallet API key is required for ephemeral wallet mode. ' +
+        'Get your API key from https://portal.cdp.coinbase.com/'
+      );
     }
 
     // Initialize storage
@@ -134,26 +151,43 @@ export class BaseAppAccount implements Account {
   }
 
   constructor(
-    spendPermission: SpendPermission,
-    ephemeralSmartWallet: EphemeralSmartWallet,
-    logger?: Logger
+    spendPermission: SpendPermission | null,
+    ephemeralSmartWallet: EphemeralSmartWallet | null,
+    logger?: Logger,
+    mainWalletAddress?: string,
+    provider?: MainWalletProvider
   ) {
-    if (!ephemeralSmartWallet) {
-      throw new Error('Wallet client is required');
-    }
-
-    this.accountId = ephemeralSmartWallet.address;
-
-    this.paymentMakers = {
-      'base': new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger),
+    if (ephemeralSmartWallet) {
+      // Ephemeral wallet mode
+      if (!spendPermission) {
+        throw new Error('Spend permission is required for ephemeral wallet mode');
+      }
+      this.accountId = ephemeralSmartWallet.address;
+      this.paymentMakers = {
+        'base': new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger),
+      };
+    } else {
+      // Main wallet mode
+      if (!mainWalletAddress || !provider) {
+        throw new Error('Main wallet address and provider are required for main wallet mode');
+      }
+      this.accountId = mainWalletAddress;
+      this.paymentMakers = {
+        'base': new MainWalletPaymentMaker(mainWalletAddress, provider, logger),
+      };
     }
   }
 
   static clearAllStoredData(userWalletAddress: string, storage?: IStorage<string>): void {
-    if (typeof window === 'undefined' && !storage) {
-      throw new Error('clearAllStoredData requires a storage to be provided outside of browser environments');
+    // In non-browser environments, require an explicit storage parameter
+    if (!storage) {
+      const browserStorage = new BrowserStorage();
+      // Check if BrowserStorage would work (i.e., we're in a browser)
+      if (typeof window === 'undefined') {
+        throw new Error('clearAllStoredData requires a storage to be provided outside of browser environments');
+      }
+      storage = browserStorage;
     }
-    storage = storage || new BrowserStorage();
 
     storage.delete(this.toStorageKey(userWalletAddress));
   }

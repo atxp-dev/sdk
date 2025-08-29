@@ -21,6 +21,7 @@ const account = await BaseAppAccount.initialize({
   walletAddress: address,
   apiKey,
   appName: 'Mini App ATXP',
+  useEphemeralWallet: false, // Temporary - see Non ephemeral wallet mode below
   // Parameters for the spend permission (see How it works below)
   allowance: BigInt('10000000'), // 10 USDC
   periodInDays: 30,
@@ -37,6 +38,11 @@ const res = await client.callTool({
   {query: 'How do I make a mini app?'}
 );
 ```
+
+## Non ephemeral wallet mode
+You can disabled ephemeral wallets and use the user's main wallet for all actions by passing the parameter `useEphemeralWallet: false` to the `BaseAppAccount.initialize` call. If not provided, it defaults to `true`.
+
+Note that the UX is degraded in this mode - users are prompted to verify every transaction, and every signature. So that's 1 verification on accessing the MCP server at all, and 2 more (transaction plus sign JWT) for each transaction. This mode is intended as an short-term unblock for dev shops building mini-apps while we sort out a longer-term strategy.
 
 
 ## Clearing state
