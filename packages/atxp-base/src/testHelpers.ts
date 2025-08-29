@@ -65,6 +65,52 @@ export function mockSpendPermission({
   } as any;
 }
 
+// Helper to remove timestamp fields from any object (for test comparisons)
+export function removeTimestamps<T extends Record<string, any>>(obj: T): T {
+  // Common timestamp field names
+  const timestampFields = ['timestamp', 'start', 'end', 'createdAt', 'updatedAt', 'expiresAt', 'issuedAt'];
+  
+  // Deep clone the object to avoid mutations
+  const result = JSON.parse(JSON.stringify(obj));
+  
+  // Recursive function to remove timestamps
+  function removeFromObject(target: any): void {
+    if (!target || typeof target !== 'object') return;
+    
+    // Handle arrays
+    if (Array.isArray(target)) {
+      target.forEach(item => removeFromObject(item));
+      return;
+    }
+    
+    // Handle objects
+    for (const key in target) {
+      if (timestampFields.includes(key)) {
+        // Validate it looks like a timestamp (number between year 2000 and 2100)
+        const value = target[key];
+        if (typeof value === 'number' && value > 946684800 && value < 4102444800) {
+          delete target[key];
+        }
+      } else if (typeof target[key] === 'object') {
+        removeFromObject(target[key]);
+      }
+    }
+  }
+  
+  removeFromObject(result);
+  return result;
+}
+
+// Helper to check if a timestamp is within a certain range of an expected time
+// This uses toBeGreaterThanOrEqual/toBeLessThanOrEqual because toBeCloseTo is for
+// floating-point precision, not range checking
+export function expectTimestampAround(timestamp: number, expectedOffset: number = 0, tolerance: number = 60) {
+  const now = Math.floor(Date.now() / 1000);
+  const expected = now + expectedOffset;
+  expect(timestamp).toBeGreaterThanOrEqual(expected - tolerance);
+  expect(timestamp).toBeLessThanOrEqual(expected + tolerance);
+}
+
 // Mock expired spend permission
 export function mockExpiredSpendPermission(overrides = {}): SpendPermission {
   const now = Math.floor(Date.now() / 1000);
