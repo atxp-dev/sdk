@@ -1,6 +1,6 @@
 {
   "name": "@atxp/sqlite",
-  "version": "0.2.18",
+  "version": "0.2.19",
   "description": "ATXP SQLite Database - SQLite platform implementation for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
@@ -23,7 +23,7 @@
     "test:integration": "vitest run src/sqlite.integration.test.ts --reporter=verbose"
   },
   "dependencies": {
-    "@atxp/common": "0.2.18",
+    "@atxp/common": "0.2.19",
     "better-sqlite3": "^12.2.0"
   },
   "devDependencies": {
