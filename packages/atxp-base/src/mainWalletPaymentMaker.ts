@@ -1,5 +1,5 @@
 import { PaymentMaker } from '@atxp/client';
-import { encodeFunctionData } from 'viem';
+import { encodeFunctionData, toHex } from 'viem';
 import { USDC_CONTRACT_ADDRESS_BASE, type Hex } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import { ConsoleLogger, Logger, Currency } from '@atxp/common';
@@ -70,9 +70,26 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     const message = messageParts.join('\n');
 
     // Sign with the main wallet
+    // Coinbase Wallet requires hex-encoded messages, while other wallets may accept plain strings
+    let messageToSign: string;
+    
+    // Check if this is Coinbase Wallet by looking for provider properties
+    const isCoinbaseWallet = (this.provider as any).isCoinbaseWallet || 
+                            (this.provider as any).isCoinbaseBrowser;
+    
+    if (isCoinbaseWallet) {
+      // Coinbase Wallet requires hex-encoded messages
+      messageToSign = toHex(message);
+      this.logger.info('Using hex-encoded message for Coinbase Wallet');
+    } else {
+      // Other wallets (MetaMask, etc.) typically accept plain strings
+      messageToSign = message;
+      this.logger.info('Using plain string message for wallet');
+    }
+    
     const signature = await this.provider.request({
       method: 'personal_sign',
-      params: [message, this.walletAddress]
+      params: [messageToSign, this.walletAddress]
     });
 
     // Create EIP-1271 auth data
