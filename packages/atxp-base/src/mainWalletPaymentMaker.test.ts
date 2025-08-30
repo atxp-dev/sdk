@@ -1,6 +1,8 @@
 // Mock viem before imports
 vi.mock('viem', () => ({
-  encodeFunctionData: vi.fn(() => '0xmocktransferdata')
+  encodeFunctionData: vi.fn(() => '0xmocktransferdata'),
+  toHex: vi.fn((str) => '0x' + Buffer.from(str).toString('hex')),
+  fromHex: vi.fn((hex) => Buffer.from(hex.slice(2), 'hex').toString())
 }));
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -9,7 +11,7 @@ import BigNumber from 'bignumber.js';
 import { TEST_WALLET_ADDRESS, TEST_RECEIVER_ADDRESS, mockProvider } from './testHelpers.js';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 
-const { encodeFunctionData } = await import('viem');
+const { encodeFunctionData, fromHex } = await import('viem');
 
 describe('MainWalletPaymentMaker', () => {
   let provider: ReturnType<typeof mockProvider>;
@@ -98,6 +100,7 @@ describe('MainWalletPaymentMaker', () => {
         codeChallenge: 'test-challenge'
       });
 
+      // Since mock provider doesn't have isCoinbaseWallet, it should pass plain string
       // Verify exact message format
       expect(capturedMessage).toContain('PayMCP Authorization Request\n\n');
       expect(capturedMessage).toContain(`Wallet: ${TEST_WALLET_ADDRESS}`);
@@ -117,6 +120,39 @@ describe('MainWalletPaymentMaker', () => {
           codeChallenge: 'test'
         })
       ).rejects.toThrow('User rejected signature');
+    });
+
+    it('should use hex encoding for Coinbase Wallet', async () => {
+      const mockSignature = '0xmocksignature';
+      let capturedMessage = '';
+      
+      // Create a provider that identifies as Coinbase Wallet
+      const coinbaseProvider = {
+        ...provider,
+        isCoinbaseWallet: true,
+        request: vi.fn(async ({ method, params }) => {
+          if (method === 'personal_sign' && params) {
+            capturedMessage = params[0];
+            return mockSignature;
+          }
+          throw new Error(`Unexpected method: ${method}`);
+        })
+      };
+      
+      const coinbasePaymentMaker = new MainWalletPaymentMaker(TEST_WALLET_ADDRESS, coinbaseProvider);
+
+      await coinbasePaymentMaker.generateJWT({
+        paymentRequestId: 'test-payment-id',
+        codeChallenge: 'test-challenge'
+      });
+
+      // Should pass hex-encoded message for Coinbase Wallet
+      expect(capturedMessage).toMatch(/^0x[0-9a-fA-F]+$/);
+      
+      // Decode and verify content
+      const decodedMessage = fromHex(capturedMessage as `0x${string}`, 'string');
+      expect(decodedMessage).toContain('PayMCP Authorization Request');
+      expect(decodedMessage).toContain(`Wallet: ${TEST_WALLET_ADDRESS}`);
     });
   });
 
