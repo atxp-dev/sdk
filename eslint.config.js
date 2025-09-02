@@ -58,6 +58,13 @@ module.exports = [
       'no-console': 'warn',
     },
   },
+  // Override for atxp CLI package (allows console statements)
+  {
+    files: ['packages/atxp/src/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
   // Configuration for test files and config files without TypeScript project references
   {
     files: ['**/*.test.ts', '**/*.spec.ts', '**/*.test.tsx', '**/*.spec.tsx', '**/vitest.config.ts'],
