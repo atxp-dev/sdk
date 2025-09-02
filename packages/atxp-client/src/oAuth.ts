@@ -157,7 +157,8 @@ export class OAuthClient extends OAuthResourceClient {
   }
 
   handleCallback = async (url: string): Promise<void> => {
-    this.logger.info(`Handling authorization code callback: ${url}`);
+    this.logger.info(`Handling authorization code callback`)
+    this.logger.debug(`Callback URL: ${url}`);
 
     const callbackUrl = new URL(url);
     const state = callbackUrl.searchParams.get('state');

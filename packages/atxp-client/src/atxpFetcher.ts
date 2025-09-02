@@ -279,7 +279,7 @@ export class ATXPFetcher {
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('Location');
       if (location) {
-        this.logger.info(`ATXP: got redirect authorization code response - redirect to ${location}`);
+        this.logger.debug(`ATXP: got redirect authorization code response - redirect to ${location}`);
         return location;
       } else {
         this.logger.info(`ATXP: got redirect authorization code response, but no redirect URL in Location header`);
@@ -291,7 +291,7 @@ export class ATXPFetcher {
       const body = await response.json();
       const redirectUrl = body.redirect;
       if (redirectUrl) {
-        this.logger.info(`ATXP: got response.ok authorization code response - redirect to ${redirectUrl}`);
+        this.logger.debug(`ATXP: got response.ok authorization code response - redirect to ${redirectUrl}`);
         return redirectUrl;
       } else {
         this.logger.info(`ATXP: got authorization code response with response.ok, but no redirect URL in body`);
