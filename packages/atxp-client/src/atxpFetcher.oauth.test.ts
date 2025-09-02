@@ -179,4 +179,19 @@ describe('atxpFetcher.fetch oauth', () => {
     const fetcher = atxpFetcher(f.fetchHandler);
     await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow('authorization response from the server is an error');
   });
+
+  it('should handle case when payment maker lacks generateJWT method', async () => {
+    const f = fetchMock.createInstance().postOnce('https://example.com/mcp', 401);
+    mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER);
+    mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER);
+
+    // Mock a payment maker that doesn't have generateJWT method
+    const brokenPaymentMaker = {
+      makePayment: vi.fn().mockResolvedValue('testPaymentId')
+      // Missing generateJWT method
+    } as unknown as PaymentMaker;
+
+    const fetcher = atxpFetcher(f.fetchHandler, { 'broken': brokenPaymentMaker });
+    await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow('Payment maker is missing generateJWT method. Available payment makers: [broken]. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.');
+  });
 });

@@ -245,6 +245,17 @@ export class ATXPFetcher {
       throw new Error(`Code challenge not provided`);
     }
 
+    if (!paymentMaker) {
+      const availableNetworks = Array.from(this.paymentMakers.keys()).join(', ');
+      throw new Error(`Payment maker is null/undefined. Available payment makers: [${availableNetworks}]. This usually indicates a payment maker object was not properly instantiated.`);
+    }
+
+    // TypeScript should prevent this, but add runtime check for edge cases (untyped JS, version mismatches, etc.)
+    if (!paymentMaker.generateJWT) {
+      const availableNetworks = Array.from(this.paymentMakers.keys()).join(', ');
+      throw new Error(`Payment maker is missing generateJWT method. Available payment makers: [${availableNetworks}]. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.`);
+    }
+
     const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge});
 
     // Make a fetch call to the authorization URL with the payment ID
@@ -297,7 +308,7 @@ export class ATXPFetcher {
       throw new Error(`ATXP: multiple payment makers found - cannot determine which one to use for auth`);
     }
 
-    const paymentMaker = Array.from(this.paymentMakers.values())[0];
+    const paymentMaker: PaymentMaker | undefined = Array.from(this.paymentMakers.values())[0];
     if (paymentMaker) {
       // We can do the full OAuth flow - we'll generate a signed JWT and call /authorize on the
       // AS to get a code, then exchange the code for an access token
