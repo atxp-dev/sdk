@@ -1,6 +1,6 @@
 {
   "name": "@atxp/client",
-  "version": "0.2.19",
+  "version": "0.2.20",
   "description": "ATXP Client - MCP client with OAuth authentication and payment processing",
   "license": "MIT",
   "repository": {
@@ -22,7 +22,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@atxp/common": "0.2.19",
+    "@atxp/common": "0.2.20",
     "@modelcontextprotocol/sdk": "^1.15.0",
     "@solana/pay": "^0.2.5",
     "@solana/web3.js": "^1.98.1",
