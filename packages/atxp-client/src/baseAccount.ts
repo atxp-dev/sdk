@@ -10,7 +10,7 @@ export class BaseAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
 
-  constructor(baseRPCUrl: string, sourceSecretKey: Hex) {
+  constructor(baseRPCUrl: string, sourceSecretKey: string) {
     if (!baseRPCUrl) {
       throw new Error('Base RPC URL is required');
     }
@@ -18,7 +18,7 @@ export class BaseAccount implements Account {
       throw new Error('Source secret key is required');
     }
 
-    const account = privateKeyToAccount(sourceSecretKey);
+    const account = privateKeyToAccount(sourceSecretKey as Hex);
 
     this.accountId = account.address;
     const walletClient = createWalletClient({
