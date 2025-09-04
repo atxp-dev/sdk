@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Mock window object to simulate browser environment for ephemeral wallet tests
+Object.defineProperty(global, 'window', {
+  value: {},
+  writable: true,
+  configurable: true
+});
+
 // Mock all external modules before imports
 vi.mock('@base-org/account', () => ({
   createBaseAccountSDK: vi.fn(() => ({

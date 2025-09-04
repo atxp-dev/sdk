@@ -10,7 +10,7 @@ import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from
 import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { ConsoleLogger, Logger } from '@atxp/common';
 import { createBaseAccountSDK } from "@base-org/account";
-import { requestSpendPermission } from "@base-org/account/spend-permission/browser";
+// Dynamic import - will be resolved at runtime based on environment
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
@@ -95,6 +95,10 @@ export class BaseAppAccount implements Account {
     await this.deploySmartWallet(smartWallet);
     logger.info(`Deployed smart wallet: ${smartWallet.address}`);
 
+    // Dynamically import requestSpendPermission based on environment
+    // This function requires browser APIs and wallet interaction
+    const { requestSpendPermission } = await this.getSpendPermissionModule();
+    
     const permission = await requestSpendPermission({
       account: config.walletAddress,
       spender: smartWallet.address,
@@ -176,6 +180,24 @@ export class BaseAppAccount implements Account {
         'base': new MainWalletPaymentMaker(mainWalletAddress, provider, logger),
       };
     }
+  }
+
+  /**
+   * Dynamically import the appropriate spend-permission module based on environment.
+   * Uses browser version as requestSpendPermission only exists there.
+   * Throws error if used in server-side environment.
+   */
+  private static async getSpendPermissionModule() {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined') {
+      throw new Error(
+        'requestSpendPermission requires browser environment. ' +
+        'BaseAppAccount.initialize() with ephemeral wallet should only be called client-side in Next.js apps.'
+      );
+    }
+
+    // Use browser version since requestSpendPermission only exists there
+    return await import('@base-org/account/spend-permission/browser');
   }
 
   static clearAllStoredData(userWalletAddress: string, storage?: IStorage<string>): void {
