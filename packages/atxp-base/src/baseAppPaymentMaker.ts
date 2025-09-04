@@ -3,7 +3,7 @@ import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
-// Dynamic import - will be resolved at runtime based on environment
+import { getSpendPermissionModule } from './spendPermissionUtils.js';
 
 // Helper function to convert to base64url that works in both Node.js and browsers
 function toBase64Url(data: string): string {
@@ -141,7 +141,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
     const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
     // Dynamically import prepareSpendCallData based on environment
-    const { prepareSpendCallData } = await this.getSpendPermissionModule();
+    const { prepareSpendCallData } = await getSpendPermissionModule();
     const spendCalls = await prepareSpendCallData(this.spendPermission, amountInUSDCUnits);
     
     // Add a second call to transfer USDC from the smart wallet to the receiver
@@ -198,14 +198,4 @@ export class BaseAppPaymentMaker implements PaymentMaker {
    * Dynamically import the appropriate spend-permission module based on environment.
    * Uses browser or node version as appropriate since prepareSpendCallData exists in both.
    */
-  private async getSpendPermissionModule() {
-    // Check if we're in a browser environment
-    if (typeof window !== 'undefined') {
-      // Use browser version
-      return await import('@base-org/account/spend-permission/browser');
-    } else {
-      // Use node version  
-      return await import('@base-org/account/spend-permission/node');
-    }
-  }
 }
