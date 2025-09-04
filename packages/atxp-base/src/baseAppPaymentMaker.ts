@@ -130,13 +130,12 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return encodedAuth;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
 
-    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ${receiver} on Base`);
+    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ${receiver} on Base with memo: ${memo}`);
 
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
     const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
@@ -145,13 +144,27 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     const spendCalls = await prepareSpendCallData(this.spendPermission, amountInUSDCUnits);
     
     // Add a second call to transfer USDC from the smart wallet to the receiver
+    let transferCallData = encodeFunctionData({
+      abi: ERC20_ABI,
+      functionName: "transfer",
+      args: [receiver as Address, amountInUSDCUnits],
+    });
+    
+    // Append memo to transfer call data if present
+    // This works because the EVM ignores extra calldata beyond what a function expects.
+    // The ERC20 transfer() function only reads the first 68 bytes (4-byte selector + 32-byte address + 32-byte amount).
+    // Any additional data appended after those 68 bytes is safely ignored by the USDC contract
+    // but remains accessible in the transaction data for payment verification.
+    // This is a well-established pattern used by OpenSea, Uniswap, and other major protocols.
+    if (memo && memo.trim()) {
+      const memoHex = Buffer.from(memo.trim(), 'utf8').toString('hex');
+      transferCallData = (transferCallData + memoHex) as Hex;
+      this.logger.info(`Added memo "${memo.trim()}" to transfer call`);
+    }
+    
     const transferCall = {
       to: USDC_CONTRACT_ADDRESS_BASE as Hex,
-      data: encodeFunctionData({
-        abi: ERC20_ABI,
-        functionName: "transfer",
-        args: [receiver as Address, amountInUSDCUnits],
-      }),
+      data: transferCallData,
       value: '0x0' as Hex
     };
     
