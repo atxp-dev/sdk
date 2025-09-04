@@ -3,7 +3,7 @@ import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
-import { prepareSpendCallData } from '@base-org/account/spend-permission';
+import { getSpendPermissionModule } from './spendPermissionUtils.js';
 
 // Helper function to convert to base64url that works in both Node.js and browsers
 function toBase64Url(data: string): string {
@@ -140,6 +140,8 @@ export class BaseAppPaymentMaker implements PaymentMaker {
 
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
     const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
+    // Dynamically import prepareSpendCallData based on environment
+    const { prepareSpendCallData } = await getSpendPermissionModule();
     const spendCalls = await prepareSpendCallData(this.spendPermission, amountInUSDCUnits);
     
     // Add a second call to transfer USDC from the smart wallet to the receiver
@@ -191,4 +193,9 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     // The payment verification system needs the on-chain transaction hash
     return txHash;
   }
+
+  /**
+   * Dynamically import the appropriate spend-permission module based on environment.
+   * Uses browser or node version as appropriate since prepareSpendCallData exists in both.
+   */
 }

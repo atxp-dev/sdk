@@ -10,7 +10,7 @@ import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from
 import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { ConsoleLogger, Logger } from '@atxp/common';
 import { createBaseAccountSDK } from "@base-org/account";
-import { requestSpendPermission } from "@base-org/account/spend-permission";
+import { getSpendPermissionModule } from './spendPermissionUtils.js';
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
@@ -95,6 +95,10 @@ export class BaseAppAccount implements Account {
     await this.deploySmartWallet(smartWallet);
     logger.info(`Deployed smart wallet: ${smartWallet.address}`);
 
+    // Dynamically import requestSpendPermission based on environment
+    // This function requires browser APIs and wallet interaction
+    const { requestSpendPermission } = await getSpendPermissionModule();
+    
     const permission = await requestSpendPermission({
       account: config.walletAddress,
       spender: smartWallet.address,
@@ -177,6 +181,12 @@ export class BaseAppAccount implements Account {
       };
     }
   }
+
+  /**
+   * Dynamically import the appropriate spend-permission module based on environment.
+   * Uses browser version as requestSpendPermission only exists there.
+   * Throws error if used in server-side environment.
+   */
 
   static clearAllStoredData(userWalletAddress: string, storage?: IStorage<string>): void {
     // In non-browser environments, require an explicit storage parameter
