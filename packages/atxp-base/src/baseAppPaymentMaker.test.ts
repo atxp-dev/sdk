@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // Mock all external modules before imports
-vi.mock('@base-org/account/spend-permission', () => ({
+vi.mock('@base-org/account/spend-permission/browser', () => ({
   prepareSpendCallData: vi.fn()
 }));
 

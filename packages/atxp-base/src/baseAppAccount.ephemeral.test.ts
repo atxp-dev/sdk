@@ -9,7 +9,7 @@ vi.mock('@base-org/account', () => ({
   }))
 }));
 
-vi.mock('@base-org/account/spend-permission', () => ({
+vi.mock('@base-org/account/spend-permission/browser', () => ({
   requestSpendPermission: vi.fn(),
   prepareSpendCallData: vi.fn()
 }));
