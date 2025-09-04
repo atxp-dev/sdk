@@ -223,7 +223,7 @@ export async function setupInitializationMocks({
   bundlerClient = mockBundlerClient()
 } = {}): Promise<any> {
   const { createBaseAccountSDK } = await import('@base-org/account');
-  const { requestSpendPermission } = await import('@base-org/account/spend-permission');
+  const { requestSpendPermission } = await import('@base-org/account/spend-permission/browser');
   const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
   const { createPublicClient } = await import('viem');
 
@@ -250,7 +250,7 @@ export async function setupInitializationMocks({
 export async function setupPaymentMocks({
   spendCalls = mockSpendCalls()
 } = {}): Promise<any> {
-  const { prepareSpendCallData } = await import('@base-org/account/spend-permission');
+  const { prepareSpendCallData } = await import('@base-org/account/spend-permission/browser');
   (prepareSpendCallData as any).mockResolvedValue(spendCalls);
   
   return {

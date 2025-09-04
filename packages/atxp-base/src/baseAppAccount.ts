@@ -10,7 +10,7 @@ import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from
 import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { ConsoleLogger, Logger } from '@atxp/common';
 import { createBaseAccountSDK } from "@base-org/account";
-import { requestSpendPermission } from "@base-org/account/spend-permission";
+import { requestSpendPermission } from "@base-org/account/spend-permission/browser";
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;

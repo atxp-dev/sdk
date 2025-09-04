@@ -3,7 +3,7 @@ import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
-import { prepareSpendCallData } from '@base-org/account/spend-permission';
+import { prepareSpendCallData } from '@base-org/account/spend-permission/browser';
 
 // Helper function to convert to base64url that works in both Node.js and browsers
 function toBase64Url(data: string): string {
