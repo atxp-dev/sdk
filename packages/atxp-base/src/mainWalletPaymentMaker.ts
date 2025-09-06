@@ -74,8 +74,12 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     let messageToSign: string;
     
     // Check if this is Coinbase Wallet by looking for provider properties
-    const isCoinbaseWallet = (this.provider as any).isCoinbaseWallet || 
-                            (this.provider as any).isCoinbaseBrowser;
+    const providerWithCoinbase = this.provider as MainWalletProvider & {
+      isCoinbaseWallet?: boolean;
+      isCoinbaseBrowser?: boolean;
+    };
+    const isCoinbaseWallet = providerWithCoinbase.isCoinbaseWallet || 
+                            providerWithCoinbase.isCoinbaseBrowser;
     
     if (isCoinbaseWallet) {
       // Coinbase Wallet requires hex-encoded messages
