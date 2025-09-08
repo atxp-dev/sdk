@@ -46,7 +46,6 @@ app.use(express.json());
 
 const destination = process.env.ATXP_DESTINATION!;
 console.log('Starting MCP server with destination', destination);
-console.log('Starting MCP server with token', process.env.ATXP_AUTH_CLIENT_TOKEN!);
 app.use(atxpServer({
   destination,
   network: 'base',

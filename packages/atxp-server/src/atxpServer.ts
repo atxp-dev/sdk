@@ -1,5 +1,5 @@
 import { ConsoleLogger, OAuthResourceClient, DEFAULT_AUTHORIZATION_SERVER, MemoryOAuthDb } from "@atxp/common";
-import { ATXPConfig, PaymentServer } from "./types.js";
+import { ATXPConfig } from "./types.js";
 import { checkToken } from "./token.js";
 import { sendOAuthChallenge } from "./oAuthChallenge.js";
 import { withATXPContext } from "./atxpContext.js";
@@ -21,7 +21,6 @@ export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConf
   currency: 'USDC' as const,
   network: 'base' as const,
   server: DEFAULT_AUTHORIZATION_SERVER,
-  atxpAuthClientToken: undefined as string|undefined, // Will be set in buildServerConfig
   payeeName: 'An ATXP Server',
   allowHttp: false, // May be overridden in buildServerConfig by process.env.NODE_ENV
   resource: null, // Set dynamically from the request URL
@@ -46,15 +45,8 @@ export function buildServerConfig(args: ATXPArgs): ATXPConfig {
     clientName: withDefaults.payeeName,
   });
   const logger = withDefaults.logger ?? new ConsoleLogger();
-  let paymentServer: PaymentServer | undefined;
-  if (withDefaults.paymentServer ) {
-    paymentServer = withDefaults.paymentServer;
-  } else {
-    if (!withDefaults.atxpAuthClientToken) {
-      throw new Error('ATXP_AUTH_CLIENT_TOKEN is not set. If no payment server is provided, you must set ATXP_AUTH_CLIENT_TOKEN.');
-    }
-    paymentServer = new ATXPPaymentServer(withDefaults.server, withDefaults.atxpAuthClientToken, logger);
-  }
+  const paymentServer = withDefaults.paymentServer ?? new ATXPPaymentServer(withDefaults.server, logger)
+  
   const built = { oAuthDb, oAuthClient, paymentServer, logger};
   return Object.freeze({ ...withDefaults, ...built });
 };
