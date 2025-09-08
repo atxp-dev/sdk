@@ -45,7 +45,7 @@ export type ATXPConfig = {
   logger: Logger;
   oAuthDb: OAuthDb;
   oAuthClient: OAuthResourceClient;
-  paymentServer: PaymentServer | undefined;
+  paymentServer: PaymentServer;
 }
 
 
