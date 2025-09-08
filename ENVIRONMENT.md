@@ -4,24 +4,6 @@ This document provides detailed information about all environment variables used
 
 ## Required Environment Variables
 
-### `ATXP_AUTH_CLIENT_TOKEN`
-
-**Required for server-side payment operations**
-
-This token is used to authenticate with the ATXP authorization server for payment-related operations. It must be set when using the `ATXPPaymentServer` class.
-
-**Type**: String  
-**Required**: Yes (for payment operations)  
-**Default**: None  
-
-**Usage**: This token is automatically used in the `makeRequest` method of `ATXPPaymentServer` to authenticate API calls to the ATXP server.
-
-**Example**:
-```bash
-ATXP_AUTH_CLIENT_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-**Error**: If not set, the SDK will throw an error: `ATXP_AUTH_CLIENT_TOKEN is not set`
 
 ### `SOLANA_ENDPOINT`
 
@@ -113,7 +95,6 @@ NODE_ENV=development
 DEBUG=1
 SOLANA_ENDPOINT=https://api.devnet.solana.com
 SOLANA_PRIVATE_KEY=your_devnet_private_key
-ATXP_AUTH_CLIENT_TOKEN=your_dev_auth_token
 ```
 
 ### Production Environment
@@ -123,7 +104,6 @@ ATXP_AUTH_CLIENT_TOKEN=your_dev_auth_token
 NODE_ENV=production
 SOLANA_ENDPOINT=https://api.mainnet-beta.solana.com
 SOLANA_PRIVATE_KEY=your_mainnet_private_key
-ATXP_AUTH_CLIENT_TOKEN=your_prod_auth_token
 ```
 
 ### Testing Environment
@@ -133,7 +113,6 @@ ATXP_AUTH_CLIENT_TOKEN=your_prod_auth_token
 NODE_ENV=test
 SOLANA_ENDPOINT=https://api.testnet.solana.com
 SOLANA_PRIVATE_KEY=your_testnet_private_key
-ATXP_AUTH_CLIENT_TOKEN=your_test_auth_token
 ```
 
 ## Platform-Specific Setup
@@ -145,7 +124,6 @@ For Vercel deployments, set environment variables in the Vercel dashboard:
 1. Go to your project in the Vercel dashboard
 2. Navigate to Settings → Environment Variables
 3. Add each required variable:
-   - `ATXP_AUTH_CLIENT_TOKEN`
    - `SOLANA_ENDPOINT`
    - `SOLANA_PRIVATE_KEY`
    - `NODE_ENV` (set to `production`)
@@ -168,7 +146,7 @@ ENV NODE_ENV=production
 ENV SOLANA_ENDPOINT=https://api.mainnet-beta.solana.com
 
 # Note: Set sensitive variables at runtime
-# docker run -e ATXP_AUTH_CLIENT_TOKEN=... -e SOLANA_PRIVATE_KEY=... your-app
+# docker run -e SOLANA_PRIVATE_KEY=... your-app
 ```
 
 ### Kubernetes Deployment
@@ -190,11 +168,6 @@ spec:
           value: "production"
         - name: SOLANA_ENDPOINT
           value: "https://api.mainnet-beta.solana.com"
-        - name: ATXP_AUTH_CLIENT_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: atxp-secrets
-              key: auth-token
         - name: SOLANA_PRIVATE_KEY
           valueFrom:
             secretKeyRef:
@@ -206,17 +179,12 @@ spec:
 
 ### Common Issues
 
-1. **"ATXP_AUTH_CLIENT_TOKEN is not set"**
-   - Ensure the environment variable is properly set
-   - Check that your `.env` file is being loaded
-   - Verify the variable name spelling
-
-2. **"Invalid Solana endpoint"**
+1. **"Invalid Solana endpoint"**
    - Ensure the SOLANA_ENDPOINT is a valid URL
    - Check network connectivity to the endpoint
    - Verify the endpoint is accessible from your deployment environment
 
-3. **"Invalid private key format"**
+2. **"Invalid private key format"**
    - Ensure the private key is in base58 format
    - Check that the key hasn't been corrupted or truncated
    - Verify you're using the correct key for the intended network
@@ -228,7 +196,7 @@ You can validate your environment setup by running:
 ```bash
 # Check if all required variables are set
 node -e "
-const required = ['ATXP_AUTH_CLIENT_TOKEN', 'SOLANA_ENDPOINT', 'SOLANA_PRIVATE_KEY'];
+const required = ['SOLANA_ENDPOINT', 'SOLANA_PRIVATE_KEY'];
 const missing = required.filter(key => !process.env[key]);
 if (missing.length > 0) {
   console.error('Missing required environment variables:', missing);

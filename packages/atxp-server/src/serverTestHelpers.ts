@@ -47,7 +47,6 @@ export function config(args: Partial<ATXPConfig> = {}): ATXPConfig {
   return buildServerConfig({
     ...args, 
     destination: args.destination ?? DESTINATION,
-    atxpAuthClientToken: args.atxpAuthClientToken ?? 'test-auth-token'
   });
 }
 

@@ -11,8 +11,8 @@ describe('ATXPPaymentServer', () => {
       body: { success: true }
     });
 
-    // Create server instance with auth credentials
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', 'test-auth-token', TH.logger(), mock.fetchHandler);
+    // Create server instance
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
     
     const chargeParams = TH.charge({
       source: 'test-source',
@@ -29,7 +29,6 @@ describe('ATXPPaymentServer', () => {
     expect(call).toBeDefined();
     expect(call?.options.method).toBe('post');
     expect(call?.options.headers).toEqual({
-      'authorization': 'Bearer test-auth-token',
       'content-type': 'application/json'
     });
     const parsedBody = JSON.parse(call?.options.body as string);
@@ -41,36 +40,23 @@ describe('ATXPPaymentServer', () => {
     // Credentials were fetched from the real database
   });
 
-  it('should use the environment variable token when calling the charge endpoint', async () => {
+  it('should make requests without authorization headers', async () => {
     const mock = fetchMock.createInstance();
     mock.post('https://auth.atxp.ai/charge', {
       status: 200,
       body: { success: true }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', 'test-auth-token', TH.logger(), mock.fetchHandler);
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
     
     await server.charge(TH.charge({
       source: 'test-source',
       destination: 'test-destination'
     }));
 
-    // Verify the environment variable token was used
+    // Verify no authorization header is included
     const call = mock.callHistory.lastCall('https://auth.atxp.ai/charge');
-    expect((call?.options?.headers as any)?.['authorization']).toBe('Bearer test-auth-token');
-  });
-
-  it('should throw an error if auth credentials are not provided', async () => {
-    const mock = fetchMock.createInstance();
-    
-    // Test that constructor throws when auth credentials are not provided
-    expect(() => {
-      new ATXPPaymentServer('https://auth.atxp.ai', '', TH.logger(), mock.fetchHandler);
-    }).toThrow('Auth credentials are required');
-
-    // Verify fetch was never called
-    const call = mock.callHistory.lastCall('https://auth.atxp.ai/charge');
-    expect(call).toBeUndefined();
+    expect((call?.options?.headers as any)?.['authorization']).toBeUndefined();
   });
 
   it('should call the create payment request endpoint', async () => {
@@ -80,7 +66,7 @@ describe('ATXPPaymentServer', () => {
       body: { id: 'test-payment-request-id' }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', 'test-auth-token', TH.logger(), mock.fetchHandler);
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
     
     const paymentRequestParams = {
       ...TH.charge({
@@ -99,7 +85,6 @@ describe('ATXPPaymentServer', () => {
     expect(call).toBeDefined();
     expect(call?.options.method).toBe('post');
     expect(call?.options.headers).toEqual({
-      'authorization': 'Bearer test-auth-token',
       'content-type': 'application/json'
     });
     const parsedBody = JSON.parse(call?.options.body as string);
@@ -109,14 +94,14 @@ describe('ATXPPaymentServer', () => {
     });
   });
 
-  it('should use the environment variable token when calling the create payment request endpoint', async () => {
+  it('should make payment request without authorization headers', async () => {
     const mock = fetchMock.createInstance();
     mock.post('https://auth.atxp.ai/payment-request', {
       status: 200,
       body: { id: 'test-payment-request-id' }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', 'test-auth-token', TH.logger(), mock.fetchHandler);
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
     
     await server.createPaymentRequest({
       ...TH.charge({
@@ -125,22 +110,9 @@ describe('ATXPPaymentServer', () => {
       })
     });
 
-    // Verify the environment variable token was used
+    // Verify no authorization header is included
     const call = mock.callHistory.lastCall('https://auth.atxp.ai/payment-request');
-    expect((call?.options?.headers as any)?.['authorization']).toBe('Bearer test-auth-token');
-  });
-
-  it('should throw an error if auth credentials are not provided for payment request', async () => {
-    const mock = fetchMock.createInstance();
-    
-    // Test that constructor throws when auth credentials are not provided
-    expect(() => {
-      new ATXPPaymentServer('https://auth.atxp.ai', '', TH.logger(), mock.fetchHandler);
-    }).toThrow('Auth credentials are required');
-
-    // Verify fetch was never called
-    const call = mock.callHistory.lastCall('https://auth.atxp.ai/payment-request');
-    expect(call).toBeUndefined();
+    expect((call?.options?.headers as any)?.['authorization']).toBeUndefined();
   });
 
   it('should handle charge endpoint returning 402 status (payment required)', async () => {
@@ -153,7 +125,7 @@ describe('ATXPPaymentServer', () => {
       }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', 'test-auth-token', TH.logger(), mock.fetchHandler);
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
     
     const result = await server.charge(TH.charge({
       source: 'test-source',
@@ -177,7 +149,7 @@ describe('ATXPPaymentServer', () => {
       body: { error: 'server error' }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', 'test-auth-token', TH.logger(), mock.fetchHandler);
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
     
     await expect(server.charge(TH.charge({
       source: 'test-source',
@@ -192,7 +164,7 @@ describe('ATXPPaymentServer', () => {
       body: { error: 'bad request' }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', 'test-auth-token', TH.logger(), mock.fetchHandler);
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
     
     await expect(server.createPaymentRequest({
       ...TH.charge({
@@ -209,7 +181,7 @@ describe('ATXPPaymentServer', () => {
       body: { success: true } // Missing 'id' field
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', 'test-auth-token', TH.logger(), mock.fetchHandler);
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
     
     await expect(server.createPaymentRequest({
       ...TH.charge({
