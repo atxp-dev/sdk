@@ -5,12 +5,11 @@ import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPay
 import { generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { Hex } from '@atxp/client';
-import { SpendPermission } from './types.js';
+import { SpendPermission, Eip1193Provider } from './types.js';
+import { requestSpendPermission } from './spendPermissionShim.js';
 import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
 import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { ConsoleLogger, Logger } from '@atxp/common';
-import { createBaseAccountSDK } from "@base-org/account";
-import { getSpendPermissionModule } from './spendPermissionUtils.js';
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
@@ -25,9 +24,8 @@ export class BaseAppAccount implements Account {
   }
 
   static async initialize(config: {
-      walletAddress: string, 
-      apiKey: string;
-      appName: string;
+      walletAddress: string,
+      provider: Eip1193Provider,
       useEphemeralWallet?: boolean;
       allowance?: bigint;
       periodInDays?: number;
@@ -38,20 +36,10 @@ export class BaseAppAccount implements Account {
     const logger = config.logger || new ConsoleLogger();
     const useEphemeralWallet = config.useEphemeralWallet ?? true; // Default to true for backward compatibility
     
-    // Initialize Base SDK
-    const sdk = createBaseAccountSDK({
-      appName: config?.appName,
-      appChainIds: [base.id],
-      paymasterUrls: {
-        [base.id]: PAYMASTER_URL
-      }
-    });
-    const provider = sdk.getProvider();
-    
     // Some wallets don't support wallet_connect, so 
     // will just continue if it fails
     try {
-      await provider.request({ method: 'wallet_connect' });
+      await config.provider.request({ method: 'wallet_connect' });
     } catch (error) {
       // Continue if wallet_connect is not supported
       logger.warn(`wallet_connect not supported, continuing with initialization. ${error}`);
@@ -65,15 +53,7 @@ export class BaseAppAccount implements Account {
         null, // No ephemeral wallet in main wallet mode
         logger,
         config.walletAddress,
-        provider
-      );
-    }
-
-    // Validate smart wallet configuration for ephemeral mode
-    if (!config.apiKey) {
-      throw new Error(
-        'Smart wallet API key is required for ephemeral wallet mode. ' +
-        'Get your API key from https://portal.cdp.coinbase.com/'
+        config.provider
       );
     }
 
@@ -85,19 +65,15 @@ export class BaseAppAccount implements Account {
     // Try to load existing permission
     const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
     if (existingData) {
-      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey, config.apiKey);
+      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey);
       return new BaseAppAccount(existingData.permission, ephemeralSmartWallet, logger);
     }
 
     const privateKey = generatePrivateKey();
-    const smartWallet = await toEphemeralSmartWallet(privateKey, config.apiKey);
+    const smartWallet = await toEphemeralSmartWallet(privateKey);
     logger.info(`Generated ephemeral wallet: ${smartWallet.address}`);
     await this.deploySmartWallet(smartWallet);
     logger.info(`Deployed smart wallet: ${smartWallet.address}`);
-
-    // Dynamically import requestSpendPermission based on environment
-    // This function requires browser APIs and wallet interaction
-    const { requestSpendPermission } = await getSpendPermissionModule();
     
     const permission = await requestSpendPermission({
       account: config.walletAddress,
@@ -106,7 +82,7 @@ export class BaseAppAccount implements Account {
       chainId: base.id,
       allowance: config?.allowance ?? DEFAULT_ALLOWANCE,
       periodInDays: config?.periodInDays ?? DEFAULT_PERIOD_IN_DAYS,
-      provider,
+      provider: config.provider,
     });
     
     // Save wallet and permission

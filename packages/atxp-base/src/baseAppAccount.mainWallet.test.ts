@@ -1,26 +1,13 @@
-// Mock all external modules before imports
-vi.mock('@base-org/account', () => ({
-  createBaseAccountSDK: vi.fn(() => ({
-    getProvider: vi.fn(() => ({
-      request: vi.fn()
-    }))
-  }))
-}));
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BaseAppAccount } from './baseAppAccount.js';
 import { MainWalletPaymentMaker } from './mainWalletPaymentMaker.js';
 import { MemoryStorage } from './storage.js';
 import BigNumber from 'bignumber.js';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
-import { 
-  TEST_API_KEY,
+import {
   TEST_WALLET_ADDRESS,
   mockProvider,
-  mockBaseAccountSDK,
 } from './testHelpers.js';
-
-const { createBaseAccountSDK } = await import('@base-org/account');
 
 describe('BaseAppAccount - Main Wallet Mode', () => {
   let storage: MemoryStorage;
@@ -37,15 +24,10 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
   describe('initialize with useEphemeralWallet=false', () => {
     it('should initialize without creating ephemeral wallet', async () => {
       const provider = mockProvider();
-      const sdk = mockBaseAccountSDK({ provider });
-      
-      // @ts-expect-error - mocked function
-      createBaseAccountSDK.mockReturnValue(sdk);
 
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'test-app',
+        provider: provider,
         useEphemeralWallet: false,
         storage,
       });
@@ -60,7 +42,6 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
       
       // Should NOT create ephemeral wallet or request spend permission
-      expect(createBaseAccountSDK).toHaveBeenCalledTimes(1);
       // Storage should remain empty (no ephemeral wallet data saved)
       const storageKey = `atxp-base-permission-${TEST_WALLET_ADDRESS}`;
       expect(storage.get(storageKey)).toBeNull();
@@ -68,30 +49,13 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
     it('should make correct blockchain calls in main wallet mode', async () => {
       const provider = mockProvider();
-      const sdk = mockBaseAccountSDK({ provider });
-      
-      // @ts-expect-error - mocked function
-      createBaseAccountSDK.mockReturnValue(sdk);
 
       await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'test-app',
+        provider: provider,
         useEphemeralWallet: false,
         storage,
       });
-
-      // Verify SDK initialization
-      expect(createBaseAccountSDK).toHaveBeenCalledWith({
-        appName: 'test-app',
-        appChainIds: [8453], // base.id
-        paymasterUrls: {
-          8453: 'https://api.developer.coinbase.com/rpc/v1/base/snPdXqIzOGhRkGNJvEHM5bl9Hm3yRO3m'
-        }
-      });
-
-      // Verify provider setup
-      expect(sdk.getProvider).toHaveBeenCalled();
       
       // Verify wallet_connect attempt
       expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
@@ -103,41 +67,16 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
     it('should handle wallet_connect failure gracefully', async () => {
       const provider = mockProvider();
       provider.request.mockRejectedValueOnce(new Error('wallet_connect not supported'));
-      
-      const sdk = mockBaseAccountSDK({ provider });
-      
-      // @ts-expect-error - mocked function
-      createBaseAccountSDK.mockReturnValue(sdk);
 
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'test-app',
+        provider: provider,
         useEphemeralWallet: false,
         storage,
       });
 
       expect(account.accountId).toBe(TEST_WALLET_ADDRESS);
       expect(account.paymentMakers['base']).toBeInstanceOf(MainWalletPaymentMaker);
-    });
-
-    it('should not require apiKey in main wallet mode', async () => {
-      const provider = mockProvider();
-      const sdk = mockBaseAccountSDK({ provider });
-      
-      // @ts-expect-error - mocked function
-      createBaseAccountSDK.mockReturnValue(sdk);
-
-      // Should not throw without API key when useEphemeralWallet=false
-      const account = await BaseAppAccount.initialize({
-        walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: '', // Empty API key
-        appName: 'test-app',
-        useEphemeralWallet: false,
-        storage,
-      });
-
-      expect(account.accountId).toBe(TEST_WALLET_ADDRESS);
     });
 
     it('should pass the provider to MainWalletPaymentMaker', async () => {
@@ -147,16 +86,10 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         if (method === 'personal_sign') return '0xmocksignature';
         throw new Error(`Unexpected method: ${method}`);
       });
-      
-      const sdk = mockBaseAccountSDK({ provider });
-      
-      // @ts-expect-error - mocked function
-      createBaseAccountSDK.mockReturnValue(sdk);
 
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'test-app',
+        provider: provider,
         useEphemeralWallet: false,
         storage,
       });
@@ -175,10 +108,6 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
     it('should not interact with storage in main wallet mode', async () => {
       const provider = mockProvider();
-      const sdk = mockBaseAccountSDK({ provider });
-      
-      // @ts-expect-error - mocked function
-      createBaseAccountSDK.mockReturnValue(sdk);
 
       // Spy on storage methods
       const getSpy = vi.spyOn(storage, 'get');
@@ -187,8 +116,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
       await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'test-app',
+        provider: provider,
         useEphemeralWallet: false,
         storage,
       });
@@ -203,17 +131,12 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
   describe('initialize with useEphemeralWallet not specified', () => {
     it('should default to ephemeral wallet mode for backward compatibility', async () => {
       const provider = mockProvider();
-      const sdk = mockBaseAccountSDK({ provider });
-      
-      // @ts-expect-error - mocked function
-      createBaseAccountSDK.mockReturnValue(sdk);
 
       // This should throw because apiKey is required for ephemeral wallet mode
       await expect(
         BaseAppAccount.initialize({
           walletAddress: TEST_WALLET_ADDRESS,
-          apiKey: '', // Empty API key
-          appName: 'test-app',
+          provider: provider,
           storage,
           // useEphemeralWallet not specified - should default to true
         })
@@ -246,16 +169,10 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         if (method === 'eth_blockNumber') return '0x102';
         throw new Error(`Unexpected method: ${method}`);
       });
-      
-      const sdk = mockBaseAccountSDK({ provider });
-      
-      // @ts-expect-error - mocked function
-      createBaseAccountSDK.mockReturnValue(sdk);
 
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'test-app',
+        provider: provider,
         useEphemeralWallet: false,
         storage,
       });
@@ -292,16 +209,10 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         if (method === 'personal_sign') return '0xmocksignature';
         throw new Error(`Unexpected method: ${method}`);
       });
-      
-      const sdk = mockBaseAccountSDK({ provider });
-      
-      // @ts-expect-error - mocked function
-      createBaseAccountSDK.mockReturnValue(sdk);
 
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'test-app',
+        provider: provider,
         useEphemeralWallet: false,
         storage,
       });
