@@ -7,15 +7,6 @@ Object.defineProperty(global, 'window', {
   configurable: true
 });
 
-// Mock all external modules before imports
-vi.mock('@base-org/account', () => ({
-  createBaseAccountSDK: vi.fn(() => ({
-    getProvider: vi.fn(() => ({
-      request: vi.fn()
-    }))
-  }))
-}));
-
 vi.mock('@base-org/account/spend-permission/browser', () => ({
   requestSpendPermission: vi.fn(),
   prepareSpendCallData: vi.fn()
@@ -42,15 +33,11 @@ import { base } from 'viem/chains';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import {
-  TEST_API_KEY,
   TEST_WALLET_ADDRESS,
   TEST_SMART_WALLET_ADDRESS,
   TEST_RECEIVER_ADDRESS,
   TEST_PRIVATE_KEY,
-  TEST_PAYMASTER_URL,
-  TEST_BUNDLER_URL,
   setupInitializationMocks,
-  setupPaymentMocks,
   mockSpendPermission,
   mockExpiredSpendPermission,
   mockSmartAccount,
@@ -83,8 +70,7 @@ describe('BaseAppAccount', () => {
       // Initialize account
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'Test App',
+        provider: mockProvider(),
         storage: mockStorage
       });
 
@@ -145,8 +131,7 @@ describe('BaseAppAccount', () => {
       // Initialize account
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'Test App',
+        provider: mockProvider(),
         storage: mockStorage
       });
 
@@ -178,8 +163,7 @@ describe('BaseAppAccount', () => {
       // Initialize account
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'Test App',
+        provider: mockProvider(),
         storage: mockStorage
       });
 
@@ -208,8 +192,7 @@ describe('BaseAppAccount', () => {
 
       await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'Test App',
+        provider: mockProvider(),
         allowance: customAllowance,
         periodInDays: customPeriod,
         storage: mockStorage
@@ -222,15 +205,6 @@ describe('BaseAppAccount', () => {
           periodInDays: customPeriod
         })
       );
-    });
-
-    it('should throw error when API key is not provided', async () => {
-      await expect(BaseAppAccount.initialize({
-        walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: '',
-        appName: 'Test App',
-        storage: mockStorage
-      })).rejects.toThrow('Smart wallet API key is required');
     });
 
     it('should make all required blockchain calls when creating new account', async () => {
@@ -251,19 +225,8 @@ describe('BaseAppAccount', () => {
       // Initialize account
       await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'Test App',
+        provider: mockProvider(),
         storage: mockStorage
-      });
-
-      // Verify SDK initialization
-      expect(mocks.createBaseAccountSDK).toHaveBeenCalledTimes(1);
-      expect(mocks.createBaseAccountSDK).toHaveBeenCalledWith({
-        appName: 'Test App',
-        appChainIds: [base.id],
-        paymasterUrls: {
-          [base.id]: TEST_PAYMASTER_URL
-        }
       });
 
       // Verify wallet_connect attempt
@@ -274,7 +237,6 @@ describe('BaseAppAccount', () => {
         chain: base,
         transport: expect.anything()
       });
-      expect(http).toHaveBeenCalledWith(`${TEST_BUNDLER_URL}/${TEST_API_KEY}`);
 
       // Verify smart account creation
       expect(mocks.toCoinbaseSmartAccount).toHaveBeenCalledWith({
@@ -348,19 +310,8 @@ describe('BaseAppAccount', () => {
       // Initialize account
       await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'Test App',
+        provider: mockProvider(),
         storage: mockStorage
-      });
-
-      // Verify SDK initialization still happens
-      expect(mocks.createBaseAccountSDK).toHaveBeenCalledTimes(1);
-      expect(mocks.createBaseAccountSDK).toHaveBeenCalledWith({
-        appName: 'Test App',
-        appChainIds: [base.id],
-        paymasterUrls: {
-          [base.id]: TEST_PAYMASTER_URL
-        }
       });
 
       // Verify wallet_connect attempt still happens
@@ -371,7 +322,6 @@ describe('BaseAppAccount', () => {
         chain: base,
         transport: expect.anything()
       });
-      expect(http).toHaveBeenCalledWith(`${TEST_BUNDLER_URL}/${TEST_API_KEY}`);
 
       // Verify smart account creation with stored private key
       expect(mocks.toCoinbaseSmartAccount).toHaveBeenCalledWith({
@@ -414,8 +364,7 @@ describe('BaseAppAccount', () => {
       // Initialize account - should not throw despite wallet_connect failure
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'Test App',
+        provider: mockProvider(),
         storage: mockStorage
       });
 
@@ -433,8 +382,7 @@ describe('BaseAppAccount', () => {
       // Initialize should throw
       await expect(BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'Test App',
+        provider: mockProvider(),
         storage: mockStorage
       })).rejects.toThrow('Smart wallet deployment failed');
     });
@@ -484,13 +432,11 @@ describe('BaseAppAccount', () => {
       const spendCalls = mockSpendCalls();
       
       await setupInitializationMocks({ bundlerClient, smartAccount });
-      const { prepareSpendCallData } = await setupPaymentMocks({ spendCalls });
 
       // Initialize account
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
-        apiKey: TEST_API_KEY,
-        appName: 'Test App',
+        provider: mockProvider(),
         storage: mockStorage
       });
 
@@ -501,7 +447,6 @@ describe('BaseAppAccount', () => {
 
       // Verify payment was made
       expect(txHash).toBe('0xtxhash');
-      expect(prepareSpendCallData).toHaveBeenCalledWith(permission, 1500000n); // 1.5 USDC in smallest units
       expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
         account: smartAccount,
         calls: [

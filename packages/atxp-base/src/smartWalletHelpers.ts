@@ -29,9 +29,9 @@ export interface EphemeralSmartWallet {
  * Creates an ephemeral smart wallet with paymaster support
  */
 export async function toEphemeralSmartWallet(
-  privateKey: Hex,
-  apiKey: string
+  privateKey: Hex
 ): Promise<EphemeralSmartWallet> {
+  const apiKey = process.env.COINBASE_API_KEY;
   const signer = privateKeyToAccount(privateKey);
   
   const publicClient = createPublicClient({
