@@ -23,8 +23,7 @@ vi.mock('viem', async () => {
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import BigNumber from 'bignumber.js';
-import { 
-  setupPaymentMocks,
+import {
   mockSpendPermission,
   mockEphemeralSmartWallet,
   mockBundlerClient,
@@ -78,8 +77,6 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const smartWallet = mockEphemeralSmartWallet({ client: bundlerClient });
     const spendCalls = mockSpendCalls();
     
-    const { prepareSpendCallData } = await setupPaymentMocks({ spendCalls });
-    
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5); // 1.5 USDC
     
@@ -87,9 +84,6 @@ describe('baseAppPaymentMaker.makePayment', () => {
     
     // Verify the transaction hash
     expect(txHash).toBe('0xtxhash');
-    
-    // Verify prepareSpendCallData was called with correct amount
-    expect(prepareSpendCallData).toHaveBeenCalledWith(permission, 1500000n); // 1.5 USDC = 1,500,000 in smallest units
     
     // Verify sendUserOperation was called with correct parameters
     expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
@@ -129,8 +123,6 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const bundlerClient = mockFailedBundlerClient({ failureType: 'receipt' });
     const smartWallet = mockEphemeralSmartWallet({ client: bundlerClient });
     
-    await setupPaymentMocks({ spendCalls: [] });
-    
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5);
     
@@ -143,8 +135,6 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const permission = mockSpendPermission();
     const bundlerClient = mockFailedBundlerClient({ failureType: 'noTxHash' });
     const smartWallet = mockEphemeralSmartWallet({ client: bundlerClient });
-    
-    await setupPaymentMocks({ spendCalls: [] });
     
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5);

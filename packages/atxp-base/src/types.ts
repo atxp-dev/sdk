@@ -34,3 +34,10 @@ export type SpendPermission = {
     extraData: string;
   };
 };
+
+export type Eip1193Provider = {
+  request: (params: {
+    method: string;
+    params?: any[];
+  }) => Promise<any>;
+};
