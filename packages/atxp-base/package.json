@@ -35,7 +35,6 @@
   "dependencies": {
     "@atxp/client": "0.6.1",
     "@atxp/common": "0.6.1",
-    "@base-org/account": "^2.1.0",
     "bignumber.js": "^9.3.0"
   },
   "peerDependencies": {
