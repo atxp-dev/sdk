@@ -68,7 +68,7 @@ describe('MainWalletPaymentMaker', () => {
       });
       expect(payload.iat).toBeDefined();
       expect(payload.exp).toBeDefined();
-      expect(payload.nonce).toBeDefined();
+      expect(payload.nonce).toBeUndefined();
       expect(payload.msg).toContain('PayMCP Authorization Request');
       
       // Decode JWT signature
@@ -122,14 +122,15 @@ describe('MainWalletPaymentMaker', () => {
       });
 
       // Since mock provider doesn't have isCoinbaseWallet, it should pass plain string
-      // Verify exact message format
+      // Verify exact message format (no nonce)
       expect(capturedMessage).toContain('PayMCP Authorization Request\n\n');
       expect(capturedMessage).toContain(`Wallet: ${TEST_WALLET_ADDRESS}`);
       expect(capturedMessage).toContain('Timestamp: ');
-      expect(capturedMessage).toContain('Nonce: ');
       expect(capturedMessage).toContain('Code Challenge: test-challenge');
       expect(capturedMessage).toContain('Payment Request ID: test-payment-id');
       expect(capturedMessage).toContain('\n\n\nSign this message to prove you control this wallet.');
+      // Should NOT contain nonce
+      expect(capturedMessage).not.toContain('Nonce: ');
     });
 
     it('should handle signature errors', async () => {

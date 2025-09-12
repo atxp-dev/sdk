@@ -42,7 +42,7 @@ function toBase64Url(data: string): string {
 
 /**
  * Convert EIP-1271 auth data to JWT format
- * @param authData The EIP-1271 auth data
+ * @param authData The EIP-1271 auth data (signature will be moved to JWT signature section)
  * @returns JWT string in the format header.payload.signature
  */
 export function createEIP1271JWT(authData: EIP1271AuthData): string {
@@ -52,6 +52,7 @@ export function createEIP1271JWT(authData: EIP1271AuthData): string {
     typ: 'JWT'
   };
 
+  // Create payload without signature (signature goes in JWT signature section)
   const payload: EIP1271JWTPayload = {
     sub: authData.walletAddress,
     iss: 'accounts.atxp.ai',
@@ -67,7 +68,7 @@ export function createEIP1271JWT(authData: EIP1271AuthData): string {
   const encodedHeader = toBase64Url(JSON.stringify(header));
   const encodedPayload = toBase64Url(JSON.stringify(payload));
   
-  // For EIP-1271, the signature is the third part
+  // EIP-1271 signature goes in JWT signature section
   const encodedSignature = toBase64Url(authData.signature);
 
   // Return JWT format: header.payload.signature

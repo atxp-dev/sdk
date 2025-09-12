@@ -142,6 +142,12 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
     it('should pass the provider to MainWalletPaymentMaker', async () => {
       const provider = mockProvider();
+      // Set up mock to return signature for personal_sign
+      provider.request.mockImplementation(async ({ method }) => {
+        if (method === 'personal_sign') return '0xmocksignature';
+        throw new Error(`Unexpected method: ${method}`);
+      });
+      
       const sdk = mockBaseAccountSDK({ provider });
       
       // @ts-expect-error - mocked function
@@ -306,8 +312,8 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         codeChallenge: 'test-challenge'
       });
 
-      // JWT should be base64url encoded
-      expect(jwt).toMatch(/^[A-Za-z0-9_-]+$/);
+      // JWT should have proper JWT format (header.payload.signature)
+      expect(jwt.split('.')).toHaveLength(3);
       
       // Verify personal_sign was called
       expect(provider.request).toHaveBeenCalledWith({
