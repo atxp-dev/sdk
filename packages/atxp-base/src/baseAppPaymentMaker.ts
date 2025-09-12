@@ -76,7 +76,6 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
     
-    // Construct the message in the standardized format (no nonce needed - timestamp + other params provide uniqueness)
     const message = constructEIP1271Message({
       walletAddress: this.smartWallet.account.address,
       timestamp,
@@ -89,7 +88,6 @@ export class BaseAppPaymentMaker implements PaymentMaker {
       message: message
     });
     
-    // Create EIP-1271 auth data structure (no nonce needed)
     const authData = createEIP1271AuthData({
       walletAddress: this.smartWallet.account.address,
       message,
@@ -99,12 +97,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
       paymentRequestId
     });
     
-    // Create JWT format (new implementation)
     const jwtToken = createEIP1271JWT(authData);
-    
-    // TODO: Remove legacy support after transition period
-    // For now, we can also generate legacy format for comparison
-    // const legacyToken = createLegacyEIP1271Auth(authData);
     
     this.logger.info(`codeChallenge: ${codeChallenge}`);
     this.logger.info(`paymentRequestId: ${paymentRequestId}`);

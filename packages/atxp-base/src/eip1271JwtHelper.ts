@@ -1,6 +1,6 @@
 /**
  * EIP-1271 JWT helper utilities for creating properly formatted JWTs
- * from EIP-1271 auth data while maintaining backward compatibility.
+ * from EIP-1271 auth data.
  */
 
 interface EIP1271AuthData {
@@ -9,7 +9,7 @@ interface EIP1271AuthData {
   message: string;
   signature: string;
   timestamp: number;
-  nonce?: string; // Made optional for backward compatibility
+  nonce?: string;
   code_challenge?: string;
   payment_request_id?: string;
 }
@@ -52,7 +52,6 @@ export function createEIP1271JWT(authData: EIP1271AuthData): string {
     typ: 'JWT'
   };
 
-  // Create JWT payload (nonce removed - timestamp, code_challenge, and payment_request_id provide sufficient uniqueness)
   const payload: EIP1271JWTPayload = {
     sub: authData.walletAddress,
     iss: 'accounts.atxp.ai',
@@ -99,7 +98,7 @@ export function createEIP1271AuthData({
   message: string;
   signature: string;
   timestamp: number;
-  nonce?: string; // Made optional
+  nonce?: string;
   codeChallenge?: string;
   paymentRequestId?: string;
 }): EIP1271AuthData {
@@ -109,7 +108,7 @@ export function createEIP1271AuthData({
     message,
     signature,
     timestamp,
-    ...(nonce && { nonce }), // Only include if provided
+    ...(nonce && { nonce }),
     ...(codeChallenge && { code_challenge: codeChallenge }),
     ...(paymentRequestId && { payment_request_id: paymentRequestId })
   };
@@ -127,7 +126,7 @@ export function constructEIP1271Message({
 }: {
   walletAddress: string;
   timestamp: number;
-  nonce?: string; // Made optional
+  nonce?: string;
   codeChallenge?: string;
   paymentRequestId?: string;
 }): string {
@@ -138,7 +137,6 @@ export function constructEIP1271Message({
     `Timestamp: ${timestamp}`
   ];
   
-  // Only include nonce if provided and not undefined (for backward compatibility)
   if (nonce !== undefined && nonce !== null) {
     messageParts.push(`Nonce: ${nonce}`);
   }

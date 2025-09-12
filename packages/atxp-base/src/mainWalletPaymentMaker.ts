@@ -40,7 +40,6 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     // Generate EIP-1271 auth data for main wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
     
-    // Construct the message in the standardized format (no nonce needed - timestamp + other params provide uniqueness)
     const message = constructEIP1271Message({
       walletAddress: this.walletAddress,
       timestamp,
@@ -75,7 +74,6 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       params: [messageToSign, this.walletAddress]
     });
 
-    // Create EIP-1271 auth data structure (no nonce needed)
     const authData = createEIP1271AuthData({
       walletAddress: this.walletAddress,
       message,
@@ -85,12 +83,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       paymentRequestId: payload.paymentRequestId
     });
 
-    // Create JWT format (new implementation)
     const jwtToken = createEIP1271JWT(authData);
-    
-    // TODO: Remove legacy support after transition period
-    // For now, we can also generate legacy format for comparison
-    // const legacyToken = createLegacyEIP1271Auth(authData);
     
     this.logger.info(`Generated EIP-1271 JWT: ${jwtToken}`);
     
