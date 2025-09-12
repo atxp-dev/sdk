@@ -5,7 +5,6 @@ import BigNumber from 'bignumber.js';
 import { ConsoleLogger, Logger, Currency } from '@atxp/common';
 import { 
   createEIP1271JWT, 
-  createLegacyEIP1271Auth, 
   createEIP1271AuthData,
   constructEIP1271Message 
 } from './eip1271JwtHelper.js';

@@ -46,22 +46,34 @@ describe('MainWalletPaymentMaker', () => {
         ]
       });
 
-      // Should return base64url encoded JWT
-      // Decode base64url
-      const base64 = jwt.replace(/-/g, '+').replace(/_/g, '/');
-      const padding = '='.repeat((4 - base64.length % 4) % 4);
-      const decodedJwt = JSON.parse(Buffer.from(base64 + padding, 'base64').toString());
+      // Should return JWT format (header.payload.signature)
+      const parts = jwt.split('.');
+      expect(parts).toHaveLength(3);
       
-      expect(decodedJwt).toMatchObject({
-        type: 'EIP1271_AUTH',
-        walletAddress: TEST_WALLET_ADDRESS,
-        signature: mockSignature,
+      // Decode JWT header
+      const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString());
+      expect(header).toEqual({
+        alg: 'EIP1271',
+        typ: 'JWT'
+      });
+      
+      // Decode JWT payload
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      expect(payload).toMatchObject({
+        sub: TEST_WALLET_ADDRESS,
+        iss: 'accounts.atxp.ai',
+        aud: 'https://auth.atxp.ai',
         payment_request_id: 'test-payment-id',
         code_challenge: 'test-challenge'
       });
-      expect(decodedJwt.timestamp).toBeDefined();
-      expect(decodedJwt.nonce).toBeDefined();
-      expect(decodedJwt.message).toContain('PayMCP Authorization Request');
+      expect(payload.iat).toBeDefined();
+      expect(payload.exp).toBeDefined();
+      expect(payload.nonce).toBeDefined();
+      expect(payload.msg).toContain('PayMCP Authorization Request');
+      
+      // Decode JWT signature
+      const signature = Buffer.from(parts[2], 'base64url').toString();
+      expect(signature).toBe(mockSignature);
     });
 
     it('should generate JWT without optional fields', async () => {
@@ -73,14 +85,23 @@ describe('MainWalletPaymentMaker', () => {
         codeChallenge: ''
       });
 
-      // Decode base64url
-      const base64 = jwt.replace(/-/g, '+').replace(/_/g, '/');
-      const padding = '='.repeat((4 - base64.length % 4) % 4);
-      const decodedJwt = JSON.parse(Buffer.from(base64 + padding, 'base64').toString());
+      // Should return JWT format without optional fields
+      const parts = jwt.split('.');
+      expect(parts).toHaveLength(3);
       
-      expect(decodedJwt.type).toBe('EIP1271_AUTH');
-      expect(decodedJwt.payment_request_id).toBeUndefined();
-      expect(decodedJwt.code_challenge).toBeUndefined();
+      // Decode JWT payload
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      expect(payload).toMatchObject({
+        sub: TEST_WALLET_ADDRESS,
+        iss: 'accounts.atxp.ai',
+        aud: 'https://auth.atxp.ai'
+      });
+      expect(payload.code_challenge).toBeUndefined();
+      expect(payload.payment_request_id).toBeUndefined();
+      
+      // Decode JWT signature
+      const signature = Buffer.from(parts[2], 'base64url').toString();
+      expect(signature).toBe(mockSignature);
     });
 
     it('should construct message in correct format', async () => {

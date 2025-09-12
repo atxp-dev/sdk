@@ -6,7 +6,6 @@ import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { getSpendPermissionModule } from './spendPermissionUtils.js';
 import { 
   createEIP1271JWT, 
-  createLegacyEIP1271Auth, 
   createEIP1271AuthData,
   constructEIP1271Message 
 } from './eip1271JwtHelper.js';
