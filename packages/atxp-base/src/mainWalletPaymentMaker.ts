@@ -39,13 +39,11 @@ export class MainWalletPaymentMaker implements PaymentMaker {
 
     // Generate EIP-1271 auth data for main wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
-    const nonce = Math.random().toString(36).substring(2, 15);
     
-    // Construct the message in the standardized format - must match BaseAppPaymentMaker exactly
+    // Construct the message in the standardized format (no nonce needed - timestamp + other params provide uniqueness)
     const message = constructEIP1271Message({
       walletAddress: this.walletAddress,
       timestamp,
-      nonce,
       codeChallenge: payload.codeChallenge,
       paymentRequestId: payload.paymentRequestId
     });
@@ -77,13 +75,12 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       params: [messageToSign, this.walletAddress]
     });
 
-    // Create EIP-1271 auth data structure
+    // Create EIP-1271 auth data structure (no nonce needed)
     const authData = createEIP1271AuthData({
       walletAddress: this.walletAddress,
       message,
       signature,
       timestamp,
-      nonce,
       codeChallenge: payload.codeChallenge,
       paymentRequestId: payload.paymentRequestId
     });

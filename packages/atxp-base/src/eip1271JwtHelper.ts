@@ -9,7 +9,7 @@ interface EIP1271AuthData {
   message: string;
   signature: string;
   timestamp: number;
-  nonce: string;
+  nonce?: string; // Made optional for backward compatibility
   code_challenge?: string;
   payment_request_id?: string;
 }
@@ -25,7 +25,6 @@ interface EIP1271JWTPayload {
   aud: string;           // audience  
   iat: number;           // timestamp
   exp: number;           // expiration (timestamp + 3600)
-  nonce: string;         // nonce
   msg: string;           // the signed message
   code_challenge?: string;
   payment_request_id?: string;
@@ -53,14 +52,13 @@ export function createEIP1271JWT(authData: EIP1271AuthData): string {
     typ: 'JWT'
   };
 
-  // Create JWT payload
+  // Create JWT payload (nonce removed - timestamp, code_challenge, and payment_request_id provide sufficient uniqueness)
   const payload: EIP1271JWTPayload = {
     sub: authData.walletAddress,
     iss: 'accounts.atxp.ai',
     aud: 'https://auth.atxp.ai',
     iat: authData.timestamp,
     exp: authData.timestamp + 3600, // 1 hour expiration
-    nonce: authData.nonce,
     msg: authData.message,
     ...(authData.code_challenge && { code_challenge: authData.code_challenge }),
     ...(authData.payment_request_id && { payment_request_id: authData.payment_request_id })
@@ -101,7 +99,7 @@ export function createEIP1271AuthData({
   message: string;
   signature: string;
   timestamp: number;
-  nonce: string;
+  nonce?: string; // Made optional
   codeChallenge?: string;
   paymentRequestId?: string;
 }): EIP1271AuthData {
@@ -111,7 +109,7 @@ export function createEIP1271AuthData({
     message,
     signature,
     timestamp,
-    nonce,
+    ...(nonce && { nonce }), // Only include if provided
     ...(codeChallenge && { code_challenge: codeChallenge }),
     ...(paymentRequestId && { payment_request_id: paymentRequestId })
   };
@@ -129,7 +127,7 @@ export function constructEIP1271Message({
 }: {
   walletAddress: string;
   timestamp: number;
-  nonce: string;
+  nonce?: string; // Made optional
   codeChallenge?: string;
   paymentRequestId?: string;
 }): string {
@@ -137,9 +135,13 @@ export function constructEIP1271Message({
     `PayMCP Authorization Request`,
     ``,
     `Wallet: ${walletAddress}`,
-    `Timestamp: ${timestamp}`,
-    `Nonce: ${nonce}`
+    `Timestamp: ${timestamp}`
   ];
+  
+  // Only include nonce if provided and not undefined (for backward compatibility)
+  if (nonce !== undefined && nonce !== null) {
+    messageParts.push(`Nonce: ${nonce}`);
+  }
   
   if (codeChallenge) {
     messageParts.push(`Code Challenge: ${codeChallenge}`);

@@ -75,13 +75,11 @@ export class BaseAppPaymentMaker implements PaymentMaker {
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
-    const nonce = Math.random().toString(36).substring(2, 15); // Generate random nonce
     
-    // Construct the message in the standardized format
+    // Construct the message in the standardized format (no nonce needed - timestamp + other params provide uniqueness)
     const message = constructEIP1271Message({
       walletAddress: this.smartWallet.account.address,
       timestamp,
-      nonce,
       codeChallenge,
       paymentRequestId
     });
@@ -91,13 +89,12 @@ export class BaseAppPaymentMaker implements PaymentMaker {
       message: message
     });
     
-    // Create EIP-1271 auth data structure
+    // Create EIP-1271 auth data structure (no nonce needed)
     const authData = createEIP1271AuthData({
       walletAddress: this.smartWallet.account.address,
       message,
       signature,
       timestamp,
-      nonce,
       codeChallenge,
       paymentRequestId
     });
