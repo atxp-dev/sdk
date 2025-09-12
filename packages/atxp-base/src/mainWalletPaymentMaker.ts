@@ -3,21 +3,14 @@ import { encodeFunctionData, toHex } from 'viem';
 import { USDC_CONTRACT_ADDRESS_BASE, type Hex } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import { ConsoleLogger, Logger, Currency } from '@atxp/common';
+import { 
+  createEIP1271JWT, 
+  createLegacyEIP1271Auth, 
+  createEIP1271AuthData,
+  constructEIP1271Message 
+} from './eip1271JwtHelper.js';
 
 const USDC_DECIMALS = 6;
-
-// Helper function to convert to base64url that works in both Node.js and browsers
-function toBase64Url(data: string): string {
-  // Convert string to base64
-  const base64 = typeof Buffer !== 'undefined' 
-    ? Buffer.from(data).toString('base64')
-    : btoa(data);
-  // Convert base64 to base64url
-  return base64
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
 
 export type MainWalletProvider = {
   request: (params: { 
@@ -49,25 +42,14 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     const timestamp = Math.floor(Date.now() / 1000);
     const nonce = Math.random().toString(36).substring(2, 15);
     
-    // Construct the message in the required format - must match BaseAppPaymentMaker exactly
-    const messageParts = [
-      `PayMCP Authorization Request`,
-      ``,
-      `Wallet: ${this.walletAddress}`,
-      `Timestamp: ${timestamp}`,
-      `Nonce: ${nonce}`
-    ];
-    
-    if (payload.codeChallenge) {
-      messageParts.push(`Code Challenge: ${payload.codeChallenge}`);
-    }
-    
-    if (payload.paymentRequestId) {
-      messageParts.push(`Payment Request ID: ${payload.paymentRequestId}`);
-    }
-    
-    messageParts.push('', '', 'Sign this message to prove you control this wallet.');
-    const message = messageParts.join('\n');
+    // Construct the message in the standardized format - must match BaseAppPaymentMaker exactly
+    const message = constructEIP1271Message({
+      walletAddress: this.walletAddress,
+      timestamp,
+      nonce,
+      codeChallenge: payload.codeChallenge,
+      paymentRequestId: payload.paymentRequestId
+    });
 
     // Sign with the main wallet
     // Coinbase Wallet requires hex-encoded messages, while other wallets may accept plain strings
@@ -96,23 +78,27 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       params: [messageToSign, this.walletAddress]
     });
 
-    // Create EIP-1271 auth data
-    const authData = {
-      type: 'EIP1271_AUTH',
+    // Create EIP-1271 auth data structure
+    const authData = createEIP1271AuthData({
       walletAddress: this.walletAddress,
-      message: message,
-      signature: signature,
-      timestamp: timestamp,
-      nonce: nonce,
-      ...(payload.codeChallenge && { code_challenge: payload.codeChallenge }),
-      ...(payload.paymentRequestId && { payment_request_id: payload.paymentRequestId })
-    };
+      message,
+      signature,
+      timestamp,
+      nonce,
+      codeChallenge: payload.codeChallenge,
+      paymentRequestId: payload.paymentRequestId
+    });
 
-    // Encode as base64url
-    const encodedAuth = toBase64Url(JSON.stringify(authData));
-    this.logger.info(`Generated EIP-1271 auth data: ${encodedAuth}`);
+    // Create JWT format (new implementation)
+    const jwtToken = createEIP1271JWT(authData);
     
-    return encodedAuth;
+    // TODO: Remove legacy support after transition period
+    // For now, we can also generate legacy format for comparison
+    // const legacyToken = createLegacyEIP1271Auth(authData);
+    
+    this.logger.info(`Generated EIP-1271 JWT: ${jwtToken}`);
+    
+    return jwtToken;
   }
 
   async makePayment(

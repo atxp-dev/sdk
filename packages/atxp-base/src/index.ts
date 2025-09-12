@@ -9,3 +9,9 @@ export {
   BrowserStorage,
   MemoryStorage 
 } from './storage.js';
+export { 
+  createEIP1271JWT, 
+  createLegacyEIP1271Auth, 
+  createEIP1271AuthData,
+  constructEIP1271Message 
+} from './eip1271JwtHelper.js';
