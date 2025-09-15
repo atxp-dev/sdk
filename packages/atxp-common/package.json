@@ -13,6 +13,23 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js", 
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./dist/platform/index.js": {
+      "types": "./dist/platform/index.d.ts",
+      "import": "./dist/platform/index.js",
+      "require": "./dist/platform/index.js"
+    },
+    "./src/commonTestHelpers.js": {
+      "types": "./dist/commonTestHelpers.d.ts",
+      "import": "./dist/commonTestHelpers.js",
+      "require": "./dist/commonTestHelpers.js"
+    }
+  },
   "files": [
     "dist"
   ],
