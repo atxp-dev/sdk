@@ -12,6 +12,30 @@ const createConfig = (packageName, options = {}) => {
     analyzeBundle = false
   } = options;
 
+  // External function to handle regex patterns and exact matches
+  const isExternal = (id) => {
+    // Check exact matches first
+    const exactMatches = [
+      '@atxp/common', '@atxp/client', '@atxp/server', '@atxp/redis', 
+      '@atxp/sqlite', '@atxp/base', '@modelcontextprotocol/sdk',
+      '@modelcontextprotocol/sdk/types.js', '@modelcontextprotocol/sdk/client',
+      'bignumber.js', 'oauth4webapi', 'jose', 'tweetnacl', 'tweetnacl-util',
+      ...platformExternals[platform],
+      ...external
+    ];
+    
+    if (exactMatches.includes(id)) return true;
+    
+    // Check regex patterns for deep imports
+    const patterns = [
+      /^viem/, // All viem imports including deep paths
+      /^@solana\/web3\.js/, /^@solana\/pay/, /^@solana\/buffer-layout/, /^@solana\/spl-token/,
+      /^bs58/, /^react-native-url-polyfill/, /^expo-crypto/, /^@base-org\/account/
+    ];
+    
+    return patterns.some(pattern => pattern.test(id));
+  };
+
   // Define platform-specific externals
   const platformExternals = {
     node: [
@@ -27,22 +51,22 @@ const createConfig = (packageName, options = {}) => {
     ]
   };
 
-  // Common externals for all packages
-  const commonExternals = [
-    '@atxp/common', '@atxp/client', '@atxp/server', '@atxp/redis', 
-    '@atxp/sqlite', '@atxp/base', '@modelcontextprotocol/sdk',
-    '@modelcontextprotocol/sdk/types.js', '@modelcontextprotocol/sdk/client',
-    'bignumber.js', 'oauth4webapi', 'jose', 'tweetnacl', 'tweetnacl-util'
-  ];
-
-  const allExternals = [
-    ...commonExternals,
-    ...platformExternals[platform],
-    ...external
-  ];
-
   const plugins = [
-    typescript(),
+    typescript({
+      tsconfig: false,
+      compilerOptions: {
+        target: 'es2020',
+        module: 'esnext',
+        lib: ['es2020', 'dom'],
+        moduleResolution: 'node',
+        allowSyntheticDefaultImports: true,
+        esModuleInterop: true,
+        skipLibCheck: true,
+        strict: true,
+        declaration: false,
+        sourceMap: true
+      }
+    }),
     resolve({
       preferBuiltins: platform === 'node',
       browser: platform === 'neutral',
@@ -67,7 +91,7 @@ const createConfig = (packageName, options = {}) => {
         preserveModules: true,
         preserveModulesRoot: 'src'
       },
-      external: allExternals,
+      external: isExternal,
       plugins
     },
     // TypeScript declarations
@@ -77,7 +101,7 @@ const createConfig = (packageName, options = {}) => {
         file: 'dist/index.d.ts',
         format: 'es'
       },
-      external: allExternals,
+      external: isExternal,
       plugins: [dts()]
     }
   ];
