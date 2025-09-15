@@ -4,16 +4,11 @@ import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { getSpendPermissionModule } from './spendPermissionUtils.js';
-
-// Helper function to convert to base64url that works in both Node.js and browsers
-function toBase64Url(data: string): string {
-  // Convert string to base64
-  const base64 = typeof Buffer !== 'undefined' 
-    ? Buffer.from(data).toString('base64')
-    : btoa(data);
-  // Convert base64 to base64url
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
+import { 
+  createEIP1271JWT, 
+  createEIP1271AuthData,
+  constructEIP1271Message 
+} from './eip1271JwtHelper.js';
 
 const USDC_DECIMALS = 6;
 
@@ -80,54 +75,36 @@ export class BaseAppPaymentMaker implements PaymentMaker {
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
-    const nonce = Math.random().toString(36).substring(2, 15); // Generate random nonce
     
-    // Construct the message in the required format
-    const messageParts = [
-      `PayMCP Authorization Request`,
-      ``,
-      `Wallet: ${this.smartWallet.account.address}`,
-      `Timestamp: ${timestamp}`,
-      `Nonce: ${nonce}`
-    ];
-    
-    if (codeChallenge) {
-      messageParts.push(`Code Challenge: ${codeChallenge}`);
-    }
-    
-    if (paymentRequestId) {
-      messageParts.push(`Payment Request ID: ${paymentRequestId}`);
-    }
-    
-    messageParts.push('', '', 'Sign this message to prove you control this wallet.');
-    const message = messageParts.join('\n');
+    const message = constructEIP1271Message({
+      walletAddress: this.smartWallet.account.address,
+      timestamp,
+      codeChallenge,
+      paymentRequestId
+    });
     
     // Sign the message - this will return an ABI-encoded signature from the smart wallet
     const signature = await this.smartWallet.account.signMessage({
       message: message
     });
     
-    // Create EIP-1271 auth data
-    const authData = {
-      type: 'EIP1271_AUTH',
+    const authData = createEIP1271AuthData({
       walletAddress: this.smartWallet.account.address,
-      message: message,
-      signature: signature,
-      timestamp: timestamp,
-      nonce: nonce,
-      ...(codeChallenge && { code_challenge: codeChallenge }),
-      ...(paymentRequestId && { payment_request_id: paymentRequestId })
-    };
+      message,
+      signature,
+      timestamp,
+      codeChallenge,
+      paymentRequestId
+    });
     
-    // Encode as base64url
-    const encodedAuth = toBase64Url(JSON.stringify(authData));
+    const jwtToken = createEIP1271JWT(authData);
     
     this.logger.info(`codeChallenge: ${codeChallenge}`);
     this.logger.info(`paymentRequestId: ${paymentRequestId}`);
     this.logger.info(`walletAddress: ${this.smartWallet.account.address}`);
-    this.logger.info(`Generated EIP-1271 auth data: ${encodedAuth}`);
+    this.logger.info(`Generated EIP-1271 JWT: ${jwtToken}`);
     
-    return encodedAuth;
+    return jwtToken;
   }
 
   async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
