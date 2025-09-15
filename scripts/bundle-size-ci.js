@@ -172,6 +172,7 @@ async function main() {
   const customOutputFile = process.argv.find(arg => arg.startsWith('--output='))?.split('=')[1];
   const showToStdout = process.argv.includes('--stdout');
   const showHelp = process.argv.includes('--help') || process.argv.includes('-h');
+  const fastMode = process.argv.includes('--fast');
   
   if (showHelp) {
     console.log(`
@@ -181,6 +182,7 @@ Options:
   --json              Output in JSON format instead of markdown
   --output=<file>     Save output to specific file (default: timestamped file in bundle-analysis/)
   --stdout            Print output to stdout instead of saving to file
+  --fast              Run in fast mode (sequential analysis for CI performance)
   --help, -h          Show this help message
 
 Examples:
@@ -195,10 +197,21 @@ Examples:
   console.log('🔍 Analyzing bundle sizes for all packages...\n');
   
   try {
-    // Analyze all packages in parallel for speed
-    const results = await Promise.all(
-      PACKAGES.map(packageName => analyzePackage(packageName))
-    );
+    let results;
+    if (fastMode) {
+      // Sequential analysis for CI reliability
+      console.log('🐌 Running in fast mode (sequential analysis)...\n');
+      results = [];
+      for (const packageName of PACKAGES) {
+        const result = await analyzePackage(packageName);
+        results.push(result);
+      }
+    } else {
+      // Analyze all packages in parallel for speed
+      results = await Promise.all(
+        PACKAGES.map(packageName => analyzePackage(packageName))
+      );
+    }
     
     // Generate the output content
     let outputContent;

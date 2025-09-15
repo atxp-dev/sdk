@@ -38,16 +38,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build packages
-        run: npm run build
-
       - name: Analyze current bundle sizes
         run: |
           # Ensure bundle-analysis directory exists
           mkdir -p bundle-analysis
-          
-          # Run analysis and save to specific file
-          npm run size:ci -- --output=bundle-analysis/current-analysis.md
+
+          # Run analysis and save to specific file (this includes the build step)
+          npm run size:ci -- --fast --output=bundle-analysis/current-analysis.md
           
           # Verify the analysis file was created
           if [ ! -f "bundle-analysis/current-analysis.md" ]; then
@@ -64,13 +61,12 @@ jobs:
           
           # Clean any previous build artifacts from PR branch
           npm run clean || true
-          
-          # Install dependencies and build base branch
+
+          # Install dependencies for base branch
           npm ci
-          npm run build
-          
-          # Run base analysis with error handling
-          if npm run size:ci -- --output=bundle-analysis/base-analysis.md; then
+
+          # Run base analysis with error handling (this includes the build step)
+          if npm run size:ci -- --fast --output=bundle-analysis/base-analysis.md; then
             echo "✅ Base branch analysis completed"
           else
             echo "⚠️ Base branch analysis failed, creating placeholder"
@@ -84,9 +80,8 @@ jobs:
           # Switch back to PR branch (use commit SHA for reliability)
           git checkout ${{ github.event.pull_request.head.sha }}
           
-          # Restore PR branch dependencies and build state
+          # Restore PR branch dependencies
           npm ci
-          npm run build
 
       - name: Generate bundle size comparison report
         run: |
