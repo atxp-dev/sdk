@@ -1,0 +1,25 @@
+# Source files - only dist should be published
+src/
+
+# Test files
+*.test.ts
+*.spec.ts
+**/*.test.ts
+**/*.spec.ts
+
+# TypeScript configuration
+tsconfig.json
+tsconfig.*.json
+*.tsbuildinfo
+
+# Build and dev configuration
+vitest.config.ts
+*.config.js
+*.config.ts
+
+# Documentation (README.md is included via files array in package.json)
+docs/
+
+# Development files
+.eslintrc*
+.prettierrc*

@@ -41,19 +41,31 @@ describe('basePaymentMaker.generateJWT', () => {
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const authData = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: 'testCodeChallenge'});
 
-    // Should return base64-encoded EIP-1271 auth data
+    // Should return JWT format (header.payload.signature)
     expect(authData).toBeDefined();
     expect(typeof authData).toBe('string');
     
-    // Decode and verify the auth data
-    const decoded = JSON.parse(Buffer.from(authData, 'base64').toString('utf-8'));
-    expect(decoded.type).toBe('EIP1271_AUTH');
-    expect(decoded.walletAddress).toBe(smartWallet.address);
-    expect(decoded.message).toContain('PayMCP Authorization Request');
-    expect(decoded.signature).toBeDefined();
-    expect(decoded.timestamp).toBeDefined();
-    expect(decoded.nonce).toBeDefined();
-    expect(decoded.code_challenge).toBe('testCodeChallenge');
+    // Verify JWT structure
+    const parts = authData.split('.');
+    expect(parts).toHaveLength(3);
+    
+    // Decode JWT header
+    const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString());
+    expect(header).toEqual({
+      alg: 'EIP1271',
+      typ: 'JWT'
+    });
+    
+    // Decode JWT payload
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    expect(payload.sub).toBe(smartWallet.address);
+    expect(payload.msg).toContain('PayMCP Authorization Request');
+    expect(payload.iat).toBeDefined();
+    expect(payload.code_challenge).toBe('testCodeChallenge');
+    
+    // Decode JWT signature
+    const signature = Buffer.from(parts[2], 'base64url').toString();
+    expect(signature).toBeDefined();
   });
 
   it('should include payment request id if provided', async () => {
@@ -64,10 +76,14 @@ describe('basePaymentMaker.generateJWT', () => {
     const paymentRequestId = 'id1';
     const authData = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
     
-    // Decode and verify the auth data includes payment request ID
-    const decoded = JSON.parse(Buffer.from(authData, 'base64').toString('utf-8'));
-    expect(decoded.payment_request_id).toEqual(paymentRequestId);
-    expect(decoded.message).toContain(`Payment Request ID: ${paymentRequestId}`);
+    // Verify JWT includes payment request ID
+    const parts = authData.split('.');
+    expect(parts).toHaveLength(3);
+    
+    // Decode JWT payload
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    expect(payload.payment_request_id).toEqual(paymentRequestId);
+    expect(payload.msg).toContain(`Payment Request ID: ${paymentRequestId}`);
   });
 });
 
