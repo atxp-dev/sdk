@@ -59,24 +59,16 @@ const createConfig = (packageName, options = {}) => {
   }
 
   return [
-    // JavaScript builds
+    // Individual file builds (preserves directory structure) 
     {
       input: 'src/index.ts',
-      output: [
-        {
-          file: 'dist/index.js',
-          format: 'es',
-          sourcemap: true,
-          inlineDynamicImports: true
-        },
-        {
-          file: 'dist/index.cjs',
-          format: 'cjs',
-          sourcemap: true,
-          exports: 'auto',
-          inlineDynamicImports: true
-        }
-      ],
+      output: {
+        dir: 'dist',
+        format: 'es',
+        sourcemap: true,
+        preserveModules: true,
+        preserveModulesRoot: 'src'
+      },
       external: allExternals,
       plugins
     },
