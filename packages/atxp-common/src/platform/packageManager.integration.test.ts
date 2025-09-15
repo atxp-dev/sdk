@@ -77,7 +77,7 @@ describe('Package Manager Integration Tests', () => {
     
     console.log(`Created package: ${packageTarball}`);
     console.log(`Test directory: ${testDir}`);
-  });
+  }, 60_000); // 60 second timeout for build and pack operations
 
   afterAll(() => {
     // Clean up test directory and tarball
