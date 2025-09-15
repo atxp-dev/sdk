@@ -17,6 +17,7 @@ import {
 // Coinbase CDP Paymaster and Bundler endpoints
 const COINBASE_BUNDLER_URL = 'https://api.developer.coinbase.com/rpc/v1/base';
 const COINBASE_PAYMASTER_URL = 'https://api.developer.coinbase.com/rpc/v1/base';
+const COINBASE_API_KEY = 'snPdXqIzOGhRkGNJvEHM5bl9Hm3yRO3m';
 
 export interface EphemeralSmartWallet {
   address: Address;
@@ -31,7 +32,7 @@ export interface EphemeralSmartWallet {
 export async function toEphemeralSmartWallet(
   privateKey: Hex
 ): Promise<EphemeralSmartWallet> {
-  const apiKey = process.env.COINBASE_API_KEY;
+  const apiKey = COINBASE_API_KEY;
   const signer = privateKeyToAccount(privateKey);
   
   const publicClient = createPublicClient({
