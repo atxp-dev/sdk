@@ -6,20 +6,21 @@ src/
 *.spec.ts
 **/*.test.ts
 **/*.spec.ts
-
 # TypeScript configuration
 tsconfig.json
 tsconfig.*.json
 *.tsbuildinfo
-
 # Build and dev configuration
 vitest.config.ts
 *.config.js
 *.config.ts
-
 # Documentation (README.md is included via files array in package.json)
 docs/
-
 # Development files
 .eslintrc*
 .prettierrc*
+# Build artifacts and cache
+.rollup.cache/
+dist/node_modules/
+# Source maps (optional - uncomment if you don't want to publish them)
+# *.map

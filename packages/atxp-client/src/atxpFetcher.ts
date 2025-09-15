@@ -423,8 +423,9 @@ export class ATXPFetcher {
         }
       }
 
-      const mcpError = error instanceof McpError ? fetchError as McpError : null;
-      if (mcpError && mcpError.code === PAYMENT_REQUIRED_ERROR_CODE) {
+      // Check for MCP error with payment required code - use duck typing since instanceof may fail with bundling
+      const mcpError = (fetchError as Error & { code?: number })?.code === PAYMENT_REQUIRED_ERROR_CODE ? fetchError as McpError : null;
+      if (mcpError) {
         this.logger.info(`Payment required - ATXP client starting payment flow ${(mcpError?.data as {paymentRequestUrl: string}|undefined)?.paymentRequestUrl}`);
         if(await this.handlePaymentRequestError(mcpError)) {
           // Retry the request once - we should be auth'd now

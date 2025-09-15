@@ -92,11 +92,13 @@ module.exports = [
     ignores: [
       'packages/*/dist/**',
       'packages/*/dist-cjs/**',
+      'packages/*/.rollup.cache/**',
       'dist/**',
       'node_modules/**',
       'examples/**',
       '.mastra/**',
       '*.config.js',
+      'rollup.config.js',
     ],
   },
 ]; 
