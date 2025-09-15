@@ -31,6 +31,7 @@ const createConfig = (packageName, options = {}) => {
   const commonExternals = [
     '@atxp/common', '@atxp/client', '@atxp/server', '@atxp/redis', 
     '@atxp/sqlite', '@atxp/base', '@modelcontextprotocol/sdk',
+    '@modelcontextprotocol/sdk/types.js', '@modelcontextprotocol/sdk/client',
     'bignumber.js', 'oauth4webapi', 'jose', 'tweetnacl', 'tweetnacl-util'
   ];
 
@@ -41,17 +42,14 @@ const createConfig = (packageName, options = {}) => {
   ];
 
   const plugins = [
+    typescript(),
     resolve({
       preferBuiltins: platform === 'node',
       browser: platform === 'neutral',
       exportConditions: platform === 'node' ? ['node'] : ['browser', 'import', 'default']
     }),
     commonjs(),
-    json(),
-    typescript({
-      tsconfig: `./tsconfig.json`,
-      outputToFilesystem: true
-    })
+    json()
   ];
 
   if (analyzeBundle) {
