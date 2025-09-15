@@ -1,0 +1,153 @@
+name: Bundle Size Analysis
+
+on:
+  pull_request:
+    paths:
+      # Trigger on source code changes in packages
+      - 'packages/*/src/**'
+      - 'packages/*/rollup.config.js'
+      - 'packages/*/package.json'
+      - 'rollup.config.js'
+      - 'package.json'
+      - 'scripts/bundle-size-ci.js'
+      # Trigger on workflow changes
+      - '.github/workflows/bundle-size.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  analyze-bundle-size:
+    name: Analyze Bundle Size
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Fetch enough history for comparison
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npm run build
+
+      - name: Analyze current bundle sizes
+        run: |
+          # Ensure bundle-analysis directory exists
+          mkdir -p bundle-analysis
+          
+          # Run analysis and save to specific file
+          npm run size:ci -- --output=bundle-analysis/current-analysis.md
+          
+          # Verify the analysis file was created
+          if [ ! -f "bundle-analysis/current-analysis.md" ]; then
+            echo "❌ Current branch analysis failed"
+            exit 1
+          fi
+          
+          echo "✅ Current branch analysis completed"
+
+      - name: Get base branch bundle sizes  
+        run: |
+          # Switch to base branch (use commit SHA for reliability)
+          git checkout ${{ github.event.pull_request.base.sha }}
+          
+          # Clean any previous build artifacts from PR branch
+          npm run clean || true
+          
+          # Install dependencies and build base branch
+          npm ci
+          npm run build
+          
+          # Run base analysis with error handling
+          if npm run size:ci -- --output=bundle-analysis/base-analysis.md; then
+            echo "✅ Base branch analysis completed"
+          else
+            echo "⚠️ Base branch analysis failed, creating placeholder"
+            mkdir -p bundle-analysis
+            echo "# Base Branch Analysis Unavailable" > bundle-analysis/base-analysis.md
+            echo "" >> bundle-analysis/base-analysis.md
+            echo "Base branch analysis could not be completed." >> bundle-analysis/base-analysis.md
+            echo "This may be due to build failures or missing dependencies." >> bundle-analysis/base-analysis.md
+          fi
+          
+          # Switch back to PR branch (use commit SHA for reliability)
+          git checkout ${{ github.event.pull_request.head.sha }}
+          
+          # Restore PR branch dependencies and build state
+          npm ci
+          npm run build
+
+      - name: Generate bundle size comparison report
+        run: |
+          # Ensure bundle-analysis directory exists
+          mkdir -p bundle-analysis
+          
+          # Create final comparison report
+          cat > bundle-analysis/bundle-report.md << 'EOF'
+          ## 📊 Bundle Size Analysis
+          
+          ### Current Branch Analysis
+          EOF
+          cat bundle-analysis/current-analysis.md >> bundle-analysis/bundle-report.md
+          
+          echo "" >> bundle-analysis/bundle-report.md
+          echo "---" >> bundle-analysis/bundle-report.md
+          echo "" >> bundle-analysis/bundle-report.md
+          echo "### Base Branch Comparison" >> bundle-analysis/bundle-report.md
+          
+          if [ -s bundle-analysis/base-analysis.md ] && ! grep -q "Base Branch Analysis Unavailable" bundle-analysis/base-analysis.md; then
+            echo "" >> bundle-analysis/bundle-report.md
+            echo "> 📋 **Base branch analysis for comparison:**" >> bundle-analysis/bundle-report.md
+            echo "" >> bundle-analysis/bundle-report.md
+            echo "<details><summary>View base branch analysis</summary>" >> bundle-analysis/bundle-report.md
+            echo "" >> bundle-analysis/bundle-report.md
+            cat bundle-analysis/base-analysis.md >> bundle-analysis/bundle-report.md
+            echo "" >> bundle-analysis/bundle-report.md
+            echo "</details>" >> bundle-analysis/bundle-report.md
+          else
+            echo "" >> bundle-analysis/bundle-report.md
+            echo "ℹ️ No base branch analysis available for comparison." >> bundle-analysis/bundle-report.md
+          fi
+          
+          # Verify the final report was created
+          if [ ! -f "bundle-analysis/bundle-report.md" ]; then
+            echo "❌ Failed to generate bundle size comparison report"
+            exit 1
+          fi
+          
+          echo "✅ Bundle size comparison report generated"
+
+      - name: Find existing bundle size comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '📊 Bundle Size Analysis'
+
+      - name: Create or update bundle size comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: bundle-analysis/bundle-report.md
+          edit-mode: replace
+
+      - name: Upload bundle analysis artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-analysis
+          path: bundle-analysis/
+          retention-days: 30
