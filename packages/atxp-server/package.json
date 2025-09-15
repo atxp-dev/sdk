@@ -16,7 +16,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "rollup -c",
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
