@@ -9,7 +9,8 @@ const createConfig = (packageName, options = {}) => {
   const {
     platform = 'node',
     external = [],
-    analyzeBundle = false
+    analyzeBundle = process.env.ANALYZE_BUNDLE === 'true',
+    analyzeOptions = {}
   } = options;
 
   // External function to handle regex patterns and exact matches
@@ -77,7 +78,13 @@ const createConfig = (packageName, options = {}) => {
   ];
 
   if (analyzeBundle) {
-    plugins.push(analyzer({ summaryOnly: true }));
+    const defaultAnalyzeOptions = {
+      summaryOnly: process.env.ANALYZE_SUMMARY_ONLY !== 'false',
+      stdout: true,
+      limit: parseInt(process.env.ANALYZE_LIMIT) || 10,
+      showExports: process.env.ANALYZE_SHOW_EXPORTS === 'true'
+    };
+    plugins.push(analyzer({ ...defaultAnalyzeOptions, ...analyzeOptions }));
   }
 
   return [
