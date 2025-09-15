@@ -9,6 +9,7 @@
     "directory": "packages/atxp-base"
   },
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
