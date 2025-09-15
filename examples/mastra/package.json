@@ -18,19 +18,19 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.3.23",
-    "@atxp/client": "*",
-    "@atxp/common": "*",
-    "@mastra/core": "^0.12.1",
-    "@mastra/libsql": "^0.12.0",
-    "@mastra/loggers": "^0.10.5",
+    "@atxp/client": "file:../../packages/atxp-client",
+    "@atxp/common": "file:../../packages/atxp-common",
+    "@mastra/core": "file:../../../mastra/packages/core",
+    "@mastra/libsql": "file:../../../mastra/stores/libsql",
+    "@mastra/loggers": "file:../../../mastra/packages/loggers",
     "@mastra/mcp": "file:../../../mastra/packages/mcp",
-    "@mastra/memory": "^0.12.0",
+    "@mastra/memory": "file:../../../mastra/packages/memory",
     "dotenv": "^17.2.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
-    "mastra": "^0.10.18",
+    "mastra": "file:../../../mastra/packages/cli",
     "typescript": "^5.9.2"
   }
 }

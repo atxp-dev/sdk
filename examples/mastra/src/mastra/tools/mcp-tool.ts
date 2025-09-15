@@ -1,7 +1,5 @@
 import 'dotenv/config';
-import { SolanaAccount } from '@atxp/client/solanaAccount.js'
-
-import { buildStreamableTransport } from '@atxp/client/atxpClient.js'
+import { ATXPAccount, buildStreamableTransport } from '@atxp/client'
 import chalk from 'chalk';
 import { MastraMCPServerDefinition, LogMessage, MCPClient } from '@mastra/mcp';
 
@@ -24,7 +22,7 @@ const SERVICES: Record<string, ServiceConfig> = {
   }
 };
 
-const createServerConfigs = async (account: SolanaAccount) => {
+const createServerConfigs = async (account: ATXPAccount) => {
   const serverConfigs: Record<string, MastraMCPServerDefinition> = {};
 
   // Create server configurations for each service
@@ -41,6 +39,7 @@ const createServerConfigs = async (account: SolanaAccount) => {
 
     // Add server configuration
     serverConfigs[serviceName] = {
+      url: new URL(serviceConfig.mcpServer),
       customTransport: transport,
       logger: (logMessage: LogMessage) => {
         console.log(chalk.gray(`[${logMessage.serverName}] ${logMessage.level}: ${logMessage.message}`));
@@ -53,16 +52,13 @@ const createServerConfigs = async (account: SolanaAccount) => {
 };
 
 
-const solanaEndpoint = process.env.SOLANA_ENDPOINT || '';
-const solanaPrivateKey = process.env.SOLANA_PRIVATE_KEY || '';
+const atxpConnectionString = process.env.ATXP_CONNECTION_STRING
 
-if (!solanaEndpoint || !solanaPrivateKey) {
+if (!atxpConnectionString) {
   throw new Error('SOLANA_ENDPOINT and SOLANA_PRIVATE_KEY must be set');
 }
 
-// validateEnvironment(solanaEndpoint, solanaPrivateKey);
-
-const account = new SolanaAccount(solanaEndpoint, solanaPrivateKey);
+const account = new ATXPAccount(atxpConnectionString);
 
 // Create server configurations for all services
 const serverConfigs = await createServerConfigs(account);
