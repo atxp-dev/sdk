@@ -81,7 +81,7 @@ const createConfig = (packageName, options = {}) => {
   }
 
   return [
-    // Individual file builds (preserves directory structure) 
+    // ESM build - individual file builds (preserves directory structure) 
     {
       input: 'src/index.ts',
       output: {
@@ -90,6 +90,29 @@ const createConfig = (packageName, options = {}) => {
         sourcemap: true,
         preserveModules: true,
         preserveModulesRoot: 'src'
+      },
+      external: isExternal,
+      plugins
+    },
+    // ESM entry point bundle
+    {
+      input: 'src/index.ts',
+      output: {
+        file: 'dist/index.js',
+        format: 'es',
+        sourcemap: true
+      },
+      external: isExternal,
+      plugins
+    },
+    // CommonJS entry point bundle
+    {
+      input: 'src/index.ts',
+      output: {
+        file: 'dist/index.cjs',
+        format: 'cjs',
+        sourcemap: true,
+        exports: 'named'
       },
       external: isExternal,
       plugins
