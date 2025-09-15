@@ -41,9 +41,15 @@ function analyzePackage(packageName) {
       
       if (packageName === 'atxp-client') {
         platform = 'neutral';
-        // For client package, we'll just measure the unbundled size since it has
-        // many peer dependencies that would be provided by the consuming app
-        throw new Error('Skipping bundle - has many peer dependencies');
+        // For client package, mark the heaviest external deps as external
+        // but still bundle the core client logic with lighter dependencies
+        external = [
+          '@atxp/common', '@atxp/client', '@atxp/server',
+          '@solana/web3.js', '@solana/pay', '@solana/buffer-layout',
+          '@solana/spl-token', 'viem', 'bs58',
+          '@modelcontextprotocol/sdk', 'bignumber.js',
+          'react-native-url-polyfill', 'expo-crypto'
+        ];
       } else if (packageName === 'atxp-base') {
         platform = 'neutral';
         // Mark monorepo and heavy deps as external
