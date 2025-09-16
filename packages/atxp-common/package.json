@@ -40,7 +40,9 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "test": "vitest run",
     "test:integration": "vitest run --testTimeout=120000 src/**/*.integration.test.ts",
-    "test:package-managers": "vitest run --testTimeout=120000 src/platform/packageManager.integration.test.ts"
+    "test:package-managers": "vitest run --testTimeout=120000 src/platform/packageManager.integration.test.ts",
+    "prepack": "npm run build && npm run typecheck",
+    "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
     "bignumber.js": "^9.3.0",

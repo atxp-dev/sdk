@@ -29,7 +29,9 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "test": "vitest run",
-    "test:integration": "vitest run src/redisOAuthDb.integration.test.ts --reporter=verbose"
+    "test:integration": "vitest run src/redisOAuthDb.integration.test.ts --reporter=verbose",
+    "prepack": "npm run build && npm run typecheck",
+    "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
     "@atxp/common": "0.2.22",

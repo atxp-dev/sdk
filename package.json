@@ -37,7 +37,11 @@
     "dev:resource": "npm run build && npm run build:dev && node dist/resource.js",
     "dev:cli": "npm run build && npm run build:dev && node dist/cli.js",
     "size:report": "node scripts/bundle-size-ci.js --stdout",
-    "size:ci": "node scripts/bundle-size-ci.js"
+    "size:ci": "node scripts/bundle-size-ci.js",
+    "validate:packages": "node scripts/validate-packages.js",
+    "test:package-install": "node scripts/test-package-installation.js",
+    "pack:all": "npm run pack:dry --workspaces --if-present",
+    "prepack:all": "npm run prepack --workspaces --if-present"
   },
   "dependencies": {
     "dotenv": "^16.5.0"

@@ -28,7 +28,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "npm run build && npm run typecheck",
+    "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
     "@atxp/common": "0.2.22",
