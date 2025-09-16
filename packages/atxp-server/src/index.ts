@@ -57,7 +57,7 @@ export {
   type ATXPArgs,
   DEFAULT_CONFIG,
   buildServerConfig
-} from './atxpServer.js';
+} from './serverConfig.js';
 
 // Additional utilities needed by middleware packages
 export { getResource } from './getResource.js';

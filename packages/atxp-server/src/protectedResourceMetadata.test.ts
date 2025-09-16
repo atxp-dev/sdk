@@ -8,7 +8,7 @@ describe('getProtectedResourceMetadata', () => {
     const metadata = getProtectedResourceMetadata(config, new URL('https://example.com/.well-known/oauth-protected-resource'));
     expect(metadata).toMatchObject({
       resource: new URL('https://example.com'),
-      resource_name: 'An ATXP Server',
+      resource_name: 'Test ATXP Server',
       authorization_servers: ['https://auth.atxp.ai'],
       bearer_methods_supported: ['header'],
       scopes_supported: ['read', 'write'],
@@ -50,7 +50,7 @@ describe('getProtectedResourceMetadata', () => {
     const metadata = getProtectedResourceMetadata(config, new URL('https://example.com/.well-known/oauth-protected-resource/'));
     expect(metadata).toMatchObject({
       resource: new URL('https://example.com'),
-      resource_name: 'An ATXP Server',
+      resource_name: 'Test ATXP Server',
       authorization_servers: ['https://auth.atxp.ai'],
       bearer_methods_supported: ['header'],
       scopes_supported: ['read', 'write'],
@@ -62,7 +62,7 @@ describe('getProtectedResourceMetadata', () => {
     const metadata = getProtectedResourceMetadata(config, new URL('https://example.com/.well-known/oauth-protected-resource'));
     expect(metadata).toMatchObject({
       resource: new URL('https://example.com'),
-      resource_name: 'An ATXP Server',
+      resource_name: 'Test ATXP Server',
       authorization_servers: ['https://auth.atxp.ai'],
       bearer_methods_supported: ['header'],
       scopes_supported: ['read', 'write'],
@@ -74,7 +74,7 @@ describe('getProtectedResourceMetadata', () => {
     const metadata = getProtectedResourceMetadata(config, new URL('https://example.com/.well-known/oauth-protected-resource/mcp/'));
     expect(metadata).toMatchObject({
       resource: new URL('https://example.com/mcp'),
-      resource_name: 'An ATXP Server',
+      resource_name: 'Test ATXP Server',
       authorization_servers: ['https://auth.atxp.ai'],
       bearer_methods_supported: ['header'],
       scopes_supported: ['read', 'write'],
@@ -86,7 +86,7 @@ describe('getProtectedResourceMetadata', () => {
     const metadata = getProtectedResourceMetadata(config, new URL('https://example.com/.well-known/oauth-protected-resource/mcp/'));
     expect(metadata).toMatchObject({
       resource: new URL('https://example.com/mcp'),
-      resource_name: 'An ATXP Server',
+      resource_name: 'Test ATXP Server',
       authorization_servers: ['https://auth.atxp.ai'],
       bearer_methods_supported: ['header'],
       scopes_supported: ['read', 'write'],
@@ -98,7 +98,7 @@ describe('getProtectedResourceMetadata', () => {
     const metadata = getProtectedResourceMetadata(config, new URL('https://example.com/.well-known/oauth-protected-resource/mcp?query=string'));
     expect(metadata).toMatchObject({
       resource: new URL('https://example.com/mcp'),
-      resource_name: 'An ATXP Server',
+      resource_name: 'Test ATXP Server',
       authorization_servers: ['https://auth.atxp.ai'],
       bearer_methods_supported: ['header'],
       scopes_supported: ['read', 'write'],
@@ -110,7 +110,7 @@ describe('getProtectedResourceMetadata', () => {
     const metadata = getProtectedResourceMetadata(config, new URL('https://example.com/.well-known/oauth-protected-resource/mcp/message'));
     expect(metadata).toMatchObject({
       resource: new URL('https://example.com/mcp/message'),
-      resource_name: 'An ATXP Server',
+      resource_name: 'Test ATXP Server',
       authorization_servers: ['https://auth.atxp.ai'],
       bearer_methods_supported: ['header'],
       scopes_supported: ['read', 'write'],
