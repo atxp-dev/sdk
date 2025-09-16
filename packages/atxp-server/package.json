@@ -36,11 +36,12 @@
     "@atxp/common": "0.3.0",
     "@modelcontextprotocol/sdk": "^1.15.0",
     "bignumber.js": "^9.3.0",
-    "content-type": "^1.0.5",
     "oauth4webapi": "^3.5.0"
   },
   "peerDependencies": {
-    "express": "^5.0.0"
+    "express": "^5.0.0",
+    "raw-body": "^3.0.0",
+    "content-type": "^1.0.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
