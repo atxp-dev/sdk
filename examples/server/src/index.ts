@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import express, { Request, RequestHandler, Response } from 'express';
+import express, { Request, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { atxpServer, requirePayment } from '@atxp/server';
+import { atxpExpressMiddleware, requirePayment } from '@atxp/express-middleware';
 import { Network } from '@atxp/common';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
-// type HttpServer = Express & { mcpServers: McpServerApplication[] };
+
 // Validate required environment variables
 function validateEnvironment() {
   const required = ['FUNDING_DESTINATION', 'FUNDING_NETWORK'];
@@ -93,7 +93,7 @@ async function main() {
   // Create OAuth components (automatically uses in-memory implementation for ':memory:')
   
   // Create ATXP router and use it as middleware
-  const atxpRouter = atxpServer({
+  const atxpRouter = atxpExpressMiddleware({
     destination: process.env.FUNDING_DESTINATION!,
     network: process.env.FUNDING_NETWORK! as Network,
     payeeName: 'ATXP Server Example',
