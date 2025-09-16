@@ -34,7 +34,9 @@
     "@atxp/client": "0.2.22",
     "@atxp/common": "0.2.22",
     "@base-org/account": "^2.1.0",
-    "bignumber.js": "^9.3.0",
+    "bignumber.js": "^9.3.0"
+  },
+  "peerDependencies": {
     "viem": "^2.34.0"
   },
   "devDependencies": {
@@ -48,6 +50,7 @@
     "jsdom": "^25.0.1",
     "supertest": "^7.1.4",
     "typescript": "^5.7.3",
+    "viem": "^2.34.0",
     "vitest": "^3.0.9"
   }
 }

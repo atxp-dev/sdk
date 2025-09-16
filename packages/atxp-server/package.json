@@ -33,18 +33,21 @@
   "dependencies": {
     "@atxp/common": "0.2.22",
     "@modelcontextprotocol/sdk": "^1.15.0",
-    "@types/express": "^5.0.0",
     "bignumber.js": "^9.3.0",
     "content-type": "^1.0.5",
-    "express": "^5.0.0",
     "oauth4webapi": "^3.5.0"
   },
+  "peerDependencies": {
+    "express": "^5.0.0"
+  },
   "devDependencies": {
+    "@types/express": "^5.0.0",
     "@types/node": "^22.13.0",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
     "eslint": "^9.32.0",
+    "express": "^5.0.0",
     "node-mocks-http": "^1.17.2",
     "supertest": "^7.1.4",
     "typescript": "^5.7.3",
