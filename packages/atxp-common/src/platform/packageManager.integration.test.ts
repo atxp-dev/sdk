@@ -73,8 +73,15 @@ describe('Package Manager Integration Tests', () => {
     console.log('Building and packing @atxp/common for integration tests...');
     execSync('npm run build', { cwd: process.cwd() });
     const packOutput = execSync('npm pack', { cwd: process.cwd(), encoding: 'utf8' });
-    packageTarball = join(process.cwd(), packOutput.trim());
-    
+
+    // Extract tarball filename from npm pack output (it's the line ending with .tgz)
+    const tarballName = packOutput.split('\n').find(line => line.trim().endsWith('.tgz'))?.trim();
+    if (!tarballName) {
+      throw new Error(`Could not find tarball name in npm pack output: ${packOutput}`);
+    }
+
+    packageTarball = join(process.cwd(), tarballName);
+
     console.log(`Created package: ${packageTarball}`);
     console.log(`Test directory: ${testDir}`);
   }, 60_000); // 60 second timeout for build and pack operations
