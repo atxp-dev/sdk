@@ -60,7 +60,7 @@ export function buildServerConfig(args: ATXPArgs): ATXPConfig {
   return Object.freeze({ ...withDefaults, ...built });
 };
 
-export function atxpServer(args: ATXPArgs): Router {
+export function atxpExpressMiddleware(args: ATXPArgs): Router {
   const config = buildServerConfig(args);
   const router = Router();
 

@@ -1,5 +1,5 @@
 import { describe, it, expect} from 'vitest';
-import { atxpServer } from './atxpServer.js';
+import { atxpExpressMiddleware } from './atxpExpressMiddleware.js';
 import { MemoryOAuthDb } from '@atxp/common';
 import * as TH from '@atxp/server/serverTestHelpers';
 import express from 'express';
@@ -8,7 +8,7 @@ import request from 'supertest';
 describe('ATXP', () => {
   it('should run code at request start and finish', async () => {
     const logger = TH.logger();
-    const router = atxpServer(TH.config({
+    const router = atxpExpressMiddleware(TH.config({
       logger, 
       oAuthClient: TH.oAuthClient({introspectResult: TH.tokenData({active: true})})
     }));
@@ -37,7 +37,7 @@ describe('ATXP', () => {
   it('should run code at start and finish if sending an OAuth challenge', async () => {
     const badToken = TH.tokenData({active: false});
     const logger = TH.logger();
-    const router = atxpServer(TH.config({
+    const router = atxpExpressMiddleware(TH.config({
       logger, 
       oAuthClient: TH.oAuthClient({introspectResult: badToken})
     }));
@@ -65,7 +65,7 @@ describe('ATXP', () => {
   it('should save the oAuth token in the DB if it is active', async () => {
     const goodToken = TH.tokenData({active: true, sub: 'test-user'});
     const oAuthDb = new MemoryOAuthDb();
-    const router = atxpServer(TH.config({
+    const router = atxpExpressMiddleware(TH.config({
       oAuthClient: TH.oAuthClient({introspectResult: goodToken}),
       oAuthDb
     }));
@@ -86,7 +86,7 @@ describe('ATXP', () => {
       .send(TH.mcpToolRequest());
 
     expect(response.status).toBe(200);
-    // atxpServer stores the oAuth token that was used to auth to ITSELF under the url ''
+    // atxpExpressMiddleware stores the oAuth token that was used to auth to ITSELF under the url ''
     const tokenFromDb = await oAuthDb.getAccessToken('test-user', '');
     expect(tokenFromDb).toMatchObject({
       accessToken: 'self-access-token',
@@ -96,7 +96,7 @@ describe('ATXP', () => {
   
   it('should return an OAuth challenge if token not active', async () => {
     const badToken = TH.tokenData({active: false});
-    const router = atxpServer(TH.config({
+    const router = atxpExpressMiddleware(TH.config({
       oAuthClient: TH.oAuthClient({introspectResult: badToken})
     }));
 
@@ -120,7 +120,7 @@ describe('ATXP', () => {
   });
 
   it('should not intercept non-MCP requests', async () => {
-    const router = atxpServer(TH.config({
+    const router = atxpExpressMiddleware(TH.config({
       destination: 'test-destination',
     }));
 
@@ -142,7 +142,7 @@ describe('ATXP', () => {
   });
 
   it('serves PRM endpoint', async () => {
-    const router = atxpServer(TH.config({
+    const router = atxpExpressMiddleware(TH.config({
       destination: 'test-destination',
     }));
 
@@ -157,7 +157,7 @@ describe('ATXP', () => {
     // Check the response data
     expect(response.body).toMatchObject({
       resource: expect.stringMatching(/^https?:\/\/127\.0\.0\.1:\d+\/$/),
-      resource_name: 'An ATXP Server',
+      resource_name: 'Test ATXP Server',
       authorization_servers: ['https://auth.atxp.ai'],
       bearer_methods_supported: ['header'],
       scopes_supported: ['read', 'write'],

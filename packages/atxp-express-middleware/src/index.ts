@@ -3,8 +3,8 @@ export {
   type ATXPArgs,
   DEFAULT_CONFIG,
   buildServerConfig,
-  atxpServer
-} from './atxpServer.js';
+  atxpExpressMiddleware
+} from './atxpExpressMiddleware.js';
 
 // Re-export commonly used types from @atxp/server for convenience
 export type {
@@ -19,4 +19,8 @@ export type {
   TokenCheckFail,
   TokenCheck,
   ProtectedResourceMetadata
+} from '@atxp/server';
+
+export {
+  requirePayment
 } from '@atxp/server';
