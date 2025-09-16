@@ -1,9 +1,9 @@
 import { ConsoleLogger, OAuthResourceClient, DEFAULT_AUTHORIZATION_SERVER, MemoryOAuthDb } from "@atxp/common";
 import { ATXPConfig } from "./types.js";
-import { checkToken } from "./token.js";
-import { sendOAuthChallenge } from "./oAuthChallenge.js";
+import { checkToken } from "./node/token.js";
+import { sendOAuthChallenge } from "./node/oauth.js";
 import { withATXPContext } from "./atxpContext.js";
-import { parseMcpRequests } from "./http.js";
+import { parseMcpRequests } from "./node/http.js";
 import { Request, Response, NextFunction, Router } from "express";
 import { getProtectedResourceMetadata as getPRMResponse, sendProtectedResourceMetadata } from "./protectedResourceMetadata.js";
 import { getResource } from "./getResource.js";

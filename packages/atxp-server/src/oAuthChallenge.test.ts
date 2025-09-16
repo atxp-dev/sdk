@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as TH from './serverTestHelpers.js';
 import { TokenProblem } from './types.js';
-import { sendOAuthChallenge } from './oAuthChallenge.js';
+import { sendOAuthChallenge } from './node/oauth.js';
 
 describe('oAuthChallenge', () => {
   it('should return false if the token check passes', async () => {
@@ -79,9 +79,9 @@ describe('oAuthChallenge', () => {
     expect(ended).toBe(true);
     expect(res.writeHead).toHaveBeenCalledWith(401);
     expect(res.setHeader).toHaveBeenCalledWith('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl}"`);
-    expect(res.end).toHaveBeenCalledWith(JSON.stringify({ 
-      error: 'invalid_token', 
-      error_description: 'Token is does not match the expected audience' 
+    expect(res.end).toHaveBeenCalledWith(JSON.stringify({
+      error: 'invalid_token',
+      error_description: 'Token does not match the expected audience'
     }));
   });
 

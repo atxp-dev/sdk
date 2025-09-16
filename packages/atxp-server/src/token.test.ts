@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as TH from './serverTestHelpers.js';
-import { checkToken } from './token.js';
+import { checkToken } from './node/token.js';
 import { TokenProblem } from './types.js';
 
 describe('checkToken', () => {
