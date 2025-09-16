@@ -4,8 +4,6 @@ import { BasePaymentMaker } from './basePaymentMaker.js';
 import { createWalletClient, http } from 'viem';
 import { base } from 'viem/chains';
 
-export const USDC_CONTRACT_ADDRESS_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base mainnet
-
 export class BaseAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };

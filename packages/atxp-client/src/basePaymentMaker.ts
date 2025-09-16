@@ -12,7 +12,7 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { BigNumber } from "bignumber.js";
-import { USDC_CONTRACT_ADDRESS_BASE } from './baseAccount.js';
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseConstants.js';
 
 // Type for the extended wallet client with public actions
 type ExtendedWalletClient = WalletClient & PublicActions;
