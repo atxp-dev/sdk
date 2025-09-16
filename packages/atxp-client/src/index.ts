@@ -41,7 +41,10 @@ export {
 } from './atxpAccount.js';
 
 export {
-  USDC_CONTRACT_ADDRESS_BASE,
+  USDC_CONTRACT_ADDRESS_BASE
+} from './baseConstants.js';
+
+export {
   BaseAccount
 } from './baseAccount.js';
 
