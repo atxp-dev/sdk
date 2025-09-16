@@ -1,7 +1,14 @@
-import { IncomingMessage } from "http";
-import { ATXPConfig, TokenCheck, TokenProblem } from "./types.js";
+import { ATXPConfig, TokenCheck, TokenProblem } from "../types.js";
 
-export async function checkToken(config: ATXPConfig, resourceURL: URL, req: IncomingMessage): Promise<TokenCheck> {
+/**
+ * Core platform-agnostic token checking logic
+ * Takes an authorization header string instead of platform-specific request objects
+ */
+export async function checkTokenCore(
+  config: ATXPConfig,
+  resourceURL: URL,
+  authorizationHeader: string | null
+): Promise<TokenCheck> {
   const protocol = resourceURL.protocol;
   const host = resourceURL.host;
   const pathname = resourceURL.pathname;
@@ -13,19 +20,18 @@ export async function checkToken(config: ATXPConfig, resourceURL: URL, req: Inco
   };
 
   // Extract the Bearer token from the Authorization header
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
+  if (!authorizationHeader) {
     return {...failure, problem: TokenProblem.NO_TOKEN, data: null, token: null}
   }
-  if (!authHeader.startsWith('Bearer ')) {
+  if (!authorizationHeader.startsWith('Bearer ')) {
     return {...failure, problem: TokenProblem.NON_BEARER_AUTH_HEADER, data: null, token: null}
   }
 
-  const token = authHeader.substring(7);
+  const token = authorizationHeader.substring(7);
 
   try {
     const introspectionResult = await config.oAuthClient.introspectToken(config.server, token);
-    
+
     if (!introspectionResult.active) {
       return {...failure, problem: TokenProblem.INVALID_TOKEN, data: null, token}
     }

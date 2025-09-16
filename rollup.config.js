@@ -40,9 +40,11 @@ const createConfig = (packageName, options = {}) => {
   // Define platform-specific externals
   const platformExternals = {
     node: [
-      // Node.js built-ins
+      // Node.js built-ins (both old and node: prefixed formats)
       'fs', 'path', 'crypto', 'http', 'https', 'url', 'stream',
-      'util', 'events', 'buffer', 'process', 'os'
+      'util', 'events', 'buffer', 'process', 'os',
+      'node:fs', 'node:path', 'node:crypto', 'node:http', 'node:https', 'node:url', 'node:stream',
+      'node:util', 'node:events', 'node:buffer', 'node:process', 'node:os'
     ],
     neutral: [
       // These packages should be external for client/base packages
