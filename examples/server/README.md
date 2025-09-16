@@ -6,6 +6,7 @@ This example demonstrates how to create an MCP (Model Context Protocol) server u
 
 - 🚀 **Simple MCP Server**: Implements a basic MCP server with one tool
 - 💰 **Payment Integration**: Requires 0.01 USDC payment before executing the tool
+- 🌐 **Multi-Network Support**: Supports Base, Ethereum, Solana and other networks
 - 🔐 **ATXP Authentication**: Uses OAuth-based authentication flow
 - 🛠️ **Hello World Tool**: Simple greeting tool that accepts optional parameters
 - 🏥 **Health Check**: Basic health check endpoint
@@ -25,7 +26,8 @@ This example demonstrates how to create an MCP (Model Context Protocol) server u
    ```
    
    Edit `.env` and provide:
-   - `SOLANA_DESTINATION`: Your Solana wallet address to receive payments
+   - `FUNDING_DESTINATION`: Your wallet address to receive payments
+   - `FUNDING_NETWORK`: Network for payments (e.g., 'base', 'ethereum', 'solana')
    - `PORT`: (Optional) Server port, defaults to 3010
    - `ATXP_SERVER`: (Optional) ATXP auth server, defaults to https://auth.atxp.ai
 
@@ -137,13 +139,13 @@ curl http://localhost:3010/health
 2. **Authentication Challenge**: Server responds with OAuth challenge if not authenticated
 3. **Client Authentication**: Client follows OAuth flow to get access token
 4. **Payment Required**: Server requires 0.01 USDC payment before executing tool
-5. **Payment Processing**: Client makes Solana payment to server's destination address
+5. **Payment Processing**: Client makes payment on the configured network to server's destination address
 6. **Tool Execution**: Server executes the tool and returns results
 
 ## Architecture
 
 - **Express.js**: Web server framework
-- **ATXP Server Middleware**: Handles authentication and payment validation
+- **ATXP Express Middleware**: Handles authentication and payment validation
 - **MCP Server**: Implements Model Context Protocol for tool calls
 - **Zod**: Runtime type validation for tool parameters
 - **BigNumber.js**: Precise decimal handling for payment amounts

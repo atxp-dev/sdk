@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import express, { Request, Response } from 'express';
+import express, { Request, RequestHandler, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
 import { atxpServer, requirePayment } from '@atxp/server';
-import { ConsoleLogger, LogLevel, UrlString, OAuthResourceClient, createOAuthDb } from '@atxp/common';
+import { Network } from '@atxp/common';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
-
+// type HttpServer = Express & { mcpServers: McpServerApplication[] };
 // Validate required environment variables
 function validateEnvironment() {
-  const required = ['SOLANA_DESTINATION'];
+  const required = ['FUNDING_DESTINATION', 'FUNDING_NETWORK'];
   const missing = required.filter(varName => !process.env[varName]);
   
   if (missing.length > 0) {
@@ -92,15 +92,16 @@ async function main() {
   
   // Create OAuth components (automatically uses in-memory implementation for ':memory:')
   
-  app.use(atxpServer({
-    destination: process.env.SOLANA_DESTINATION!,
-    resource: `http://localhost:${PORT}` as UrlString,
-    server: (process.env.ATXP_SERVER || 'https://auth.atxp.ai') as UrlString,
-    mountPath: '/',
+  // Create ATXP router and use it as middleware
+  const atxpRouter = atxpServer({
+    destination: process.env.FUNDING_DESTINATION!,
+    network: process.env.FUNDING_NETWORK! as Network,
     payeeName: 'ATXP Server Example',
     allowHttp: process.env.NODE_ENV === 'development',
-    logger: new ConsoleLogger({ level: LogLevel.INFO }),
-  }));
+  });
+  
+  // Use the router as middleware - Express v5 compatibility
+  app.use(atxpRouter as any);
 
   // MCP endpoint - handle MCP requests
   app.post('/', async (req: Request, res: Response) => {
