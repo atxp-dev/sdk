@@ -145,7 +145,7 @@ curl http://localhost:3010/health
 ## Architecture
 
 - **Express.js**: Web server framework
-- **ATXP Express Middleware**: Handles authentication and payment validation
+- **ATXP Express Router**: Handles authentication and payment validation
 - **MCP Server**: Implements Model Context Protocol for tool calls
 - **Zod**: Runtime type validation for tool parameters
 - **BigNumber.js**: Precise decimal handling for payment amounts

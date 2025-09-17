@@ -52,14 +52,14 @@ export { requirePayment } from './requirePayment.js';
 
 // Test utilities are available via separate export ./serverTestHelpers
 
-// Server configuration utilities (needed for Express middleware)
+// Server configuration utilities (needed for Express router)
 export {
   type ATXPArgs,
   DEFAULT_CONFIG,
   buildServerConfig
 } from './serverConfig.js';
 
-// Additional utilities needed by middleware packages
+// Additional utilities needed by express packages
 export { getResource } from './getResource.js';
 export { ATXPPaymentServer } from './paymentServer.js';
 export {

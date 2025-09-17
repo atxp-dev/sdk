@@ -31,7 +31,7 @@ const PACKAGES = [
   'atxp-base',
   'atxp-redis',
   'atxp-sqlite',
-  'atxp-express-middleware'
+  'atxp-express'
 ];
 
 /**

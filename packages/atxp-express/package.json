@@ -1,12 +1,12 @@
 {
-  "name": "@atxp/express-middleware",
+  "name": "@atxp/express",
   "version": "0.3.0",
-  "description": "ATXP Express Middleware - Express.js integration for Authorization Token Exchange Protocol",
+  "description": "ATXP Express - Express.js integration for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/atxp-dev/sdk.git",
-    "directory": "packages/atxp-express-middleware"
+    "directory": "packages/atxp-express"
   },
   "type": "module",
   "sideEffects": false,

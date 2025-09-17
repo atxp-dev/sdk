@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { atxpExpressMiddleware, requirePayment } from '@atxp/express-middleware';
+import { atxpExpress, requirePayment } from '@atxp/express';
 import { Network } from '@atxp/common';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
@@ -93,7 +93,7 @@ async function main() {
   // Create OAuth components (automatically uses in-memory implementation for ':memory:')
   
   // Create ATXP router and use it as middleware
-  const atxpRouter = atxpExpressMiddleware({
+  const atxpRouter = atxpExpress({
     destination: process.env.FUNDING_DESTINATION!,
     network: process.env.FUNDING_NETWORK! as Network,
     payeeName: 'ATXP Server Example',

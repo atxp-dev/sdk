@@ -69,7 +69,7 @@ jobs:
           npm version $VERSION --no-git-tag-version -w packages/atxp-server
           npm version $VERSION --no-git-tag-version -w packages/atxp-client
           npm version $VERSION --no-git-tag-version -w packages/atxp-base
-          npm version $VERSION --no-git-tag-version -w packages/atxp-express-middleware
+          npm version $VERSION --no-git-tag-version -w packages/atxp-express
           
           # Update cross-package dependencies to match new version
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-client
@@ -78,7 +78,7 @@ jobs:
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-redis
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-base
           npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-base
-          npm pkg set dependencies."@atxp/server"=$VERSION -w packages/atxp-express-middleware
+          npm pkg set dependencies."@atxp/server"=$VERSION -w packages/atxp-express
           
           # Regenerate package-lock.json with updated versions
           npm install
@@ -99,4 +99,4 @@ jobs:
           npm publish -w packages/atxp-server --provenance --access public
           npm publish -w packages/atxp-client --provenance --access public
           npm publish -w packages/atxp-base --provenance --access public
-          npm publish -w packages/atxp-express-middleware --provenance --access public
+          npm publish -w packages/atxp-express --provenance --access public

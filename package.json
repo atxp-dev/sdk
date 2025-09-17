@@ -11,7 +11,7 @@
     "packages/atxp-server",
     "packages/atxp-client",
     "packages/atxp-base",
-    "packages/atxp-express-middleware"
+    "packages/atxp-express"
   ],
   "repository": {
     "type": "git",

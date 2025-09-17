@@ -13,7 +13,7 @@ import {
   sendOAuthMetadata
 } from "@atxp/server";
 
-export function atxpExpressMiddleware(args: ATXPArgs): Router {
+export function atxpExpress(args: ATXPArgs): Router {
   const config = buildServerConfig(args);
   const router = Router();
 

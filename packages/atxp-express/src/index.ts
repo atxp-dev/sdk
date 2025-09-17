@@ -1,7 +1,7 @@
-// Express middleware for ATXP
+// Express router for ATXP
 export {
-  atxpExpressMiddleware
-} from './atxpExpressMiddleware.js';
+  atxpExpress
+} from './atxpExpress.js';
 
 // Re-export configuration utilities from @atxp/server for convenience
 export {
