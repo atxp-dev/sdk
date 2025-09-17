@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { buildATXPConfig } from '../buildAtxpConfig.js';
+import { buildATXPConfig } from '../buildATXPConfig.js';
 import './setup.js';
+import { ATXPArgs } from '@atxp/server';
 
 // Mock the buildServerConfig function
 vi.mock('@atxp/server', () => ({
@@ -10,13 +11,13 @@ vi.mock('@atxp/server', () => ({
   }))
 }));
 
-describe('buildAtxpConfig', () => {
+describe('buildATXPConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should call buildServerConfig with provided args', () => {
-    const args = {
+    const args : ATXPArgs = {
       destination: '0x1234567890123456789012345678901234567890',
       network: 'base' as const,
       payeeName: 'Test Server',
