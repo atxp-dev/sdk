@@ -97,11 +97,11 @@ async function handleRequest(config: ATXPConfig, request: Request): Promise<Resp
 
     // Check if this is an MCP request by examining the request
     const clonedRequest = request.clone();
-    const isMCPRequest = await parseMcpRequestsWebApi(config, clonedRequest);
-    logger.debug(`${isMCPRequest.length} MCP requests found in request`);
+    const mcpRequests = await parseMcpRequestsWebApi(config, clonedRequest);
+    logger.debug(`${mcpRequests.length} MCP requests found in request`);
 
     // If there are no MCP requests, let the request continue without authentication
-    if (isMCPRequest.length === 0) {
+    if (mcpRequests.length === 0) {
       logger.debug('No MCP requests found - letting request continue without ATXP processing');
       return null;
     }
