@@ -8,6 +8,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
 import { atxpExpress, requirePayment } from '@atxp/express';
 import { Network } from '@atxp/common';
+import { ChainFundDestinationAccount } from '@atxp/server';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
 
@@ -94,8 +95,7 @@ async function main() {
   
   // Create ATXP router and use it as middleware
   const atxpRouter = atxpExpress({
-    destination: process.env.FUNDING_DESTINATION!,
-    network: process.env.FUNDING_NETWORK! as Network,
+    fundDestinationAccount: new ChainFundDestinationAccount(process.env.FUNDING_DESTINATION!, process.env.FUNDING_NETWORK! as Network),
     payeeName: 'ATXP Server Example',
     allowHttp: process.env.NODE_ENV === 'development',
   });
