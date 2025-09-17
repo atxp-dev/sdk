@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ATXPArgs } from "@atxp/server";
+import { Network } from "@atxp/common";
 
 /**
  * Extended ATXPArgs with additional MCP-specific fields
@@ -30,6 +31,32 @@ export interface ATXPEnv {
   FUNDING_DESTINATION?: string;
   FUNDING_NETWORK?: string;
   ALLOW_INSECURE_HTTP_REQUESTS_DEV_ONLY_PLEASE?: string;
+}
+
+/**
+ * Configuration options for atxpCloudflare function
+ */
+export interface ATXPCloudflareOptions {
+  /** The MCP agent class to wrap */
+  mcpAgent: {
+    new (ctx: any, env: any): any;
+    serve(path: string): any;
+    serveSSE(path: string): any;
+  };
+  /** Service name for OAuth metadata */
+  serviceName?: string;
+  /** Mount paths for MCP endpoints */
+  mountPaths?: {
+    mcp?: string;
+    sse?: string;
+    root?: string;
+  };
+  /** Allow HTTP requests (dev only) */
+  allowHttp?: boolean;
+  /** Funding destination address */
+  destination: string;
+  /** Blockchain network */
+  network: Network;
 }
 
 /**
