@@ -23,15 +23,3 @@ export function setATXPWorkerContext(config: ATXPConfig, resource: URL, tokenChe
 export function getATXPWorkerContext(): ATXPWorkerContextType | null {
   return currentContext;
 }
-
-
-// Helper functions that mirror the SDK's context functions exactly
-export function getATXPConfig(): ATXPConfig | null {
-  const context = getATXPWorkerContext();
-  return context?.config ?? null;
-}
-
-export function atxpAccountId(): string | null {
-  const context = getATXPWorkerContext();
-  return context?.tokenCheck?.data?.sub ?? null;
-}

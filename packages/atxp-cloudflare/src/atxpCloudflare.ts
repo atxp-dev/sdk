@@ -1,5 +1,4 @@
-import { ATXPConfig, checkTokenWebApi, parseMcpRequestsWebApi, sendOAuthChallengeWebApi } from "@atxp/server";
-import { ATXPMcpApi } from "./mcpApi.js";
+import { ATXPConfig, checkTokenWebApi, getOAuthMetadata, getProtectedResourceMetadata, parseMcpRequestsWebApi, sendOAuthChallengeWebApi, sendOAuthMetadataWebApi, sendProtectedResourceMetadataWebApi } from "@atxp/server";
 import { ATXPCloudflareOptions } from "./types.js";
 import { setATXPWorkerContext } from "./workerContext.js";
 import { buildATXPConfig } from "./buildATXPConfig.js";
@@ -38,11 +37,21 @@ export function atxpCloudflare(options: ATXPCloudflareOptions) {
     async fetch(request: Request, env: any, ctx: any): Promise<Response> {
       try {
         const url = new URL(request.url);
-        const resourceUrl = url.origin + "/";
+        const prmMetadata = getProtectedResourceMetadata(config, url);
+        if (prmMetadata) {
+          const prmResponse = sendProtectedResourceMetadataWebApi(prmMetadata);
+          if (prmResponse) {
+            return prmResponse;
+          }
+        }
 
-        // Handle OAuth metadata endpoint BEFORE authentication
-        if (url.pathname === "/.well-known/oauth-protected-resource") {
-          return ATXPMcpApi.createOAuthMetadata(resourceUrl, options.payeeName);
+        // Some older clients don't use PRM and assume the MCP server is an OAuth server
+        const oAuthMetadata = await getOAuthMetadata(config, url);
+        if (oAuthMetadata != null) {
+          const oAuthResponse = sendOAuthMetadataWebApi(oAuthMetadata);
+          if (oAuthResponse) {
+            return oAuthResponse;
+          }
         }
 
         // Handle ATXP middleware processing
