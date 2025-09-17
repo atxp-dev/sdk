@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ATXPMcpApi } from "./mcpApi.js";
-import { ATXPAuthContext, ATXPCloudflareOptions } from "./types.js";
+import { ATXPCloudflareOptions } from "./types.js";
 
 /**
  * Cloudflare Workers equivalent of atxpServer() - wraps an MCP server with ATXP authentication and payments
@@ -39,50 +39,19 @@ export function atxpCloudflareWorker(options: ATXPCloudflareOptions) {
           return ATXPMcpApi.createOAuthMetadata(resourceUrl, options.payeeName);
         }
 
-        // Initialize empty auth context
-        let authContext: ATXPAuthContext = {};
-
         // Handle ATXP middleware processing
-        try {
-          // Check if ATXP middleware should handle this request
-          const atxpResponse = await ATXPMcpApi.getMiddleware().handleRequest(request);
-          if (atxpResponse) {
-            return atxpResponse;
-          }
-
-          // Extract authentication data from ATXP context
-          authContext = ATXPMcpApi.createAuthContext();
-        } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error('ATXP middleware error:', error);
+        const atxpResponse = await ATXPMcpApi.getMiddleware().handleRequest(request);
+        if (atxpResponse) {
+          return atxpResponse;
         }
-
-        // Create extended context with props and ATXP initialization params for MCP handler
-        // Note: We pass the original config options rather than the built config
-        // because the built config contains class instances that don't serialize
-        const extendedCtx = {
-          ...(ctx as any),
-          props: {
-            ...authContext,
-            atxpInitParams: {
-              ...options,
-              resourceUrl  // Pass consistent resource URL
-            }
-          }
-        };
 
         // Route to appropriate MCP endpoints
         if (url.pathname === sse || url.pathname === sse + "/message") {
-          return mcpAgent.serveSSE(sse).fetch(request, env, extendedCtx);
+          return mcpAgent.serveSSE(sse).fetch(request, env, ctx);
         }
 
-        if (url.pathname === mcp) {
-          return mcpAgent.serve(mcp).fetch(request, env, extendedCtx);
-        }
-
-        // Handle root path for MCP connections
-        if (url.pathname === root) {
-          return mcpAgent.serve(root).fetch(request, env, extendedCtx);
+        if (url.pathname === mcp || url.pathname === root) {
+          return mcpAgent.serve(url.pathname).fetch(request, env, ctx);
         }
 
         return new Response("Not found", { status: 404 });

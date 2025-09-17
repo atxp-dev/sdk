@@ -42,7 +42,7 @@ export class ATXPWorkerMiddleware {
       }
 
       // Create and store context for this request using SDK-compatible structure
-      setATXPWorkerContext(this.config, tokenCheck);
+      setATXPWorkerContext(this.config, resource, tokenCheck);
 
       // Let the request continue to MCP handling
       return null;
