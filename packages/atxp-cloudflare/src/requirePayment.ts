@@ -1,14 +1,13 @@
 import { RequirePaymentConfig } from "@atxp/common";
-import { requirePayment as requirePaymentSDK, withATXPContext } from "@atxp/server";
+import { ATXPArgs, requirePayment as requirePaymentSDK, withATXPContext } from "@atxp/server";
 import { getATXPConfig } from "./workerContext.js";
 import { ATXPMcpApi } from "./mcpApi.js";
-import { ATXPMcpArgs } from "./types.js";
 
 // Extended config to support authenticated user override and ATXP init params
 interface ExtendedPaymentConfig extends RequirePaymentConfig {
   authenticatedUser?: string;
   userToken?: string;
-  atxpInitParams?: ATXPMcpArgs;  // Allow passing ATXP initialization params
+  atxpInitParams?: ATXPArgs;  // Allow passing ATXP initialization params
 }
 
 export async function requirePayment(paymentConfig: ExtendedPaymentConfig): Promise<void> {
@@ -37,7 +36,7 @@ export async function requirePayment(paymentConfig: ExtendedPaymentConfig): Prom
   }
 
   // Use the SDK's requirePayment function with temporary context
-  const resourceUrl = paymentConfig.atxpInitParams?.resourceUrl;
+  const resourceUrl = paymentConfig.atxpInitParams?.resource;
   if (!resourceUrl) {
     throw new Error('Resource URL not provided in ATXP init params');
   }

@@ -29,11 +29,11 @@ export function atxpCloudflare(options: ATXPCloudflareOptions) {
         config: {
           destination: options.destination,
           network: options.network,
-          payeeName: options.serviceName || 'MCP Server',
+          payeeName: options.payeeName || 'MCP Server',
           allowHttp: options.allowHttp || false
         },
         mcpAgent: options.mcpAgent,
-        serviceName: options.serviceName,
+        serviceName: options.payeeName,
         mountPaths: options.mountPaths
       });
 
