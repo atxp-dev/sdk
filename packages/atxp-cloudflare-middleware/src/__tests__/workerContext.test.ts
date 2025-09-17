@@ -6,6 +6,7 @@ import {
   atxpAccountId
 } from '../workerContext.js';
 import './setup.js';
+import { TokenCheck } from '@atxp/server';
 
 describe('workerContext', () => {
   beforeEach(() => {
@@ -19,7 +20,7 @@ describe('workerContext', () => {
       const mockTokenCheck = {
         token: 'test-token',
         data: { sub: 'test-user', active: true }
-      };
+      } as TokenCheck;
 
       setATXPWorkerContext(mockConfig, mockTokenCheck);
 
@@ -70,7 +71,7 @@ describe('workerContext', () => {
       const mockTokenCheck = {
         token: 'test-token',
         data: { sub: 'test-user-id', active: true }
-      };
+      } as TokenCheck;
 
       setATXPWorkerContext(mockConfig, mockTokenCheck);
 
