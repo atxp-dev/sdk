@@ -6,7 +6,7 @@ import { JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
 import { OAuthResourceClient, TokenData, Logger, Currency, Network, MemoryOAuthDb, DEFAULT_AUTHORIZATION_SERVER } from '@atxp/common';
 import { vi } from 'vitest';
 import { Charge, ATXPConfig, TokenCheck, TokenCheckPass, TokenCheckFail, TokenProblem, McpMethod, McpName, PaymentServer } from './types.js';
-import { ChainFundDestinationAccount } from './fundDestinationAccount.js';
+import { ChainPaymentDestination } from './fundDestinationAccount.js';
 // Note: buildServerConfig is not exported from serverTestHelpers to avoid circular dependencies
 // It should be imported from the main index when needed
 import { BigNumber } from 'bignumber.js';
@@ -56,7 +56,7 @@ export function config(args: Partial<ATXPConfig> = {}): ATXPConfig {
   } as any;
 
   const config: ATXPConfig = {
-    fundDestinationAccount: args.fundDestinationAccount ?? new ChainFundDestinationAccount(DESTINATION, 'base'),
+    paymentDestination: args.paymentDestination ?? new ChainPaymentDestination(DESTINATION, 'base'),
     mountPath: args.mountPath ?? '/',
     currency: args.currency ?? 'USDC',
     server: args.server ?? DEFAULT_AUTHORIZATION_SERVER,
