@@ -39,8 +39,8 @@ describe('requirePayment', () => {
       authenticatedUser: 'test-user',
       userToken: 'test-token',
       atxpInitParams: {
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base' as const,
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base' as const,
         resourceUrl: 'https://example.com/'
       }
     };
@@ -71,8 +71,8 @@ describe('requirePayment', () => {
       authenticatedUser: 'test-user',
       userToken: 'test-token',
       atxpInitParams: {
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base' as const,
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base' as const,
         resourceUrl: 'https://example.com/'
       }
     };
@@ -103,8 +103,8 @@ describe('requirePayment', () => {
       price: new BigNumber(0.01),
       userToken: 'test-token',
       atxpInitParams: {
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base' as const,
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base' as const,
         resourceUrl: 'https://example.com/'
       }
     };
@@ -120,8 +120,8 @@ describe('requirePayment', () => {
       price: new BigNumber(0.01),
       authenticatedUser: 'test-user',
       atxpInitParams: {
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base' as const,
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base' as const,
         resourceUrl: 'https://example.com/'
       }
     };
@@ -138,8 +138,8 @@ describe('requirePayment', () => {
       authenticatedUser: 'test-user',
       userToken: 'test-token',
       atxpInitParams: {
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base' as const
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base' as const
       }
     };
 
@@ -158,8 +158,8 @@ describe('requirePayment', () => {
       authenticatedUser: 'test-user',
       userToken: 'test-token',
       atxpInitParams: {
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base' as const,
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base' as const,
         resourceUrl: 'https://example.com/'
       }
     };

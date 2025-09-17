@@ -10,33 +10,33 @@ describe('ATXPMcpApi', () => {
   describe('init', () => {
     it('should initialize ATXP middleware with valid config', () => {
       expect(() => ATXPMcpApi.init({
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base'
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base'
       })).not.toThrow();
 
       expect(ATXPMcpApi.isInitialized()).toBe(true);
     });
 
-    it('should throw error when fundingDestination is missing', () => {
+    it('should throw error when destination is missing', () => {
       expect(() => ATXPMcpApi.init({
-        fundingDestination: '',
-        fundingNetwork: 'base'
-      })).toThrow('fundingDestination is required for ATXP initialization');
+        destination: '',
+        network: 'base'
+      })).toThrow('destination is required for ATXP initialization');
     });
 
-    it('should throw error when fundingNetwork is missing', () => {
+    it('should throw error when network is invalid', () => {
       expect(() => ATXPMcpApi.init({
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: '' as any
-      })).toThrow('fundingNetwork is required for ATXP initialization');
+        destination: '0x1234567890123456789012345678901234567890',
+        network: '' as any
+      })).toThrow();
     });
   });
 
   describe('getMiddleware', () => {
     it('should return middleware after initialization', () => {
       ATXPMcpApi.init({
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base'
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base'
       });
 
       const middleware = ATXPMcpApi.getMiddleware();
@@ -51,8 +51,8 @@ describe('ATXPMcpApi', () => {
   describe('getConfig', () => {
     it('should return config after initialization', () => {
       ATXPMcpApi.init({
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base'
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base'
       });
 
       const config = ATXPMcpApi.getConfig();
@@ -88,8 +88,8 @@ describe('ATXPMcpApi', () => {
   describe('reset', () => {
     it('should reset initialization state', () => {
       ATXPMcpApi.init({
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base'
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base'
       });
 
       expect(ATXPMcpApi.isInitialized()).toBe(true);

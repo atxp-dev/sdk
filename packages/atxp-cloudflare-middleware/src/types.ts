@@ -1,18 +1,10 @@
-import { Network } from "@atxp/common";
+import { ATXPArgs } from "@atxp/server";
 import { McpAgent } from "agents/mcp";
 
 /**
- * Configuration options for initializing ATXP with MCP servers
+ * Extended ATXPArgs with additional MCP-specific fields
  */
-export interface ATXPMcpConfig {
-  /** The wallet address or identifier where payments should be sent */
-  fundingDestination: string;
-  /** The blockchain network for payments (e.g., 'base', 'ethereum') */
-  fundingNetwork: Network;
-  /** Display name for the payee (shown to users) */
-  payeeName?: string;
-  /** Whether to allow HTTP connections (for development) */
-  allowHttp?: boolean;
+export interface ATXPMcpArgs extends ATXPArgs {
   /** The resource URL for this MCP server (used for context) */
   resourceUrl?: string;
 }
@@ -27,7 +19,7 @@ export interface ATXPAuthContext {
     sub?: string;
     [key: string]: unknown;
   };
-  atxpInitParams?: ATXPMcpConfig;  // Pass ATXP initialization params to Durable Object
+  atxpInitParams?: ATXPMcpArgs;  // Pass ATXP initialization params to Durable Object
   [key: string]: unknown;
 }
 
@@ -52,7 +44,7 @@ export interface ATXPCloudflareWorkerHandler {
  */
 export interface ATXPCloudflareWorkerOptions {
   /** Configuration for ATXP */
-  config: ATXPMcpConfig;
+  config: ATXPMcpArgs;
   /** The MCP agent class to wrap */
   mcpAgent: typeof McpAgent; // Using any to avoid dependency on specific agents type
   /** Service name for OAuth metadata */

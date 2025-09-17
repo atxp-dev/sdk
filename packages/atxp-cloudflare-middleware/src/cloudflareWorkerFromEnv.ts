@@ -14,8 +14,8 @@ import { McpAgent } from "agents/mcp";
  *       mcpAgent: MyMCP,
  *       serviceName: "My MCP Server",
  *       allowHttp: env.ALLOW_INSECURE_HTTP_REQUESTS_DEV_ONLY_PLEASE === 'true',
- *       fundingDestination: env.FUNDING_DESTINATION,
- *       fundingNetwork: env.FUNDING_NETWORK
+ *       destination: env.FUNDING_DESTINATION,
+ *       network: env.FUNDING_NETWORK
  *     });
  *     return handler.fetch(request, env, ctx);
  *   }
@@ -27,16 +27,16 @@ export function atxpCloudflareWorkerFromEnv(options: {
   serviceName?: string;
   mountPaths?: { mcp?: string; sse?: string; root?: string; };
   allowHttp?: boolean;
-  fundingDestination: string;
-  fundingNetwork: Network;
+  destination: string;
+  network: Network;
 }) {
   return {
     async fetch(request: Request, env: ATXPEnv, ctx: {[key: string]: unknown}): Promise<Response> {
       // Use the main atxpCloudflareWorker function with parameter-based config
       const handler = atxpCloudflareWorker({
         config: {
-          fundingDestination: options.fundingDestination,
-          fundingNetwork: options.fundingNetwork,
+          destination: options.destination,
+          network: options.network,
           payeeName: options.serviceName || 'MCP Server',
           allowHttp: options.allowHttp || false
         },

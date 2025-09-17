@@ -25,8 +25,8 @@ describe('atxpCloudflareWorkerFromEnv', () => {
       mcpAgent: mockMcpAgent,
       serviceName: 'Test Service',
       allowHttp: true,
-      fundingDestination: '0x1234567890123456789012345678901234567890',
-      fundingNetwork: 'base'
+      destination: '0x1234567890123456789012345678901234567890',
+      network: 'base'
     });
 
     expect(handler).toBeDefined();
@@ -40,8 +40,8 @@ describe('atxpCloudflareWorkerFromEnv', () => {
       mcpAgent: mockMcpAgent,
       serviceName: 'Test Service',
       allowHttp: true,
-      fundingDestination: '0x1234567890123456789012345678901234567890',
-      fundingNetwork: 'base',
+      destination: '0x1234567890123456789012345678901234567890',
+      network: 'base',
       mountPaths: { mcp: '/custom-mcp' }
     });
 
@@ -53,8 +53,8 @@ describe('atxpCloudflareWorkerFromEnv', () => {
 
     expect(atxpCloudflareWorker).toHaveBeenCalledWith({
       config: {
-        fundingDestination: '0x1234567890123456789012345678901234567890',
-        fundingNetwork: 'base',
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base',
         payeeName: 'Test Service',
         allowHttp: true
       },
@@ -70,8 +70,8 @@ describe('atxpCloudflareWorkerFromEnv', () => {
     const handler = atxpCloudflareWorkerFromEnv({
       mcpAgent: mockMcpAgent,
       allowHttp: false,
-      fundingDestination: '0x1234567890123456789012345678901234567890',
-      fundingNetwork: 'base'
+      destination: '0x1234567890123456789012345678901234567890',
+      network: 'base'
     });
 
     const mockRequest = new Request('https://example.com/');
@@ -101,8 +101,8 @@ describe('atxpCloudflareWorkerFromEnv', () => {
 
     const handler = atxpCloudflareWorkerFromEnv({
       mcpAgent: mockMcpAgent,
-      fundingDestination: '0x1234567890123456789012345678901234567890',
-      fundingNetwork: 'base'
+      destination: '0x1234567890123456789012345678901234567890',
+      network: 'base'
     });
 
     const mockRequest = new Request('https://example.com/');

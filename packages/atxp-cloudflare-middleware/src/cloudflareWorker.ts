@@ -7,7 +7,7 @@ import { ATXPAuthContext, ATXPCloudflareWorkerOptions } from "./types.js";
  * Usage:
  * ```typescript
  * export default atxpCloudflareWorker({
- *   config: { fundingDestination: "0x...", fundingNetwork: "base" },
+ *   config: { destination: "0x...", network: "base" },
  *   mcpAgent: MyMCP,
  *   serviceName: "My MCP Server"
  * });

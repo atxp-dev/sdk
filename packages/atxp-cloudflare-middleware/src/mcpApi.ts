@@ -3,7 +3,7 @@ import { getATXPWorkerContext, atxpAccountId } from "./workerContext.js";
 import { buildWorkerATXPConfig } from "./buildConfig.js";
 import { ATXPConfig } from "@atxp/server";
 import {
-  ATXPMcpConfig,
+  ATXPMcpArgs,
   ATXPAuthContext
 } from "./types.js";
 
@@ -18,23 +18,13 @@ export class ATXPMcpApi {
   /**
    * Initialize ATXP middleware for MCP server
    */
-  static init(options: ATXPMcpConfig): void {
-    if (!options.fundingDestination) {
-      throw new Error('fundingDestination is required for ATXP initialization');
+  static init(options: ATXPMcpArgs): void {
+    if (!options.destination) {
+      throw new Error('destination is required for ATXP initialization');
     }
-    if (!options.fundingNetwork) {
-      throw new Error('fundingNetwork is required for ATXP initialization');
-    }
-
-    const atxpArgs = {
-      destination: options.fundingDestination,
-      network: options.fundingNetwork,
-      payeeName: options.payeeName || 'MCP Server',
-      allowHttp: options.allowHttp || false,
-    };
 
     // Build config once and reuse it
-    ATXPMcpApi.config = buildWorkerATXPConfig(atxpArgs);
+    ATXPMcpApi.config = buildWorkerATXPConfig(options);
     ATXPMcpApi.middleware = new ATXPWorkerMiddleware(ATXPMcpApi.config);
   }
 
