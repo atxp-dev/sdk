@@ -6,13 +6,13 @@ export type FundingAmount = {
   currency: Currency;
 }
 
-export type FundingDestination = {
+export type PaymentAddress = {
   destination: string;
   network: Network;
 }
 
 export interface PaymentDestination {
-  destination(fundingAmount: FundingAmount, buyerAddress: string): FundingDestination;
+  destination(fundingAmount: FundingAmount, buyerAddress: string): PaymentAddress;
 }
 
 export class ChainPaymentDestination implements PaymentDestination {
@@ -21,7 +21,7 @@ export class ChainPaymentDestination implements PaymentDestination {
     private readonly network: Network
   ) {}
 
-  destination(_fundingAmount: FundingAmount, _buyerAddress: string): FundingDestination {
+  destination(_fundingAmount: FundingAmount, _buyerAddress: string): PaymentAddress {
     return {
       destination: this.address,
       network: this.network

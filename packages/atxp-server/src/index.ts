@@ -57,7 +57,7 @@ export { requirePayment } from './requirePayment.js';
 // Payment destination types and implementations
 export {
   type FundingAmount,
-  type FundingDestination,
+  type PaymentAddress,
   type PaymentDestination,
   ChainPaymentDestination
 } from './paymentDestination.js';
