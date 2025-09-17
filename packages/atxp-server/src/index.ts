@@ -60,7 +60,7 @@ export {
   type FundingDestination,
   type PaymentDestination,
   ChainPaymentDestination
-} from './fundDestinationAccount.js';
+} from './paymentDestination.js';
 
 // Test utilities are available via separate export ./serverTestHelpers
 
