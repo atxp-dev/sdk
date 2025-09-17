@@ -67,7 +67,19 @@ export class PaymentNetworkError extends Error {
   }
 }
 
+export type SignedPaymentMessage = {
+  data: string;
+  signature: string;
+  from: string;
+  to: string;
+  amount: BigNumber;
+  currency: Currency;
+  network: Network;
+}
+
 export interface PaymentMaker {
   makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<string>;
+  createSignedPaymentMessage: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<SignedPaymentMessage>;
+  submitPaymentMessage: (signedMessage: SignedPaymentMessage) => Promise<string>;
   generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;
 }

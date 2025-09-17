@@ -57,5 +57,13 @@ export {
   type ClientConfig,
   InsufficientFundsError,
   PaymentNetworkError,
-  type PaymentMaker
+  type PaymentMaker,
+  type SignedPaymentMessage
 } from './types.js';
+
+// X402 support
+export {
+  type X402Config,
+  wrapWithX402,
+  enableX402Support
+} from './x402Wrapper.js';

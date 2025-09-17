@@ -1,6 +1,6 @@
-import type { PaymentMaker, Hex } from './types.js';
+import type { PaymentMaker, Hex, SignedPaymentMessage } from './types.js';
 import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from './types.js';
-import { Logger, Currency } from '@atxp/common';
+import { Logger, Currency, Network } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
@@ -81,7 +81,7 @@ export class BasePaymentMaker implements PaymentMaker {
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
     const headerObj = { alg: 'ES256K' };
-    
+
     const payloadObj = {
       sub: this.signingClient.account!.address,
       iss: 'accounts.atxp.ai',
@@ -99,7 +99,7 @@ export class BasePaymentMaker implements PaymentMaker {
     const messageBytes = typeof Buffer !== 'undefined'
       ? Buffer.from(message, 'utf8')
       : new TextEncoder().encode(message);
-    
+
     const signResult = await this.signingClient.signMessage({
       account: this.signingClient.account!,
       message: { raw: messageBytes },
@@ -116,24 +116,24 @@ export class BasePaymentMaker implements PaymentMaker {
     return jwt;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
+  async createSignedPaymentMessage(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<SignedPaymentMessage> {
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
     }
 
-    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base from ${this.signingClient.account!.address}`);
+    this.logger.info(`Creating signed payment message for ${amount} ${currency} to ${receiver} on Base from ${this.signingClient.account!.address}`);
 
     try {
-      // Check balance before attempting payment
+      // Check balance before creating payment message
       const balanceRaw = await this.signingClient.readContract({
         address: USDC_CONTRACT_ADDRESS_BASE as Address,
         abi: ERC20_ABI,
         functionName: 'balanceOf',
         args: [this.signingClient.account!.address],
       }) as bigint;
-      
+
       const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** USDC_DECIMALS);
-      
+
       if (balance.lt(amount)) {
         this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
         throw new InsufficientFundsErrorClass(currency, amount, balance, 'base');
@@ -141,42 +141,102 @@ export class BasePaymentMaker implements PaymentMaker {
 
       // Convert amount to USDC units (6 decimals) as BigInt
       const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
-      
+
       const data = encodeFunctionData({
         abi: ERC20_ABI,
         functionName: "transfer",
         args: [receiver as Address, amountInUSDCUnits],
       });
-      const hash = await this.signingClient.sendTransaction({
+
+      // Create the transaction message
+      const transactionMessage = {
         chain: base,
         account: this.signingClient.account!,
-        to: USDC_CONTRACT_ADDRESS_BASE,
+        to: USDC_CONTRACT_ADDRESS_BASE as Address,
         data: data,
         value: parseEther('0'),
         maxPriorityFeePerGas: parseEther('0.000000001')
-      });
-      
-      // Wait for transaction confirmation with more blocks to ensure propagation
-      this.logger.info(`Waiting for transaction confirmation: ${hash}`);
-      const receipt = await this.signingClient.waitForTransactionReceipt({ 
-        hash: hash as Hex,
-        confirmations: 1
-      });
-      
-      if (receipt.status === 'reverted') {
-        throw new PaymentNetworkErrorClass(`Transaction reverted: ${hash}`, new Error('Transaction reverted on chain'));
-      }
-      
-      this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
-      
-      return hash;
+      };
+
+      // Sign the transaction without sending it
+      const signedTx = await this.signingClient.prepareTransactionRequest(transactionMessage);
+      const signature = await this.signingClient.signTransaction(signedTx);
+
+      return {
+        data: data,
+        signature: signature,
+        from: this.signingClient.account!.address,
+        to: receiver,
+        amount: amount,
+        currency: currency,
+        network: 'base' as Network
+      };
     } catch (error) {
       if (error instanceof InsufficientFundsErrorClass || error instanceof PaymentNetworkErrorClass) {
         throw error;
       }
-      
+
       // Wrap other errors in PaymentNetworkError
-      throw new PaymentNetworkErrorClass(`Payment failed on Base network: ${(error as Error).message}`, error as Error);
+      throw new PaymentNetworkErrorClass(`Failed to create signed payment message: ${(error as Error).message}`, error as Error);
+    }
+  }
+
+  async submitPaymentMessage(signedMessage: SignedPaymentMessage): Promise<string> {
+    this.logger.info(`Submitting signed payment message to blockchain`);
+
+    try {
+      // For now, we'll re-create and send the transaction
+      // In a full X402 implementation, this would submit the pre-signed transaction
+      // to the facilitator which would then submit it to the blockchain
+      const amountInUSDCUnits = BigInt(signedMessage.amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
+
+      const hash = await this.signingClient.sendTransaction({
+        chain: base,
+        account: this.signingClient.account!,
+        to: USDC_CONTRACT_ADDRESS_BASE,
+        data: signedMessage.data as Hex,
+        value: parseEther('0'),
+        maxPriorityFeePerGas: parseEther('0.000000001')
+      });
+
+      // Wait for transaction confirmation
+      this.logger.info(`Waiting for transaction confirmation: ${hash}`);
+      const receipt = await this.signingClient.waitForTransactionReceipt({
+        hash: hash as Hex,
+        confirmations: 1
+      });
+
+      if (receipt.status === 'reverted') {
+        throw new PaymentNetworkErrorClass(`Transaction reverted: ${hash}`, new Error('Transaction reverted on chain'));
+      }
+
+      this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
+
+      return hash;
+    } catch (error) {
+      if (error instanceof PaymentNetworkErrorClass) {
+        throw error;
+      }
+
+      // Wrap other errors in PaymentNetworkError
+      throw new PaymentNetworkErrorClass(`Failed to submit payment: ${(error as Error).message}`, error as Error);
+    }
+  }
+
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string = ''): Promise<string> {
+    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base from ${this.signingClient.account!.address}`);
+
+    try {
+      // Use the new separated methods
+      const signedMessage = await this.createSignedPaymentMessage(amount, currency, receiver, memo);
+
+      // For standard ATXP flow, immediately submit the signed payment
+      const hash = await this.submitPaymentMessage(signedMessage);
+
+      return hash;
+    } catch (error) {
+      // Error handling is already done in the individual methods
+      throw error;
     }
   }
 }
