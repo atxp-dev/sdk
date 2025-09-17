@@ -63,7 +63,5 @@ export {
 
 // X402 support
 export {
-  type X402Config,
-  wrapWithX402,
-  enableX402Support
+  wrapWithX402
 } from './x402Wrapper.js';

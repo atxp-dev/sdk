@@ -17,7 +17,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
   private connection: Connection;
   private source: Keypair;
   private logger: Logger;
-  private lastTransaction: Transaction | null = null;
+  private preparedTransaction: Transaction | null = null;
 
   constructor(solanaEndpoint: string, sourceSecretKey: string, logger?: Logger) {
     if (!solanaEndpoint) {
@@ -30,9 +30,9 @@ export class SolanaPaymentMaker implements PaymentMaker {
     this.source = Keypair.fromSecretKey(bs58.decode(sourceSecretKey));
     this.logger = logger ?? new ConsoleLogger();
   }
-  
+
   generateJWT = async({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> => {
-    // Solana/Web3.js secretKey is 64 bytes: 
+    // Solana/Web3.js secretKey is 64 bytes:
     // first 32 bytes are the private scalar, last 32 are the public key.
     // JWK expects only the 32-byte private scalar for 'd'
     const jwk = {
@@ -93,18 +93,14 @@ export class SolanaPaymentMaker implements PaymentMaker {
       transaction.add(modifyComputeUnits);
       transaction.add(addPriorityFee);
 
-      // Sign the transaction
-      transaction.sign(this.source);
-
       // Store the transaction for later submission
-      this.lastTransaction = transaction;
+      this.preparedTransaction = transaction;
 
-      // Serialize the transaction for the signature
-      const signature = bs58.encode(transaction.serialize());
-
+      // For X402, return a simplified structure
+      // The actual signing happens when submitted
       return {
-        data: signature,
-        signature: signature,
+        data: bs58.encode(transaction.serialize({ requireAllSignatures: false })),
+        signature: '', // Will be signed by facilitator
         from: this.source.publicKey.toBase58(),
         to: receiver,
         amount: amount,
@@ -122,23 +118,21 @@ export class SolanaPaymentMaker implements PaymentMaker {
   }
 
   async submitPaymentMessage(signedMessage: SignedPaymentMessage): Promise<string> {
-    this.logger.info(`Submitting signed payment message to Solana blockchain`);
+    this.logger.info(`Submitting payment to Solana blockchain`);
 
     try {
-      // For Solana, we need to reconstruct and submit the transaction
-      // In a full X402 implementation, this would be handled by the facilitator
-      if (!this.lastTransaction) {
+      if (!this.preparedTransaction) {
         throw new PaymentNetworkError('No transaction to submit. Call createSignedPaymentMessage first.');
       }
 
       const transactionHash = await sendAndConfirmTransaction(
         this.connection,
-        this.lastTransaction,
+        this.preparedTransaction,
         [this.source],
       );
 
       // Clear the stored transaction
-      this.lastTransaction = null;
+      this.preparedTransaction = null;
 
       return transactionHash;
     } catch (error) {
@@ -148,23 +142,6 @@ export class SolanaPaymentMaker implements PaymentMaker {
 
       // Wrap other errors in PaymentNetworkError
       throw new PaymentNetworkError(`Failed to submit payment: ${(error as Error).message}`, error as Error);
-    }
-  }
-
-  makePayment = async (amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> => {
-    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Solana from ${this.source.publicKey.toBase58()}`);
-
-    try {
-      // Use the new separated methods
-      const signedMessage = await this.createSignedPaymentMessage(amount, currency, receiver, memo);
-
-      // For standard ATXP flow, immediately submit the signed payment
-      const hash = await this.submitPaymentMessage(signedMessage);
-
-      return hash;
-    } catch (error) {
-      // Error handling is already done in the individual methods
-      throw error;
     }
   }
 }

@@ -29,31 +29,6 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     this.fetchFn = fetchFn;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
-    const body = {
-      amount: amount.toString(),
-      currency,
-      receiver,
-      memo,
-    };
-    const response = await this.fetchFn(`${this.origin}/pay`, {
-      method: 'POST',
-      headers: {
-        'Authorization': toBasicAuth(this.token),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`ATXPAccount: /pay failed: ${response.status} ${response.statusText} ${text}`);
-    }
-    const json = await response.json() as { txHash?: string };
-    if (!json?.txHash) {
-      throw new Error('ATXPAccount: /pay did not return txHash');
-    }
-    return json.txHash;
-  }
 
   async createSignedPaymentMessage(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<SignedPaymentMessage> {
     // For ATXPAccount, we create a signed payment message via the HTTP endpoint

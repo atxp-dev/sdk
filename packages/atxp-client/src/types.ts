@@ -78,7 +78,6 @@ export type SignedPaymentMessage = {
 }
 
 export interface PaymentMaker {
-  makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<string>;
   createSignedPaymentMessage: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<SignedPaymentMessage>;
   submitPaymentMessage: (signedMessage: SignedPaymentMessage) => Promise<string>;
   generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;

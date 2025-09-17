@@ -1,218 +1,108 @@
-# X402 Server Example with Coinbase Facilitator
+# X402 Server Example
 
-This example demonstrates how to use ATXP SDK with the real Coinbase X402 facilitator for processing USDC payments on Base.
+This example demonstrates X402 payment protocol with ATXP SDK. You can test it immediately using the **public test facilitator** - no API keys required!
 
-## What is X402?
+## Quick Start (Testnet - No API Keys!)
 
-X402 is a payment protocol that uses HTTP 402 (Payment Required) status codes with payment headers to enable micropayments for web resources. This example uses the **official Coinbase X402 facilitator** to process real USDC payments on the Base blockchain.
-
-## Prerequisites
-
-### 1. Coinbase Developer Platform (CDP) Account
-You need CDP API keys to use the Coinbase facilitator:
-1. Go to [https://portal.cdp.coinbase.com/](https://portal.cdp.coinbase.com/)
-2. Create an account or sign in
-3. Generate API keys (API Key ID and Secret)
-
-### 2. Base Wallet with USDC
-For the test client, you need:
-- A wallet on Base network with some USDC
-- The wallet's private key (for signing payments)
-- An RPC endpoint (from Alchemy, Infura, or similar)
-
-### 3. Recipient Wallet
-A Base wallet address where you want to receive payments (for the server)
-
-## Setup
-
-1. Install dependencies:
+### 1. Install and Configure
 ```bash
 npm install
-```
-
-2. Create a `.env` file:
-```bash
 cp .env.example .env
+# Edit .env - set your RECIPIENT_ADDRESS
 ```
 
-3. Configure your environment variables:
+### 2. Get Test USDC
+Get free test USDC on Base Sepolia from:
+- [Circle USDC Faucet](https://faucet.circle.com/) (recommended)
+- Or any Base Sepolia faucet for ETH
 
-```env
-# CDP API Keys (required for real payments)
-CDP_API_KEY_ID=your_cdp_api_key_id
-CDP_API_KEY_SECRET=your_cdp_api_key_secret
-
-# Network: "base" for mainnet or "base-sepolia" for testnet
-NETWORK=base
-
-# Your wallet to receive payments
-RECIPIENT_ADDRESS=0xYourWalletAddressHere
-
-# For the test client
-BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/your-api-key
-BASE_PRIVATE_KEY=your_private_key_here
-```
-
-## Running the Example
-
-### Start the X402 Server
-
+### 3. Run Server
 ```bash
 npm run dev
 ```
 
-The server will start with either:
-- **Production Mode**: If CDP API keys are configured (real payments)
-- **Demo Mode**: If no CDP API keys (no actual payments)
+The server automatically uses the **public test facilitator** at `https://x402.org/facilitator` - no login or API keys needed!
 
-### Test with the Client
-
-In a separate terminal:
-
+### 4. Test Client
 ```bash
+# In another terminal
 npm run test-client
 ```
 
-The test client will:
-1. Check server configuration
-2. Attempt to access protected resources
-3. Handle X402 payment challenges automatically
-4. Make real USDC payments on Base
-5. Display transaction details
+## Configuration Options
+
+### Testnet Mode (Default - No API Keys!)
+```env
+NETWORK=base-sepolia
+RECIPIENT_ADDRESS=0xYourWalletAddress
+# No CDP keys needed! Uses public facilitator
+```
+
+### Production Mode (Real Money)
+```env
+NETWORK=base
+CDP_API_KEY_ID=your_key_id         # Get from cdp.coinbase.com
+CDP_API_KEY_SECRET=your_key_secret # Get from cdp.coinbase.com
+RECIPIENT_ADDRESS=0xYourWalletAddress
+```
 
 ## How It Works
 
-### Server Flow (with Coinbase Facilitator)
+1. Server uses X402 middleware to protect endpoints
+2. Client requests protected resource
+3. Server returns 402 Payment Required
+4. Client signs payment and retries
+5. Facilitator verifies and settles on blockchain
+6. Server returns protected resource
 
-1. Client requests a protected resource
-2. Coinbase middleware returns 402 with payment requirements
-3. Client signs and sends payment in X-Payment header
-4. Coinbase facilitator:
-   - Verifies the payment signature
-   - Checks account balance
-   - Submits transaction to Base blockchain
-   - Waits for confirmation
-5. Server returns the protected resource
+## Facilitator Options
 
-### Client Flow (ATXP SDK)
+| Mode | Network | Facilitator | API Keys | Real Money |
+|------|---------|------------|----------|------------|
+| **Test** (default) | Base Sepolia | `https://x402.org/facilitator` | ❌ None | ❌ Test USDC |
+| Production | Base Mainnet | Coinbase CDP | ✅ Required | ✅ Real USDC |
+
+## Server Code
+
+The entire X402 integration is just one middleware line:
 
 ```typescript
-// Wrap fetch with X402 support
-const x402Fetch = wrapWithX402(fetch, {
-  account: baseAccount,
-  approvePayment: async (payment) => {
-    // Approve payments under 10 cents
-    return payment.amount.lte(new BigNumber('0.10'));
-  },
-  onPayment: async ({ payment }) => {
-    console.log('Payment successful:', payment);
-  }
-});
-
-// Use like regular fetch - payments handled automatically
-const response = await x402Fetch('http://localhost:3001/api/protected-resource');
+app.use(paymentMiddleware(
+  recipientAddress,
+  { '/api/resource': { price: '$0.01', network: 'base-sepolia' } },
+  { url: 'https://x402.org/facilitator' }  // Public test facilitator
+));
 ```
 
-## Pricing Structure
+## Client Code
 
-The example server has three tiers:
+The ATXP SDK handles X402 automatically:
 
-| Endpoint | Price | Description |
-|----------|-------|-------------|
-| `/api/protected-resource/:id` | $0.01 | Basic protected content |
-| `/api/premium-resource` | $0.10 | Premium features |
-| `/api/expensive-resource` | $1.00 | High-value content |
-
-## Testing on Different Networks
-
-### Base Mainnet (Production)
-```env
-NETWORK=base
+```typescript
+const x402Fetch = wrapWithX402(fetch, account);
+const response = await x402Fetch('http://localhost:3001/api/resource');
 ```
-- Real USDC payments
-- Real money involved
-- Transactions visible on [BaseScan](https://basescan.org)
 
-### Base Sepolia (Testnet)
-```env
-NETWORK=base-sepolia
-```
-- Test USDC tokens
-- No real money
-- Get test USDC from faucets
-- Transactions visible on [Base Sepolia Explorer](https://sepolia.basescan.org)
+## Cost Structure
 
-## Important Security Notes
-
-⚠️ **NEVER commit real private keys or API secrets to version control**
-
-- Use environment variables for sensitive data
-- Keep your `.env` file in `.gitignore`
-- Use separate wallets for testing
-- Start with small amounts when testing on mainnet
-
-## Cost Breakdown
-
-When using Base mainnet:
-- **Gas fees**: ~$0.001 per transaction (Base has very low fees)
-- **Facilitator fee**: 0% (Coinbase doesn't charge fees)
-- **Total cost**: Resource price + minimal gas
-
-## Monitoring Transactions
-
-View your transactions on:
-- **Base Mainnet**: [https://basescan.org](https://basescan.org)
-- **Base Sepolia**: [https://sepolia.basescan.org](https://sepolia.basescan.org)
-
-Search by your wallet address or transaction hash.
+- **Testnet**: Free (test USDC)
+- **Mainnet**: Resource price + ~$0.001 gas (Base has very low fees)
 
 ## Troubleshooting
 
-### "CDP API keys not configured"
-Set `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` in your `.env` file.
+### "No payment maker found"
+Ensure your account is configured for the correct network (base-sepolia for testnet).
 
-### "Insufficient USDC balance"
-Ensure your wallet has enough USDC on the correct network.
+### "Insufficient balance"
+Get test USDC from the Circle faucet for Base Sepolia.
 
-### "Transaction failed"
-Check:
-1. Network configuration matches between client and server
-2. Wallet has enough USDC and ETH for gas
-3. RPC endpoint is working
-
-### "Payment not approved"
-The test client auto-approves payments under $0.10. Adjust the limit in `test-client.ts` if needed.
-
-## Architecture
-
-```
-┌─────────┐      402 Challenge      ┌─────────┐
-│ Client  │ ─────────────────────> │ Server  │
-│ (ATXP)  │                         │(Express)│
-│         │ <───────────────────── │ + X402  │
-└─────────┘   Retry with Payment    └─────────┘
-     │                                    │
-     │                                    ▼
-     │                            ┌──────────────┐
-     │                            │  Coinbase    │
-     │                            │ Facilitator  │
-     │                            └──────────────┘
-     │                                    │
-     └────────────────────────────────────┘
-            Submit to Base Blockchain
-```
-
-## Next Steps
-
-1. **Customize pricing**: Edit the `pricing` object in `server.ts`
-2. **Add more endpoints**: Create new protected routes
-3. **Implement business logic**: Add real functionality to protected endpoints
-4. **Deploy to production**: Use proper hosting with HTTPS
-5. **Monitor usage**: Track payments and API usage
+### View Transactions
+- **Testnet**: [Base Sepolia Explorer](https://sepolia.basescan.org)
+- **Mainnet**: [BaseScan](https://basescan.org)
 
 ## Resources
 
-- [X402 Protocol Specification](https://github.com/coinbase/x402)
-- [Coinbase Developer Platform](https://portal.cdp.coinbase.com/)
-- [Base Documentation](https://docs.base.org/)
+- [X402 Protocol](https://github.com/coinbase/x402)
+- [Circle USDC Faucet](https://faucet.circle.com/)
+- [Base Sepolia Info](https://docs.base.org/network-information)
 - [ATXP Documentation](https://docs.atxp.ai/)

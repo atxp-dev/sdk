@@ -20,7 +20,7 @@ type ExtendedWalletClient = WalletClient & PublicActions;
 // Helper function to convert to base64url that works in both Node.js and browsers
 function toBase64Url(data: string): string {
   // Convert string to base64
-  const base64 = typeof Buffer !== 'undefined' 
+  const base64 = typeof Buffer !== 'undefined'
     ? Buffer.from(data).toString('base64')
     : btoa(data);
   // Convert base64 to base64url
@@ -63,6 +63,7 @@ const ERC20_ABI = [
 export class BasePaymentMaker implements PaymentMaker {
   protected signingClient: ExtendedWalletClient;
   protected logger: Logger;
+  private lastSignedTransaction: string | null = null;
 
   constructor(baseRPCUrl: string, walletClient: WalletClient, logger?: Logger) {
     if (!baseRPCUrl) {
@@ -148,23 +149,25 @@ export class BasePaymentMaker implements PaymentMaker {
         args: [receiver as Address, amountInUSDCUnits],
       });
 
-      // Create the transaction message
-      const transactionMessage = {
+      // Prepare and sign the transaction
+      const preparedTx = await this.signingClient.prepareTransactionRequest({
         chain: base,
         account: this.signingClient.account!,
-        to: USDC_CONTRACT_ADDRESS_BASE as Address,
+        to: USDC_CONTRACT_ADDRESS_BASE,
         data: data,
         value: parseEther('0'),
         maxPriorityFeePerGas: parseEther('0.000000001')
-      };
+      });
 
-      // Sign the transaction without sending it
-      const signedTx = await this.signingClient.prepareTransactionRequest(transactionMessage);
-      const signature = await this.signingClient.signTransaction(signedTx);
+      // Sign the transaction but don't send it
+      const signedTx = await this.signingClient.signTransaction(preparedTx);
+
+      // Store for potential later submission
+      this.lastSignedTransaction = signedTx;
 
       return {
         data: data,
-        signature: signature,
+        signature: signedTx, // The actual signed transaction
         from: this.signingClient.account!.address,
         to: receiver,
         amount: amount,
@@ -182,21 +185,19 @@ export class BasePaymentMaker implements PaymentMaker {
   }
 
   async submitPaymentMessage(signedMessage: SignedPaymentMessage): Promise<string> {
-    this.logger.info(`Submitting signed payment message to blockchain`);
+    this.logger.info(`Submitting payment to blockchain`);
 
     try {
-      // For now, we'll re-create and send the transaction
-      // In a full X402 implementation, this would submit the pre-signed transaction
-      // to the facilitator which would then submit it to the blockchain
-      const amountInUSDCUnits = BigInt(signedMessage.amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
+      // Use the signed transaction from the message or the stored one
+      const signedTx = signedMessage.signature || this.lastSignedTransaction;
 
-      const hash = await this.signingClient.sendTransaction({
-        chain: base,
-        account: this.signingClient.account!,
-        to: USDC_CONTRACT_ADDRESS_BASE,
-        data: signedMessage.data as Hex,
-        value: parseEther('0'),
-        maxPriorityFeePerGas: parseEther('0.000000001')
+      if (!signedTx) {
+        throw new PaymentNetworkErrorClass('No signed transaction available');
+      }
+
+      // Send the pre-signed transaction
+      const hash = await this.signingClient.sendRawTransaction({
+        serializedTransaction: signedTx as Hex
       });
 
       // Wait for transaction confirmation
@@ -212,6 +213,9 @@ export class BasePaymentMaker implements PaymentMaker {
 
       this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
 
+      // Clear the stored transaction
+      this.lastSignedTransaction = null;
+
       return hash;
     } catch (error) {
       if (error instanceof PaymentNetworkErrorClass) {
@@ -220,23 +224,6 @@ export class BasePaymentMaker implements PaymentMaker {
 
       // Wrap other errors in PaymentNetworkError
       throw new PaymentNetworkErrorClass(`Failed to submit payment: ${(error as Error).message}`, error as Error);
-    }
-  }
-
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string = ''): Promise<string> {
-    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base from ${this.signingClient.account!.address}`);
-
-    try {
-      // Use the new separated methods
-      const signedMessage = await this.createSignedPaymentMessage(amount, currency, receiver, memo);
-
-      // For standard ATXP flow, immediately submit the signed payment
-      const hash = await this.submitPaymentMessage(signedMessage);
-
-      return hash;
-    } catch (error) {
-      // Error handling is already done in the individual methods
-      throw error;
     }
   }
 }
