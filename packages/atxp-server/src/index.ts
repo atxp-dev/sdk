@@ -38,6 +38,8 @@ export {
   sendOAuthChallenge,
   parseMcpRequests as parseMcpRequestsNode,
   parseBody as parseBodyNode,
+  sendProtectedResourceMetadata as sendProtectedResourceMetadataNode,
+  sendOAuthMetadata as sendOAuthMetadataNode,
 } from './node/index.js';
 
 // Web API implementations (for Cloudflare Workers, Deno, browsers, etc.)
