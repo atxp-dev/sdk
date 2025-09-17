@@ -1,4 +1,5 @@
 import { Network } from "@atxp/common";
+import { McpAgent } from "agents/mcp";
 
 /**
  * Configuration options for initializing ATXP with MCP servers
@@ -24,7 +25,7 @@ export interface ATXPAuthContext {
   userToken?: string;
   claims?: {
     sub?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   atxpInitParams?: ATXPMcpConfig;  // Pass ATXP initialization params to Durable Object
   [key: string]: unknown;
@@ -43,7 +44,7 @@ export interface ATXPEnv {
  * Cloudflare Workers ATXP handler function - similar to atxpServer but for Workers
  */
 export interface ATXPCloudflareWorkerHandler {
-  (request: Request, env: any, ctx: ExecutionContext): Promise<Response | null>;
+  (request: Request, env: unknown, ctx: {[key: string]: unknown}): Promise<Response | null>;
 }
 
 /**
@@ -53,7 +54,7 @@ export interface ATXPCloudflareWorkerOptions {
   /** Configuration for ATXP */
   config: ATXPMcpConfig;
   /** The MCP agent class to wrap */
-  mcpAgent: any; // Using any to avoid dependency on specific agents type
+  mcpAgent: typeof McpAgent; // Using any to avoid dependency on specific agents type
   /** Service name for OAuth metadata */
   serviceName?: string;
   /** Mount paths for MCP endpoints */

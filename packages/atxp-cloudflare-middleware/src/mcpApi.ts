@@ -51,7 +51,7 @@ export class ATXPMcpApi {
   /**
    * Get the ATXP configuration (must call init() first)
    */
-  static getConfig(): any {
+  static getConfig(): ATXPConfig {
     if (!ATXPMcpApi.config) {
       throw new Error('ATXP not initialized - call ATXPMcpApi.init() first');
     }

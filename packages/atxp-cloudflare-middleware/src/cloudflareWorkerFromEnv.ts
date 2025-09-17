@@ -31,7 +31,7 @@ export function atxpCloudflareWorkerFromEnv(options: {
   fundingNetwork: Network;
 }) {
   return {
-    async fetch(request: Request, env: ATXPEnv, ctx: unknown): Promise<Response> {
+    async fetch(request: Request, env: ATXPEnv, ctx: {[key: string]: unknown}): Promise<Response> {
       // Use the main atxpCloudflareWorker function with parameter-based config
       const handler = atxpCloudflareWorker({
         config: {

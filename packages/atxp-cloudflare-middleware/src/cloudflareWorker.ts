@@ -25,7 +25,7 @@ export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
   const { mcp = "/mcp", sse = "/sse", root = "/" } = mountPaths;
 
   return {
-    async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
+    async fetch(request: Request, env: unknown, ctx: {[key: string]: unknown}): Promise<Response> {
       try {
         // Initialize ATXP for each request in case of Cloudflare Workers isolation
         if (!ATXPMcpApi.isInitialized()) {
@@ -54,6 +54,7 @@ export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
           // Extract authentication data from ATXP context
           authContext = ATXPMcpApi.createAuthContext();
         } catch (error) {
+          // eslint-disable-next-line no-console
           console.error('ATXP middleware error:', error);
         }
 
@@ -88,6 +89,7 @@ export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
         return new Response("Not found", { status: 404 });
 
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Error in ATXP Cloudflare Worker handler:', error);
         return new Response(JSON.stringify({
           error: 'server_error',
