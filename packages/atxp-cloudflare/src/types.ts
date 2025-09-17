@@ -1,14 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ATXPArgs } from "@atxp/server";
-import { Network } from "@atxp/common";
-
-/**
- * Extended ATXPArgs with additional MCP-specific fields
- */
-export interface ATXPMcpArgs extends ATXPArgs {
-  /** The resource URL for this MCP server (used for context) */
-  resourceUrl?: string;
-}
 
 /**
  * Authentication context type for ATXP integration with MCP servers
@@ -20,7 +11,7 @@ export interface ATXPAuthContext {
     sub?: string;
     [key: string]: unknown;
   };
-  atxpInitParams?: ATXPMcpArgs;  // Pass ATXP initialization params to Durable Object
+  atxpInitParams?: ATXPArgs;  // Pass ATXP initialization params to Durable Object
   [key: string]: unknown;
 }
 
@@ -36,27 +27,19 @@ export interface ATXPEnv {
 /**
  * Configuration options for atxpCloudflare function
  */
-export interface ATXPCloudflareOptions {
+export interface ATXPCloudflareOptions extends ATXPArgs {
   /** The MCP agent class to wrap */
   mcpAgent: {
     new (ctx: any, env: any): any;
     serve(path: string): any;
     serveSSE(path: string): any;
   };
-  /** Service name for OAuth metadata */
-  serviceName?: string;
   /** Mount paths for MCP endpoints */
   mountPaths?: {
     mcp?: string;
     sse?: string;
     root?: string;
   };
-  /** Allow HTTP requests (dev only) */
-  allowHttp?: boolean;
-  /** Funding destination address */
-  destination: string;
-  /** Blockchain network */
-  network: Network;
 }
 
 /**
@@ -71,7 +54,7 @@ export interface ATXPCloudflareWorkerHandler {
  */
 export interface ATXPCloudflareWorkerOptions {
   /** Configuration for ATXP */
-  config: ATXPMcpArgs;
+  config: ATXPArgs;
   /** The MCP agent class to wrap */
   mcpAgent: {
     new (ctx: any, env: any): any;
