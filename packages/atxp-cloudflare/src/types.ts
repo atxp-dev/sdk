@@ -7,7 +7,6 @@ import { ATXPArgs } from "@atxp/server";
 export interface ATXPCloudflareOptions extends ATXPArgs {
   /** The MCP agent class to wrap */
   mcpAgent: {
-    new (ctx: any, env: any): any;
     serve(path: string): any;
     serveSSE(path: string): any;
   };

@@ -59,4 +59,23 @@ describe('requirePayment', () => {
     expect(mockRequirePaymentSDK).toHaveBeenCalledWith(paymentConfig);
   });
 
+  it('should throw error when no ATXP config found', async () => {
+    (getATXPWorkerContext as any).mockReturnValue(null);
+
+    const paymentConfig = {
+      price: new BigNumber(0.01),
+      authenticatedUser: 'test-user',
+      userToken: 'test-token',
+      atxpInitParams: {
+        destination: '0x1234567890123456789012345678901234567890',
+        network: 'base' as const,
+        resourceUrl: 'https://example.com/'
+      }
+    };
+
+    await expect(requirePayment(paymentConfig)).rejects.toThrow('No ATXP config found - payments cannot be processed');
+    expect(mockWithATXPContext).not.toHaveBeenCalled();
+    expect(mockRequirePaymentSDK).not.toHaveBeenCalled();
+  });
+
 });
