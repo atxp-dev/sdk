@@ -23,6 +23,5 @@ export type {
   ATXPAuthContext,
   ATXPEnv,
   ATXPCloudflareWorkerHandler,
-  ATXPCloudflareWorkerOptions,
   ATXPCloudflareOptions
 } from './types.js';

@@ -24,20 +24,7 @@ import { ATXPEnv, ATXPCloudflareOptions } from "./types.js";
 export function atxpCloudflare(options: ATXPCloudflareOptions) {
   return {
     async fetch(request: Request, env: ATXPEnv, ctx: any): Promise<Response> {
-      // Use the main atxpCloudflareWorker function with parameter-based config
-      const handler = atxpCloudflareWorker({
-        config: {
-          destination: options.destination,
-          network: options.network,
-          payeeName: options.payeeName || 'MCP Server',
-          allowHttp: options.allowHttp || false
-        },
-        mcpAgent: options.mcpAgent,
-        serviceName: options.payeeName,
-        mountPaths: options.mountPaths
-      });
-
-      return handler.fetch(request, env, ctx);
+      return atxpCloudflareWorker(options).fetch(request, env, ctx);
     }
   };
 }

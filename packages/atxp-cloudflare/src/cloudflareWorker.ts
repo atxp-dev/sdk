@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ATXPMcpApi } from "./mcpApi.js";
-import { ATXPAuthContext, ATXPCloudflareWorkerOptions } from "./types.js";
+import { ATXPAuthContext, ATXPCloudflareOptions } from "./types.js";
 
 /**
  * Cloudflare Workers equivalent of atxpServer() - wraps an MCP server with ATXP authentication and payments
@@ -14,11 +14,9 @@ import { ATXPAuthContext, ATXPCloudflareWorkerOptions } from "./types.js";
  * });
  * ```
  */
-export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
+export function atxpCloudflareWorker(options: ATXPCloudflareOptions) {
   const {
-    config,
     mcpAgent,
-    serviceName = "ATXP MCP Server",
     mountPaths = { mcp: "/mcp", sse: "/sse", root: "/" }
   } = options;
 
@@ -30,7 +28,7 @@ export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
       try {
         // Initialize ATXP for each request in case of Cloudflare Workers isolation
         if (!ATXPMcpApi.isInitialized()) {
-          ATXPMcpApi.init(config);
+          ATXPMcpApi.init(options);
         }
 
         const url = new URL(request.url);
@@ -38,7 +36,7 @@ export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
 
         // Handle OAuth metadata endpoint BEFORE authentication
         if (url.pathname === "/.well-known/oauth-protected-resource") {
-          return ATXPMcpApi.createOAuthMetadata(resourceUrl, serviceName);
+          return ATXPMcpApi.createOAuthMetadata(resourceUrl, options.payeeName);
         }
 
         // Initialize empty auth context
@@ -67,7 +65,7 @@ export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
           props: {
             ...authContext,
             atxpInitParams: {
-              ...config,
+              ...options,
               resourceUrl  // Pass consistent resource URL
             }
           }

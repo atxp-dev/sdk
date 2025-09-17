@@ -48,25 +48,3 @@ export interface ATXPCloudflareOptions extends ATXPArgs {
 export interface ATXPCloudflareWorkerHandler {
   (request: Request, env: unknown, ctx: {[key: string]: unknown}): Promise<Response | null>;
 }
-
-/**
- * Configuration options for ATXP Cloudflare Worker
- */
-export interface ATXPCloudflareWorkerOptions {
-  /** Configuration for ATXP */
-  config: ATXPArgs;
-  /** The MCP agent class to wrap */
-  mcpAgent: {
-    new (ctx: any, env: any): any;
-    serve(path: string): any;
-    serveSSE(path: string): any;
-  };
-  /** Service name for OAuth metadata */
-  serviceName?: string;
-  /** Mount paths for MCP endpoints */
-  mountPaths?: {
-    mcp?: string;
-    sse?: string;
-    root?: string;
-  };
-}
