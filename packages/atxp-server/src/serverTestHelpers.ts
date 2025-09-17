@@ -3,10 +3,11 @@
 import { Readable } from 'stream';
 import { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'http';
 import { JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
-import { OAuthResourceClient, TokenData, Logger, Currency, Network } from '@atxp/common';
+import { OAuthResourceClient, TokenData, Logger, Currency, Network, MemoryOAuthDb, DEFAULT_AUTHORIZATION_SERVER } from '@atxp/common';
 import { vi } from 'vitest';
 import { Charge, ATXPConfig, TokenCheck, TokenCheckPass, TokenCheckFail, TokenProblem, McpMethod, McpName, PaymentServer } from './types.js';
-import { buildServerConfig } from './atxpServer.js';
+// Note: buildServerConfig is not exported from serverTestHelpers to avoid circular dependencies
+// It should be imported from the main index when needed
 import { BigNumber } from 'bignumber.js';
 import * as oauth from 'oauth4webapi';
 
@@ -44,10 +45,32 @@ export function logger(): Logger {
 }
 
 export function config(args: Partial<ATXPConfig> = {}): ATXPConfig {
-  return buildServerConfig({
-    ...args, 
+  // Create a basic config without using buildServerConfig to avoid circular dependency
+  const mockLogger = logger();
+  const oAuthDb = args.oAuthDb ?? new MemoryOAuthDb();
+  const oAuthClient = args.oAuthClient ?? {
+    introspect: vi.fn().mockResolvedValue(tokenData()),
+    validateClientCredentials: vi.fn().mockResolvedValue(true),
+    extractAccessToken: vi.fn().mockReturnValue('test-token')
+  } as any;
+
+  const config: ATXPConfig = {
     destination: args.destination ?? DESTINATION,
-  });
+    mountPath: args.mountPath ?? '/',
+    currency: args.currency ?? 'USDC',
+    network: args.network ?? 'base',
+    server: args.server ?? DEFAULT_AUTHORIZATION_SERVER,
+    payeeName: args.payeeName ?? 'Test ATXP Server',
+    allowHttp: args.allowHttp ?? true,
+    resource: args.resource ?? null,
+    oAuthDb,
+    oAuthClient,
+    paymentServer: args.paymentServer ?? paymentServer(),
+    logger: args.logger ?? mockLogger,
+    ...args
+  };
+
+  return config;
 }
 
 export function paymentServer({

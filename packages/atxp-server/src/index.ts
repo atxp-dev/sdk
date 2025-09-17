@@ -1,11 +1,3 @@
-// Main server functionality
-export {
-  type ATXPArgs,
-  DEFAULT_CONFIG,
-  buildServerConfig,
-  atxpServer
-} from './atxpServer.js';
-
 // Core types and interfaces
 export {
   type McpMethod,
@@ -57,3 +49,24 @@ export {
 
 // Payment functionality
 export { requirePayment } from './requirePayment.js';
+
+// Test utilities are available via separate export ./serverTestHelpers
+
+// Server configuration utilities (needed for Express router)
+export {
+  type ATXPArgs,
+  DEFAULT_CONFIG,
+  buildServerConfig
+} from './serverConfig.js';
+
+// Additional utilities needed by express packages
+export { getResource } from './getResource.js';
+export { ATXPPaymentServer } from './paymentServer.js';
+export {
+  getOAuthMetadata,
+  sendOAuthMetadata
+} from './oAuthMetadata.js';
+export {
+  getProtectedResourceMetadata,
+  sendProtectedResourceMetadata
+} from './protectedResourceMetadata.js';

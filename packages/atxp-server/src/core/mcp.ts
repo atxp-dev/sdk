@@ -9,7 +9,7 @@ export function parseMcpRequestsCore(
   requestUrl: URL,
   method: string,
   parsedBody: unknown
-): any[] {
+): unknown[] {
   if (!method || method.toLowerCase() !== 'post') {
     return [];
   }
@@ -38,7 +38,7 @@ export function parseMcpRequestsCore(
     );
   } else {
     // Single request
-    const body = parsedBody as any;
+    const body = parsedBody as {jsonrpc?: string, method?: string, id?: unknown};
     if (body.jsonrpc === '2.0' && body.method && body.id !== undefined) {
       return [body];
     }

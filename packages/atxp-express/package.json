@@ -1,12 +1,12 @@
 {
-  "name": "@atxp/server",
+  "name": "@atxp/express",
   "version": "0.3.0",
-  "description": "ATXP Server - MCP server implementation with payment processing capabilities",
+  "description": "ATXP Express - Express.js integration for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/atxp-dev/sdk.git",
-    "directory": "packages/atxp-server"
+    "directory": "packages/atxp-express"
   },
   "type": "module",
   "sideEffects": false,
@@ -18,11 +18,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./serverTestHelpers": {
-      "types": "./dist/serverTestHelpers.d.ts",
-      "import": "./dist/serverTestHelpers.js",
-      "require": "./dist/serverTestHelpers.js"
     }
   },
   "files": [
@@ -38,20 +33,20 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/common": "0.3.0",
-    "@modelcontextprotocol/sdk": "^1.15.0",
-    "bignumber.js": "^9.3.0",
-    "oauth4webapi": "^3.5.0"
+    "@atxp/server": "0.3.0"
   },
   "peerDependencies": {
-    "content-type": "^1.0.5"
+    "express": "^5.0.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.0",
     "@types/node": "^22.13.0",
+    "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
     "eslint": "^9.32.0",
-    "node-mocks-http": "^1.17.2",
+    "express": "^5.0.0",
+    "supertest": "^7.1.4",
     "typescript": "^5.7.3",
     "vitest": "^3.0.9"
   }
