@@ -20,7 +20,6 @@ export { ATXPWorkerMiddleware } from './workerMiddleware.js';
 
 // Type exports
 export type {
-  ATXPMcpArgs,
   ATXPAuthContext,
   ATXPEnv,
   ATXPCloudflareWorkerHandler,
