@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { buildWorkerATXPConfig } from '../buildConfig.js';
+import { buildATXPConfig } from '../buildAtxpConfig.js';
 import './setup.js';
 
 // Mock the buildServerConfig function
@@ -10,7 +10,7 @@ vi.mock('@atxp/server', () => ({
   }))
 }));
 
-describe('buildWorkerATXPConfig', () => {
+describe('buildAtxpConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -23,7 +23,7 @@ describe('buildWorkerATXPConfig', () => {
       allowHttp: true
     };
 
-    const result = buildWorkerATXPConfig(args);
+    const result = buildATXPConfig(args);
 
     expect(result).toEqual({
       mockConfig: true,
@@ -41,7 +41,7 @@ describe('buildWorkerATXPConfig', () => {
       network: 'base' as const
     };
 
-    buildWorkerATXPConfig(args);
+    buildATXPConfig(args);
 
     // Verify that fetch is defined on globalThis (it may be bound)
     expect(globalThis.fetch).toBeDefined();
@@ -60,7 +60,7 @@ describe('buildWorkerATXPConfig', () => {
       network: 'base' as const
     };
 
-    expect(() => buildWorkerATXPConfig(args)).not.toThrow();
+    expect(() => buildATXPConfig(args)).not.toThrow();
 
     // Restore original fetch
     globalThis.fetch = originalFetch;

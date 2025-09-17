@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   setATXPWorkerContext,
   getATXPWorkerContext,
-  getATXPConfig,
-  atxpAccountId
 } from '../workerContext.js';
 import './setup.js';
 import { TokenCheck } from '@atxp/server';
@@ -11,7 +9,7 @@ import { TokenCheck } from '@atxp/server';
 describe('workerContext', () => {
   beforeEach(() => {
     // Reset context before each test
-    setATXPWorkerContext({} as any);
+    setATXPWorkerContext({} as any, new URL('https://example.com'));
   });
 
   describe('setATXPWorkerContext and getATXPWorkerContext', () => {
@@ -22,12 +20,12 @@ describe('workerContext', () => {
         data: { sub: 'test-user', active: true }
       } as TokenCheck;
 
-      setATXPWorkerContext(mockConfig, mockTokenCheck);
+      setATXPWorkerContext(mockConfig, new URL('https://example.com'), mockTokenCheck);
 
       const context = getATXPWorkerContext();
       expect(context).toEqual({
-        userToken: 'test-token',
-        tokenData: { sub: 'test-user', active: true },
+        tokenCheck: mockTokenCheck,
+        resource: new URL('https://example.com'),
         config: mockConfig
       });
     });
@@ -35,12 +33,12 @@ describe('workerContext', () => {
     it('should handle missing token check', () => {
       const mockConfig = { logger: { debug: () => {} } } as any;
 
-      setATXPWorkerContext(mockConfig);
+      setATXPWorkerContext(mockConfig, new URL('https://example.com'));
 
       const context = getATXPWorkerContext();
       expect(context).toEqual({
-        userToken: null,
-        tokenData: null,
+        tokenCheck: null,
+        resource: new URL('https://example.com'),
         config: mockConfig
       });
     });
@@ -49,47 +47,19 @@ describe('workerContext', () => {
   describe('getATXPConfig', () => {
     it('should return config from context', () => {
       const mockConfig = { logger: { debug: () => {} } } as any;
-      setATXPWorkerContext(mockConfig);
+      setATXPWorkerContext(mockConfig, new URL('https://example.com'));
 
-      const config = getATXPConfig();
+      const config = getATXPWorkerContext()?.config;
       expect(config).toBe(mockConfig);
     });
 
     it('should return null when no context exists', () => {
-      setATXPWorkerContext({} as any);
+      setATXPWorkerContext({} as any, new URL('https://example.com'));
       // Clear the context by setting it to null internally
       (setATXPWorkerContext as any)(null);
 
-      const config = getATXPConfig();
+      const config = getATXPWorkerContext()?.config;
       expect(config).toBe(null);
-    });
-  });
-
-  describe('atxpAccountId', () => {
-    it('should return account ID from token data', () => {
-      const mockConfig = { logger: { debug: () => {} } } as any;
-      const mockTokenCheck = {
-        token: 'test-token',
-        data: { sub: 'test-user-id', active: true }
-      } as TokenCheck;
-
-      setATXPWorkerContext(mockConfig, mockTokenCheck);
-
-      const accountId = atxpAccountId();
-      expect(accountId).toBe('test-user-id');
-    });
-
-    it('should return null when no token data exists', () => {
-      const mockConfig = { logger: { debug: () => {} } } as any;
-      setATXPWorkerContext(mockConfig);
-
-      const accountId = atxpAccountId();
-      expect(accountId).toBe(null);
-    });
-
-    it('should return null when no context exists', () => {
-      const accountId = atxpAccountId();
-      expect(accountId).toBe(null);
     });
   });
 });
