@@ -1,4 +1,3 @@
-import { ATXPWorkerMiddleware } from "./workerMiddleware.js";
 import { getATXPWorkerContext, atxpAccountId } from "./workerContext.js";
 import { buildWorkerATXPConfig } from "./buildConfig.js";
 import { ATXPConfig, ATXPArgs } from "@atxp/server";
@@ -11,7 +10,6 @@ import {
  * ATXP API for MCP servers - provides authentication and payment functionality
  */
 export class ATXPMcpApi {
-  private static middleware: ATXPWorkerMiddleware | null = null;
   private static config: ATXPConfig | null = null;
 
   /**
@@ -24,17 +22,6 @@ export class ATXPMcpApi {
 
     // Build config once and reuse it
     ATXPMcpApi.config = buildWorkerATXPConfig(options);
-    ATXPMcpApi.middleware = new ATXPWorkerMiddleware(ATXPMcpApi.config);
-  }
-
-  /**
-   * Get the ATXP middleware instance (must call init() first)
-   */
-  static getMiddleware(): ATXPWorkerMiddleware {
-    if (!ATXPMcpApi.middleware) {
-      throw new Error('ATXP not initialized - call ATXPMcpApi.init() first');
-    }
-    return ATXPMcpApi.middleware;
   }
 
   /**
@@ -88,14 +75,13 @@ export class ATXPMcpApi {
    * Check if ATXP is initialized
    */
   static isInitialized(): boolean {
-    return ATXPMcpApi.middleware !== null && ATXPMcpApi.config !== null;
+    return ATXPMcpApi.config !== null;
   }
 
   /**
    * Reset ATXP state (useful for testing)
    */
   static reset(): void {
-    ATXPMcpApi.middleware = null;
     ATXPMcpApi.config = null;
   }
 }

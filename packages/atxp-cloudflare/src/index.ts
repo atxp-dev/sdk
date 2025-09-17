@@ -15,9 +15,6 @@ export {
   atxpAccountId
 } from './workerContext.js';
 
-// Middleware exports
-export { ATXPWorkerMiddleware } from './workerMiddleware.js';
-
 // Type exports
 export type {
   ATXPAuthContext,
