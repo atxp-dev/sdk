@@ -2,6 +2,7 @@ import { ATXPConfig, checkTokenWebApi, parseMcpRequestsWebApi, sendOAuthChalleng
 import { ATXPMcpApi } from "./mcpApi.js";
 import { ATXPCloudflareOptions } from "./types.js";
 import { setATXPWorkerContext } from "./workerContext.js";
+import { buildATXPConfig } from "./buildATXPConfig.js";
 
 /**
  * Convenience function to create ATXP Cloudflare Worker with environment-based configuration
@@ -30,16 +31,12 @@ export function atxpCloudflare(options: ATXPCloudflareOptions) {
 
   // Destructure mount paths with guaranteed defaults
   const { mcp = "/mcp", sse = "/sse", root = "/" } = mountPaths;
+  const config = buildATXPConfig(options)
 
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async fetch(request: Request, env: any, ctx: any): Promise<Response> {
       try {
-        // Initialize ATXP for each request in case of Cloudflare Workers isolation
-        if (!ATXPMcpApi.isInitialized()) {
-          ATXPMcpApi.init(options);
-        }
-
         const url = new URL(request.url);
         const resourceUrl = url.origin + "/";
 
@@ -49,7 +46,7 @@ export function atxpCloudflare(options: ATXPCloudflareOptions) {
         }
 
         // Handle ATXP middleware processing
-        const atxpResponse = await handleRequest(ATXPMcpApi.getConfig(), request);
+        const atxpResponse = await handleRequest(config, request);
         if (atxpResponse) {
           return atxpResponse;
         }
