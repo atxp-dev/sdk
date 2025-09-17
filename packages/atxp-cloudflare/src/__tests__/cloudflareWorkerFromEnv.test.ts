@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { atxpCloudflareWorkerFromEnv } from '../cloudflareWorkerFromEnv.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { atxpCloudflare } from '../atxpCloudflare.js';
 import './setup.js';
 
 // Mock the atxpCloudflareWorker function
@@ -10,7 +10,7 @@ vi.mock('../cloudflareWorker.js', () => ({
 // Import the mocked function
 import { atxpCloudflareWorker } from '../cloudflareWorker.js';
 
-describe('atxpCloudflareWorkerFromEnv', () => {
+describe('atxpCloudflare', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (atxpCloudflareWorker as any).mockReturnValue({
@@ -21,7 +21,7 @@ describe('atxpCloudflareWorkerFromEnv', () => {
   it('should create a handler with environment-based configuration', () => {
     const mockMcpAgent = vi.fn() as any;
 
-    const handler = atxpCloudflareWorkerFromEnv({
+    const handler = atxpCloudflare({
       mcpAgent: mockMcpAgent,
       serviceName: 'Test Service',
       allowHttp: true,
@@ -36,7 +36,7 @@ describe('atxpCloudflareWorkerFromEnv', () => {
   it('should call atxpCloudflareWorker with correct config on fetch', async () => {
     const mockMcpAgent = vi.fn() as any;
 
-    const handler = atxpCloudflareWorkerFromEnv({
+    const handler = atxpCloudflare({
       mcpAgent: mockMcpAgent,
       serviceName: 'Test Service',
       allowHttp: true,
@@ -67,7 +67,7 @@ describe('atxpCloudflareWorkerFromEnv', () => {
   it('should use default payeeName when serviceName is not provided', async () => {
     const mockMcpAgent = vi.fn() as any;
 
-    const handler = atxpCloudflareWorkerFromEnv({
+    const handler = atxpCloudflare({
       mcpAgent: mockMcpAgent,
       allowHttp: false,
       destination: '0x1234567890123456789012345678901234567890',
@@ -99,7 +99,7 @@ describe('atxpCloudflareWorkerFromEnv', () => {
     };
     (atxpCloudflareWorker as any).mockReturnValue(mockHandler);
 
-    const handler = atxpCloudflareWorkerFromEnv({
+    const handler = atxpCloudflare({
       mcpAgent: mockMcpAgent,
       destination: '0x1234567890123456789012345678901234567890',
       network: 'base'

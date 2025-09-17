@@ -1,6 +1,6 @@
 // Main exports
 export { atxpCloudflareWorker } from './cloudflareWorker.js';
-export { atxpCloudflareWorkerFromEnv } from './cloudflareWorkerFromEnv.js';
+export { atxpCloudflare } from './atxpCloudflare.js';
 export { requirePayment } from './requirePayment.js';
 
 // API and configuration exports

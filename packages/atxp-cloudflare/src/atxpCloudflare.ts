@@ -10,7 +10,7 @@ import { ATXPEnv } from "./types.js";
  * ```typescript
  * export default {
  *   async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
- *     const handler = atxpCloudflareWorkerFromEnv({
+ *     const handler = atxpCloudflareWorker({
  *       mcpAgent: MyMCP,
  *       serviceName: "My MCP Server",
  *       allowHttp: env.ALLOW_INSECURE_HTTP_REQUESTS_DEV_ONLY_PLEASE === 'true',
@@ -22,7 +22,7 @@ import { ATXPEnv } from "./types.js";
  * };
  * ```
  */
-export function atxpCloudflareWorkerFromEnv(options: {
+export function atxpCloudflare(options: {
   mcpAgent: {
     new (ctx: any, env: any): any;
     serve(path: string): any;
