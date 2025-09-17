@@ -1,9 +1,8 @@
 import { ATXPWorkerMiddleware } from "./workerMiddleware.js";
 import { getATXPWorkerContext, atxpAccountId } from "./workerContext.js";
 import { buildWorkerATXPConfig } from "./buildConfig.js";
-import { ATXPConfig } from "@atxp/server";
+import { ATXPConfig, ATXPArgs } from "@atxp/server";
 import {
-  ATXPMcpArgs,
   ATXPAuthContext
 } from "./types.js";
 
@@ -18,7 +17,7 @@ export class ATXPMcpApi {
   /**
    * Initialize ATXP middleware for MCP server
    */
-  static init(options: ATXPMcpArgs): void {
+  static init(options: ATXPArgs): void {
     if (!options.destination) {
       throw new Error('destination is required for ATXP initialization');
     }
