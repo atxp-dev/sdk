@@ -1,4 +1,4 @@
-import { buildWorkerATXPConfig } from "./buildConfig.js";
+import { buildATXPConfig } from "./buildATXPConfig.js";
 import { ATXPConfig, ATXPArgs } from "@atxp/server";
 
 /**
@@ -16,7 +16,7 @@ export class ATXPMcpApi {
     }
 
     // Build config once and reuse it
-    ATXPMcpApi.config = buildWorkerATXPConfig(options);
+    ATXPMcpApi.config = buildATXPConfig(options);
   }
 
   /**

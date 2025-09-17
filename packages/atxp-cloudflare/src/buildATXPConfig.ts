@@ -3,7 +3,7 @@ import { ATXPConfig, ATXPArgs, buildServerConfig } from "@atxp/server";
 /**
  * Build configuration for Cloudflare Workers
  */
-export function buildWorkerATXPConfig(args: ATXPArgs): ATXPConfig {
+export function buildATXPConfig(args: ATXPArgs): ATXPConfig {
   // Override the global fetch to fix Cloudflare Workers context issues
   if (typeof globalThis.fetch !== 'undefined') {
     // Store original fetch in case we need it

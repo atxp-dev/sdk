@@ -5,7 +5,7 @@ export { requirePayment } from './requirePayment.js';
 
 // API and configuration exports
 export { ATXPMcpApi } from './mcpApi.js';
-export { buildWorkerATXPConfig } from './buildConfig.js';
+export { buildATXPConfig as buildWorkerATXPConfig } from './buildATXPConfig.js';
 
 // Context management exports
 export {
