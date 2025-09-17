@@ -18,7 +18,7 @@ export interface FundDestinationAccount {
 export class BaseFundDestinationAccount implements FundDestinationAccount {
   constructor(private readonly address: string) {}
 
-  destination(fundingAmount: FundingAmount, buyerAddress: string): FundingDestination {
+  destination(_fundingAmount: FundingAmount, _buyerAddress: string): FundingDestination {
     return {
       destination: this.address,
       network: 'base'
@@ -29,7 +29,7 @@ export class BaseFundDestinationAccount implements FundDestinationAccount {
 export class SolanaFundDestinationAccount implements FundDestinationAccount {
   constructor(private readonly address: string) {}
 
-  destination(fundingAmount: FundingAmount, buyerAddress: string): FundingDestination {
+  destination(_fundingAmount: FundingAmount, _buyerAddress: string): FundingDestination {
     return {
       destination: this.address,
       network: 'solana'

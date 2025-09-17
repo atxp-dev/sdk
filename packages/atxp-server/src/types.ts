@@ -1,4 +1,4 @@
-import { AuthorizationServerUrl, Currency, Logger, PaymentRequestData, Network, UrlString, OAuthDb, TokenData, OAuthResourceClient } from "@atxp/common";
+import { AuthorizationServerUrl, Currency, Logger, PaymentRequestData, UrlString, OAuthDb, TokenData, OAuthResourceClient } from "@atxp/common";
 import { FundDestinationAccount } from "./fundDestinationAccount.js";
 
 // https://github.com/modelcontextprotocol/typescript-sdk/blob/c6ac083b1b37b222b5bfba5563822daa5d03372e/src/types.ts
