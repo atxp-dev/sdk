@@ -24,11 +24,14 @@ describe('ATXPMcpApi', () => {
       })).toThrow('destination is required for ATXP initialization');
     });
 
-    it('should throw error when network is invalid', () => {
+    it('should not throw error when network is empty (uses default)', () => {
       expect(() => ATXPMcpApi.init({
         destination: '0x1234567890123456789012345678901234567890',
         network: '' as any
-      })).toThrow();
+      })).not.toThrow();
+
+      expect(ATXPMcpApi.isInitialized()).toBe(true);
+      ATXPMcpApi.reset();
     });
   });
 
