@@ -24,8 +24,8 @@ export function atxpExpress(args: ATXPArgs): Router {
       const requestUrl = new URL(req.url, req.protocol + '://' + req.host);
       logger.debug(`Handling ${req.method} ${requestUrl.toString()}`);
 
-      const resource = getResource(config, requestUrl);
-      const prmResponse = getPRMResponse(config, requestUrl);
+      const resource = getResource(config, requestUrl, req.headers);
+      const prmResponse = getPRMResponse(config, requestUrl, req.headers);
       if (sendProtectedResourceMetadataNode(res, prmResponse)) {
         return;
       }

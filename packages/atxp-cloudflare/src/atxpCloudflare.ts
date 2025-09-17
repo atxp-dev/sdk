@@ -37,7 +37,8 @@ export function atxpCloudflare(options: ATXPCloudflareOptions) {
     async fetch(request: Request, env: any, ctx: any): Promise<Response> {
       try {
         const url = new URL(request.url);
-        const prmMetadata = getProtectedResourceMetadata(config, url);
+        const headers = Object.fromEntries(request.headers.entries());
+        const prmMetadata = getProtectedResourceMetadata(config, url, headers);
         if (prmMetadata) {
           const prmResponse = sendProtectedResourceMetadataWebApi(prmMetadata);
           if (prmResponse) {
