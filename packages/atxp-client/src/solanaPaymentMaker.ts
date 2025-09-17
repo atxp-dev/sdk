@@ -17,7 +17,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
   private connection: Connection;
   private source: Keypair;
   private logger: Logger;
-  private preparedTransaction: Transaction | null = null;
+  private lastSignedTransaction: string | null = null;
 
   constructor(solanaEndpoint: string, sourceSecretKey: string, logger?: Logger) {
     if (!solanaEndpoint) {
@@ -93,14 +93,18 @@ export class SolanaPaymentMaker implements PaymentMaker {
       transaction.add(modifyComputeUnits);
       transaction.add(addPriorityFee);
 
-      // Store the transaction for later submission
-      this.preparedTransaction = transaction;
+      // Sign the transaction
+      transaction.sign(this.source);
 
-      // For X402, return a simplified structure
-      // The actual signing happens when submitted
+      // Serialize the signed transaction
+      const signedTx = bs58.encode(transaction.serialize());
+
+      // Store for potential later submission
+      this.lastSignedTransaction = signedTx;
+
       return {
         data: bs58.encode(transaction.serialize({ requireAllSignatures: false })),
-        signature: '', // Will be signed by facilitator
+        signature: signedTx, // The actual signed transaction
         from: this.source.publicKey.toBase58(),
         to: receiver,
         amount: amount,
@@ -121,18 +125,25 @@ export class SolanaPaymentMaker implements PaymentMaker {
     this.logger.info(`Submitting payment to Solana blockchain`);
 
     try {
-      if (!this.preparedTransaction) {
-        throw new PaymentNetworkError('No transaction to submit. Call createSignedPaymentMessage first.');
+      // Use the signed transaction from the message or the stored one
+      const signedTx = signedMessage.signature || this.lastSignedTransaction;
+
+      if (!signedTx) {
+        throw new PaymentNetworkError('No signed transaction available');
       }
 
-      const transactionHash = await sendAndConfirmTransaction(
-        this.connection,
-        this.preparedTransaction,
-        [this.source],
+      // Deserialize and send the signed transaction
+      const transaction = Transaction.from(bs58.decode(signedTx));
+
+      const transactionHash = await this.connection.sendRawTransaction(
+        transaction.serialize()
       );
 
+      // Wait for confirmation
+      await this.connection.confirmTransaction(transactionHash, 'confirmed');
+
       // Clear the stored transaction
-      this.preparedTransaction = null;
+      this.lastSignedTransaction = null;
 
       return transactionHash;
     } catch (error) {
