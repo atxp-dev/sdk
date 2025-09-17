@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ATXPMcpApi } from "./mcpApi.js";
 import { ATXPAuthContext, ATXPCloudflareWorkerOptions } from "./types.js";
 
@@ -25,7 +26,7 @@ export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
   const { mcp = "/mcp", sse = "/sse", root = "/" } = mountPaths;
 
   return {
-    async fetch(request: Request, env: unknown, ctx: {[key: string]: unknown}): Promise<Response> {
+    async fetch(request: Request, env: any, ctx: any): Promise<Response> {
       try {
         // Initialize ATXP for each request in case of Cloudflare Workers isolation
         if (!ATXPMcpApi.isInitialized()) {
@@ -62,7 +63,7 @@ export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
         // Note: We pass the original config options rather than the built config
         // because the built config contains class instances that don't serialize
         const extendedCtx = {
-          ...(ctx as Record<string, unknown>),
+          ...(ctx as any),
           props: {
             ...authContext,
             atxpInitParams: {

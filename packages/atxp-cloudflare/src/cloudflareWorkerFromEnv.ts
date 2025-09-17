@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Network } from "@atxp/common";
 import { atxpCloudflareWorker } from "./cloudflareWorker.js";
 import { ATXPEnv } from "./types.js";
-import { McpAgent } from "agents/mcp";
 
 /**
  * Convenience function to create ATXP Cloudflare Worker with environment-based configuration
@@ -23,7 +23,11 @@ import { McpAgent } from "agents/mcp";
  * ```
  */
 export function atxpCloudflareWorkerFromEnv(options: {
-  mcpAgent: typeof McpAgent; // Using any to avoid dependency on specific agents type
+  mcpAgent: {
+    new (ctx: any, env: any): any;
+    serve(path: string): any;
+    serveSSE(path: string): any;
+  };
   serviceName?: string;
   mountPaths?: { mcp?: string; sse?: string; root?: string; };
   allowHttp?: boolean;
@@ -31,7 +35,7 @@ export function atxpCloudflareWorkerFromEnv(options: {
   network: Network;
 }) {
   return {
-    async fetch(request: Request, env: ATXPEnv, ctx: {[key: string]: unknown}): Promise<Response> {
+    async fetch(request: Request, env: ATXPEnv, ctx: any): Promise<Response> {
       // Use the main atxpCloudflareWorker function with parameter-based config
       const handler = atxpCloudflareWorker({
         config: {

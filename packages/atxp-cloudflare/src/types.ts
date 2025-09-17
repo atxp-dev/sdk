@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ATXPArgs } from "@atxp/server";
-import { McpAgent } from "agents/mcp";
 
 /**
  * Extended ATXPArgs with additional MCP-specific fields
@@ -46,7 +46,11 @@ export interface ATXPCloudflareWorkerOptions {
   /** Configuration for ATXP */
   config: ATXPMcpArgs;
   /** The MCP agent class to wrap */
-  mcpAgent: typeof McpAgent; // Using any to avoid dependency on specific agents type
+  mcpAgent: {
+    new (ctx: any, env: any): any;
+    serve(path: string): any;
+    serveSSE(path: string): any;
+  };
   /** Service name for OAuth metadata */
   serviceName?: string;
   /** Mount paths for MCP endpoints */
