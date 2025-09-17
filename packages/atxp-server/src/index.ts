@@ -54,12 +54,12 @@ export {
 // Payment functionality
 export { requirePayment } from './requirePayment.js';
 
-// Fund destination account types and implementations
+// Payment destination types and implementations
 export {
   type FundingAmount,
   type FundingDestination,
-  type FundDestinationAccount,
-  ChainFundDestinationAccount
+  type PaymentDestination,
+  ChainPaymentDestination
 } from './fundDestinationAccount.js';
 
 // Test utilities are available via separate export ./serverTestHelpers

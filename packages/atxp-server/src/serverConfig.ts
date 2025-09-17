@@ -2,7 +2,7 @@ import { ConsoleLogger, OAuthResourceClient, DEFAULT_AUTHORIZATION_SERVER, Memor
 import { ATXPConfig } from "./types.js";
 import { ATXPPaymentServer } from "./paymentServer.js";
 
-type RequiredATXPConfigFields = 'fundDestinationAccount';
+type RequiredATXPConfigFields = 'paymentDestination';
 type RequiredATXPConfig = Pick<ATXPConfig, RequiredATXPConfigFields>;
 type OptionalATXPConfig = Omit<ATXPConfig, RequiredATXPConfigFields>;
 export type ATXPArgs = RequiredATXPConfig & Partial<OptionalATXPConfig>;
@@ -18,8 +18,8 @@ export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConf
 };
 
 export function buildServerConfig(args: ATXPArgs): ATXPConfig {
-  if(!args.fundDestinationAccount) {
-    throw new Error('fundDestinationAccount is required');
+  if(!args.paymentDestination) {
+    throw new Error('paymentDestination is required');
   }
 
   // Read environment variables at runtime, not module load time

@@ -11,11 +11,11 @@ export type FundingDestination = {
   network: Network;
 }
 
-export interface FundDestinationAccount {
+export interface PaymentDestination {
   destination(fundingAmount: FundingAmount, buyerAddress: string): FundingDestination;
 }
 
-export class ChainFundDestinationAccount implements FundDestinationAccount {
+export class ChainPaymentDestination implements PaymentDestination {
   constructor(
     private readonly address: string,
     private readonly network: Network
