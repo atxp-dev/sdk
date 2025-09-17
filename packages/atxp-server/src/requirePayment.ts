@@ -12,11 +12,18 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     throw new Error('No user found');
   }
 
+  const fundingAmount = {
+    amount: paymentConfig.price,
+    currency: config.currency
+  };
+
+  const fundingDestination = config.fundDestinationAccount.destination(fundingAmount, user);
+
   const charge = {
-    amount: paymentConfig.price, 
-    currency: config.currency, 
-    network: config.network, 
-    destination: config.destination, 
+    amount: paymentConfig.price,
+    currency: config.currency,
+    network: fundingDestination.network,
+    destination: fundingDestination.destination,
     source: user,
     payeeName: config.payeeName,
   };
