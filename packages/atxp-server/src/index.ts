@@ -59,8 +59,7 @@ export {
   type FundingAmount,
   type FundingDestination,
   type FundDestinationAccount,
-  BaseFundDestinationAccount,
-  SolanaFundDestinationAccount
+  ChainFundDestinationAccount
 } from './fundDestinationAccount.js';
 
 // Test utilities are available via separate export ./serverTestHelpers
