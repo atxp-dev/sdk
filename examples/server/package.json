@@ -12,7 +12,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@atxp/server": "file:../../packages/atxp-server/dist",
+    "@atxp/server": "*",
     "@atxp/common": "*",
     "@modelcontextprotocol/sdk": "^1.15.0",
     "express": "^5.0.1",
