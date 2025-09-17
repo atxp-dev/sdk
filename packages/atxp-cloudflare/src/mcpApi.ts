@@ -1,10 +1,5 @@
-import { getATXPWorkerContext, atxpAccountId } from "./workerContext.js";
 import { buildWorkerATXPConfig } from "./buildConfig.js";
 import { ATXPConfig, ATXPArgs } from "@atxp/server";
-import {
-  ATXPAuthContext
-} from "./types.js";
-
 
 /**
  * ATXP API for MCP servers - provides authentication and payment functionality
@@ -32,25 +27,6 @@ export class ATXPMcpApi {
       throw new Error('ATXP not initialized - call ATXPMcpApi.init() first');
     }
     return ATXPMcpApi.config;
-  }
-
-  /**
-   * Create authentication context from ATXP worker context
-   * This should be called after ATXP middleware processing
-   */
-  static createAuthContext(): ATXPAuthContext {
-    const atxpWorkerContext = getATXPWorkerContext();
-
-    if (!atxpWorkerContext) {
-      return {};
-    }
-
-    const {tokenCheck} = atxpWorkerContext;
-    return {
-      user: atxpAccountId() || undefined,
-      userToken: tokenCheck?.token || undefined,
-      claims: tokenCheck?.data || undefined,
-    };
   }
 
   /**

@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { atxpCloudflareWorker } from "./cloudflareWorker.js";
-import { ATXPEnv, ATXPCloudflareOptions } from "./types.js";
+import { ATXPCloudflareOptions } from "./types.js";
 
 /**
  * Convenience function to create ATXP Cloudflare Worker with environment-based configuration
@@ -22,9 +21,5 @@ import { ATXPEnv, ATXPCloudflareOptions } from "./types.js";
  * ```
  */
 export function atxpCloudflare(options: ATXPCloudflareOptions) {
-  return {
-    async fetch(request: Request, env: ATXPEnv, ctx: any): Promise<Response> {
-      return atxpCloudflareWorker(options).fetch(request, env, ctx);
-    }
-  };
+  return atxpCloudflareWorker(options)
 }
