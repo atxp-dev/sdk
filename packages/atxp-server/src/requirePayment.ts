@@ -17,13 +17,13 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     currency: config.currency
   };
 
-  const fundingDestination = config.paymentDestination.destination(fundingAmount, user);
+  const paymentAddress = config.paymentDestination.destination(fundingAmount, user);
 
   const charge = {
     amount: paymentConfig.price,
     currency: config.currency,
-    network: fundingDestination.network,
-    destination: fundingDestination.destination,
+    network: paymentAddress.network,
+    destination: paymentAddress.destination,
     source: user,
     payeeName: config.payeeName,
   };
