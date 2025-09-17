@@ -9,7 +9,7 @@ export function getResource(config: ATXPConfig, requestUrl: URL): URL {
   if (config.resource) {
     return new URL(config.resource);
   }
-  const protocol = config.allowHttp && requestUrl.protocol === 'http:' ? 'http:' : requestUrl.protocol;
+  const protocol = config.allowHttp ? requestUrl.protocol : 'https:';
   const url = new URL(`${protocol}//${requestUrl.host}${requestUrl.pathname}`);
 
   const fullPath = getPath(url);
