@@ -1,5 +1,4 @@
 // Main exports
-export { atxpCloudflareWorker } from './cloudflareWorker.js';
 export { atxpCloudflare } from './atxpCloudflare.js';
 export { requirePayment } from './requirePayment.js';
 
