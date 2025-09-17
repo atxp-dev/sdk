@@ -1,11 +1,10 @@
 import { createConfig } from '../../rollup.config.js';
 
-export default createConfig({
-  packageName: '@atxp/cloudflare-middleware',
-  input: 'src/index.ts',
+export default createConfig('@atxp/cloudflare-middleware', {
   external: [
     '@atxp/common',
     '@atxp/server',
-    'agents'
+    'agents',
+    'agents/mcp'
   ]
 });

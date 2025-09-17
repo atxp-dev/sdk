@@ -62,7 +62,7 @@ export function atxpCloudflareWorker(options: ATXPCloudflareWorkerOptions) {
         // Note: We pass the original config options rather than the built config
         // because the built config contains class instances that don't serialize
         const extendedCtx = {
-          ...ctx,
+          ...(ctx as Record<string, unknown>),
           props: {
             ...authContext,
             atxpInitParams: {
