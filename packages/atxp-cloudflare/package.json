@@ -1,12 +1,12 @@
 {
-  "name": "@atxp/cloudflare-middleware",
+  "name": "@atxp/cloudflare",
   "version": "0.3.0",
-  "description": "ATXP Cloudflare Middleware - Cloudflare Workers integration for Authorization Token Exchange Protocol",
+  "description": "ATXP Cloudflare - Cloudflare Workers integration for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/atxp-dev/sdk.git",
-    "directory": "packages/atxp-cloudflare-middleware"
+    "directory": "packages/atxp-cloudflare"
   },
   "type": "module",
   "sideEffects": false,

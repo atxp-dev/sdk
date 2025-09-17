@@ -1,6 +1,6 @@
 import { createConfig } from '../../rollup.config.js';
 
-export default createConfig('@atxp/cloudflare-middleware', {
+export default createConfig('@atxp/cloudflare', {
   external: [
     '@atxp/common',
     '@atxp/server',
