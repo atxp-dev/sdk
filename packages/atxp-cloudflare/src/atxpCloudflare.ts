@@ -72,8 +72,7 @@ export function atxpCloudflare(options: ATXPCloudflareOptions) {
         return new Response("Not found", { status: 404 });
 
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Error in ATXP Cloudflare Worker handler:', error);
+        config.logger.error(`Error in ATXP Cloudflare Worker handler: ${error}`);
         return new Response(JSON.stringify({
           error: 'server_error',
           error_description: error instanceof Error ? error.message : 'Unknown error'
