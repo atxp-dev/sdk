@@ -34,16 +34,18 @@ export {
 
 // Node.js HTTP implementations (for Express, Fastify, etc.)
 export {
-  checkToken,
+  checkToken as checkTokenNode,
   sendOAuthChallenge,
-  parseMcpRequests,
-  parseBody
+  parseMcpRequests as parseMcpRequestsNode,
+  parseBody as parseBodyNode,
 } from './node/index.js';
 
 // Web API implementations (for Cloudflare Workers, Deno, browsers, etc.)
 export {
   checkTokenWebApi,
   sendOAuthChallengeWebApi,
+  sendProtectedResourceMetadataWebApi,
+  sendOAuthMetadataWebApi,
   parseMcpRequestsWebApi
 } from './webapi/index.js';
 
@@ -64,9 +66,8 @@ export { getResource } from './getResource.js';
 export { ATXPPaymentServer } from './paymentServer.js';
 export {
   getOAuthMetadata,
-  sendOAuthMetadata
 } from './oAuthMetadata.js';
 export {
   getProtectedResourceMetadata,
-  sendProtectedResourceMetadata
 } from './protectedResourceMetadata.js';
+

@@ -1,16 +1,5 @@
 import { ATXPConfig, ProtectedResourceMetadata } from "./types.js";
-import { ServerResponse } from "http";
 import { getPath, getResource } from "./getResource.js";
-
-export function sendProtectedResourceMetadata(res: ServerResponse, metadata: ProtectedResourceMetadata | null): boolean {
-  if (!metadata) {
-    return false;
-  }
-  res.setHeader('Content-Type', 'application/json');
-  res.writeHead(200);
-  res.end(JSON.stringify(metadata));
-  return true;
-}
 
 export function getProtectedResourceMetadata(config: ATXPConfig, requestUrl: URL): ProtectedResourceMetadata | null {
   if (isProtectedResourceMetadataRequest(config, requestUrl)) {
