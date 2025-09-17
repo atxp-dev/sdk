@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction, Router } from "express";
 import {
-  ATXPConfig,
   ATXPArgs,
-  DEFAULT_CONFIG,
   buildServerConfig,
   checkToken,
   sendOAuthChallenge,
