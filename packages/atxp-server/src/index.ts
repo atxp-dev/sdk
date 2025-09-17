@@ -54,6 +54,15 @@ export {
 // Payment functionality
 export { requirePayment } from './requirePayment.js';
 
+// Fund destination account types and implementations
+export {
+  type FundingAmount,
+  type FundingDestination,
+  type FundDestinationAccount,
+  BaseFundDestinationAccount,
+  SolanaFundDestinationAccount
+} from './fundDestinationAccount.js';
+
 // Test utilities are available via separate export ./serverTestHelpers
 
 // Server configuration utilities (needed for Express router)
