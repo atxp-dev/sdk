@@ -15,24 +15,16 @@ export interface FundDestinationAccount {
   destination(fundingAmount: FundingAmount, buyerAddress: string): FundingDestination;
 }
 
-export class BaseFundDestinationAccount implements FundDestinationAccount {
-  constructor(private readonly address: string) {}
+export class ChainFundDestinationAccount implements FundDestinationAccount {
+  constructor(
+    private readonly address: string,
+    private readonly network: Network
+  ) {}
 
   destination(_fundingAmount: FundingAmount, _buyerAddress: string): FundingDestination {
     return {
       destination: this.address,
-      network: 'base'
-    };
-  }
-}
-
-export class SolanaFundDestinationAccount implements FundDestinationAccount {
-  constructor(private readonly address: string) {}
-
-  destination(_fundingAmount: FundingAmount, _buyerAddress: string): FundingDestination {
-    return {
-      destination: this.address,
-      network: 'solana'
+      network: this.network
     };
   }
 }
