@@ -1,3 +1,4 @@
+import { JSONRPCRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ATXPConfig } from "../types.js";
 import { parseMcpRequestsCore } from "../core/mcp.js";
 
@@ -8,7 +9,7 @@ import { parseMcpRequestsCore } from "../core/mcp.js";
 export async function parseMcpRequestsWebApi(
   config: ATXPConfig,
   request: Request
-): Promise<any[]> {
+): Promise<JSONRPCRequest[]> {
   const requestUrl = new URL(request.url);
 
   try {
@@ -20,7 +21,7 @@ export async function parseMcpRequestsWebApi(
     const parsedBody = JSON.parse(text);
 
     // Use the shared core logic
-    return parseMcpRequestsCore(config, requestUrl, request.method, parsedBody);
+    return parseMcpRequestsCore(config, requestUrl, request.method, parsedBody) as JSONRPCRequest[];
   } catch (error) {
     config.logger.debug(`Error parsing MCP request: ${error instanceof Error ? error.message : String(error)}`);
     return [];
