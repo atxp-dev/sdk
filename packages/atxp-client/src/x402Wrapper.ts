@@ -66,12 +66,19 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account, logger?: Logg
           payload: eip3009Authorization
         };
 
+        // Base64 encode the X402 message for the X-Payment header
+        const x402MessageJson = JSON.stringify(x402Message);
+        log.debug(`X402 message being sent: ${x402MessageJson}`);
+        const x402MessageBase64 = typeof Buffer !== 'undefined'
+          ? Buffer.from(x402MessageJson).toString('base64')
+          : btoa(x402MessageJson);
+
         // Send the X402 message in the X-Payment header
         const retryInit = {
           ...init,
           headers: {
             ...(init?.headers || {}),
-            'X-Payment': JSON.stringify(x402Message)
+            'X-Payment': x402MessageBase64
           }
         };
 
