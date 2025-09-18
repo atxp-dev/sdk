@@ -1,52 +1,68 @@
-import express from 'express';
-import cors from 'cors';
-import { paymentMiddleware, createFacilitatorConfig } from '@coinbase/x402';
-import dotenv from 'dotenv';
+import express from "express";
+import { paymentMiddleware } from "x402-express";
+import { facilitator } from "@coinbase/x402";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load .env from current directory first, then from repo root
+dotenv.config(); // Load local .env if it exists
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') }); // Also load from repo root
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-// Configure facilitator
-const facilitator = process.env.CDP_API_KEY_ID && process.env.CDP_API_KEY_SECRET
-  ? createFacilitatorConfig(process.env.CDP_API_KEY_ID, process.env.CDP_API_KEY_SECRET)  // Production (mainnet)
-  : { url: 'https://x402.org/facilitator' };  // Public test facilitator (Base Sepolia)
+// Your wallet address to receive payments
+const recipientAddress = process.env.ATXP_DESTINATION! as `0x${string}`;
 
-// Single line to enable X402 payments on endpoints
+// Determine network based on environment
+const isMainnet = process.env.CDP_API_KEY_ID !== undefined;
+const network = isMainnet ? "base" : "base-sepolia";
+
+// Configure facilitator based on environment
+const facilitatorConfig = process.env.CDP_API_KEY_ID && process.env.CDP_API_KEY_SECRET
+  ? facilitator  // Use CDP facilitator for mainnet
+  : { url: "https://x402.org/facilitator" } ; // Use public test facilitator
+
+// Configure payment middleware
 app.use(paymentMiddleware(
-  process.env.RECIPIENT_ADDRESS || '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb8',
+  recipientAddress,
   {
-    '/api/resource': {
-      price: '$0.01',
-      network: process.env.NETWORK || 'base-sepolia'  // Default to testnet
-    }
+    "GET /api/resource": {
+      price: "$0.01",
+      network: network,
+    },
   },
-  facilitator
+  facilitatorConfig
 ));
 
-// Protected endpoint - X402 middleware handles payment automatically
-app.get('/api/resource', (req, res) => {
+// Protected endpoint - costs $0.01 USDC
+app.get("/api/resource", (req, res) => {
   res.json({
     success: true,
-    data: 'This is protected content that costs $0.01 USDC',
+    data: "This is protected content that costs $0.01 USDC",
     timestamp: Date.now()
   });
 });
 
 const PORT = process.env.PORT || 3001;
+
 app.listen(PORT, () => {
-  const network = process.env.NETWORK || 'base-sepolia';
-  const isTestnet = network === 'base-sepolia';
+  console.log(`X402 Server (Coinbase SDK) running on http://localhost:${PORT}`);
+  console.log(`Recipient address: ${recipientAddress}`);
+  console.log(`Network: ${network} (${isMainnet ? 'MAINNET - real money!' : 'testnet'})`);
+  console.log(`Facilitator: ${process.env.CDP_API_KEY_ID ? 'CDP (mainnet)' : 'Public test facilitator'}`);
 
-  console.log(`X402 Server running on http://localhost:${PORT}`);
-  console.log(`Network: ${network} (${isTestnet ? 'TESTNET - using test USDC' : 'MAINNET - real money!'})`);
-  console.log(`Facilitator: ${isTestnet ? 'https://x402.org/facilitator (public)' : 'Coinbase CDP (requires API keys)'}`);
-  console.log(`Protected endpoint: GET /api/resource ($0.01 USDC)`);
+  if (isMainnet) {
+    console.log("\n⚠️  WARNING: Running on MAINNET - real USDC payments!");
+  }
 
-  if (isTestnet) {
-    console.log('\n✅ Using public test facilitator - no API keys needed!');
-    console.log('Get test USDC from Circle faucet for Base Sepolia to test payments.');
+  console.log("\nProtected endpoints:");
+  console.log(`  GET /api/resource - $0.01 USDC`);
+
+  if (!process.env.ATXP_DESTINATION) {
+    console.error("\n❌ ERROR: ATXP_DESTINATION environment variable is required!");
+    process.exit(1);
   }
 });

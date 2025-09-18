@@ -1,19 +1,25 @@
 import { wrapWithX402, BaseAccount } from '@atxp/client';
 import { ConsoleLogger } from '@atxp/common';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load .env from current directory first, then from repo root
+dotenv.config(); // Load local .env if it exists
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') }); // Also load from repo root
 
 async function testX402Client() {
   // Check for required environment variables
-  if (!process.env.BASE_RPC_URL || !process.env.BASE_PRIVATE_KEY) {
-    console.error('Missing BASE_RPC_URL and BASE_PRIVATE_KEY');
+  if (!process.env.BASE_RPC || !process.env.BASE_PRIVATE_KEY) {
+    console.error('Missing BASE_RPC and/or BASE_PRIVATE_KEY');
     process.exit(1);
   }
 
   // Create account
   const account = new BaseAccount(
-    process.env.BASE_RPC_URL,
+    process.env.BASE_RPC,
     process.env.BASE_PRIVATE_KEY
   );
 
