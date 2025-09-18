@@ -17,7 +17,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     currency: config.currency
   };
 
-  const paymentAddress = config.paymentDestination.destination(fundingAmount, user);
+  const paymentAddress = await config.paymentDestination.destination(fundingAmount, user);
 
   const charge = {
     amount: paymentConfig.price,

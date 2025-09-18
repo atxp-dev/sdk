@@ -59,7 +59,8 @@ export {
   type FundingAmount,
   type PaymentAddress,
   type PaymentDestination,
-  ChainPaymentDestination
+  ChainPaymentDestination,
+  ATXPPaymentDestination
 } from './paymentDestination.js';
 
 // Test utilities are available via separate export ./serverTestHelpers
