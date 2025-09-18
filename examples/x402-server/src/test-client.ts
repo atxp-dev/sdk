@@ -32,11 +32,21 @@ async function testX402Client() {
   console.log('Using wrapWithX402 (our custom implementation)');
 
   // Wrap fetch with X402 support using our custom implementation
-  const x402Fetch = wrapWithX402(
-    fetch as any,
+  const x402Fetch = wrapWithX402({
     account,
-    logger
-  );
+    logger,
+    fetchFn: fetch as any,
+    approvePayment: async (payment) => {
+      console.log(`Approving payment of ${payment.amount} ${payment.currency} to ${payment.iss}`);
+      return true;
+    },
+    onPayment: async ({ payment }) => {
+      console.log(`Payment made: ${payment.amount} ${payment.currency}`);
+    },
+    onPaymentFailure: async ({ payment, error }) => {
+      console.error(`Payment failed: ${error.message}`);
+    }
+  });
 
   // Make a single request to the protected endpoint
   const serverUrl = process.env.X402_SERVER_URL || 'http://localhost:3001';

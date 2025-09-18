@@ -1,12 +1,16 @@
 import type { Account, PaymentMaker, Hex } from './types.js';
-import { privateKeyToAccount } from 'viem/accounts';
+import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { BasePaymentMaker } from './basePaymentMaker.js';
-import { createWalletClient, http } from 'viem';
+import { createWalletClient, http, WalletClient } from 'viem';
 import { base } from 'viem/chains';
+import { LocalSigner } from './localSigner.js';
+import { LocalAccount } from 'viem';
 
 export class BaseAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
+  private walletClient: WalletClient;
+  private account: PrivateKeyAccount;
 
   constructor(baseRPCUrl: string, sourceSecretKey: string) {
     if (!baseRPCUrl) {
@@ -16,16 +20,25 @@ export class BaseAccount implements Account {
       throw new Error('Source secret key is required');
     }
 
-    const account = privateKeyToAccount(sourceSecretKey as Hex);
+    this.account = privateKeyToAccount(sourceSecretKey as Hex);
 
-    this.accountId = account.address;
-    const walletClient = createWalletClient({
-      account: account,
+    this.accountId = this.account.address;
+    this.walletClient = createWalletClient({
+      account: this.account,
       chain: base,
       transport: http(baseRPCUrl),
     });
     this.paymentMakers = {
-      'base': new BasePaymentMaker(baseRPCUrl, walletClient),
+      'base': new BasePaymentMaker(baseRPCUrl, this.walletClient),
     }
+  }
+
+  /**
+   * Get a signer that can be used with the x402 library
+   * This is only available for EVM-based accounts
+   */
+  getSigner(): LocalAccount {
+    // Return the viem account directly - it implements LocalAccount interface
+    return this.account;
   }
 }
