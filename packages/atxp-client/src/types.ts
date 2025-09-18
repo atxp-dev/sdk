@@ -67,18 +67,28 @@ export class PaymentNetworkError extends Error {
   }
 }
 
-export type SignedPaymentMessage = {
-  data: string;
-  signature: string;
-  from: string;
-  to: string;
-  amount: BigNumber;
-  currency: Currency;
-  network: Network;
+export type EIP3009Message = {
+  // X402 wrapper fields
+  x402Version: number;
+  scheme: string;
+  network: string;
+
+  // EIP-3009 payload for "exact" scheme
+  payload: {
+    signature: string;
+    authorization: {
+      from: string;
+      to: string;
+      value: string;
+      validAfter: string;
+      validBefore: string;
+      nonce: string;
+    };
+  };
 }
 
 export interface PaymentMaker {
-  createSignedPaymentMessage: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<SignedPaymentMessage>;
-  submitPaymentMessage: (signedMessage: SignedPaymentMessage) => Promise<string>;
+  makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<string>;
+  createPaymentAuthorization: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<EIP3009Message>;
   generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;
 }

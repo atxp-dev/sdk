@@ -28,28 +28,21 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account): FetchLike {
           throw new Error(`No payment maker found for ${paymentMakerKey}`);
         }
 
-        // Create a signed payment message
-        const signedMessage = await paymentMaker.createSignedPaymentMessage(
+        // Create an EIP-3009 payment authorization for X402
+        const authorization = await paymentMaker.createPaymentAuthorization(
           new BigNumber(amount),
           currency,
           recipient,
           memo || ''
         );
 
-        // Retry the request with the payment
+        // The authorization is already in X402 format with EIP-3009 payload
+        // Send it directly in the X-Payment header
         const retryInit = {
           ...init,
           headers: {
             ...(init?.headers || {}),
-            'X-Payment': JSON.stringify({
-              signature: signedMessage.signature,
-              data: signedMessage.data,
-              from: signedMessage.from,
-              to: signedMessage.to,
-              amount: signedMessage.amount.toString(),
-              currency: signedMessage.currency,
-              network: signedMessage.network
-            })
+            'X-Payment': JSON.stringify(authorization)
           }
         };
 

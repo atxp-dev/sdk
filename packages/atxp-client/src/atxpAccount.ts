@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker, SignedPaymentMessage } from './types.js';
+import type { Account, PaymentMaker, EIP3009Message } from './types.js';
 import type { FetchLike, Network, Currency } from '@atxp/common'
 import BigNumber from 'bignumber.js';
 
@@ -30,11 +30,9 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
   }
 
 
-  async createSignedPaymentMessage(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<SignedPaymentMessage> {
-    // For ATXPAccount, we create a signed payment message via the HTTP endpoint
-    // This is a placeholder implementation - the actual ATXP server would need
-    // to provide an endpoint for creating signed messages without submission
-    const response = await this.fetchFn(`${this.origin}/sign-payment`, {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
+    // Make a regular payment via the /pay endpoint
+    const response = await this.fetchFn(`${this.origin}/pay`, {
       method: 'POST',
       headers: {
         'Authorization': toBasicAuth(this.token),
@@ -50,42 +48,39 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`ATXPAccount: /sign-payment failed: ${response.status} ${response.statusText} ${text}`);
+      throw new Error(`ATXPAccount: /pay failed: ${response.status} ${response.statusText} ${text}`);
     }
 
-    const json = await response.json() as any;
-    return {
-      data: json.data || '',
-      signature: json.signature || '',
-      from: json.from || '',
-      to: receiver,
-      amount,
-      currency,
-      network: 'base' as Network, // ATXPAccount uses Base network
-    };
+    const json = await response.json() as { txHash?: string };
+    if (!json?.txHash) {
+      throw new Error('ATXPAccount: /pay did not return txHash');
+    }
+    return json.txHash;
   }
 
-  async submitPaymentMessage(signedMessage: SignedPaymentMessage): Promise<string> {
-    // Submit a pre-signed payment message
-    const response = await this.fetchFn(`${this.origin}/submit-payment`, {
+  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Message> {
+    // Create an EIP-3009 payment authorization via the HTTP endpoint
+    const response = await this.fetchFn(`${this.origin}/create-payment-authorization`, {
       method: 'POST',
       headers: {
         'Authorization': toBasicAuth(this.token),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(signedMessage),
+      body: JSON.stringify({
+        amount: amount.toString(),
+        currency,
+        receiver,
+        memo,
+      }),
     });
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`ATXPAccount: /submit-payment failed: ${response.status} ${response.statusText} ${text}`);
+      throw new Error(`ATXPAccount: /create-payment-authorization failed: ${response.status} ${response.statusText} ${text}`);
     }
 
-    const json = await response.json() as { txHash?: string };
-    if (!json?.txHash) {
-      throw new Error('ATXPAccount: /submit-payment did not return txHash');
-    }
-    return json.txHash;
+    // Return the EIP-3009 payment authorization from the accounts service
+    return await response.json() as EIP3009Message;
   }
 
   async generateJWT(params: { paymentRequestId: string; codeChallenge: string }): Promise<string> {

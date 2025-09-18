@@ -1,4 +1,4 @@
-import type { PaymentMaker, SignedPaymentMessage } from './types.js';
+import type { PaymentMaker, EIP3009Message } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { Keypair, Connection, PublicKey, ComputeBudgetProgram, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
 import { createTransfer, ValidateTransferError as _ValidateTransferError } from "@solana/pay";
@@ -48,13 +48,13 @@ export class SolanaPaymentMaker implements PaymentMaker {
     return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '');
   }
 
-  async createSignedPaymentMessage(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<SignedPaymentMessage> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkError('Only USDC currency is supported; received ' + currency);
     }
 
     const receiverKey = new PublicKey(receiver);
-    this.logger.info(`Creating signed payment message for ${amount} ${currency} to ${receiver} on Solana from ${this.source.publicKey.toBase58()}`);
+    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Solana from ${this.source.publicKey.toBase58()}`);
 
     try {
       // Check balance before creating payment message
@@ -93,66 +93,28 @@ export class SolanaPaymentMaker implements PaymentMaker {
       transaction.add(modifyComputeUnits);
       transaction.add(addPriorityFee);
 
-      // Sign the transaction
-      transaction.sign(this.source);
+      // Sign and send the transaction
+      const transactionHash = await sendAndConfirmTransaction(
+        this.connection,
+        transaction,
+        [this.source],
+        { commitment: 'confirmed' }
+      );
 
-      // Serialize the signed transaction
-      const signedTx = bs58.encode(transaction.serialize());
-
-      // Store for potential later submission
-      this.lastSignedTransaction = signedTx;
-
-      return {
-        data: bs58.encode(transaction.serialize({ requireAllSignatures: false })),
-        signature: signedTx, // The actual signed transaction
-        from: this.source.publicKey.toBase58(),
-        to: receiver,
-        amount: amount,
-        currency: currency,
-        network: 'solana' as Network
-      };
+      this.logger.info(`Payment completed: ${transactionHash}`);
+      return transactionHash;
     } catch (error) {
       if (error instanceof InsufficientFundsError || error instanceof PaymentNetworkError) {
         throw error;
       }
 
       // Wrap other errors in PaymentNetworkError
-      throw new PaymentNetworkError(`Failed to create signed payment message: ${(error as Error).message}`, error as Error);
+      throw new PaymentNetworkError(`Failed to make payment: ${(error as Error).message}`, error as Error);
     }
   }
 
-  async submitPaymentMessage(signedMessage: SignedPaymentMessage): Promise<string> {
-    this.logger.info(`Submitting payment to Solana blockchain`);
-
-    try {
-      // Use the signed transaction from the message or the stored one
-      const signedTx = signedMessage.signature || this.lastSignedTransaction;
-
-      if (!signedTx) {
-        throw new PaymentNetworkError('No signed transaction available');
-      }
-
-      // Deserialize and send the signed transaction
-      const transaction = Transaction.from(bs58.decode(signedTx));
-
-      const transactionHash = await this.connection.sendRawTransaction(
-        transaction.serialize()
-      );
-
-      // Wait for confirmation
-      await this.connection.confirmTransaction(transactionHash, 'confirmed');
-
-      // Clear the stored transaction
-      this.lastSignedTransaction = null;
-
-      return transactionHash;
-    } catch (error) {
-      if (error instanceof PaymentNetworkError) {
-        throw error;
-      }
-
-      // Wrap other errors in PaymentNetworkError
-      throw new PaymentNetworkError(`Failed to submit payment: ${(error as Error).message}`, error as Error);
-    }
+  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Message> {
+    // EIP-3009 is an Ethereum/EVM standard, not supported on Solana
+    throw new PaymentNetworkError('EIP-3009 payment authorizations are not supported on Solana');
   }
 }
