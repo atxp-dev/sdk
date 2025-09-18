@@ -4,8 +4,8 @@ import { BigNumber } from 'bignumber.js';
 
 export function wrapWithX402(fetchFn: FetchLike, account: Account, logger?: Logger): FetchLike {
   const log = logger ?? new ConsoleLogger();
-  return async function x402FetchWrapper(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    const response = await fetchFn(input as RequestInfo | URL, init);
+  return async function x402FetchWrapper(input: string | URL, init?: RequestInit): Promise<Response> {
+    const response = await fetchFn(input, init);
 
     // Check if this is an X402 payment challenge
     if (response.status === 402) {
@@ -65,7 +65,7 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account, logger?: Logg
         log.info('Retrying request with X-Payment header');
 
         // Retry the request
-        const retryResponse = await fetchFn(input as RequestInfo | URL, retryInit);
+        const retryResponse = await fetchFn(input, retryInit);
 
         if (retryResponse.ok) {
           log.info('X402 payment accepted, request successful');
@@ -76,7 +76,7 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account, logger?: Logg
         return retryResponse;
       } catch (error) {
         // If there's an error processing the payment, return the original 402 response
-        log.error('Failed to handle X402 payment challenge:', error);
+        log.error(`Failed to handle X402 payment challenge: ${error}`);
         return response;
       }
     }
