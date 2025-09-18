@@ -1,4 +1,4 @@
-import { Eip1193Provider, SpendPermission } from "./types";
+import { Eip1193Provider, SpendPermission } from "./types.js";
 import { createWalletClient, custom, encodeFunctionData } from 'viem';
 import { base } from 'viem/chains';
 

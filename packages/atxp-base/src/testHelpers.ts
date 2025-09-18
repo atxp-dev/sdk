@@ -208,7 +208,6 @@ export function mockSpendCalls({
 // Helper to setup initialization mocks
 export async function setupInitializationMocks({
   provider = mockProvider(),
-  spendPermission = mockSpendPermission(),
   smartAccount = mockSmartAccount(),
   bundlerClient = mockBundlerClient()
 } = {}): Promise<any> {

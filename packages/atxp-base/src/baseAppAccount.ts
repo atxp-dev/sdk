@@ -13,7 +13,6 @@ import { ConsoleLogger, Logger } from '@atxp/common';
 
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
-const PAYMASTER_URL = 'https://api.developer.coinbase.com/rpc/v1/base/snPdXqIzOGhRkGNJvEHM5bl9Hm3yRO3m';
 
 export class BaseAppAccount implements Account {
   accountId: string;
