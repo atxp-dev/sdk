@@ -25,7 +25,18 @@ describe('atxpClient events', () => {
     const onAuthorize = vi.fn();
     const paymentMaker = {
       makePayment: vi.fn(),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      createPaymentAuthorization: vi.fn().mockResolvedValue({
+        from: '0x123',
+        to: '0x456',
+        value: '1000000',
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
+        nonce: '0x789',
+        v: 27,
+        r: '0xabc',
+        s: '0xdef'
+      })
     };
     const account = {
       accountId: 'bdj',
@@ -64,7 +75,18 @@ describe('atxpClient events', () => {
     const onAuthorizeFailure = vi.fn();
     const paymentMaker = {
       makePayment: vi.fn(),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      createPaymentAuthorization: vi.fn().mockResolvedValue({
+        from: '0x123',
+        to: '0x456',
+        value: '1000000',
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
+        nonce: '0x789',
+        v: 27,
+        r: '0xabc',
+        s: '0xdef'
+      })
     };
     const account = {
       accountId: 'bdj',
@@ -107,7 +129,18 @@ describe('atxpClient events', () => {
     const onPayment = vi.fn();
     const paymentMaker = {
       makePayment: vi.fn().mockResolvedValue('test-payment-result-id'),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      createPaymentAuthorization: vi.fn().mockResolvedValue({
+        from: '0x123',
+        to: '0x456',
+        value: '1000000',
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
+        nonce: '0x789',
+        v: 27,
+        r: '0xabc',
+        s: '0xdef'
+      })
     };
     const account = {
       accountId: 'bdj',
@@ -151,7 +184,18 @@ describe('atxpClient events', () => {
     const onPaymentFailure = vi.fn();
     const paymentMaker = {
       makePayment: vi.fn().mockImplementation(() => Promise.reject(new Error('Payment failed'))),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      createPaymentAuthorization: vi.fn().mockResolvedValue({
+        from: '0x123',
+        to: '0x456',
+        value: '1000000',
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
+        nonce: '0x789',
+        v: 27,
+        r: '0xabc',
+        s: '0xdef'
+      })
     };
     const account = {
       accountId: 'bdj',

@@ -7,6 +7,7 @@ describe('X402 Wrapper', () => {
   it('should produce valid X402 message structure matching protocol specification', async () => {
     // Mock account with test payment maker
     const mockAccount: Account = {
+      accountId: 'test-account',
       paymentMakers: {
         'base:USDC': {
           async createPaymentAuthorization(
@@ -38,6 +39,9 @@ describe('X402 Wrapper', () => {
         // First request - return 402 challenge
         return {
           status: 402,
+          ok: false,
+          json: async () => ({}),
+          text: async () => '',
           headers: {
             get: (name: string) => {
               if (name === 'X-Payment-Required') {
@@ -87,7 +91,11 @@ describe('X402 Wrapper', () => {
       return {
         status: 200,
         ok: true,
-        json: async () => ({ success: true })
+        json: async () => ({ success: true }),
+        text: async () => JSON.stringify({ success: true }),
+        headers: {
+          get: () => null
+        }
       };
     });
 
@@ -99,10 +107,15 @@ describe('X402 Wrapper', () => {
   });
 
   it('should handle non-402 responses without modification', async () => {
-    const mockAccount: Account = { paymentMakers: {} };
+    const mockAccount: Account = {
+      accountId: 'test-account',
+      paymentMakers: {}
+    };
     const mockFetch = vi.fn(async () => ({
       status: 200,
       ok: true,
+      json: async () => ({}),
+      text: async () => '',
       headers: {
         get: () => null
       }
@@ -116,9 +129,15 @@ describe('X402 Wrapper', () => {
   });
 
   it('should handle 402 responses without X-Payment-Required header', async () => {
-    const mockAccount: Account = { paymentMakers: {} };
+    const mockAccount: Account = {
+      accountId: 'test-account',
+      paymentMakers: {}
+    };
     const mockFetch = vi.fn(async () => ({
       status: 402,
+      ok: false,
+      json: async () => ({}),
+      text: async () => '',
       headers: {
         get: () => null
       }
