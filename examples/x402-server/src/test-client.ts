@@ -24,13 +24,19 @@ async function testX402Client() {
   );
 
   // Create a logger (optional - defaults to ConsoleLogger if not provided)
-  const logger = new ConsoleLogger();
+  const logger = new ConsoleLogger({ prefix: '[X402 Client]' });
+
+  // Log account info
+  console.log('Using RPC:', process.env.BASE_RPC);
+  console.log('Account address:', account.accountId);
 
   // Wrap fetch with X402 support
   const x402Fetch = wrapWithX402(fetch as any, account, logger);
 
   // Make a single request to the protected endpoint
   const serverUrl = process.env.X402_SERVER_URL || 'http://localhost:3001';
+  console.log('Making request to:', `${serverUrl}/api/resource`);
+
   const response = await x402Fetch(`${serverUrl}/api/resource`);
 
   if (response.ok) {
