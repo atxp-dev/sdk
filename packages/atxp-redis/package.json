@@ -1,6 +1,6 @@
 {
   "name": "@atxp/redis",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "ATXP Redis Database - Redis OAuth database implementation for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
@@ -34,7 +34,7 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/common": "0.3.0",
+    "@atxp/common": "0.4.0",
     "ioredis": "^5.7.0"
   },
   "devDependencies": {

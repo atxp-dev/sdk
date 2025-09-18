@@ -1,6 +1,6 @@
 {
   "name": "@atxp/express",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "ATXP Express - Express.js integration for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
@@ -33,7 +33,7 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/server": "0.3.0"
+    "@atxp/server": "0.4.0"
   },
   "peerDependencies": {
     "express": "^5.0.0"
