@@ -9,6 +9,7 @@ import {
   encodeFunctionData,
   WalletClient,
   PublicActions,
+  getAddress,
 } from "viem";
 import { base } from "viem/chains";
 import { BigNumber } from "bignumber.js";
@@ -205,7 +206,7 @@ export class BasePaymentMaker implements PaymentMaker {
 
       // Create EIP-3009 authorization parameters
       const validAfter = Math.floor(Date.now() / 1000); // Valid immediately
-      const validBefore = Math.floor(Date.now() / 1000) + 3600; // Valid for 1 hour
+      const validBefore = Math.floor(Date.now() / 1000) + 660; // Valid for 11 minutes (matching x402-fetch)
       const nonce = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
 
       // Convert amount to USDC units (6 decimals)
@@ -217,7 +218,7 @@ export class BasePaymentMaker implements PaymentMaker {
           name: 'USD Coin',
           version: '2',
           chainId: base.id, // Base mainnet chain ID (8453)
-          verifyingContract: USDC_CONTRACT_ADDRESS_BASE as `0x${string}`,
+          verifyingContract: getAddress(USDC_CONTRACT_ADDRESS_BASE),
         },
         types: {
           TransferWithAuthorization: [
@@ -231,8 +232,8 @@ export class BasePaymentMaker implements PaymentMaker {
         },
         primaryType: 'TransferWithAuthorization' as const,
         message: {
-          from: this.signingClient.account!.address,
-          to: receiver as Address,
+          from: getAddress(this.signingClient.account!.address),
+          to: getAddress(receiver),
           value,
           validAfter: validAfter.toString(),
           validBefore: validBefore.toString(),
@@ -252,8 +253,8 @@ export class BasePaymentMaker implements PaymentMaker {
       return {
         signature,
         authorization: {
-          from: this.signingClient.account!.address,
-          to: receiver,
+          from: getAddress(this.signingClient.account!.address),
+          to: getAddress(receiver),
           value,
           validAfter: validAfter.toString(),
           validBefore: validBefore.toString(),

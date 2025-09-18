@@ -17,7 +17,7 @@ async function testX402Client() {
     process.exit(1);
   }
 
-  // Create account
+  // Create account to verify we have the right credentials
   const account = new BaseAccount(
     process.env.BASE_RPC,
     process.env.BASE_PRIVATE_KEY
@@ -29,9 +29,14 @@ async function testX402Client() {
   // Log account info
   console.log('Using RPC:', process.env.BASE_RPC);
   console.log('Account address:', account.accountId);
+  console.log('Using wrapWithX402 (our custom implementation)');
 
-  // Wrap fetch with X402 support
-  const x402Fetch = wrapWithX402(fetch as any, account, logger);
+  // Wrap fetch with X402 support using our custom implementation
+  const x402Fetch = wrapWithX402(
+    fetch as any,
+    account,
+    logger
+  );
 
   // Make a single request to the protected endpoint
   const serverUrl = process.env.X402_SERVER_URL || 'http://localhost:3001';
@@ -42,6 +47,14 @@ async function testX402Client() {
   if (response.ok) {
     const data = await response.json();
     console.log('Success:', data);
+
+    // Try to decode payment response if available
+    const paymentResponseHeader = response.headers.get('x-payment-response');
+    if (paymentResponseHeader) {
+      const paymentResponseJson = Buffer.from(paymentResponseHeader, 'base64').toString('utf-8');
+      const paymentResponse = JSON.parse(paymentResponseJson);
+      console.log('Payment response:', paymentResponse);
+    }
   } else {
     console.error('Failed:', response.status, response.statusText);
   }

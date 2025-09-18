@@ -73,12 +73,12 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account, logger?: Logg
           ? Buffer.from(x402MessageJson).toString('base64')
           : btoa(x402MessageJson);
 
-        // Send the X402 message in the X-Payment header
+        // Send the X402 message in the X-PAYMENT header
         const retryInit = {
           ...init,
           headers: {
             ...(init?.headers || {}),
-            'X-Payment': x402MessageBase64
+            'X-PAYMENT': x402MessageBase64
           }
         };
 
