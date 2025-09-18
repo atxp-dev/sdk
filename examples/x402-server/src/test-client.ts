@@ -1,4 +1,4 @@
-import { wrapWithX402, BaseAccount } from '@atxp/client';
+import { wrapWithX402, ATXPAccount } from '@atxp/client';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -18,9 +18,8 @@ async function testX402Client() {
   }
 
   // Create account
-  const account = new BaseAccount(
-    process.env.BASE_RPC,
-    process.env.BASE_PRIVATE_KEY
+  const account = new ATXPAccount(
+    process.env.ATXP_CONNECTION_STRING!
   );
 
   // Create a logger with DEBUG level to see all messages
