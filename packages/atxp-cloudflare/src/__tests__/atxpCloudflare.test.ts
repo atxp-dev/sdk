@@ -100,7 +100,7 @@ describe('atxpCloudflare', () => {
       const request = new Request('https://example.com/test');
       const result = await handler.fetch(request, {}, {});
 
-      expect(getProtectedResourceMetadata).toHaveBeenCalledWith(mockConfig, new URL('https://example.com/test'));
+      expect(getProtectedResourceMetadata).toHaveBeenCalledWith(mockConfig, new URL('https://example.com/test'), {});
       expect(sendProtectedResourceMetadataWebApi).toHaveBeenCalledWith(mockPrmMetadata);
       expect(result).toBe(mockPrmResponse);
     });
