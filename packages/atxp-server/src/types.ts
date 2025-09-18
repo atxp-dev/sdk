@@ -1,4 +1,5 @@
-import { AuthorizationServerUrl, Currency, Logger, PaymentRequestData, Network, UrlString, OAuthDb, TokenData, OAuthResourceClient } from "@atxp/common";
+import { AuthorizationServerUrl, Currency, Logger, PaymentRequestData, UrlString, OAuthDb, TokenData, OAuthResourceClient } from "@atxp/common";
+import { PaymentDestination } from "./paymentDestination.js";
 
 // https://github.com/modelcontextprotocol/typescript-sdk/blob/c6ac083b1b37b222b5bfba5563822daa5d03372e/src/types.ts
 // ctrl+f "method: z.literal(""
@@ -32,10 +33,9 @@ export type PaymentServer = {
 }
 
 export type ATXPConfig = {
-  destination: string;
+  paymentDestination: PaymentDestination;
   mountPath: string;
   currency: Currency;
-  network: Network;
   server: AuthorizationServerUrl;
   payeeName: string;
   // If not provided, the resource will be inferred from the request URL

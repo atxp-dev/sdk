@@ -54,6 +54,15 @@ export {
 // Payment functionality
 export { requirePayment } from './requirePayment.js';
 
+// Payment destination types and implementations
+export {
+  type FundingAmount,
+  type PaymentAddress,
+  type PaymentDestination,
+  ChainPaymentDestination,
+  ATXPPaymentDestination
+} from './paymentDestination.js';
+
 // Test utilities are available via separate export ./serverTestHelpers
 
 // Server configuration utilities (needed for Express router)

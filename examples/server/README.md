@@ -24,10 +24,17 @@ This example demonstrates how to create an MCP (Model Context Protocol) server u
    ```bash
    cp env.example .env
    ```
-   
-   Edit `.env` and provide:
+
+   Edit `.env` and provide one of the following payment destination options:
+
+   **Option A: Dynamic ATXP Destination (Recommended)**
+   - `ATXP_CONNECTION_STRING`: Connection string from ATXP accounts service (e.g., 'https://accounts.atxp.ai/?connection_token=abc123')
+
+   **Option B: Static Funding Destination**
    - `FUNDING_DESTINATION`: Your wallet address to receive payments
    - `FUNDING_NETWORK`: Network for payments (e.g., 'base', 'ethereum', 'solana')
+
+   **Additional Options**
    - `PORT`: (Optional) Server port, defaults to 3010
    - `ATXP_SERVER`: (Optional) ATXP auth server, defaults to https://auth.atxp.ai
 
@@ -133,19 +140,51 @@ Check if the server is running:
 curl http://localhost:3010/health
 ```
 
+## Payment Destination Options
+
+The server supports two payment destination modes:
+
+### Dynamic ATXP Destination (Recommended)
+
+When using `ATXP_CONNECTION_STRING`, the server uses the `ATXPPaymentDestination` class which:
+- Dynamically resolves payment destinations via the ATXP accounts service
+- Calls the `/destination` endpoint with connection token, buyer address, and amount
+- Returns the appropriate wallet address and network for each payment
+- Provides flexibility for multi-user scenarios and account management
+
+**Example:**
+```bash
+ATXP_CONNECTION_STRING=https://accounts.atxp.ai/?connection_token=your_connection_token_here
+```
+
+### Static Funding Destination
+
+When using `FUNDING_DESTINATION` and `FUNDING_NETWORK`, the server uses the `ChainPaymentDestination` class which:
+- Uses a fixed wallet address for all payments
+- Sends all payments to the same network
+- Simpler setup for single-wallet scenarios
+
+**Example:**
+```bash
+FUNDING_DESTINATION=0x1234567890123456789012345678901234567890
+FUNDING_NETWORK=base
+```
+
 ## Authentication & Payment Flow
 
 1. **Client Request**: Client sends MCP request to server
 2. **Authentication Challenge**: Server responds with OAuth challenge if not authenticated
 3. **Client Authentication**: Client follows OAuth flow to get access token
 4. **Payment Required**: Server requires 0.01 USDC payment before executing tool
-5. **Payment Processing**: Client makes payment on the configured network to server's destination address
-6. **Tool Execution**: Server executes the tool and returns results
+5. **Destination Resolution**: Server resolves payment destination (static or dynamic)
+6. **Payment Processing**: Client makes payment on the resolved network to the destination address
+7. **Tool Execution**: Server executes the tool and returns results
 
 ## Architecture
 
 - **Express.js**: Web server framework
 - **ATXP Express Router**: Handles authentication and payment validation
+- **Payment Destinations**: Supports both static (`ChainPaymentDestination`) and dynamic (`ATXPPaymentDestination`) payment resolution
 - **MCP Server**: Implements Model Context Protocol for tool calls
 - **Zod**: Runtime type validation for tool parameters
 - **BigNumber.js**: Precise decimal handling for payment amounts

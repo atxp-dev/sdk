@@ -8,23 +8,26 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
 import { atxpExpress, requirePayment } from '@atxp/express';
 import { Network } from '@atxp/common';
+import { ChainPaymentDestination, ATXPPaymentDestination } from '@atxp/server';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
 
 // Validate required environment variables
 function validateEnvironment() {
-  const required = ['FUNDING_DESTINATION', 'FUNDING_NETWORK'];
-  const missing = required.filter(varName => !process.env[varName]);
-  
-  if (missing.length > 0) {
+  // Support either ATXP connection string OR static funding destination
+  const hasAtxpConnection = process.env.ATXP_CONNECTION_STRING;
+  const hasStaticFunding = process.env.FUNDING_DESTINATION && process.env.FUNDING_NETWORK;
+
+  if (!hasAtxpConnection && !hasStaticFunding) {
     console.error('❌ Missing required environment variables:');
-    missing.forEach(varName => {
-      console.error(`   - ${varName}`);
-    });
+    console.error('   Either provide:');
+    console.error('     - ATXP_CONNECTION_STRING (for dynamic destination resolution)');
+    console.error('   OR');
+    console.error('     - FUNDING_DESTINATION and FUNDING_NETWORK (for static destination)');
     console.error('\nPlease check your .env file or environment setup.');
     process.exit(1);
   }
-  
+
   console.log('✅ Environment variables validated');
 }
 
@@ -93,9 +96,13 @@ async function main() {
   // Create OAuth components (automatically uses in-memory implementation for ':memory:')
   
   // Create ATXP router and use it as middleware
+  // Use either ATXP connection string for dynamic resolution or static funding destination
+  const paymentDestination = process.env.ATXP_CONNECTION_STRING
+    ? new ATXPPaymentDestination(process.env.ATXP_CONNECTION_STRING)
+    : new ChainPaymentDestination(process.env.FUNDING_DESTINATION!, process.env.FUNDING_NETWORK! as Network);
+
   const atxpRouter = atxpExpress({
-    destination: process.env.FUNDING_DESTINATION!,
-    network: process.env.FUNDING_NETWORK! as Network,
+    paymentDestination,
     payeeName: 'ATXP Server Example',
     allowHttp: process.env.NODE_ENV === 'development',
   });

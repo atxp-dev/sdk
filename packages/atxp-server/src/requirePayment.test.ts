@@ -22,8 +22,8 @@ describe('requirePayment', () => {
       expect(paymentServer.charge).toHaveBeenCalledWith({
         amount: BigNumber(0.01),
         currency: config.currency,
-        network: config.network,
-        destination: config.destination,
+        network: 'base',
+        destination: TH.DESTINATION,
         source: 'test-user',
         payeeName: config.payeeName,
       });
@@ -53,8 +53,8 @@ describe('requirePayment', () => {
         expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
           amount: BigNumber(0.01),
           currency: config.currency,
-          network: config.network,
-          destination: config.destination,
+          network: 'base',
+          destination: TH.DESTINATION,
           source: 'test-user',
           payeeName: config.payeeName,
         });
