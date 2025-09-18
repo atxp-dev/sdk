@@ -1,4 +1,4 @@
-import type { Account } from './types.js';
+import type { Account, X402Message } from './types.js';
 import { FetchLike } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 
@@ -28,21 +28,28 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account): FetchLike {
           throw new Error(`No payment maker found for ${paymentMakerKey}`);
         }
 
-        // Create an EIP-3009 payment authorization for X402
-        const authorization = await paymentMaker.createPaymentAuthorization(
+        // Create an EIP-3009 payment authorization
+        const eip3009Authorization = await paymentMaker.createPaymentAuthorization(
           new BigNumber(amount),
           currency,
           recipient,
           memo || ''
         );
 
-        // The authorization is already in X402 format with EIP-3009 payload
-        // Send it directly in the X-Payment header
+        // Wrap the EIP-3009 authorization in X402 protocol format
+        const x402Message: X402Message = {
+          x402Version: 1,
+          scheme: 'exact',
+          network: network,
+          payload: eip3009Authorization
+        };
+
+        // Send the X402 message in the X-Payment header
         const retryInit = {
           ...init,
           headers: {
             ...(init?.headers || {}),
-            'X-Payment': JSON.stringify(authorization)
+            'X-Payment': JSON.stringify(x402Message)
           }
         };
 

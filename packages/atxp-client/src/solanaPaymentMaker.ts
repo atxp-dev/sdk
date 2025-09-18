@@ -1,4 +1,4 @@
-import type { PaymentMaker, EIP3009Message } from './types.js';
+import type { PaymentMaker, EIP3009Authorization } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { Keypair, Connection, PublicKey, ComputeBudgetProgram, sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTransfer, ValidateTransferError as _ValidateTransferError } from "@solana/pay";
@@ -111,7 +111,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     }
   }
 
-  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Message> {
+  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Authorization> {
     // EIP-3009 is an Ethereum/EVM standard, not supported on Solana
     throw new PaymentNetworkError('EIP-3009 payment authorizations are not supported on Solana');
   }

@@ -1,4 +1,4 @@
-import type { PaymentMaker, Hex, EIP3009Message } from './types.js';
+import type { PaymentMaker, Hex, EIP3009Authorization } from './types.js';
 import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from './types.js';
 import { Logger, Currency } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
@@ -180,7 +180,7 @@ export class BasePaymentMaker implements PaymentMaker {
     }
   }
 
-  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Message> {
+  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Authorization> {
     // BasePaymentMaker doesn't have access to accounts service, so throw not-implemented
     throw new PaymentNetworkErrorClass('EIP-3009 payment authorizations are not supported by BasePaymentMaker');
   }

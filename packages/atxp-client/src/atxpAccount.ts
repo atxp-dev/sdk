@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker, EIP3009Message } from './types.js';
+import type { Account, PaymentMaker, EIP3009Authorization } from './types.js';
 import type { FetchLike, Network, Currency } from '@atxp/common'
 import BigNumber from 'bignumber.js';
 
@@ -58,7 +58,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     return json.txHash;
   }
 
-  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Message> {
+  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Authorization> {
     // Create an EIP-3009 payment authorization via the HTTP endpoint
     const response = await this.fetchFn(`${this.origin}/create-payment-authorization`, {
       method: 'POST',
@@ -79,8 +79,8 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
       throw new Error(`ATXPAccount: /create-payment-authorization failed: ${response.status} ${response.statusText} ${text}`);
     }
 
-    // Return the EIP-3009 payment authorization from the accounts service
-    return await response.json() as EIP3009Message;
+    // Return the EIP-3009 authorization from the accounts service
+    return await response.json() as EIP3009Authorization;
   }
 
   async generateJWT(params: { paymentRequestId: string; codeChallenge: string }): Promise<string> {
