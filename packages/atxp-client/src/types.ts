@@ -62,7 +62,7 @@ export class InsufficientFundsError extends Error {
 
 export class PaymentNetworkError extends Error {
   constructor(message: string, public readonly originalError?: Error) {
-    super(`Payment failed due to network error: ${message}. Please check your network connection and try again.`);
+    super(`Payment failed due to network error: ${message}`);
     this.name = 'PaymentNetworkError';
   }
 }
