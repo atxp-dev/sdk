@@ -180,8 +180,93 @@ export class BasePaymentMaker implements PaymentMaker {
     }
   }
 
-  async createPaymentAuthorization(_amount: BigNumber, _currency: Currency, _receiver: string, _memo: string): Promise<EIP3009Authorization> {
-    // BasePaymentMaker doesn't have access to accounts service, so throw not-implemented
-    throw new PaymentNetworkErrorClass('EIP-3009 payment authorizations are not supported by BasePaymentMaker');
+  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Authorization> {
+    if (currency.toUpperCase() !== 'USDC') {
+      throw new PaymentNetworkErrorClass('Only USDC is supported for EIP-3009 authorizations');
+    }
+
+    this.logger.info(`Creating EIP-3009 authorization for ${amount} ${currency} to ${receiver}`);
+
+    try {
+      // Check balance before creating authorization
+      const balanceRaw = await this.signingClient.readContract({
+        address: USDC_CONTRACT_ADDRESS_BASE as Address,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: [this.signingClient.account!.address],
+      }) as bigint;
+
+      const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** USDC_DECIMALS);
+
+      if (balance.lt(amount)) {
+        this.logger.warn(`Insufficient ${currency} balance for authorization. Required: ${amount}, Available: ${balance}`);
+        throw new InsufficientFundsErrorClass(currency, amount, balance, 'base');
+      }
+
+      // Create EIP-3009 authorization parameters
+      const validAfter = Math.floor(Date.now() / 1000); // Valid immediately
+      const validBefore = Math.floor(Date.now() / 1000) + 3600; // Valid for 1 hour
+      const nonce = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
+
+      // Convert amount to USDC units (6 decimals)
+      const value = amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0);
+
+      // Create the EIP-712 typed data for signing
+      const typedData = {
+        domain: {
+          name: 'USD Coin',
+          version: '2',
+          chainId: base.id, // Base mainnet chain ID (8453)
+          verifyingContract: USDC_CONTRACT_ADDRESS_BASE as `0x${string}`,
+        },
+        types: {
+          TransferWithAuthorization: [
+            { name: 'from', type: 'address' },
+            { name: 'to', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'validAfter', type: 'uint256' },
+            { name: 'validBefore', type: 'uint256' },
+            { name: 'nonce', type: 'bytes32' },
+          ],
+        },
+        primaryType: 'TransferWithAuthorization' as const,
+        message: {
+          from: this.signingClient.account!.address,
+          to: receiver as Address,
+          value,
+          validAfter: validAfter.toString(),
+          validBefore: validBefore.toString(),
+          nonce,
+        },
+      };
+
+      // Sign the typed data
+      const signature = await this.signingClient.signTypedData({
+        account: this.signingClient.account!,
+        ...typedData,
+      });
+
+      this.logger.info(`Created EIP-3009 authorization with signature: ${signature}`);
+
+      // Return EIP-3009 authorization in the expected format
+      return {
+        signature,
+        authorization: {
+          from: this.signingClient.account!.address,
+          to: receiver,
+          value,
+          validAfter: validAfter.toString(),
+          validBefore: validBefore.toString(),
+          nonce,
+        }
+      };
+    } catch (error) {
+      if (error instanceof InsufficientFundsErrorClass || error instanceof PaymentNetworkErrorClass) {
+        throw error;
+      }
+
+      // Wrap other errors in PaymentNetworkError
+      throw new PaymentNetworkErrorClass(`Failed to create EIP-3009 authorization: ${(error as Error).message}`, error as Error);
+    }
   }
 }
