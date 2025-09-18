@@ -9,30 +9,43 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account, logger?: Logg
 
     // Check if this is an X402 payment challenge
     if (response.status === 402) {
-      const paymentHeader = response.headers.get('X-Payment-Required');
-
-      if (!paymentHeader) {
-        // Not an X402 response, return as-is
-        log.debug('Received 402 response without X-Payment-Required header');
-        return response;
-      }
-
       log.info('Received X402 payment challenge');
 
       try {
-        // Parse the X402 payment requirements
-        const paymentChallenge = JSON.parse(paymentHeader);
-        const { network, currency, amount, recipient, memo } = paymentChallenge;
+        // Parse the X402 payment requirements from response body
+        const responseBody = await response.text();
+        const paymentChallenge = JSON.parse(responseBody);
+
+        // Check if this is a valid X402 response
+        if (!paymentChallenge.x402Version || !paymentChallenge.accepts || !Array.isArray(paymentChallenge.accepts)) {
+          log.debug('Received 402 response without valid X402 format');
+          return response;
+        }
+
+        // Find the accept option for base:USDC
+        const baseUsdcOption = paymentChallenge.accepts.find((option: any) =>
+          option.network === 'base' && option.asset === '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+        );
+
+        if (!baseUsdcOption) {
+          log.error('No base:USDC accept option found in payment challenge');
+          throw new Error('No base:USDC accept option found in payment challenge');
+        }
+
+        const { network, maxAmountRequired, payTo: recipient, asset } = baseUsdcOption;
+
+        // Convert maxAmountRequired from wei to decimal (USDC has 6 decimals)
+        const amount = new BigNumber(maxAmountRequired).dividedBy(new BigNumber(10).pow(6)).toString();
+        const currency = 'USDC'; // Based on the asset address in the response
 
         log.debug(`Payment required: ${amount} ${currency} on ${network} to ${recipient}`);
 
-        // Find the appropriate payment maker
-        const paymentMakerKey = `${network}:${currency}`;
-        const paymentMaker = account.paymentMakers[paymentMakerKey];
+        // Find the appropriate payment maker using just the network name
+        const paymentMaker = account.paymentMakers[network];
 
         if (!paymentMaker) {
-          log.error(`No payment maker found for ${paymentMakerKey}`);
-          throw new Error(`No payment maker found for ${paymentMakerKey}`);
+          log.info(`No payment maker found for ${network}`);
+          return response;
         }
 
         log.debug(`Creating EIP-3009 payment authorization`);
@@ -42,7 +55,7 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account, logger?: Logg
           new BigNumber(amount),
           currency,
           recipient,
-          memo || ''
+          ''
         );
 
         // Wrap the EIP-3009 authorization in X402 protocol format
