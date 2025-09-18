@@ -1,5 +1,5 @@
 import { wrapWithX402, BaseAccount } from '@atxp/client';
-import { ConsoleLogger } from '@atxp/common';
+import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,8 +23,8 @@ async function testX402Client() {
     process.env.BASE_PRIVATE_KEY
   );
 
-  // Create a logger (optional - defaults to ConsoleLogger if not provided)
-  const logger = new ConsoleLogger({ prefix: '[X402 Client]' });
+  // Create a logger with DEBUG level to see all messages
+  const logger = new ConsoleLogger({ prefix: '[X402 Client]', level: LogLevel.DEBUG });
 
   // Log account info
   console.log('Using RPC:', process.env.BASE_RPC);
