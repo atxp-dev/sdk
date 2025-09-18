@@ -38,6 +38,6 @@ export type SpendPermission = {
 export type Eip1193Provider = {
   request: (params: {
     method: string;
-    params?: any[];
-  }) => Promise<any>;
+    params?: unknown[];
+  }) => Promise<unknown>;
 };

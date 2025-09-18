@@ -44,7 +44,6 @@ import {
   mockBundlerClient,
   mockFailedBundlerClient,
   mockProvider,
-  mockSpendCalls,
   getStorageKey,
   removeTimestamps,
   expectTimestampAround
@@ -157,7 +156,6 @@ describe('BaseAppAccount', () => {
       const bundlerClient = mockBundlerClient();
       const mocks = await setupInitializationMocks({ 
         bundlerClient,
-        spendPermission: newPermission 
       });
 
       // Initialize account
@@ -211,16 +209,12 @@ describe('BaseAppAccount', () => {
       const provider = mockProvider();
       const bundlerClient = mockBundlerClient();
       const smartAccount = mockSmartAccount();
-      const permission = mockSpendPermission();
       
       const mocks = await setupInitializationMocks({
         provider,
         bundlerClient,
         smartAccount,
-        spendPermission: permission
       });
-
-      const { http } = await import('viem');
 
       // Initialize account
       await BaseAppAccount.initialize({
@@ -304,8 +298,6 @@ describe('BaseAppAccount', () => {
         bundlerClient,
         smartAccount
       });
-
-      const { http } = await import('viem');
 
       // Initialize account
       await BaseAppAccount.initialize({
@@ -429,7 +421,6 @@ describe('BaseAppAccount', () => {
 
       const bundlerClient = mockBundlerClient();
       const smartAccount = mockSmartAccount();
-      const spendCalls = mockSpendCalls();
       
       await setupInitializationMocks({ bundlerClient, smartAccount });
 

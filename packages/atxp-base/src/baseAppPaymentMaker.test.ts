@@ -28,7 +28,6 @@ import {
   mockEphemeralSmartWallet,
   mockBundlerClient,
   mockFailedBundlerClient,
-  mockSpendCalls,
   TEST_RECEIVER_ADDRESS
 } from './testHelpers.js';
 
@@ -91,7 +90,6 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const permission = mockSpendPermission();
     const bundlerClient = mockBundlerClient();
     const smartWallet = mockEphemeralSmartWallet({ client: bundlerClient });
-    const spendCalls = mockSpendCalls();
     
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5); // 1.5 USDC
