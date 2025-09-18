@@ -11,52 +11,37 @@ export class RemoteSigner implements LocalAccount {
   constructor(
     public readonly address: Address,
     private accountsApiUrl: string,
+    private authorizationHeader: string,
     private fetchFn: FetchLike = fetch as FetchLike
   ) {}
 
   /**
    * Sign a typed data structure using EIP-712
-   * This is what x402-fetch will call for EIP-3009 authorization
+   * This is what x402 library will call for EIP-3009 authorization
    */
   async signTypedData<
     const TTypedData extends TypedData | { [key: string]: unknown },
     TPrimaryType extends string = string,
   >(typedData: TTypedData): Promise<Hex> {
-    // Extract the actual typed data parameters
-    const { domain, types, primaryType, message } = typedData as any;
+    const response = await this.fetchFn(`${this.accountsApiUrl}/sign-typed-data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Add authorization header if we have a token
+        ...(this.authorizationHeader ? { 'Authorization': this.authorizationHeader } : {})
+      },
+      body: JSON.stringify({
+        typedData
+      })
+    });
 
-    // For EIP-3009, we need to send this to accounts-x402's /create-payment-authorization endpoint
-    if (primaryType === 'TransferWithAuthorization') {
-      const response = await this.fetchFn(`${this.accountsApiUrl}/create-payment-authorization`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: message.from,
-          to: message.to,
-          value: message.value,
-          validAfter: message.validAfter,
-          validBefore: message.validBefore,
-          nonce: message.nonce,
-          asset: domain.verifyingContract,
-          network: this.getNetworkFromChainId(domain.chainId),
-          extra: {
-            name: domain.name,
-            version: domain.version
-          }
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to sign authorization: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      return result.signature as Hex;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to sign typed data: ${response.status} ${response.statusText} ${errorText}`);
     }
 
-    throw new Error('Unsupported typed data signing');
+    const result = await response.json();
+    return result.signature as Hex;
   }
 
   /**
@@ -80,34 +65,20 @@ export class RemoteSigner implements LocalAccount {
     // Return a dummy public key since we don't have access to it
     return '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex;
   }
-
-  /**
-   * Get chain ID from network - helper method
-   */
-  private getNetworkFromChainId(chainId: number): string {
-    const chainIdToNetwork: { [key: number]: string } = {
-      8453: 'base',
-      84532: 'base-sepolia',
-      43114: 'avalanche',
-      43113: 'avalanche-fuji',
-      1329: 'sei',
-      1328: 'sei-testnet'
-    };
-
-    return chainIdToNetwork[chainId] || 'base';
-  }
 }
 
 /**
  * Create a remote signer for use with x402-fetch
  * @param address The address of the account
  * @param accountsApiUrl The URL of the accounts-x402 API
+ * @param authorizationHeader The authorization header to use for API calls
  * @param fetchFn Optional fetch function to use
  */
 export function createRemoteSigner(
   address: Address,
   accountsApiUrl: string,
+  authorizationHeader: string,
   fetchFn?: FetchLike
 ): RemoteSigner {
-  return new RemoteSigner(address, accountsApiUrl, fetchFn);
+  return new RemoteSigner(address, accountsApiUrl, authorizationHeader, fetchFn);
 }

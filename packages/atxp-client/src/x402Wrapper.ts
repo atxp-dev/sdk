@@ -16,14 +16,11 @@ export function wrapWithX402(config: ClientConfig): FetchLike {
   const { account, logger, fetchFn = fetch, approvePayment, onPayment, onPaymentFailure } = config;
   const log = logger ?? console;
 
-  // Check if account has getSigner method (only BaseAccount for now)
+  // Check if account has getSigner method
   const accountWithSigner = account as any;
   if (!accountWithSigner.getSigner) {
     throw new Error('Account does not support getSigner, X402 payments will not work');
   }
-
-  const signer: LocalAccount = accountWithSigner.getSigner();
-  log.debug('Using local signer for X402 payments');
 
   return async function x402FetchWrapper(input: string | URL, init?: RequestInit): Promise<Response> {
     const response = await fetchFn(input, init);
@@ -102,6 +99,10 @@ export function wrapWithX402(config: ClientConfig): FetchLike {
           });
         }
       }
+
+      // Get the signer from the account
+      log.debug('Getting signer from account');
+      const signer: LocalAccount = await accountWithSigner.getSigner();
 
       // Create the X402 payment header using the x402 library
       log.debug('Creating X402 payment header with signer');

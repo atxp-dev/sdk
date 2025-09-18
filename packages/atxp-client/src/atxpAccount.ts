@@ -138,19 +138,27 @@ export class ATXPAccount implements Account {
 
   /**
    * Get a signer that can be used with the x402 library
-   * This will use RemoteSigner to delegate signing to the accounts-x402 server
-   * NOTE: This requires the accounts-x402 server to implement a signTypedData endpoint
+   * This uses RemoteSigner to delegate signing to the accounts-x402 server
    */
-  getSigner(): LocalAccount {
-    // TODO: We need to get the wallet address from the accounts-x402 server
-    // For now, throw an error indicating this is not yet implemented
-    throw new Error('ATXPAccount.getSigner() is not yet implemented - requires signTypedData endpoint on accounts-x402 server');
+  async getSigner(): Promise<LocalAccount> {
+    // Get the wallet address from the destination endpoint
+    const response = await this.fetchFn(`${this.origin}/destination`, {
+      headers: {
+        'Authorization': toBasicAuth(this.token)
+      }
+    });
 
-    // Future implementation:
-    // return new RemoteSigner(
-    //   walletAddress,
-    //   this.origin,
-    //   this.fetchFn
-    // );
+    if (!response.ok) {
+      throw new Error(`ATXPAccount: Failed to get wallet address: ${response.status} ${response.statusText}`);
+    }
+
+    const { destination } = await response.json() as { destination: string };
+
+    return new RemoteSigner(
+      destination as `0x${string}`,
+      this.origin,
+      toBasicAuth(this.token),
+      this.fetchFn
+    );
   }
 }
