@@ -1,17 +1,6 @@
 import { ATXPConfig } from "./types.js";
 import * as oauth from 'oauth4webapi';
-import { ServerResponse } from "http";
 import { getPath } from "./getResource.js";
-
-export function sendOAuthMetadata(res: ServerResponse, metadata: oauth.AuthorizationServer | null): boolean {
-  if (!metadata) {
-    return false;
-  }
-  res.setHeader('Content-Type', 'application/json');
-  res.writeHead(200);
-  res.end(JSON.stringify(metadata));
-  return true;
-}
 
 export async function getOAuthMetadata(config: ATXPConfig, requestUrl: URL): Promise<oauth.AuthorizationServer | null> {
   if (isOAuthMetadataRequest(config, requestUrl)) {

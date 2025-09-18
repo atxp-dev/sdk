@@ -2,15 +2,15 @@ import { Request, Response, NextFunction, Router } from "express";
 import {
   ATXPArgs,
   buildServerConfig,
-  checkToken,
+  checkTokenNode,
   sendOAuthChallenge,
   withATXPContext,
-  parseMcpRequests,
+  parseMcpRequestsNode,
   getProtectedResourceMetadata as getPRMResponse,
-  sendProtectedResourceMetadata,
   getResource,
   getOAuthMetadata,
-  sendOAuthMetadata
+  sendProtectedResourceMetadataNode,
+  sendOAuthMetadataNode,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
@@ -24,19 +24,19 @@ export function atxpExpress(args: ATXPArgs): Router {
       const requestUrl = new URL(req.url, req.protocol + '://' + req.host);
       logger.debug(`Handling ${req.method} ${requestUrl.toString()}`);
 
-      const resource = getResource(config, requestUrl);
-      const prmResponse = getPRMResponse(config, requestUrl);
-      if (sendProtectedResourceMetadata(res, prmResponse)) {
+      const resource = getResource(config, requestUrl, req.headers);
+      const prmResponse = getPRMResponse(config, requestUrl, req.headers);
+      if (sendProtectedResourceMetadataNode(res, prmResponse)) {
         return;
       }
 
       // Some older clients don't use PRM and assume the MCP server is an OAuth server
       const oAuthMetadata = await getOAuthMetadata(config, requestUrl);
-      if(sendOAuthMetadata(res, oAuthMetadata)) {
+      if(sendOAuthMetadataNode(res, oAuthMetadata)) {
         return;
       }
 
-      const mcpRequests = await parseMcpRequests(config, requestUrl, req, req.body);
+      const mcpRequests = await parseMcpRequestsNode(config, requestUrl, req, req.body);
       logger.debug(`${mcpRequests.length} MCP requests found in request`);
 
       if(mcpRequests.length === 0) {
@@ -45,7 +45,7 @@ export function atxpExpress(args: ATXPArgs): Router {
       }
 
       logger.debug(`Request started - ${req.method} ${req.path}`);
-      const tokenCheck = await checkToken(config, resource, req);
+      const tokenCheck = await checkTokenNode(config, resource, req);
       const user = tokenCheck.data?.sub ?? null;
 
       // Listen for when the response is finished

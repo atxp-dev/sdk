@@ -1,6 +1,7 @@
 import { ServerResponse } from "http";
-import { TokenCheck } from "../types.js";
+import { ProtectedResourceMetadata, TokenCheck } from "../types.js";
 import { createOAuthChallengeResponseCore } from "../core/oauth.js";
+import * as oauth from 'oauth4webapi';
 
 /**
  * Node.js HTTP implementation of OAuth challenge sending
@@ -21,5 +22,25 @@ export function sendOAuthChallenge(res: ServerResponse, tokenCheck: TokenCheck):
   res.writeHead(responseData.status);
   res.end(responseData.body);
 
+  return true;
+}
+
+export function sendProtectedResourceMetadata(res: ServerResponse, metadata: ProtectedResourceMetadata | null): boolean {
+  if (!metadata) {
+    return false;
+  }
+  res.setHeader('Content-Type', 'application/json');
+  res.writeHead(200);
+  res.end(JSON.stringify(metadata));
+  return true;
+}
+
+export function sendOAuthMetadata(res: ServerResponse, metadata: oauth.AuthorizationServer | null): boolean {
+  if (!metadata) {
+    return false;
+  }
+  res.setHeader('Content-Type', 'application/json');
+  res.writeHead(200);
+  res.end(JSON.stringify(metadata));
   return true;
 }

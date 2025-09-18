@@ -11,11 +11,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Package configuration
 const PACKAGES = [
   'common',
-  'server', 
+  'server',
   'client',
   'redis',
   'sqlite',
-  'base'
+  'base',
+  'express',
+  'cloudflare'
 ];
 
 /**

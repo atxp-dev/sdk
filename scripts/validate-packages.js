@@ -29,7 +29,8 @@ const PACKAGES = [
   'atxp-base',
   'atxp-redis',
   'atxp-sqlite',
-  'atxp-express'
+  'atxp-express',
+  'atxp-cloudflare'
 ];
 
 // Required fields in package.json

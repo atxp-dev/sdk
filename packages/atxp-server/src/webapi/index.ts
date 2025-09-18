@@ -2,5 +2,5 @@
 // These functions adapt Web API Request/Response to use the core business logic
 
 export { checkTokenWebApi } from './token.js';
-export { sendOAuthChallengeWebApi } from './oauth.js';
+export { sendOAuthChallengeWebApi, sendProtectedResourceMetadata as sendProtectedResourceMetadataWebApi, sendOAuthMetadata as sendOAuthMetadataWebApi } from './oauth.js';
 export { parseMcpRequestsWebApi } from './mcp.js';

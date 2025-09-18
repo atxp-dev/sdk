@@ -5,11 +5,32 @@ export function getPath(url: URL): string {
   return fullPath;
 }
 
-export function getResource(config: ATXPConfig, requestUrl: URL): URL {
+function getProtocolFromHeaders(headers: Record<string, string | string[] | undefined>, requestProtocol: string): string {
+  // Check for X-Forwarded-Proto header (common proxy header)
+  const forwardedProto = headers['x-forwarded-proto'] || headers['X-Forwarded-Proto'];
+  if (forwardedProto) {
+    const proto = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+    return proto === 'https' ? 'https:' : 'http:';
+  }
+
+  // Check for X-Forwarded-Protocol header (alternative)
+  const forwardedProtocol = headers['x-forwarded-protocol'] || headers['X-Forwarded-Protocol'];
+  if (forwardedProtocol) {
+    const proto = Array.isArray(forwardedProtocol) ? forwardedProtocol[0] : forwardedProtocol;
+    return proto === 'https' ? 'https:' : 'http:';
+  }
+
+  // Fall back to request protocol
+  return requestProtocol;
+}
+
+export function getResource(config: ATXPConfig, requestUrl: URL, headers?: Record<string, string | string[] | undefined>): URL {
   if (config.resource) {
     return new URL(config.resource);
   }
-  const protocol = process.env.NODE_ENV === 'development' ? requestUrl.protocol : 'https:';
+
+  const originalProtocol = headers ? getProtocolFromHeaders(headers, requestUrl.protocol) : requestUrl.protocol;
+  const protocol = config.allowHttp ? originalProtocol : 'https:';
   const url = new URL(`${protocol}//${requestUrl.host}${requestUrl.pathname}`);
 
   const fullPath = getPath(url);
