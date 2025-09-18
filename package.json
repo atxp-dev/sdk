@@ -46,7 +46,8 @@
     "prepack:all": "npm run prepack --workspaces --if-present"
   },
   "dependencies": {
-    "dotenv": "^16.5.0"
+    "dotenv": "^16.5.0",
+    "x402-fetch": "^0.6.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.6",

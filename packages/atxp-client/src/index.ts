@@ -68,14 +68,6 @@ export {
 } from './x402Wrapper.js';
 
 export {
-  wrapWithX402V2
-} from './x402WrapperV2.js';
-
-export {
-  wrapWithX402UsingLibrary
-} from './x402WrapperUsingX402.js';
-
-export {
   RemoteSigner,
   createRemoteSigner
 } from './remoteSigner.js';

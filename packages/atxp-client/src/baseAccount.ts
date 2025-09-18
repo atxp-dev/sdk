@@ -1,10 +1,8 @@
 import type { Account, PaymentMaker, Hex } from './types.js';
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { BasePaymentMaker } from './basePaymentMaker.js';
-import { createWalletClient, http, WalletClient } from 'viem';
+import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
 import { base } from 'viem/chains';
-import { LocalSigner } from './localSigner.js';
-import { LocalAccount } from 'viem';
 
 export class BaseAccount implements Account {
   accountId: string;

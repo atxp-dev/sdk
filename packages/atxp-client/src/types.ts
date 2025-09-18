@@ -90,6 +90,5 @@ export type X402Message = {
 
 export interface PaymentMaker {
   makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<string>;
-  createPaymentAuthorization: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<EIP3009Authorization>;
   generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;
 }

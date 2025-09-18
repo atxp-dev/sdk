@@ -1,107 +1,177 @@
-import type { Account, X402Message } from './types.js';
-import { FetchLike, Logger, ConsoleLogger } from '@atxp/common';
+import { ClientConfig, ProspectivePayment } from './types.js';
+import { BaseAccount } from './baseAccount.js';
+import { FetchLike, Logger, Network } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
+import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
+import { LocalAccount } from 'viem';
 
-export function wrapWithX402(fetchFn: FetchLike, account: Account, logger?: Logger): FetchLike {
-  const log = logger ?? new ConsoleLogger();
+/**
+ * Wraps fetch with X402 payment support using a local signer
+ * This wrapper intercepts 402 responses and creates payments using the x402 library
+ *
+ * @param config - ClientConfig containing account, logger, and fetch function
+ * @returns A wrapped fetch function that handles X402 payments
+ */
+export function wrapWithX402(config: ClientConfig): FetchLike {
+  const { account, logger, fetchFn = fetch, approvePayment, onPayment, onPaymentFailure } = config;
+  const log = logger ?? console;
+
+  // Check if account has getSigner method (only BaseAccount for now)
+  const accountWithSigner = account as any;
+  if (!accountWithSigner.getSigner) {
+    throw new Error('Account does not support getSigner, X402 payments will not work');
+  }
+
+  const signer: LocalAccount = accountWithSigner.getSigner();
+  log.debug('Using local signer for X402 payments');
+
   return async function x402FetchWrapper(input: string | URL, init?: RequestInit): Promise<Response> {
     const response = await fetchFn(input, init);
 
     // Check if this is an X402 payment challenge
-    if (response.status === 402) {
-      log.info('Received X402 payment challenge');
-
-      try {
-        // Parse the X402 payment requirements from response body
-        const responseBody = await response.text();
-        const paymentChallenge = JSON.parse(responseBody);
-
-        // Check if this is a valid X402 response
-        if (!paymentChallenge.x402Version || !paymentChallenge.accepts || !Array.isArray(paymentChallenge.accepts)) {
-          log.debug('Received 402 response without valid X402 format');
-          return response;
-        }
-
-        // Find the accept option for base:USDC
-        const baseUsdcOption = paymentChallenge.accepts.find((option: any) =>
-          option.network === 'base' && option.asset === '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
-        );
-
-        if (!baseUsdcOption) {
-          log.error('No base:USDC accept option found in payment challenge');
-          throw new Error('No base:USDC accept option found in payment challenge');
-        }
-
-        const { network, maxAmountRequired, payTo: recipient, asset } = baseUsdcOption;
-
-        // Convert maxAmountRequired from wei to decimal (USDC has 6 decimals)
-        const amount = new BigNumber(maxAmountRequired).dividedBy(new BigNumber(10).pow(6)).toString();
-        const currency = 'USDC'; // Based on the asset address in the response
-
-        log.debug(`Payment required: ${amount} ${currency} on ${network} to ${recipient}`);
-
-        // Find the appropriate payment maker using just the network name
-        const paymentMaker = account.paymentMakers[network];
-
-        if (!paymentMaker) {
-          log.info(`No payment maker found for ${network}`);
-          return response;
-        }
-
-        log.debug(`Creating EIP-3009 payment authorization`);
-
-        // Create an EIP-3009 payment authorization
-        const eip3009Authorization = await paymentMaker.createPaymentAuthorization(
-          new BigNumber(amount),
-          currency,
-          recipient,
-          ''
-        );
-
-        // Wrap the EIP-3009 authorization in X402 protocol format
-        const x402Message: X402Message = {
-          x402Version: 1,
-          scheme: 'exact',
-          network: network,
-          payload: eip3009Authorization
-        };
-
-        // Base64 encode the X402 message for the X-Payment header
-        const x402MessageJson = JSON.stringify(x402Message);
-        log.debug(`X402 message being sent: ${x402MessageJson}`);
-        const x402MessageBase64 = typeof Buffer !== 'undefined'
-          ? Buffer.from(x402MessageJson).toString('base64')
-          : btoa(x402MessageJson);
-
-        // Send the X402 message in the X-PAYMENT header
-        const retryInit = {
-          ...init,
-          headers: {
-            ...(init?.headers || {}),
-            'X-PAYMENT': x402MessageBase64
-          }
-        };
-
-        log.info('Retrying request with X-Payment header');
-
-        // Retry the request
-        const retryResponse = await fetchFn(input, retryInit);
-
-        if (retryResponse.ok) {
-          log.info('X402 payment accepted, request successful');
-        } else {
-          log.warn(`Request failed after payment with status ${retryResponse.status}`);
-        }
-
-        return retryResponse;
-      } catch (error) {
-        // If there's an error processing the payment, return the original 402 response
-        log.error(`Failed to handle X402 payment challenge: ${error}`);
-        return response;
-      }
+    if (response.status !== 402) {
+      return response;
     }
 
-    // Not a 402 response, return as-is
-    return response;
+    log.info('Received X402 payment challenge');
+
+    try {
+      // Parse the X402 payment requirements from response body
+      const responseBody = await response.text();
+      const paymentChallenge = JSON.parse(responseBody);
+
+      // Check if this is a valid X402 response
+      if (!paymentChallenge.x402Version || !paymentChallenge.accepts || !Array.isArray(paymentChallenge.accepts)) {
+        log.debug('Received 402 response without valid X402 format');
+        // Return a new Response with the original body since we consumed it
+        return new Response(responseBody, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers
+        });
+      }
+
+      // Select the best payment requirements (prefer base network, exact scheme)
+      const selectedPaymentRequirements = selectPaymentRequirements(
+        paymentChallenge.accepts,
+        'base',
+        'exact'
+      );
+
+      if (!selectedPaymentRequirements) {
+        log.info('No suitable X402 payment option found');
+        return new Response(responseBody, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers
+        });
+      }
+
+      // Convert amount from wei to human-readable for logging and approval
+      const amountInUsdc = Number(selectedPaymentRequirements.maxAmountRequired) / (10 ** 6);
+      log.debug(`Payment required: ${amountInUsdc} USDC on ${selectedPaymentRequirements.network} to ${selectedPaymentRequirements.payTo}`);
+
+      // Create the ProspectivePayment object for callbacks
+      const url = typeof input === 'string' ? input : input.toString();
+      const prospectivePayment: ProspectivePayment = {
+        accountId: account.accountId,
+        resourceUrl: url,
+        resourceName: selectedPaymentRequirements.description || url,
+        network: selectedPaymentRequirements.network as Network,
+        currency: 'USDC',
+        amount: new BigNumber(amountInUsdc),
+        iss: selectedPaymentRequirements.payTo
+      };
+
+      // Check if payment should be approved
+      if (approvePayment) {
+        const approved = await approvePayment(prospectivePayment);
+
+        if (!approved) {
+          log.info('Payment not approved by user');
+          if (onPaymentFailure) {
+            await onPaymentFailure({
+              payment: prospectivePayment,
+              error: new Error('Payment not approved')
+            });
+          }
+          return new Response(responseBody, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers
+          });
+        }
+      }
+
+      // Create the X402 payment header using the x402 library
+      log.debug('Creating X402 payment header with signer');
+      const paymentHeader = await createPaymentHeader(
+        signer,
+        paymentChallenge.x402Version,
+        selectedPaymentRequirements
+      );
+
+      // Add the payment header and retry the request
+      const retryInit = {
+        ...init,
+        headers: {
+          ...(init?.headers || {}),
+          'X-PAYMENT': paymentHeader,
+          // Request the payment response header
+          'Access-Control-Expose-Headers': 'X-PAYMENT-RESPONSE'
+        }
+      };
+
+      log.info('Retrying request with X-PAYMENT header');
+      const retryResponse = await fetchFn(input, retryInit);
+
+      if (retryResponse.ok) {
+        log.info('X402 payment accepted, request successful');
+
+        // Call onPayment callback if provided
+        if (onPayment) {
+          await onPayment({ payment: prospectivePayment });
+        }
+      } else {
+        log.warn(`Request failed after payment with status ${retryResponse.status}`);
+
+        if (onPaymentFailure) {
+          await onPaymentFailure({
+            payment: prospectivePayment,
+            error: new Error(`Request failed with status ${retryResponse.status}`)
+          });
+        }
+      }
+
+      return retryResponse;
+    } catch (error) {
+      // If there's an error processing the payment, call failure callback and return original response
+      log.error(`Failed to handle X402 payment challenge: ${error}`);
+
+      // Try to recreate the response with the body we might have consumed
+      const responseBody = await response.text();
+      const paymentChallenge = JSON.parse(responseBody);
+
+      if (onPaymentFailure && paymentChallenge?.accepts?.[0]) {
+        const firstOption = paymentChallenge.accepts[0];
+        const amount = Number(firstOption.maxAmountRequired) / (10 ** 6);
+        const url = typeof input === 'string' ? input : input.toString();
+        await onPaymentFailure({
+          payment: {
+            accountId: account.accountId,
+            resourceUrl: url,
+            resourceName: firstOption.description || url,
+            network: firstOption.network as Network,
+            currency: 'USDC',
+            amount: new BigNumber(amount),
+            iss: firstOption.payTo
+          },
+          error: error as Error
+        });
+      }
+
+      // Return the original response
+      return response;
+    }
   };
 }
