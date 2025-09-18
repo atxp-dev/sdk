@@ -184,7 +184,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return txHash;
   }
 
-  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Authorization> {
+  async createPaymentAuthorization(_amount: BigNumber, _currency: Currency, _receiver: string, _memo: string): Promise<EIP3009Authorization> {
     // BaseApp doesn't support EIP-3009 payment authorizations
     throw new PaymentNetworkError('EIP-3009 payment authorizations are not supported by BaseAppPaymentMaker');
   }

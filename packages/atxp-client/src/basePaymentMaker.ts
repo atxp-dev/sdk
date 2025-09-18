@@ -180,7 +180,7 @@ export class BasePaymentMaker implements PaymentMaker {
     }
   }
 
-  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Authorization> {
+  async createPaymentAuthorization(_amount: BigNumber, _currency: Currency, _receiver: string, _memo: string): Promise<EIP3009Authorization> {
     // BasePaymentMaker doesn't have access to accounts service, so throw not-implemented
     throw new PaymentNetworkErrorClass('EIP-3009 payment authorizations are not supported by BasePaymentMaker');
   }

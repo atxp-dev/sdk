@@ -111,7 +111,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     }
   }
 
-  async createPaymentAuthorization(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<EIP3009Authorization> {
+  async createPaymentAuthorization(_amount: BigNumber, _currency: Currency, _receiver: string, _memo: string): Promise<EIP3009Authorization> {
     // EIP-3009 is an Ethereum/EVM standard, not supported on Solana
     throw new PaymentNetworkError('EIP-3009 payment authorizations are not supported on Solana');
   }
