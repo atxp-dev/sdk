@@ -1,8 +1,9 @@
 import type { Account, X402Message } from './types.js';
-import { FetchLike } from '@atxp/common';
+import { FetchLike, Logger, ConsoleLogger } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 
-export function wrapWithX402(fetchFn: FetchLike, account: Account): FetchLike {
+export function wrapWithX402(fetchFn: FetchLike, account: Account, logger?: Logger): FetchLike {
+  const log = logger ?? new ConsoleLogger();
   return async function x402FetchWrapper(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const response = await fetchFn(input as RequestInfo | URL, init);
 
@@ -12,21 +13,29 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account): FetchLike {
 
       if (!paymentHeader) {
         // Not an X402 response, return as-is
+        log.debug('Received 402 response without X-Payment-Required header');
         return response;
       }
+
+      log.info('Received X402 payment challenge');
 
       try {
         // Parse the X402 payment requirements
         const paymentChallenge = JSON.parse(paymentHeader);
         const { network, currency, amount, recipient, memo } = paymentChallenge;
 
+        log.debug(`Payment required: ${amount} ${currency} on ${network} to ${recipient}`);
+
         // Find the appropriate payment maker
         const paymentMakerKey = `${network}:${currency}`;
         const paymentMaker = account.paymentMakers[paymentMakerKey];
 
         if (!paymentMaker) {
+          log.error(`No payment maker found for ${paymentMakerKey}`);
           throw new Error(`No payment maker found for ${paymentMakerKey}`);
         }
+
+        log.debug(`Creating EIP-3009 payment authorization`);
 
         // Create an EIP-3009 payment authorization
         const eip3009Authorization = await paymentMaker.createPaymentAuthorization(
@@ -53,11 +62,21 @@ export function wrapWithX402(fetchFn: FetchLike, account: Account): FetchLike {
           }
         };
 
+        log.info('Retrying request with X-Payment header');
+
         // Retry the request
-        return await fetchFn(input as RequestInfo | URL, retryInit);
-      } catch {
+        const retryResponse = await fetchFn(input as RequestInfo | URL, retryInit);
+
+        if (retryResponse.ok) {
+          log.info('X402 payment accepted, request successful');
+        } else {
+          log.warn(`Request failed after payment with status ${retryResponse.status}`);
+        }
+
+        return retryResponse;
+      } catch (error) {
         // If there's an error processing the payment, return the original 402 response
-        // Error is logged by the payment maker if needed
+        log.error('Failed to handle X402 payment challenge:', error);
         return response;
       }
     }

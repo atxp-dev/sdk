@@ -1,4 +1,5 @@
 import { wrapWithX402, BaseAccount } from '@atxp/client';
+import { ConsoleLogger } from '@atxp/common';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -16,8 +17,11 @@ async function testX402Client() {
     process.env.BASE_PRIVATE_KEY
   );
 
+  // Create a logger (optional - defaults to ConsoleLogger if not provided)
+  const logger = new ConsoleLogger();
+
   // Wrap fetch with X402 support
-  const x402Fetch = wrapWithX402(fetch as any, account);
+  const x402Fetch = wrapWithX402(fetch as any, account, logger);
 
   // Make a single request to the protected endpoint
   const serverUrl = process.env.X402_SERVER_URL || 'http://localhost:3001';
