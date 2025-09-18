@@ -1,4 +1,4 @@
-import { PaymentMaker, EIP3009Authorization, PaymentNetworkError } from '@atxp/client';
+import { PaymentMaker, PaymentNetworkError } from '@atxp/client';
 import { encodeFunctionData, toHex } from 'viem';
 import { USDC_CONTRACT_ADDRESS_BASE, type Hex } from '@atxp/client';
 import BigNumber from 'bignumber.js';
@@ -184,8 +184,4 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     this.logger.info(`Transaction confirmed with ${confirmations} confirmations`);
   }
 
-  async createPaymentAuthorization(_amount: BigNumber, _currency: Currency, _receiver: string, _memo: string): Promise<EIP3009Authorization> {
-    // MainWalletPaymentMaker doesn't support EIP-3009 payment authorizations
-    throw new PaymentNetworkError('EIP-3009 payment authorizations are not supported by MainWalletPaymentMaker');
-  }
 }

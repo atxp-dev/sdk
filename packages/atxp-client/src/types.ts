@@ -67,27 +67,6 @@ export class PaymentNetworkError extends Error {
   }
 }
 
-// EIP-3009 TransferWithAuthorization message
-export type EIP3009Authorization = {
-  signature: string;
-  authorization: {
-    from: string;
-    to: string;
-    value: string;
-    validAfter: string;
-    validBefore: string;
-    nonce: string;
-  };
-}
-
-// X402 protocol message wrapper
-export type X402Message = {
-  x402Version: number;
-  scheme: string;
-  network: string;
-  payload: EIP3009Authorization;
-}
-
 export interface PaymentMaker {
   makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<string>;
   generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;

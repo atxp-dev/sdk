@@ -13,7 +13,7 @@ describe('atxpClient', () => {
       .postOnce('https://example.com/mcp', CTH.authRequiredResponse())
       .post('https://example.com/mcp', CTH.mcpResponseHandler(CTH.mcpToolResponse(1, 'hello world')));
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
-      // Respond to /authorize call 
+      // Respond to /authorize call
       .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
         const state = new URL(req.args[0] as any).searchParams.get('state');
         return {
@@ -24,18 +24,7 @@ describe('atxpClient', () => {
 
     const paymentMaker = {
       makePayment: vi.fn(),
-      generateJWT: vi.fn().mockResolvedValue('testJWT'),
-      createPaymentAuthorization: vi.fn().mockResolvedValue({
-        from: '0x123',
-        to: '0x456',
-        value: '1000000',
-        validAfter: 0,
-        validBefore: Math.floor(Date.now() / 1000) + 3600,
-        nonce: '0x789',
-        v: 27,
-        r: '0xabc',
-        s: '0xdef'
-      })
+      generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
       accountId: 'bdj',
@@ -71,18 +60,7 @@ describe('atxpClient', () => {
 
     const paymentMaker = {
       makePayment: vi.fn().mockResolvedValue('test-payment-result-id'),
-      generateJWT: vi.fn().mockResolvedValue('testJWT'),
-      createPaymentAuthorization: vi.fn().mockResolvedValue({
-        from: '0x123',
-        to: '0x456',
-        value: '1000000',
-        validAfter: 0,
-        validBefore: Math.floor(Date.now() / 1000) + 3600,
-        nonce: '0x789',
-        v: 27,
-        r: '0xabc',
-        s: '0xdef'
-      })
+      generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
       accountId: 'bdj',
@@ -131,18 +109,7 @@ describe('atxpClient', () => {
 
     const paymentMaker = {
       makePayment: vi.fn().mockResolvedValue('test-payment-result-id'),
-      generateJWT: vi.fn().mockResolvedValue('testJWT'),
-      createPaymentAuthorization: vi.fn().mockResolvedValue({
-        from: '0x123',
-        to: '0x456',
-        value: '1000000',
-        validAfter: 0,
-        validBefore: Math.floor(Date.now() / 1000) + 3600,
-        nonce: '0x789',
-        v: 27,
-        r: '0xabc',
-        s: '0xdef'
-      })
+      generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
       accountId: 'bdj',
@@ -150,7 +117,7 @@ describe('atxpClient', () => {
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
-      account, 
+      account,
       fetchFn: f.fetchHandler
     });
 

@@ -1,4 +1,4 @@
-import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker, type EIP3009Authorization, PaymentNetworkError } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker, PaymentNetworkError } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
@@ -182,11 +182,6 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     // Return the actual transaction hash, not the user operation hash
     // The payment verification system needs the on-chain transaction hash
     return txHash;
-  }
-
-  async createPaymentAuthorization(_amount: BigNumber, _currency: Currency, _receiver: string, _memo: string): Promise<EIP3009Authorization> {
-    // BaseApp doesn't support EIP-3009 payment authorizations
-    throw new PaymentNetworkError('EIP-3009 payment authorizations are not supported by BaseAppPaymentMaker');
   }
 
   /**

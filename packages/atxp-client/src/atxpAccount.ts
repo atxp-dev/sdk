@@ -157,7 +157,7 @@ export class ATXPAccount implements Account {
     return new RemoteSigner(
       destination as `0x${string}`,
       this.origin,
-      toBasicAuth(this.token),
+      this.token,
       this.fetchFn
     );
   }

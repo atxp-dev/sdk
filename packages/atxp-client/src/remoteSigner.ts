@@ -1,6 +1,12 @@
 import { Hex, Address, LocalAccount, SignableMessage, TypedData, TransactionSerializable, Hash } from 'viem';
 import { FetchLike } from '@atxp/common';
 
+function toBasicAuth(token: string): string {
+  // Basic auth is base64("username:password"), password is blank
+  const b64 = Buffer.from(`${token}:`).toString('base64');
+  return `Basic ${b64}`;
+}
+
 /**
  * Creates a remote signer that delegates signing operations to the accounts-x402 API.
  * This implements the LocalAccount interface from viem to be compatible with x402-fetch.
@@ -10,8 +16,8 @@ export class RemoteSigner implements LocalAccount {
 
   constructor(
     public readonly address: Address,
-    private accountsApiUrl: string,
-    private authorizationHeader: string,
+    private origin: string,
+    private token: string,
     private fetchFn: FetchLike = fetch as FetchLike
   ) {}
 
@@ -23,12 +29,11 @@ export class RemoteSigner implements LocalAccount {
     const TTypedData extends TypedData | { [key: string]: unknown },
     TPrimaryType extends string = string,
   >(typedData: TTypedData): Promise<Hex> {
-    const response = await this.fetchFn(`${this.accountsApiUrl}/sign-typed-data`, {
+    const response = await this.fetchFn(`${this.origin}/sign-typed-data`, {
       method: 'POST',
       headers: {
+        'Authorization': toBasicAuth(this.token),
         'Content-Type': 'application/json',
-        // Add authorization header if we have a token
-        ...(this.authorizationHeader ? { 'Authorization': this.authorizationHeader } : {})
       },
       body: JSON.stringify({
         typedData
@@ -70,15 +75,15 @@ export class RemoteSigner implements LocalAccount {
 /**
  * Create a remote signer for use with x402-fetch
  * @param address The address of the account
- * @param accountsApiUrl The URL of the accounts-x402 API
- * @param authorizationHeader The authorization header to use for API calls
+ * @param origin The origin URL of the accounts-x402 API
+ * @param token The connection token for authentication
  * @param fetchFn Optional fetch function to use
  */
 export function createRemoteSigner(
   address: Address,
-  accountsApiUrl: string,
-  authorizationHeader: string,
+  origin: string,
+  token: string,
   fetchFn?: FetchLike
 ): RemoteSigner {
-  return new RemoteSigner(address, accountsApiUrl, authorizationHeader, fetchFn);
+  return new RemoteSigner(address, origin, token, fetchFn);
 }
