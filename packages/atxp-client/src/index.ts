@@ -58,7 +58,8 @@ export {
   InsufficientFundsError,
   PaymentNetworkError,
   type PaymentMaker,
-  type SignedPaymentMessage
+  type EIP3009Authorization,
+  type X402Message
 } from './types.js';
 
 // X402 support
