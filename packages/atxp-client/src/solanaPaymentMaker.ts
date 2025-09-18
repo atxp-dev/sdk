@@ -1,12 +1,14 @@
 import type { PaymentMaker, EIP3009Message } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
-import { Keypair, Connection, PublicKey, ComputeBudgetProgram, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
+import { Keypair, Connection, PublicKey, ComputeBudgetProgram, sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTransfer, ValidateTransferError as _ValidateTransferError } from "@solana/pay";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import bs58 from "bs58";
 import BigNumber from "bignumber.js";
-import { generateJWT, Currency, Network, Logger, ConsoleLogger } from '@atxp/common';
+import { generateJWT, Currency } from '@atxp/common';
 import { importJWK } from 'jose';
+import { Logger } from '@atxp/common';
+import { ConsoleLogger } from '@atxp/common';
 
 // this is a global public key for USDC on the solana mainnet
 const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
@@ -17,7 +19,6 @@ export class SolanaPaymentMaker implements PaymentMaker {
   private connection: Connection;
   private source: Keypair;
   private logger: Logger;
-  private lastSignedTransaction: string | null = null;
 
   constructor(solanaEndpoint: string, sourceSecretKey: string, logger?: Logger) {
     if (!solanaEndpoint) {
@@ -48,16 +49,17 @@ export class SolanaPaymentMaker implements PaymentMaker {
     return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '');
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
+  makePayment = async (amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> => {
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkError('Only USDC currency is supported; received ' + currency);
     }
 
     const receiverKey = new PublicKey(receiver);
+
     this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Solana from ${this.source.publicKey.toBase58()}`);
 
     try {
-      // Check balance before creating payment message
+      // Check balance before attempting payment
       const tokenAccountAddress = await getAssociatedTokenAddress(
         USDC_MINT,
         this.source.publicKey
@@ -93,15 +95,11 @@ export class SolanaPaymentMaker implements PaymentMaker {
       transaction.add(modifyComputeUnits);
       transaction.add(addPriorityFee);
 
-      // Sign and send the transaction
       const transactionHash = await sendAndConfirmTransaction(
         this.connection,
         transaction,
         [this.source],
-        { commitment: 'confirmed' }
       );
-
-      this.logger.info(`Payment completed: ${transactionHash}`);
       return transactionHash;
     } catch (error) {
       if (error instanceof InsufficientFundsError || error instanceof PaymentNetworkError) {
@@ -109,7 +107,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
       }
 
       // Wrap other errors in PaymentNetworkError
-      throw new PaymentNetworkError(`Failed to make payment: ${(error as Error).message}`, error as Error);
+      throw new PaymentNetworkError(`Payment failed on Solana network: ${(error as Error).message}`, error as Error);
     }
   }
 
