@@ -11,9 +11,9 @@ describe('X402 Wrapper', () => {
         'base:USDC': {
           async createPaymentAuthorization(
             amount: BigNumber,
-            currency: string,
+            _currency: string,
             receiver: string,
-            memo: string
+            _memo: string
           ): Promise<EIP3009Authorization> {
             // Mock EIP-3009 authorization response
             return {
