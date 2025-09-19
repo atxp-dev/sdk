@@ -1,7 +1,7 @@
 import { BigNumber } from 'bignumber.js';
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
 import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse } from '@atxp/common';
-import type { PaymentMaker, ProspectivePayment, ClientConfig, FetchWrapper } from './types.js';
+import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';

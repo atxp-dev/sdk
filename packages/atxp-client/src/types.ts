@@ -24,10 +24,6 @@ export type ProspectivePayment = {
   iss: string;
 }
 
-// Type for a fetch wrapper function that takes ClientArgs and returns wrapped fetch
-// ClientArgs is a partial ClientConfig with only required fields mandatory
-export type FetchWrapper = (config: any) => FetchLike; // Using 'any' temporarily, will be replaced with ClientArgs when exported
-
 export type ClientConfig = {
   mcpServer: string;
   account: Account;
@@ -45,6 +41,15 @@ export type ClientConfig = {
   onPayment: (args: { payment: ProspectivePayment }) => Promise<void>;
   onPaymentFailure: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
 }
+
+// ClientArgs for creating clients - required fields plus optional overrides
+type RequiredClientConfigFields = 'mcpServer' | 'account';
+type RequiredClientConfig = Pick<ClientConfig, RequiredClientConfigFields>;
+type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
+export type ClientArgs = RequiredClientConfig & Partial<OptionalClientConfig>;
+
+// Type for a fetch wrapper function that takes ClientArgs and returns wrapped fetch
+export type FetchWrapper = (config: ClientArgs) => FetchLike;
 
 export class InsufficientFundsError extends Error {
   constructor(

@@ -1,8 +1,18 @@
-import { ClientArgs, ProspectivePayment, FetchWrapper } from '@atxp/client';
+import { ProspectivePayment, FetchWrapper, ClientArgs } from '@atxp/client';
 import { FetchLike, Network } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
 import { LocalAccount } from 'viem';
+
+// Type guard for X402 challenge
+interface X402Challenge {
+  x402Version?: unknown;
+  accepts?: unknown;
+}
+
+function isX402Challenge(obj: unknown): obj is X402Challenge {
+  return typeof obj === 'object' && obj !== null;
+}
 
 /**
  * Creates an X402 payment wrapper for fetch.
@@ -35,7 +45,7 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
 
     // Parse the X402 payment requirements from response body
     const responseBody = await response.text();
-    let paymentChallenge: any;
+    let paymentChallenge: unknown;
 
     try {
       paymentChallenge = JSON.parse(responseBody);
@@ -52,7 +62,10 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
     try {
 
       // Check if this is a valid X402 response
-      if (!paymentChallenge.x402Version || !paymentChallenge.accepts || !Array.isArray(paymentChallenge.accepts)) {
+      if (!isX402Challenge(paymentChallenge) ||
+          !paymentChallenge.x402Version ||
+          !paymentChallenge.accepts ||
+          !Array.isArray(paymentChallenge.accepts)) {
         log.debug('Received 402 response without valid X402 format');
         // Return a new Response with the original body since we consumed it
         return new Response(responseBody, {
@@ -122,7 +135,7 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       log.debug('Creating X402 payment header with signer');
       const paymentHeader = await createPaymentHeader(
         signer,
-        paymentChallenge.x402Version,
+        paymentChallenge.x402Version as number,
         selectedPaymentRequirements
       );
 
@@ -180,8 +193,8 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       // If there's an error processing the payment, call failure callback and return original response
       log.error(`Failed to handle X402 payment challenge: ${error}`);
 
-      if (onPaymentFailure && paymentChallenge?.accepts?.[0]) {
-        const firstOption = paymentChallenge.accepts[0];
+      if (onPaymentFailure && isX402Challenge(paymentChallenge) && paymentChallenge.accepts && Array.isArray(paymentChallenge.accepts) && paymentChallenge.accepts[0]) {
+        const firstOption = paymentChallenge.accepts[0] as any;
         const amount = firstOption.maxAmountRequired ? Number(firstOption.maxAmountRequired) / (10 ** 6) : 0;
         const url = typeof input === 'string' ? input : input.toString();
         await onPaymentFailure({

@@ -1,13 +1,11 @@
-import { ClientConfig, FetchWrapper } from "./types.js";
-import { MemoryOAuthDb, ConsoleLogger, DEFAULT_AUTHORIZATION_SERVER, FetchLike } from "@atxp/common";
+import { ClientConfig, ClientArgs } from "./types.js";
+import { MemoryOAuthDb, ConsoleLogger, DEFAULT_AUTHORIZATION_SERVER } from "@atxp/common";
 import { atxpFetch } from "./atxpFetcher.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 type RequiredClientConfigFields = 'mcpServer' | 'account';
-type RequiredClientConfig = Pick<ClientConfig, RequiredClientConfigFields>;
 type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
-export type ClientArgs = RequiredClientConfig & Partial<OptionalClientConfig>;
 type BuildableClientConfigFields = 'oAuthDb' | 'logger';
 
 // Detect if we're in a browser environment and bind fetch appropriately

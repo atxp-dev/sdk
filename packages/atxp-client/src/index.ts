@@ -1,6 +1,5 @@
 // Main client functionality
 export {
-  type ClientArgs,
   DEFAULT_CLIENT_CONFIG,
   buildClientConfig,
   buildStreamableTransport,
@@ -53,6 +52,7 @@ export {
   type Account,
   type ProspectivePayment,
   type ClientConfig,
+  type ClientArgs,
   type FetchWrapper,
   InsufficientFundsError,
   PaymentNetworkError,
