@@ -4,7 +4,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { ChainPaymentDestination } from '@atxp/server';
+import { paymentMiddleware } from 'x402-express';
+import { facilitator } from '@coinbase/x402';
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from 'url';
@@ -30,7 +31,7 @@ const getServer = () => {
       message: z.string().optional().describe('Message to secure'),
     },
     async ({ message }: { message?: string }): Promise<CallToolResult> => {
-      // await requirePayment({price: BigNumber(0.01)}); // Will be enabled later
+      // X402 payment will be enforced by middleware
       return {
         content: [
           {
@@ -49,8 +50,15 @@ const app = express();
 app.use(express.json());
 
 const destinationAddress = process.env.ATXP_DESTINATION!;
-const destination = new ChainPaymentDestination(destinationAddress, 'base');
+const network = 'base';
 console.log('Starting MCP server with destination', destinationAddress);
+
+// Add X402 payment middleware
+app.use(paymentMiddleware(
+  destinationAddress,
+  { "POST /*": { price: "$0.01", network } },
+  process.env.CDP_API_KEY_ID ? facilitator : { url: "https://x402.org/facilitator" }
+));
 
 
 app.post('/', async (req: Request, res: Response) => {
