@@ -1,4 +1,5 @@
-import { wrapWithX402, BaseAccount } from '@atxp/client';
+import { BaseAccount } from '@atxp/client';
+import { wrapWithX402 } from '@atxp/x402';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from 'dotenv';
 import path from 'path';

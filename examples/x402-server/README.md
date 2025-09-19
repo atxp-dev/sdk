@@ -79,7 +79,9 @@ app.use(paymentMiddleware(
 The ATXP SDK handles X402 automatically:
 
 ```typescript
-const x402Fetch = wrapWithX402(fetch, account);
+import { wrapWithX402 } from '@atxp/x402';
+
+const x402Fetch = wrapWithX402({ account, fetchFn: fetch });
 const response = await x402Fetch('http://localhost:3001/api/resource');
 ```
 

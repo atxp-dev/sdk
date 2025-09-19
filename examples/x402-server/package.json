@@ -11,6 +11,7 @@
   "dependencies": {
     "@atxp/client": "file:../../packages/atxp-client",
     "@atxp/common": "file:../../packages/atxp-common",
+    "@atxp/x402": "file:../../packages/atxp-x402",
     "@coinbase/x402": "^0.3.8",
     "bignumber.js": "^9.1.2",
     "cors": "^2.8.5",

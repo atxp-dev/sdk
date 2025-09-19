@@ -60,11 +60,6 @@ export {
   type PaymentMaker
 } from './types.js';
 
-// X402 support
-export {
-  wrapWithX402
-} from './x402Wrapper.js';
-
 export {
   RemoteSigner,
   createRemoteSigner

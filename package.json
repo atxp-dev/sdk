@@ -12,7 +12,8 @@
     "packages/atxp-client",
     "packages/atxp-base",
     "packages/atxp-express",
-    "packages/atxp-cloudflare"
+    "packages/atxp-cloudflare",
+    "packages/atxp-x402"
   ],
   "repository": {
     "type": "git",

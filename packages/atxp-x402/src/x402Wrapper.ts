@@ -1,4 +1,4 @@
-import { ClientConfig, ProspectivePayment } from './types.js';
+import { ClientConfig, ProspectivePayment } from '@atxp/client';
 import { FetchLike, Network } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
