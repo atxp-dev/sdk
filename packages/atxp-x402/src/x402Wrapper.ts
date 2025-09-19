@@ -148,7 +148,8 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
           },
           body: JSON.stringify({
             amount: amountInUsdc.toString(),
-            currency: 'USDC'
+            currency: 'USDC',
+            chainType: 'ethereum' // X402 only works with Ethereum/Base
           })
         });
 
