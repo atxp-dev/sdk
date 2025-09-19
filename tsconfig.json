@@ -13,6 +13,6 @@
     "declaration": false,
     "allowSyntheticDefaultImports": true
   },
-  "include": [],
-  "exclude": ["node_modules", "dist"] 
+  "include": ["src/dev/**/*.ts"],
+  "exclude": ["node_modules", "dist", "examples", "packages"] 
 } 
