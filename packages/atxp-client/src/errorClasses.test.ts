@@ -76,7 +76,7 @@ describe('PaymentNetworkError', () => {
     
     expect(error.name).toBe('PaymentNetworkError');
     expect(error.message).toBe(
-      'Payment failed due to network error: Network failed. Please check your network connection and try again.'
+      'Payment failed due to network error: Network failed'
     );
     expect(error.originalError).toBe(originalError);
   });
@@ -86,7 +86,7 @@ describe('PaymentNetworkError', () => {
     
     expect(error.name).toBe('PaymentNetworkError');
     expect(error.message).toBe(
-      'Payment failed due to network error: Transaction reverted. Please check your network connection and try again.'
+      'Payment failed due to network error: Transaction reverted'
     );
     expect(error.originalError).toBeUndefined();
   });

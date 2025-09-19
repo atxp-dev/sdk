@@ -265,7 +265,7 @@ describe('Default Payment Failure Handler', () => {
 
       // Verify messages follow structured format
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'PAYMENT FAILED: Network error on base: Payment failed due to network error: Connection timeout. Please check your network connection and try again.'
+        'PAYMENT FAILED: Network error on base: Payment failed due to network error: Connection timeout'
       );
     });
   });
