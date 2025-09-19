@@ -1,4 +1,4 @@
-import { Hex, Address, LocalAccount, SignableMessage, TypedData, TransactionSerializable, Hash } from 'viem';
+import { Hex, Address, LocalAccount, SignableMessage, TypedData, TransactionSerializable } from 'viem';
 import { FetchLike } from '@atxp/common';
 
 function toBasicAuth(token: string): string {
@@ -26,8 +26,7 @@ export class RemoteSigner implements LocalAccount {
    * This is what x402 library will call for EIP-3009 authorization
    */
   async signTypedData<
-    const TTypedData extends TypedData | { [key: string]: unknown },
-    TPrimaryType extends string = string,
+    const TTypedData extends TypedData | { [key: string]: unknown }
   >(typedData: TTypedData): Promise<Hex> {
     const response = await this.fetchFn(`${this.origin}/sign-typed-data`, {
       method: 'POST',
@@ -52,24 +51,26 @@ export class RemoteSigner implements LocalAccount {
   /**
    * Sign a message - required by LocalAccount interface but not used for X402
    */
-  async signMessage({ message }: { message: SignableMessage }): Promise<Hex> {
+  async signMessage(_: { message: SignableMessage }): Promise<Hex> {
     throw new Error('Message signing not implemented for remote signer');
   }
 
   /**
    * Sign a transaction - required by LocalAccount interface but not used for X402
    */
-  async signTransaction(transaction: TransactionSerializable, args?: any): Promise<Hex> {
+  async signTransaction(_transaction: TransactionSerializable, _args?: unknown): Promise<Hex> {
     throw new Error('Transaction signing not implemented for remote signer');
   }
 
   /**
    * Get public key - required by LocalAccount interface
    */
-  async publicKey(): Promise<Hex> {
-    // Return a dummy public key since we don't have access to it
-    return '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex;
-  }
+  readonly publicKey = '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex;
+
+  /**
+   * Source - required by LocalAccount interface (set to 'custom')
+   */
+  readonly source = 'custom' as const;
 }
 
 /**

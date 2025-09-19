@@ -1,4 +1,4 @@
-import { PaymentMaker, PaymentNetworkError } from '@atxp/client';
+import { PaymentMaker } from '@atxp/client';
 import { encodeFunctionData, toHex } from 'viem';
 import { USDC_CONTRACT_ADDRESS_BASE, type Hex } from '@atxp/client';
 import BigNumber from 'bignumber.js';

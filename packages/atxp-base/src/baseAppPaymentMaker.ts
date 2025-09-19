@@ -1,4 +1,4 @@
-import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker, PaymentNetworkError } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';

@@ -113,7 +113,7 @@ export class ATXPAccount implements Account {
    * @param x402Challenge The X402 challenge object from the 402 response
    * @returns The X402 payment header to send in the retry request
    */
-  async createX402Payment(x402Challenge: { x402Version: number; accepts: any[] }): Promise<string> {
+  async createX402Payment(x402Challenge: { x402Version: number; accepts: unknown[] }): Promise<string> {
     const response = await this.fetchFn(`${this.origin}/create-x402-payment`, {
       method: 'POST',
       headers: {

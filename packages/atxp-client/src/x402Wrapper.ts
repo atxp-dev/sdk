@@ -1,6 +1,5 @@
 import { ClientConfig, ProspectivePayment } from './types.js';
-import { BaseAccount } from './baseAccount.js';
-import { FetchLike, Logger, Network } from '@atxp/common';
+import { FetchLike, Network } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
 import { LocalAccount } from 'viem';
@@ -17,7 +16,7 @@ export function wrapWithX402(config: ClientConfig): FetchLike {
   const log = logger ?? console;
 
   // Check if account has getSigner method
-  const accountWithSigner = account as any;
+  const accountWithSigner = account as { getSigner?: () => Promise<LocalAccount> };
   if (!accountWithSigner.getSigner) {
     throw new Error('Account does not support getSigner, X402 payments will not work');
   }
@@ -102,7 +101,7 @@ export function wrapWithX402(config: ClientConfig): FetchLike {
 
       // Get the signer from the account
       log.debug('Getting signer from account');
-      const signer: LocalAccount = await accountWithSigner.getSigner();
+      const signer: LocalAccount = await accountWithSigner.getSigner!();
 
       // Create the X402 payment header using the x402 library
       log.debug('Creating X402 payment header with signer');

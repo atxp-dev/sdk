@@ -9,7 +9,6 @@ import {
   encodeFunctionData,
   WalletClient,
   PublicActions,
-  getAddress,
 } from "viem";
 import { base } from "viem/chains";
 import { BigNumber } from "bignumber.js";
