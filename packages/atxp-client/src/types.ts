@@ -24,8 +24,9 @@ export type ProspectivePayment = {
   iss: string;
 }
 
-// Type for a fetch wrapper function that takes ClientConfig and returns wrapped fetch
-export type FetchWrapper = (config: ClientConfig) => FetchLike;
+// Type for a fetch wrapper function that takes ClientArgs and returns wrapped fetch
+// ClientArgs is a partial ClientConfig with only required fields mandatory
+export type FetchWrapper = (config: any) => FetchLike; // Using 'any' temporarily, will be replaced with ClientArgs when exported
 
 export type ClientConfig = {
   mcpServer: string;

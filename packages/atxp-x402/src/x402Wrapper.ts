@@ -1,4 +1,4 @@
-import { ClientConfig, ProspectivePayment, FetchWrapper } from '@atxp/client';
+import { ClientArgs, ProspectivePayment, FetchWrapper } from '@atxp/client';
 import { FetchLike, Network } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
@@ -9,10 +9,10 @@ import { LocalAccount } from 'viem';
  * This wrapper intercepts 402 responses and creates payments using the x402 library.
  * It follows the standard wrapper pattern - taking ClientConfig and returning a wrapped fetch.
  *
- * @param config - ClientConfig containing account, logger, and fetch function
+ * @param config - ClientArgs containing account, logger, and fetch function
  * @returns A wrapped fetch function that handles X402 payments
  */
-export const wrapWithX402: FetchWrapper = (config: ClientConfig): FetchLike => {
+export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
   const { account, logger, fetchFn = fetch, approvePayment, onPayment, onPaymentFailure } = config;
   const log = logger ?? console;
 
@@ -22,7 +22,8 @@ export const wrapWithX402: FetchWrapper = (config: ClientConfig): FetchLike => {
     throw new Error('Account does not support getSigner, X402 payments will not work');
   }
 
-  return async function x402FetchWrapper(input: string | URL, init?: RequestInit): Promise<Response> {
+  // Use arrow function to preserve context, matching atxpFetcher pattern
+  const x402FetchWrapper: FetchLike = async (input: string | URL, init?: RequestInit): Promise<Response> => {
     const response = await fetchFn(input, init);
 
     // Check if this is an X402 payment challenge
@@ -125,18 +126,35 @@ export const wrapWithX402: FetchWrapper = (config: ClientConfig): FetchLike => {
         selectedPaymentRequirements
       );
 
-      // Add the payment header and retry the request
-      const retryInit = {
+      // Add the payment header and retry the request, preserving ALL original headers
+      // This is crucial to maintain Accept and other headers
+      const originalHeaders = init?.headers;
+      let retryHeaders: Headers;
+
+      // Always use Headers object to ensure proper header handling
+      if (originalHeaders instanceof Headers) {
+        // Clone the Headers object
+        retryHeaders = new Headers(originalHeaders);
+      } else if (originalHeaders) {
+        // Convert plain object to Headers
+        retryHeaders = new Headers(originalHeaders as HeadersInit);
+      } else {
+        // Start with empty headers
+        retryHeaders = new Headers();
+      }
+
+      // Add payment headers
+      retryHeaders.set('X-PAYMENT', paymentHeader);
+      retryHeaders.set('Access-Control-Expose-Headers', 'X-PAYMENT-RESPONSE');
+
+      // Create new init object with preserved headers
+      const retryInit: RequestInit = {
         ...init,
-        headers: {
-          ...(init?.headers || {}),
-          'X-PAYMENT': paymentHeader,
-          // Request the payment response header
-          'Access-Control-Expose-Headers': 'X-PAYMENT-RESPONSE'
-        }
+        headers: retryHeaders
       };
 
       log.info('Retrying request with X-PAYMENT header');
+      log.debug(`Retry headers: X-PAYMENT=${paymentHeader.substring(0, 20)}...`);
       const retryResponse = await fetchFn(input, retryInit);
 
       if (retryResponse.ok) {
@@ -188,4 +206,6 @@ export const wrapWithX402: FetchWrapper = (config: ClientConfig): FetchLike => {
       });
     }
   };
+
+  return x402FetchWrapper;
 };

@@ -27,7 +27,7 @@ async function main() {
   const config = {
     mcpServer: serverUrl,
     account,
-    logger: new ConsoleLogger({ prefix: '[X402]', level: LogLevel.INFO }),
+    logger: new ConsoleLogger({ prefix: '[X402]', level: LogLevel.DEBUG }),
     approvePayment: async () => {
       console.log(`Auto-approving X402 payment...`);
       return true;
@@ -37,7 +37,7 @@ async function main() {
   // Create client with X402 wrapper for payment support
   const client = await atxpClient({
     ...config,
-    fetchFn: wrapWithX402(config)
+    //fetchFn: wrapWithX402(config)
   });
 
   try {
