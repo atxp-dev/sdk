@@ -209,20 +209,41 @@ export function mockSpendCalls({
 export async function setupInitializationMocks({
   provider = mockProvider(),
   smartAccount = mockSmartAccount(),
-  bundlerClient = mockBundlerClient()
+  bundlerClient = mockBundlerClient(),
+  spendPermission = mockSpendPermission(),
+  ephemeralWallet = mockEphemeralSmartWallet()
 } = {}): Promise<any> {
   const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
   const { createPublicClient } = await import('viem');
+  const { requestSpendPermission } = await import('./spendPermissionShim.js');
+  const { toEphemeralSmartWallet } = await import('./smartWalletHelpers.js');
 
   (createPublicClient as any).mockReturnValue({});
   (toCoinbaseSmartAccount as any).mockResolvedValue(smartAccount);
   (createBundlerClient as any).mockReturnValue(bundlerClient);
+  (requestSpendPermission as any).mockResolvedValue(spendPermission);
+  (toEphemeralSmartWallet as any).mockResolvedValue(ephemeralWallet);
 
   return {
     toCoinbaseSmartAccount,
     createBundlerClient,
     createPublicClient,
+    requestSpendPermission,
+    toEphemeralSmartWallet,
     provider,
+  };
+}
+
+// Helper to setup payment mocks
+export async function setupPaymentMocks({
+  spendCalls = mockSpendCalls()
+} = {}): Promise<any> {
+  const { prepareSpendCallData } = await import('./spendPermissionShim.js');
+
+  (prepareSpendCallData as any).mockResolvedValue(spendCalls);
+
+  return {
+    prepareSpendCallData
   };
 }
 

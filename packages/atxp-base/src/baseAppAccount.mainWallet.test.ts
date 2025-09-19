@@ -1,3 +1,32 @@
+// Mock the ephemeral wallet functions at the top
+vi.mock('./spendPermissionShim.js', () => ({
+  requestSpendPermission: vi.fn(),
+  prepareSpendCallData: vi.fn()
+}));
+
+vi.mock('viem/account-abstraction', () => ({
+  toCoinbaseSmartAccount: vi.fn(),
+  createBundlerClient: vi.fn()
+}));
+
+vi.mock('./smartWalletHelpers.js', () => ({
+  toEphemeralSmartWallet: vi.fn()
+}));
+
+vi.mock('viem', async () => {
+  const actual = await vi.importActual('viem');
+  return {
+    ...actual,
+    http: vi.fn(() => 'mock-transport'),
+    createPublicClient: vi.fn(() => ({})),
+    encodeFunctionData: vi.fn(() => '0xmockencodeddata'),
+    createWalletClient: vi.fn(() => ({
+      sendTransaction: vi.fn().mockResolvedValue('0xtxhash'),
+      getChainId: vi.fn().mockResolvedValue(8453) // Base mainnet chain ID
+    }))
+  };
+});
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BaseAppAccount } from './baseAppAccount.js';
 import { MainWalletPaymentMaker } from './mainWalletPaymentMaker.js';
@@ -130,17 +159,25 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
   describe('initialize with useEphemeralWallet not specified', () => {
     it('should default to ephemeral wallet mode for backward compatibility', async () => {
-      const provider = mockProvider();
+      // Need to add ephemeral wallet mocks for this test
+      const { setupInitializationMocks } = await import('./testHelpers.js');
 
-      // This should throw because apiKey is required for ephemeral wallet mode
-      await expect(
-        BaseAppAccount.initialize({
-          walletAddress: TEST_WALLET_ADDRESS,
-          provider: provider,
-          storage,
-          // useEphemeralWallet not specified - should default to true
-        })
-      ).rejects.toThrow('Smart wallet API key is required for ephemeral wallet mode');
+      const provider = mockProvider();
+      await setupInitializationMocks({ provider });
+
+      // This should work in ephemeral wallet mode (the default)
+      const account = await BaseAppAccount.initialize({
+        walletAddress: TEST_WALLET_ADDRESS,
+        provider: provider,
+        storage,
+        // useEphemeralWallet not specified - should default to true
+      });
+
+      // Should be in ephemeral wallet mode with smart wallet address as accountId
+      expect(account).toBeDefined();
+      expect(account.paymentMakers['base']).toBeDefined();
+      // In ephemeral mode, we expect the account ID to be different from wallet address
+      expect(account.accountId).not.toBe(TEST_WALLET_ADDRESS);
     });
   });
 
