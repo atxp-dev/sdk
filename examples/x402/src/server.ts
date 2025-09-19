@@ -49,10 +49,10 @@ function createMcpServer(): McpServer {
 
 // Main server setup
 async function main() {
-  console.log('🚀 Starting X402 Example Server...');
+  console.log('Starting X402 Example Server...');
 
   if (!recipientAddress) {
-    console.error('❌ ATXP_DESTINATION environment variable is required!');
+    console.error('ATXP_DESTINATION environment variable is required!');
     process.exit(1);
   }
 
@@ -86,7 +86,7 @@ async function main() {
       });
 
     } catch (error) {
-      console.error('❌ Error handling MCP request:', error);
+      console.error('Error handling MCP request:', error);
 
       if (!res.headersSent) {
         res.status(500).json({
@@ -102,9 +102,9 @@ async function main() {
   });
 
   app.listen(PORT, () => {
-    console.log(`✅ X402 MCP Server running on http://localhost:${PORT}`);
-    console.log(`💰 Payment: $0.01 USDC per request on ${network}`);
-    console.log(`📍 Recipient: ${recipientAddress}`);
+    console.log(`X402 MCP Server running on http://localhost:${PORT}`);
+    console.log(`Payment: $0.01 USDC per request on ${network}`);
+    console.log(`Recipient: ${recipientAddress}`);
   });
 }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { atxpClient, ATXPAccount, RemoteSigner } from "@atxp/client";
+import { atxpClient, ATXPAccount } from "@atxp/client";
 import { wrapWithX402 } from "@atxp/x402";
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from "dotenv";
@@ -13,17 +13,14 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 async function main() {
   const serverUrl = process.env.X402_SERVER_URL || "http://localhost:3001";
   const signerUrl = process.env.ATXP_REMOTE_SIGNER_URL || "http://localhost:3002";
+  const connectionToken = process.env.ATXP_CONNECTION_TOKEN || "test-token";
 
-  console.log("🚀 X402 MCP Client Example");
-  console.log(`📡 Server: ${serverUrl}`);
+  console.log("X402 MCP Client Example");
+  console.log(`Server: ${serverUrl}`);
 
-  // Create account with remote signer
-  const remoteSigner = new RemoteSigner(signerUrl);
-  const accountInfo = await remoteSigner.getAccountInfo();
-  const account = new ATXPAccount({
-    accountId: accountInfo.accountId,
-    remoteSigner
-  });
+  // Create account with connection string
+  const connectionString = `${signerUrl}?connection_token=${connectionToken}`;
+  const account = new ATXPAccount(connectionString);
 
   // Create config
   const config = {
@@ -31,7 +28,7 @@ async function main() {
     account,
     logger: new ConsoleLogger({ prefix: '[X402]', level: LogLevel.INFO }),
     approvePayment: async () => {
-      console.log(`💰 Auto-approving X402 payment...`);
+      console.log(`Auto-approving X402 payment...`);
       return true;
     }
   };
@@ -45,8 +42,8 @@ async function main() {
   try {
     // Call the tool (will trigger X402 payment)
     const result = await client.callTool("get_data", { query: "blockchain metrics" });
-    console.log(`\n📊 Result: ${result.content[0].text}`);
-    console.log("\n✅ Success!");
+    console.log(`\nResult: ${result.content[0].text}`);
+    console.log("\nSuccess!");
   } finally {
     await client.close();
   }
