@@ -18,7 +18,7 @@ export class ATXPLocalAccount implements LocalAccount {
   // Properties needed by x402 library's isSignerWallet check
   public readonly account: LocalAccount;
   public readonly chain: { id: number };
-  public readonly transport: {};
+  public readonly transport: object;
 
   constructor(
     public readonly address: Address,
