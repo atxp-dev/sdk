@@ -194,7 +194,7 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       log.error(`Failed to handle X402 payment challenge: ${error}`);
 
       if (onPaymentFailure && isX402Challenge(paymentChallenge) && paymentChallenge.accepts && Array.isArray(paymentChallenge.accepts) && paymentChallenge.accepts[0]) {
-        const firstOption = paymentChallenge.accepts[0] as any;
+        const firstOption = paymentChallenge.accepts[0] as { maxAmountRequired?: string | number; description?: string; network?: string; payTo?: string };
         const amount = firstOption.maxAmountRequired ? Number(firstOption.maxAmountRequired) / (10 ** 6) : 0;
         const url = typeof input === 'string' ? input : input.toString();
         await onPaymentFailure({
