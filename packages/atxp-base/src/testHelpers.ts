@@ -8,7 +8,6 @@ import { base } from 'viem/chains';
 import type { Address, Hex } from 'viem';
 
 // Common test constants
-export const TEST_API_KEY = 'test-api-key';
 export const TEST_WALLET_ADDRESS = '0x1234567890123456789012345678901234567890' as Address;
 export const TEST_SMART_WALLET_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address;
 export const TEST_RECEIVER_ADDRESS = '0x1234567890123456789012345678901234567890' as Address;
@@ -22,15 +21,6 @@ export function mockProvider({
 } = {}) {
   return {
     request
-  };
-}
-
-// Mock SDK
-export function mockBaseAccountSDK({
-  provider = mockProvider()
-} = {}) {
-  return {
-    getProvider: vi.fn(() => provider)
   };
 }
 
@@ -218,31 +208,29 @@ export function mockSpendCalls({
 // Helper to setup initialization mocks
 export async function setupInitializationMocks({
   provider = mockProvider(),
-  spendPermission = mockSpendPermission(),
   smartAccount = mockSmartAccount(),
-  bundlerClient = mockBundlerClient()
+  bundlerClient = mockBundlerClient(),
+  spendPermission = mockSpendPermission(),
+  ephemeralWallet = mockEphemeralSmartWallet()
 } = {}): Promise<any> {
-  const { createBaseAccountSDK } = await import('@base-org/account');
-  const { requestSpendPermission } = await import('@base-org/account/spend-permission/browser');
   const { toCoinbaseSmartAccount, createBundlerClient } = await import('viem/account-abstraction');
   const { createPublicClient } = await import('viem');
+  const { requestSpendPermission } = await import('./spendPermissionShim.js');
+  const { toEphemeralSmartWallet } = await import('./smartWalletHelpers.js');
 
-  const sdk = mockBaseAccountSDK({ provider });
-  
-  (createBaseAccountSDK as any).mockReturnValue(sdk);
   (createPublicClient as any).mockReturnValue({});
   (toCoinbaseSmartAccount as any).mockResolvedValue(smartAccount);
   (createBundlerClient as any).mockReturnValue(bundlerClient);
   (requestSpendPermission as any).mockResolvedValue(spendPermission);
+  (toEphemeralSmartWallet as any).mockResolvedValue(ephemeralWallet);
 
   return {
-    createBaseAccountSDK,
-    requestSpendPermission,
     toCoinbaseSmartAccount,
     createBundlerClient,
     createPublicClient,
+    requestSpendPermission,
+    toEphemeralSmartWallet,
     provider,
-    sdk
   };
 }
 
@@ -250,9 +238,10 @@ export async function setupInitializationMocks({
 export async function setupPaymentMocks({
   spendCalls = mockSpendCalls()
 } = {}): Promise<any> {
-  const { prepareSpendCallData } = await import('@base-org/account/spend-permission/browser');
+  const { prepareSpendCallData } = await import('./spendPermissionShim.js');
+
   (prepareSpendCallData as any).mockResolvedValue(spendCalls);
-  
+
   return {
     prepareSpendCallData
   };
