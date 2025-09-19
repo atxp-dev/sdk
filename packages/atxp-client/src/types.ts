@@ -24,6 +24,9 @@ export type ProspectivePayment = {
   iss: string;
 }
 
+// Type for a fetch wrapper function that takes ClientConfig and returns wrapped fetch
+export type FetchWrapper = (config: ClientConfig) => FetchLike;
+
 export type ClientConfig = {
   mcpServer: string;
   account: Account;

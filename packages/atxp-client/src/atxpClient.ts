@@ -1,6 +1,6 @@
-import { ClientConfig } from "./types.js";
-import { MemoryOAuthDb, ConsoleLogger, DEFAULT_AUTHORIZATION_SERVER } from "@atxp/common";
-import { ATXPFetcher } from "./atxpFetcher.js";
+import { ClientConfig, FetchWrapper } from "./types.js";
+import { MemoryOAuthDb, ConsoleLogger, DEFAULT_AUTHORIZATION_SERVER, FetchLike } from "@atxp/common";
+import { wrapWithATXP } from "./atxpFetcher.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
@@ -59,22 +59,10 @@ export function buildClientConfig(args: ClientArgs): ClientConfig {
 export function buildStreamableTransport(args: ClientArgs): StreamableHTTPClientTransport {
   const config = buildClientConfig(args);
 
-  const fetcher = new ATXPFetcher({
-    accountId: args.account.accountId,
-    db: config.oAuthDb,
-    paymentMakers: args.account.paymentMakers,
-    fetchFn: config.fetchFn,
-    sideChannelFetch: config.oAuthChannelFetch,
-    allowInsecureRequests: config.allowHttp,
-    allowedAuthorizationServers: config.allowedAuthorizationServers,
-    approvePayment: config.approvePayment,
-    logger: config.logger,
-    onAuthorize: config.onAuthorize,
-    onAuthorizeFailure: config.onAuthorizeFailure,
-    onPayment: config.onPayment,
-    onPaymentFailure: config.onPaymentFailure
-  });
-  const transport = new StreamableHTTPClientTransport(new URL(args.mcpServer), {fetch: fetcher.fetch});
+  // Apply the ATXP wrapper to the fetch function
+  const wrappedFetch = wrapWithATXP(config);
+
+  const transport = new StreamableHTTPClientTransport(new URL(args.mcpServer), {fetch: wrappedFetch});
   return transport;
 }
 

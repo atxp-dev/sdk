@@ -18,6 +18,7 @@ export {
 export {
   type ATXPFetcherConfig,
   atxpFetch,
+  wrapWithATXP,
   ATXPFetcher
 } from './atxpFetcher.js';
 
@@ -55,6 +56,7 @@ export {
   type Account,
   type ProspectivePayment,
   type ClientConfig,
+  type FetchWrapper,
   InsufficientFundsError,
   PaymentNetworkError,
   type PaymentMaker

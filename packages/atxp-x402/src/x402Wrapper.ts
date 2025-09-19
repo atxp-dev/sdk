@@ -1,17 +1,18 @@
-import { ClientConfig, ProspectivePayment } from '@atxp/client';
+import { ClientConfig, ProspectivePayment, FetchWrapper } from '@atxp/client';
 import { FetchLike, Network } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
 import { LocalAccount } from 'viem';
 
 /**
- * Wraps fetch with X402 payment support using a local signer
- * This wrapper intercepts 402 responses and creates payments using the x402 library
+ * Creates an X402 payment wrapper for fetch.
+ * This wrapper intercepts 402 responses and creates payments using the x402 library.
+ * It follows the standard wrapper pattern - taking ClientConfig and returning a wrapped fetch.
  *
  * @param config - ClientConfig containing account, logger, and fetch function
  * @returns A wrapped fetch function that handles X402 payments
  */
-export function wrapWithX402(config: ClientConfig): FetchLike {
+export const wrapWithX402: FetchWrapper = (config: ClientConfig): FetchLike => {
   const { account, logger, fetchFn = fetch, approvePayment, onPayment, onPaymentFailure } = config;
   const log = logger ?? console;
 
@@ -170,7 +171,7 @@ export function wrapWithX402(config: ClientConfig): FetchLike {
             accountId: account.accountId,
             resourceUrl: url,
             resourceName: firstOption.description || url,
-            network: (firstOption.network || account.network) as Network,
+            network: (firstOption.network || 'base') as Network,
             currency: 'USDC',
             amount: new BigNumber(amount),
             iss: firstOption.payTo || ''
@@ -187,4 +188,4 @@ export function wrapWithX402(config: ClientConfig): FetchLike {
       });
     }
   };
-}
+};

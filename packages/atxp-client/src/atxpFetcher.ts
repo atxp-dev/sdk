@@ -1,7 +1,7 @@
 import { BigNumber } from 'bignumber.js';
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
 import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse } from '@atxp/common';
-import type { PaymentMaker, ProspectivePayment } from './types.js';
+import type { PaymentMaker, ProspectivePayment, ClientConfig, FetchWrapper } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -24,6 +24,36 @@ export interface ATXPFetcherConfig {
   onPaymentFailure?: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
 }
 
+/**
+ * Creates an ATXP fetch wrapper that handles OAuth authentication and payments.
+ * This follows the wrapper pattern for fetch functions.
+ *
+ * @param config - The client configuration
+ * @returns A wrapped fetch function that handles ATXP protocol
+ */
+export function wrapWithATXP(config: ClientConfig): FetchLike {
+  const fetcher = new ATXPFetcher({
+    accountId: config.account.accountId,
+    db: config.oAuthDb,
+    paymentMakers: config.account.paymentMakers,
+    fetchFn: config.fetchFn,
+    sideChannelFetch: config.oAuthChannelFetch,
+    allowInsecureRequests: config.allowHttp,
+    allowedAuthorizationServers: config.allowedAuthorizationServers,
+    approvePayment: config.approvePayment,
+    logger: config.logger,
+    onAuthorize: config.onAuthorize,
+    onAuthorizeFailure: config.onAuthorizeFailure,
+    onPayment: config.onPayment,
+    onPaymentFailure: config.onPaymentFailure
+  });
+  return fetcher.fetch;
+}
+
+// Keep the old function for backward compatibility, but mark as deprecated
+/**
+ * @deprecated Use wrapWithATXP instead
+ */
 export function atxpFetch(config: ATXPFetcherConfig): FetchLike {
   const fetcher = new ATXPFetcher(config);
   return fetcher.fetch;
