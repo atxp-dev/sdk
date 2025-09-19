@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { requirePayment } from '../requirePayment.js';
 import { BigNumber } from 'bignumber.js';
 import './setup.js';
+import type { ATXPConfig, TokenCheck } from '@atxp/server';
 
 // Mock external dependencies
 vi.mock('@atxp/server', async (importOriginal) => {
@@ -10,23 +11,27 @@ vi.mock('@atxp/server', async (importOriginal) => {
     ...actual,
     requirePayment: vi.fn(),
     withATXPContext: vi.fn(),
-    buildServerConfig: vi.fn()
+    buildServerConfig: vi.fn(),
+    ChainPaymentDestination: vi.fn().mockImplementation((address: string, network: string) => ({
+      destination: vi.fn().mockResolvedValue({ destination: address, network })
+    }))
   };
 });
 
 import {
   requirePayment as mockRequirePaymentSDK,
   withATXPContext as mockWithATXPContext,
-  buildServerConfig as mockBuildServerConfig
+  buildServerConfig as mockBuildServerConfig,
+  ChainPaymentDestination,
 } from '@atxp/server';
 
 describe('requirePayment', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (mockWithATXPContext as any).mockImplementation(async (config, resource, tokenInfo, callback) => {
+    (mockWithATXPContext as any).mockImplementation(async (config: ATXPConfig, resource: URL, tokenInfo: TokenCheck | null, callback: () => Promise<void>) => {
       await callback();
     });
-    (mockBuildServerConfig as any).mockImplementation((args) => ({
+    (mockBuildServerConfig as any).mockImplementation((args: any) => ({
       logger: { error: vi.fn() },
       ...args
     }));
@@ -35,12 +40,13 @@ describe('requirePayment', () => {
   it('should require payment with config args', async () => {
     const configOpts = {
       payeeName: 'Test Payee',
-      paymentDestination: { type: 'chain', address: '0x1234', network: 'base' }
+      paymentDestination: new ChainPaymentDestination('0x1234', 'base')
     };
 
     const mcpProps = {
       resource: new URL('https://example.com'),
       tokenCheck: {
+        passes: true as const,
         token: 'test-token',
         data: { active: true, sub: 'test-user' }
       }
@@ -65,7 +71,7 @@ describe('requirePayment', () => {
   it('should handle null token check', async () => {
     const configOpts = {
       payeeName: 'Test Payee',
-      paymentDestination: { type: 'chain', address: '0x1234', network: 'base' }
+      paymentDestination: new ChainPaymentDestination('0x1234', 'base')
     };
 
     const mcpProps = {

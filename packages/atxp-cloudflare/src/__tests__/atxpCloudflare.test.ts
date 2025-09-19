@@ -11,6 +11,9 @@ vi.mock('@atxp/server', () => ({
   sendOAuthChallengeWebApi: vi.fn(),
   sendOAuthMetadataWebApi: vi.fn(),
   sendProtectedResourceMetadataWebApi: vi.fn(),
+  ChainPaymentDestination: vi.fn().mockImplementation((address: string, network: string) => ({
+    destination: vi.fn().mockResolvedValue({ destination: address, network })
+  }))
 }));
 
 vi.mock('../buildATXPConfig.js', () => ({
@@ -27,6 +30,7 @@ import {
   sendOAuthChallengeWebApi,
   sendOAuthMetadataWebApi,
   sendProtectedResourceMetadataWebApi,
+  ChainPaymentDestination,
 } from '@atxp/server';
 import { buildATXPConfig } from '../buildATXPConfig.js';
 import { ATXPCloudflareOptions } from '../types.js';
@@ -51,7 +55,7 @@ describe('atxpCloudflare', () => {
 
   const mockOptions : ATXPCloudflareOptions = {
     mcpAgent: mockMcpAgent,
-    paymentDestination: { address: '0x1234567890123456789012345678901234567890', network: 'base' },
+    paymentDestination: new ChainPaymentDestination('0x1234567890123456789012345678901234567890', 'base'),
     payeeName: 'Test Server'
   };
 
