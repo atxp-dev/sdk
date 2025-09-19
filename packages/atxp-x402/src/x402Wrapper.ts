@@ -129,7 +129,38 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
 
       // Get the signer from the account
       log.debug('Getting signer from account');
-      const signer: LocalAccount = await accountWithSigner.getSigner!();
+      const signer = await accountWithSigner.getSigner!();
+
+      // Log the address we're paying from
+      log.info(`X402 payment will be made from address: ${signer.address}`);
+
+      // If using ATXPAccount, ensure we have enough on-chain USDC by converting IOUs if needed
+      const atxpAccount = account as { origin?: string; token?: string; fetchFn?: FetchLike };
+      if (atxpAccount.origin && atxpAccount.token) {
+        log.debug('Ensuring sufficient on-chain USDC for X402 payment');
+
+        // Call /ensure-currency to convert IOUs to USDC if needed
+        const ensureResponse = await (atxpAccount.fetchFn || fetchFn)(`${atxpAccount.origin}/ensure-currency`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${atxpAccount.token}:`).toString('base64')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: amountInUsdc.toString(),
+            currency: 'USDC'
+          })
+        });
+
+        if (!ensureResponse.ok) {
+          const errorText = await ensureResponse.text();
+          log.error(`Failed to ensure currency: ${errorText}`);
+          throw new Error(`Failed to ensure sufficient USDC: ${errorText}`);
+        }
+
+        const ensureResult = await ensureResponse.json() as { message?: string; balance?: { usdc: string; iou: string } };
+        log.info(`Currency ensured: ${ensureResult.message}, USDC: ${ensureResult.balance?.usdc}, IOU: ${ensureResult.balance?.iou}`);
+      }
 
       // Create the X402 payment header using the x402 library
       log.debug('Creating X402 payment header with signer');

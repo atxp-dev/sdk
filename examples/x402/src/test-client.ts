@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { atxpClient, BaseAccount } from "@atxp/client";
+import { atxpClient, ATXPAccount } from "@atxp/client";
 import { wrapWithX402 } from "@atxp/x402";
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from "dotenv";
@@ -16,8 +16,8 @@ async function main() {
   console.log("X402 Test Client (without payments)");
   console.log(`Server: ${serverUrl}`);
 
-  //const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
-  const account = new BaseAccount(process.env.BASE_RPC!, process.env.BASE_PRIVATE_KEY! as `0x${string}`);
+  const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
+  //const account = new BaseAccount(process.env.BASE_RPC!, process.env.BASE_PRIVATE_KEY! as `0x${string}`);
   const config = {
     account, 
     logger: new ConsoleLogger({level: LogLevel.DEBUG}),

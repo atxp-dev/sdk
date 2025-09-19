@@ -2,7 +2,7 @@ import type { Account, PaymentMaker } from './types.js';
 import type { FetchLike, Network, Currency } from '@atxp/common'
 import BigNumber from 'bignumber.js';
 import { LocalAccount } from 'viem';
-import { RemoteSigner } from './remoteSigner.js';
+import { ATXPLocalAccount } from './atxpLocalAccount.js';
 
 function toBasicAuth(token: string): string {
   // Basic auth is base64("username:password"), password is blank
@@ -87,9 +87,9 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 export class ATXPAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
-  private origin: string;
-  private token: string;
-  private fetchFn: FetchLike;
+  origin: string;
+  token: string;
+  fetchFn: FetchLike;
 
   constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: Network }) {
     const { origin, token } = parseConnectionString(connectionString);
@@ -109,26 +109,8 @@ export class ATXPAccount implements Account {
   }
 
 
-  /**
-   * Get a signer that can be used with the x402 library
-   * This uses RemoteSigner to delegate signing to the accounts-x402 server
-   */
   async getSigner(): Promise<LocalAccount> {
-    // Get the wallet address from the destination endpoint
-    const response = await this.fetchFn(`${this.origin}/destination`, {
-      headers: {
-        'Authorization': toBasicAuth(this.token)
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`ATXPAccount: Failed to get wallet address: ${response.status} ${response.statusText}`);
-    }
-
-    const { destination } = await response.json() as { destination: string };
-
-    return new RemoteSigner(
-      destination as `0x${string}`,
+    return ATXPLocalAccount.create(
       this.origin,
       this.token,
       this.fetchFn

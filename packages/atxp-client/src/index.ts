@@ -60,5 +60,5 @@ export {
 } from './types.js';
 
 export {
-  RemoteSigner
-} from './remoteSigner.js';
+  ATXPLocalAccount
+} from './atxpLocalAccount.js';
