@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { atxpClient, ATXPAccount } from "@atxp/client";
+import { atxpClient, ATXPAccount, BaseAccount } from "@atxp/client";
 import { wrapWithX402 } from "@atxp/x402";
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from "dotenv";
@@ -20,7 +20,8 @@ async function main() {
 
   // Create account with connection string
   const connectionString = `${signerUrl}?connection_token=${connectionToken}`;
-  const account = new ATXPAccount(connectionString);
+  //const account = new ATXPAccount(connectionString);
+  const account = new BaseAccount(process.env.BASE_RPC!, process.env.BASE_PRIVATE_KEY! as `0x${string}`);
 
   // Create config
   const config = {
