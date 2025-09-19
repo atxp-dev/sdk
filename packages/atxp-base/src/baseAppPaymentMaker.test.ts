@@ -8,7 +8,8 @@ Object.defineProperty(global, 'window', {
 });
 
 // Mock all external modules before imports
-vi.mock('@base-org/account/spend-permission/browser', () => ({
+vi.mock('./spendPermissionShim.js', () => ({
+  requestSpendPermission: vi.fn(),
   prepareSpendCallData: vi.fn()
 }));
 
@@ -90,10 +91,16 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const permission = mockSpendPermission();
     const bundlerClient = mockBundlerClient();
     const smartWallet = mockEphemeralSmartWallet({ client: bundlerClient });
-    
+
+    // Setup mock for prepareSpendCallData
+    const { prepareSpendCallData } = await import('./spendPermissionShim.js');
+    (prepareSpendCallData as any).mockResolvedValue([
+      { to: USDC_CONTRACT_ADDRESS_BASE, data: '0xmockencodeddata', value: 0n }
+    ]);
+
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5); // 1.5 USDC
-    
+
     const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
     
     // Verify the transaction hash
@@ -102,18 +109,20 @@ describe('baseAppPaymentMaker.makePayment', () => {
     // Verify sendUserOperation was called with correct parameters
     expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
       account: smartWallet.account,
-      calls: [
-        // Spend permission calls
-        { to: '0xcontract1', data: '0xdata1', value: 0n },
-        { to: '0xcontract2', data: '0xdata2', value: 0n },
-        // Transfer call
+      calls: expect.arrayContaining([
         {
           to: USDC_CONTRACT_ADDRESS_BASE,
-          data: expect.any(String), // Encoded transfer function
+          data: expect.any(String), // Contains encoded transferFrom + memo
           value: 0n
         }
-      ],
+      ]),
       maxPriorityFeePerGas: expect.any(BigInt)
+    });
+
+    // Verify prepareSpendCallData was called with correct parameters
+    expect(prepareSpendCallData).toHaveBeenCalledWith({
+      permission: permission,
+      amount: 1500000n // 1.5 USDC in smallest units
     });
     
     // Verify waitForUserOperationReceipt was called
