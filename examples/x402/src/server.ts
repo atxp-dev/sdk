@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3001;
 const recipientAddress = process.env.ATXP_DESTINATION! as `0x${string}`;
 const network = process.env.CDP_API_KEY_ID ? "base" : "base-sepolia";
 
-// Create MCP server with a simple tool
+// Create MCP server
 function createMcpServer(): McpServer {
   const server = new McpServer({
     name: 'x402-example-server',
@@ -26,10 +26,10 @@ function createMcpServer(): McpServer {
     capabilities: { tools: {} }
   });
 
-  // Register a tool that will require X402 payment
+  // Register a simple tool
   server.tool(
     'get_data',
-    'Get premium data (requires $0.01 USDC payment via X402)',
+    'Get premium data',
     {
       query: z.string().describe('Search query'),
     },
@@ -58,28 +58,21 @@ async function main() {
 
   const app = express();
 
-  // Capture raw body as Buffer for all requests
-  // This ensures we can replay the body for both X402 and MCP processing
-  app.use(express.raw({ type: '*/*', limit: '10mb' }));
+  // IMPORTANT: Parse JSON before X402 middleware
+  app.use(express.json());
 
-  // Setup X402 payment middleware for POST only
-  const x402Middleware = paymentMiddleware(
+  // Setup X402 payment middleware
+  /*app.use(paymentMiddleware(
     recipientAddress,
     {
-      //"POST /": { price: "$0.01", network }
+      "POST /": { price: "$0.01", network }
     },
     process.env.CDP_API_KEY_ID ? facilitator : { url: "https://x402.org/facilitator" }
-  );
+  ));*/
 
-  // MCP endpoint - handle both GET and POST
-  const handleMcpRequest = async (req: Request, res: Response) => {
-    console.log('Received request with headers:', req.headers);
-    console.log('Accept header:', req.headers.accept);
-
-    // Don't process if payment was already handled (avoid double processing)
-    if (res.headersSent) {
-      return;
-    }
+  // MCP endpoint handler
+  app.post('/', async (req: Request, res: Response) => {
+    console.log('Received POST request');
 
     const server = createMcpServer();
 
@@ -91,19 +84,8 @@ async function main() {
 
       await server.connect(transport);
 
-      // If we have a body, parse it and pass it to the transport
-      let parsedBody = undefined;
-      if (req.body && Buffer.isBuffer(req.body) && req.body.length > 0) {
-        try {
-          parsedBody = JSON.parse(req.body.toString());
-          console.log('Parsed body:', JSON.stringify(parsedBody, null, 2));
-        } catch (e) {
-          console.error('Failed to parse body:', e);
-        }
-      }
-
-      // Pass the parsed body to the transport
-      await transport.handleRequest(req, res, parsedBody);
+      // Pass the parsed body from express.json()
+      await transport.handleRequest(req, res, req.body);
 
       res.on('close', () => {
         transport.close();
@@ -124,14 +106,17 @@ async function main() {
         });
       }
     }
-  };
+  });
 
-  // Apply X402 middleware and handle MCP requests
-  // The middleware will process payments, then pass control to the MCP handler
-  //app.get('/', x402Middleware, handleMcpRequest);
-  //app.post('/', x402Middleware, handleMcpRequest);
-  app.get('/', handleMcpRequest);
-  app.post('/', handleMcpRequest);
+  // Handle GET requests
+  app.get('/', async (req: Request, res: Response) => {
+    console.log('Received GET request');
+    res.status(200).json({
+      message: 'X402 MCP Server is running',
+      price: '$0.01 USDC per POST request',
+      network
+    });
+  });
 
   const server = app.listen(PORT, () => {
     console.log(`X402 MCP Server running on http://localhost:${PORT}`);
@@ -140,24 +125,13 @@ async function main() {
   });
 
   // Graceful shutdown handling
-  const shutdown = () => {
+  process.on('SIGINT', () => {
     console.log('\nShutting down server...');
     server.close(() => {
       console.log('Server closed');
       process.exit(0);
     });
-
-    // Force exit after 5 seconds if graceful shutdown fails
-    setTimeout(() => {
-      console.error('Forced shutdown after timeout');
-      process.exit(1);
-    }, 5000);
-  };
-
-  // Handle termination signals
-  process.on('SIGINT', shutdown);  // Ctrl-C
-  process.on('SIGTERM', shutdown); // Terminal close
-  process.on('SIGHUP', shutdown);  // Terminal disconnect
+  });
 }
 
 main().catch(console.error);

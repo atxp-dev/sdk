@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { atxpClient, ATXPAccount, BaseAccount } from "@atxp/client";
+import { atxpClient, BaseAccount } from "@atxp/client";
 import { wrapWithX402 } from "@atxp/x402";
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from "dotenv";
@@ -12,16 +12,15 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 async function main() {
   const serverUrl = process.env.X402_SERVER_URL || "http://localhost:3001";
-  const signerUrl = process.env.ATXP_REMOTE_SIGNER_URL || "http://localhost:3002";
-  const connectionToken = process.env.ATXP_CONNECTION_TOKEN || "test-token";
 
   console.log("X402 MCP Client Example");
   console.log(`Server: ${serverUrl}`);
 
-  // Create account with connection string
-  const connectionString = `${signerUrl}?connection_token=${connectionToken}`;
-  //const account = new ATXPAccount(connectionString);
-  const account = new BaseAccount(process.env.BASE_RPC!, process.env.BASE_PRIVATE_KEY! as `0x${string}`);
+  // Create account
+  const account = new BaseAccount(
+    process.env.BASE_RPC!,
+    process.env.BASE_PRIVATE_KEY! as `0x${string}`
+  );
 
   // Create config
   const config = {
@@ -41,10 +40,14 @@ async function main() {
   });
 
   try {
-    // Call the tool (will trigger X402 payment)
+    // Call the tool - will trigger X402 payment
+    console.log("\nCalling tool 'get_data'...");
     const result = await client.callTool("get_data", { query: "blockchain metrics" });
+
     console.log(`\nResult: ${result.content[0].text}`);
     console.log("\nSuccess!");
+  } catch (error) {
+    console.error("Error:", error);
   } finally {
     await client.close();
   }
