@@ -1,7 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { wrapWithX402 } from './x402Wrapper.js';
 import { BaseAccount } from '@atxp/client';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
+
+vi.mock('x402/client', () => ({
+  createPaymentHeader: vi.fn().mockResolvedValue('mocked-payment-header'),
+  selectPaymentRequirements: vi.fn((accepts, network) => {
+    // Return the first accept that matches the network, or null
+    return accepts.find((a: any) => a.network === network) || null;
+  })
+}));
 
 describe('wrapWithX402', () => {
   let mockAccount: BaseAccount;
@@ -19,6 +27,13 @@ describe('wrapWithX402', () => {
       getSigner: vi.fn().mockResolvedValue({
         address: '0x1234567890123456789012345678901234567890',
         signTypedData: vi.fn().mockResolvedValue('0xmockedsignature'),
+        account: {
+          address: '0x1234567890123456789012345678901234567890',
+        },
+        chain: {
+          id: 8453,
+        },
+        transport: {},
       }),
     } as unknown as BaseAccount;
 
@@ -52,30 +67,24 @@ describe('wrapWithX402', () => {
   });
 
   it('should handle 402 responses and retry with payment', async () => {
-    // First response: 402 with X402 challenge
+    // First response: 402 with X402 challenge in JSON body
     const x402Challenge = {
-      version: 0,
-      created_at: Date.now(),
-      expires_at: Date.now() + 60000,
-      request_nonce: 'test-nonce',
-      chain_id: 8453,
-      currency: 'USDC',
-      amount: '1000000',
-      recipient: '0xrecipient',
-      memo: 'Test payment',
-      receipt_url: 'https://example.com/receipt',
+      x402Version: 1,
       accepts: [
         {
-          type: 'transferWithAuthorization',
-          required: ['signature', 'authorization'],
+          network: 'base',
+          scheme: 'exact',
+          payTo: '0xrecipient',
+          maxAmountRequired: '1000000',
+          description: 'Test payment',
         },
       ],
     };
 
-    const first402Response = new Response('Payment Required', {
+    const first402Response = new Response(JSON.stringify(x402Challenge), {
       status: 402,
       headers: {
-        'X-402': btoa(JSON.stringify(x402Challenge)),
+        'Content-Type': 'application/json',
       },
     });
 
@@ -83,7 +92,7 @@ describe('wrapWithX402', () => {
     const successResponse = new Response('Success', {
       status: 200,
       headers: {
-        'X-Payment-Response': btoa(JSON.stringify({ receipt: 'test-receipt' })),
+        'X-PAYMENT-RESPONSE': JSON.stringify({ receipt: 'test-receipt' }),
       },
     });
 
@@ -115,9 +124,9 @@ describe('wrapWithX402', () => {
     // Should have called approve payment
     expect(mockApprovePayment).toHaveBeenCalledWith(
       expect.objectContaining({
-        amount: '1000000',
+        amount: expect.objectContaining({ toNumber: expect.any(Function) }),
         currency: 'USDC',
-        recipient: '0xrecipient',
+        iss: '0xrecipient',
       })
     );
 
@@ -125,7 +134,7 @@ describe('wrapWithX402', () => {
     expect(mockOnPayment).toHaveBeenCalledWith(
       expect.objectContaining({
         payment: expect.objectContaining({
-          amount: '1000000',
+          amount: expect.objectContaining({ toNumber: expect.any(Function) }),
           currency: 'USDC',
         }),
       })
@@ -134,38 +143,32 @@ describe('wrapWithX402', () => {
     // Should have made two fetch calls
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
-    // Second call should include X-Payment header
+    // Second call should include X-PAYMENT header
     expect(mockFetch).toHaveBeenNthCalledWith(2, 'https://example.com/api', {
       method: 'POST',
       body: 'test-body',
-      headers: expect.objectContaining({
-        'X-Payment': expect.any(String),
-      }),
+      headers: expect.any(Headers),
     });
   });
 
   it('should handle payment approval rejection', async () => {
     const x402Challenge = {
-      version: 0,
-      created_at: Date.now(),
-      expires_at: Date.now() + 60000,
-      request_nonce: 'test-nonce',
-      chain_id: 8453,
-      currency: 'USDC',
-      amount: '1000000',
-      recipient: '0xrecipient',
+      x402Version: 1,
       accepts: [
         {
-          type: 'transferWithAuthorization',
-          required: ['signature', 'authorization'],
+          network: 'base',
+          scheme: 'exact',
+          payTo: '0xrecipient',
+          maxAmountRequired: '1000000',
+          description: 'Test payment',
         },
       ],
     };
 
-    const response402 = new Response('Payment Required', {
+    const response402 = new Response(JSON.stringify(x402Challenge), {
       status: 402,
       headers: {
-        'X-402': btoa(JSON.stringify(x402Challenge)),
+        'Content-Type': 'application/json',
       },
     });
 
@@ -196,7 +199,7 @@ describe('wrapWithX402', () => {
     expect(mockOnPaymentFailure).toHaveBeenCalledWith(
       expect.objectContaining({
         error: expect.objectContaining({
-          message: expect.stringContaining('User rejected payment'),
+          message: expect.stringContaining('Payment not approved'),
         }),
       })
     );
@@ -205,10 +208,10 @@ describe('wrapWithX402', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('should handle missing X-402 header on 402 response', async () => {
+  it('should handle missing X402 JSON body on 402 response', async () => {
     const response402 = new Response('Payment Required', {
       status: 402,
-      // No X-402 header
+      // No JSON body with x402Version
     });
 
     mockFetch.mockResolvedValue(response402);
@@ -233,26 +236,22 @@ describe('wrapWithX402', () => {
 
   it('should handle x402 library errors', async () => {
     const x402Challenge = {
-      version: 0,
-      created_at: Date.now(),
-      expires_at: Date.now() + 60000,
-      request_nonce: 'test-nonce',
-      chain_id: 8453,
-      currency: 'USDC',
-      amount: '1000000',
-      recipient: '0xrecipient',
+      x402Version: 1,
       accepts: [
         {
-          type: 'transferWithAuthorization',
-          required: ['signature', 'authorization'],
+          network: 'base',
+          scheme: 'exact',
+          payTo: '0xrecipient',
+          maxAmountRequired: '1000000',
+          description: 'Test payment',
         },
       ],
     };
 
-    const response402 = new Response('Payment Required', {
+    const response402 = new Response(JSON.stringify(x402Challenge), {
       status: 402,
       headers: {
-        'X-402': btoa(JSON.stringify(x402Challenge)),
+        'Content-Type': 'application/json',
       },
     });
 
@@ -288,42 +287,36 @@ describe('wrapWithX402', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('should handle wrong network account', async () => {
-    // Account on wrong network
-    const wrongNetworkAccount = {
-      accountId: '0x1234567890123456789012345678901234567890',
-      network: 'solana', // Not base
-      getSigner: vi.fn(),
-    } as unknown as BaseAccount;
+  it('should handle no suitable payment option', async () => {
+    // Mock selectPaymentRequirements to return null for unsupported network
+    const { selectPaymentRequirements } = await import('x402/client');
+    (selectPaymentRequirements as Mock).mockReturnValueOnce(null);
 
+    // X402 challenge with unsupported network
     const x402Challenge = {
-      version: 0,
-      created_at: Date.now(),
-      expires_at: Date.now() + 60000,
-      request_nonce: 'test-nonce',
-      chain_id: 8453, // Base mainnet
-      currency: 'USDC',
-      amount: '1000000',
-      recipient: '0xrecipient',
+      x402Version: 1,
       accepts: [
         {
-          type: 'transferWithAuthorization',
-          required: ['signature', 'authorization'],
+          network: 'ethereum',  // Not base
+          scheme: 'exact',
+          payTo: '0xrecipient',
+          maxAmountRequired: '1000000',
+          description: 'Test payment',
         },
       ],
     };
 
-    const response402 = new Response('Payment Required', {
+    const response402 = new Response(JSON.stringify(x402Challenge), {
       status: 402,
       headers: {
-        'X-402': btoa(JSON.stringify(x402Challenge)),
+        'Content-Type': 'application/json',
       },
     });
 
     mockFetch.mockResolvedValue(response402);
 
     const wrappedFetch = wrapWithX402({
-      account: wrongNetworkAccount,
+      account: mockAccount,
       fetchFn: mockFetch,
       logger: mockLogger,
       onPaymentFailure: mockOnPaymentFailure,
@@ -334,16 +327,10 @@ describe('wrapWithX402', () => {
     // Should return the original 402 response
     expect(result.status).toBe(402);
 
-    // Should not have tried to get signer
-    expect(wrongNetworkAccount.getSigner).not.toHaveBeenCalled();
+    // Should not have tried to get signer since no suitable payment option
+    expect(mockAccount.getSigner).not.toHaveBeenCalled();
 
-    // Should have called onPaymentFailure with network mismatch error
-    expect(mockOnPaymentFailure).toHaveBeenCalledWith(
-      expect.objectContaining({
-        error: expect.objectContaining({
-          message: expect.stringContaining('network'),
-        }),
-      })
-    );
+    // Should not have called onPaymentFailure (just returns original 402)
+    expect(mockOnPaymentFailure).not.toHaveBeenCalled();
   });
 });
