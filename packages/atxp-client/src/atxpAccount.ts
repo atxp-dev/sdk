@@ -108,33 +108,6 @@ export class ATXPAccount implements Account {
     };
   }
 
-  /**
-   * Create an X402 payment header by calling the accounts-x402 server
-   * @param x402Challenge The X402 challenge object from the 402 response
-   * @returns The X402 payment header to send in the retry request
-   */
-  async createX402Payment(x402Challenge: { x402Version: number; accepts: unknown[] }): Promise<string> {
-    const response = await this.fetchFn(`${this.origin}/create-x402-payment`, {
-      method: 'POST',
-      headers: {
-        'Authorization': toBasicAuth(this.token),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(x402Challenge),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`ATXPAccount: Failed to create X402 payment: ${response.status} ${response.statusText} ${text}`);
-    }
-
-    const result = await response.json() as { paymentHeader?: string };
-    if (!result?.paymentHeader) {
-      throw new Error('ATXPAccount: Server did not return payment header');
-    }
-
-    return result.paymentHeader;
-  }
 
   /**
    * Get a signer that can be used with the x402 library

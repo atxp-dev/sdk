@@ -73,18 +73,3 @@ export class RemoteSigner implements LocalAccount {
   readonly source = 'custom' as const;
 }
 
-/**
- * Create a remote signer for use with x402-fetch
- * @param address The address of the account
- * @param origin The origin URL of the accounts-x402 API
- * @param token The connection token for authentication
- * @param fetchFn Optional fetch function to use
- */
-export function createRemoteSigner(
-  address: Address,
-  origin: string,
-  token: string,
-  fetchFn?: FetchLike
-): RemoteSigner {
-  return new RemoteSigner(address, origin, token, fetchFn);
-}

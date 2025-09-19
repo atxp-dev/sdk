@@ -31,10 +31,23 @@ export function wrapWithX402(config: ClientConfig): FetchLike {
 
     log.info('Received X402 payment challenge');
 
+    // Parse the X402 payment requirements from response body
+    const responseBody = await response.text();
+    let paymentChallenge: any;
+
     try {
-      // Parse the X402 payment requirements from response body
-      const responseBody = await response.text();
-      const paymentChallenge = JSON.parse(responseBody);
+      paymentChallenge = JSON.parse(responseBody);
+    } catch (parseError) {
+      log.error(`Failed to parse X402 challenge: ${parseError}`);
+      // Return a new Response with the original body since we consumed it
+      return new Response(responseBody, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers
+      });
+    }
+
+    try {
 
       // Check if this is a valid X402 response
       if (!paymentChallenge.x402Version || !paymentChallenge.accepts || !Array.isArray(paymentChallenge.accepts)) {
@@ -148,30 +161,30 @@ export function wrapWithX402(config: ClientConfig): FetchLike {
       // If there's an error processing the payment, call failure callback and return original response
       log.error(`Failed to handle X402 payment challenge: ${error}`);
 
-      // Try to recreate the response with the body we might have consumed
-      const responseBody = await response.text();
-      const paymentChallenge = JSON.parse(responseBody);
-
       if (onPaymentFailure && paymentChallenge?.accepts?.[0]) {
         const firstOption = paymentChallenge.accepts[0];
-        const amount = Number(firstOption.maxAmountRequired) / (10 ** 6);
+        const amount = firstOption.maxAmountRequired ? Number(firstOption.maxAmountRequired) / (10 ** 6) : 0;
         const url = typeof input === 'string' ? input : input.toString();
         await onPaymentFailure({
           payment: {
             accountId: account.accountId,
             resourceUrl: url,
             resourceName: firstOption.description || url,
-            network: firstOption.network as Network,
+            network: (firstOption.network || account.network) as Network,
             currency: 'USDC',
             amount: new BigNumber(amount),
-            iss: firstOption.payTo
+            iss: firstOption.payTo || ''
           },
           error: error as Error
         });
       }
 
-      // Return the original response
-      return response;
+      // Return a new Response with the original body since we consumed it
+      return new Response(responseBody, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers
+      });
     }
   };
 }

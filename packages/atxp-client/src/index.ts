@@ -61,6 +61,5 @@ export {
 } from './types.js';
 
 export {
-  RemoteSigner,
-  createRemoteSigner
+  RemoteSigner
 } from './remoteSigner.js';
