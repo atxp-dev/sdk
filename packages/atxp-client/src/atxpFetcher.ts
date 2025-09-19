@@ -32,7 +32,7 @@ export function atxpFetch(config: ClientConfig): FetchLike {
   return fetcher.fetch;
 }
 
-class ATXPFetcher {
+export class ATXPFetcher {
   protected oauthClient: OAuthClient;
   protected paymentMakers: Map<string, PaymentMaker>;
   protected sideChannelFetch: FetchLike;
