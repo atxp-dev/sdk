@@ -11,15 +11,16 @@ vi.mock('@atxp/server', () => ({
   sendOAuthChallengeWebApi: vi.fn(),
   sendOAuthMetadataWebApi: vi.fn(),
   sendProtectedResourceMetadataWebApi: vi.fn(),
+  ChainPaymentDestination: vi.fn().mockImplementation((address: string, network: string) => ({
+    destination: vi.fn().mockResolvedValue({ destination: address, network })
+  }))
 }));
 
 vi.mock('../buildATXPConfig.js', () => ({
   buildATXPConfig: vi.fn()
 }));
 
-vi.mock('../workerContext.js', () => ({
-  setATXPWorkerContext: vi.fn()
-}));
+// No longer need workerContext mock since context is passed through props
 
 import {
   checkTokenWebApi,
@@ -29,9 +30,9 @@ import {
   sendOAuthChallengeWebApi,
   sendOAuthMetadataWebApi,
   sendProtectedResourceMetadataWebApi,
+  ChainPaymentDestination,
 } from '@atxp/server';
 import { buildATXPConfig } from '../buildATXPConfig.js';
-import { setATXPWorkerContext } from '../workerContext.js';
 import { ATXPCloudflareOptions } from '../types.js';
 
 // Mock MCP Agent
@@ -54,8 +55,7 @@ describe('atxpCloudflare', () => {
 
   const mockOptions : ATXPCloudflareOptions = {
     mcpAgent: mockMcpAgent,
-    destination: '0x1234567890123456789012345678901234567890',
-    network: 'base' as const,
+    paymentDestination: new ChainPaymentDestination('0x1234567890123456789012345678901234567890', 'base'),
     payeeName: 'Test Server'
   };
 
@@ -225,7 +225,8 @@ describe('atxpCloudflare', () => {
 
       expect(parseMcpRequestsWebApi).toHaveBeenCalled();
       expect(checkTokenWebApi).toHaveBeenCalled();
-      expect(setATXPWorkerContext).toHaveBeenCalledWith(mockConfig, expect.any(URL), mockTokenCheck);
+      // Context is now passed through props to MCP agent instead of global context
+      expect(mockMcpAgent.serve).toHaveBeenCalledWith('/mcp');
       expect(result.status).toBe(200);
     });
 
@@ -262,7 +263,7 @@ describe('atxpCloudflare', () => {
       const result = await handler.fetch(request, {}, {});
 
       expect(checkTokenWebApi).not.toHaveBeenCalled();
-      expect(setATXPWorkerContext).not.toHaveBeenCalled();
+      // No MCP requests means no ATXP processing, context is passed through props
       expect(result.status).toBe(200);
     });
 

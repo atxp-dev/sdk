@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { requirePayment } from '../requirePayment.js';
 import { BigNumber } from 'bignumber.js';
 import './setup.js';
+import type { ATXPConfig, TokenCheck } from '@atxp/server';
 
 // Mock external dependencies
 vi.mock('@atxp/server', async (importOriginal) => {
@@ -9,73 +10,89 @@ vi.mock('@atxp/server', async (importOriginal) => {
   return {
     ...actual,
     requirePayment: vi.fn(),
-    withATXPContext: vi.fn()
+    withATXPContext: vi.fn(),
+    buildServerConfig: vi.fn(),
+    ChainPaymentDestination: vi.fn().mockImplementation((address: string, network: string) => ({
+      destination: vi.fn().mockResolvedValue({ destination: address, network })
+    }))
   };
 });
 
-vi.mock('../workerContext.js', () => ({
-  getATXPWorkerContext: vi.fn()
-}));
-
-import { requirePayment as mockRequirePaymentSDK, withATXPContext as mockWithATXPContext } from '@atxp/server';
-import { getATXPWorkerContext } from '../workerContext.js';
+import {
+  requirePayment as mockRequirePaymentSDK,
+  withATXPContext as mockWithATXPContext,
+  buildServerConfig as mockBuildServerConfig,
+  ChainPaymentDestination,
+} from '@atxp/server';
 
 describe('requirePayment', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (mockWithATXPContext as any).mockImplementation(async (config, resource, tokenInfo, callback) => {
+    (mockWithATXPContext as any).mockImplementation(async (config: ATXPConfig, resource: URL, tokenInfo: TokenCheck | null, callback: () => Promise<void>) => {
       await callback();
     });
+    (mockBuildServerConfig as any).mockImplementation((args: any) => ({
+      logger: { error: vi.fn() },
+      ...args
+    }));
   });
 
-  it('should require payment with existing config', async () => {
-    const mockConfig = { logger: { error: vi.fn() } };
-    const mockTokenCheck = {
-      token: 'test-token',
-      data: { active: true, sub: 'test-user' }
+  it('should require payment with config args', async () => {
+    const configOpts = {
+      payeeName: 'Test Payee',
+      paymentDestination: new ChainPaymentDestination('0x1234', 'base')
     };
-    (getATXPWorkerContext as any).mockReturnValue({ config: mockConfig, resource: new URL('https://example.com'), tokenCheck: mockTokenCheck });
 
-    const paymentConfig = {
-      price: new BigNumber(0.01),
-      authenticatedUser: 'test-user',
-      userToken: 'test-token',
-      atxpInitParams: {
-        destination: '0x1234567890123456789012345678901234567890',
-        network: 'base' as const,
-        resourceUrl: 'https://example.com/'
+    const mcpProps = {
+      resource: new URL('https://example.com'),
+      tokenCheck: {
+        passes: true as const,
+        token: 'test-token',
+        data: { active: true, sub: 'test-user' }
       }
     };
 
-    await requirePayment(paymentConfig);
+    const paymentConfig = {
+      price: new BigNumber(0.01)
+    };
 
+    await requirePayment(paymentConfig, configOpts, mcpProps);
+
+    expect(mockBuildServerConfig).toHaveBeenCalledWith(configOpts);
     expect(mockWithATXPContext).toHaveBeenCalledWith(
-      mockConfig,
-      new URL('https://example.com/'),
-      mockTokenCheck,
+      expect.objectContaining({ logger: expect.any(Object) }),
+      mcpProps.resource,
+      mcpProps.tokenCheck,
       expect.any(Function)
     );
-
     expect(mockRequirePaymentSDK).toHaveBeenCalledWith(paymentConfig);
   });
 
-  it('should throw error when no ATXP config found', async () => {
-    (getATXPWorkerContext as any).mockReturnValue(null);
-
-    const paymentConfig = {
-      price: new BigNumber(0.01),
-      authenticatedUser: 'test-user',
-      userToken: 'test-token',
-      atxpInitParams: {
-        destination: '0x1234567890123456789012345678901234567890',
-        network: 'base' as const,
-        resourceUrl: 'https://example.com/'
-      }
+  it('should handle null token check', async () => {
+    const configOpts = {
+      payeeName: 'Test Payee',
+      paymentDestination: new ChainPaymentDestination('0x1234', 'base')
     };
 
-    await expect(requirePayment(paymentConfig)).rejects.toThrow('No ATXP config found - payments cannot be processed');
-    expect(mockWithATXPContext).not.toHaveBeenCalled();
-    expect(mockRequirePaymentSDK).not.toHaveBeenCalled();
+    const mcpProps = {
+      resource: new URL('https://example.com'),
+      tokenCheck: null
+    };
+
+    const paymentConfig = {
+      price: new BigNumber(0.01)
+    };
+
+    await requirePayment(paymentConfig, configOpts, mcpProps);
+
+    expect(mockBuildServerConfig).toHaveBeenCalledWith(configOpts);
+    expect(mockWithATXPContext).toHaveBeenCalledWith(
+      expect.objectContaining({ logger: expect.any(Object) }),
+      mcpProps.resource,
+      null,
+      expect.any(Function)
+    );
+    expect(mockRequirePaymentSDK).toHaveBeenCalledWith(paymentConfig);
   });
 
 });

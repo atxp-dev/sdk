@@ -17,9 +17,9 @@ import BigNumber from "bignumber.js";
  */
 export class ATXPPaymentServer implements PaymentServer {
   constructor(
-    private readonly server: AuthorizationServerUrl, 
+    private readonly server: AuthorizationServerUrl,
     private readonly logger: Logger,
-    private readonly fetchFn: FetchLike = fetch) {
+    private readonly fetchFn: FetchLike = fetch.bind(globalThis)) {
   }
 
   charge = async({source, destination, network, currency, amount}: 
