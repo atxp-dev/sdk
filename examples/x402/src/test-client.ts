@@ -13,44 +13,25 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 async function main() {
   const serverUrl = process.env.X402_SERVER_URL || "http://localhost:3001";
 
-  console.log("X402 MCP Client Example");
+  console.log("X402 Test Client (without payments)");
   console.log(`Server: ${serverUrl}`);
 
-  // Create account
-  const account = new BaseAccount(
-    process.env.BASE_RPC!,
-    process.env.BASE_PRIVATE_KEY! as `0x${string}`
-  );
-
-  // Create config
-  const config = {
+  //const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
+  const account = new BaseAccount(process.env.BASE_RPC!, process.env.BASE_PRIVATE_KEY! as `0x${string}`);
+  const mcpClient = await atxpClient({
     mcpServer: serverUrl,
     account,
-    logger: new ConsoleLogger({ prefix: '[X402]', level: LogLevel.DEBUG }),
-    approvePayment: async () => {
-      console.log(`Auto-approving X402 payment...`);
-      return true;
-    }
-  };
-
-  // Create client with X402 wrapper for payment support
-  const client = await atxpClient({
-    ...config,
-    //fetchFn: wrapWithX402(config)
+    allowedAuthorizationServers: ['http://localhost:3010', 'https://auth.atxp.ai', 'https://atxp-accounts-staging.onrender.com/'],
+    allowHttp: true,
+    logger: new ConsoleLogger({level: LogLevel.DEBUG})
   });
+  const res = await mcpClient.callTool({
+    name: "secure-data",
+    arguments: { message: "blockchain metrics" }
+  });
+  
+  console.log('Result:', res);
 
-  try {
-    // Call the tool - will trigger X402 payment
-    console.log("\nCalling tool 'get_data'...");
-    const result = await client.callTool("get_data", { query: "blockchain metrics" });
-
-    console.log(`\nResult: ${result.content[0].text}`);
-    console.log("\nSuccess!");
-  } catch (error) {
-    console.error("Error:", error);
-  } finally {
-    await client.close();
-  }
 }
 
 main().catch(console.error);

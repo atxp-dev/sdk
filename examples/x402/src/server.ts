@@ -1,45 +1,40 @@
-#!/usr/bin/env node
+/* eslint-disable no-console */
 import express, { Request, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { paymentMiddleware } from 'x402-express';
-import { facilitator } from '@coinbase/x402';
 import { z } from 'zod';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { BigNumber } from 'bignumber.js';
+import { requirePayment, ChainPaymentDestination } from '@atxp/server';
+import { atxpExpress } from '@atxp/express';
+import { ConsoleLogger, LogLevel } from '@atxp/common';
+import 'dotenv/config';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config();
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+const PORT = 3001;
 
-const PORT = process.env.PORT || 3001;
-const recipientAddress = process.env.ATXP_DESTINATION! as `0x${string}`;
-const network = process.env.CDP_API_KEY_ID ? "base" : "base-sepolia";
-
-// Create MCP server
-function createMcpServer(): McpServer {
+const getServer = () => {
+  // Create an MCP server with implementation details
   const server = new McpServer({
-    name: 'x402-example-server',
+    name: 'stateless-streamable-http-server',
     version: '1.0.0',
-  }, {
-    capabilities: { tools: {} }
-  });
+  }, { capabilities: { logging: {} } });
 
-  // Register a simple tool
+  // Register a tool specifically for testing resumability
   server.tool(
-    'get_data',
-    'Get premium data',
+    'secure-data',
+    'Secure data',
     {
-      query: z.string().describe('Search query'),
+      message: z.string().optional().describe('Message to secure'),
     },
-    async ({ query }: { query: string }) => {
-      const results = Math.floor(Math.random() * 1000);
+    async ({ message }: { message?: string }): Promise<CallToolResult> => {
+      // await requirePayment({price: BigNumber(0.01)}); // Will be enabled later
       return {
-        content: [{
-          type: 'text',
-          text: `Premium data for "${query}": ${results} results found.`
-        }]
+        content: [
+          {
+            type: 'text',
+            text: `Secure data: ${message || 'No message provided'}`,
+          }
+        ],
       };
     }
   );
@@ -47,91 +42,89 @@ function createMcpServer(): McpServer {
   return server;
 }
 
-// Main server setup
-async function main() {
-  console.log('Starting X402 Example Server...');
+const app = express();
+app.use(express.json());
 
-  if (!recipientAddress) {
-    console.error('ATXP_DESTINATION environment variable is required!');
+const destinationAddress = process.env.ATXP_DESTINATION!;
+const destination = new ChainPaymentDestination(destinationAddress, 'base');
+console.log('Starting MCP server with destination', destinationAddress);
+app.use(atxpExpress({
+  paymentDestination: destination,
+  resource: `http://localhost:${PORT}`,
+  //server: 'http://localhost:3010',
+  server: 'https://auth.atxp.ai',
+  mountPath: '/',
+  payeeName: 'ATXP Client Example Resource Server',
+  allowHttp: true,
+  logger: new ConsoleLogger({level: LogLevel.DEBUG})
+}));
+
+
+app.post('/', async (req: Request, res: Response) => {
+  const server = getServer();
+  try {
+    const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true
+    });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+    res.on('close', () => {
+      console.log('Request closed');
+      transport.close();
+      server.close();
+    });
+  } catch (error) {
+    console.error('Error handling MCP request:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: 'Internal server error',
+        },
+        id: null,
+      });
+    }
+  }
+});
+
+app.get('/', async (req: Request, res: Response) => {
+  console.log('Received GET MCP request');
+  res.writeHead(405).end(JSON.stringify({
+    jsonrpc: "2.0",
+    error: {
+      code: -32000,
+      message: "Method not allowed."
+    },
+    id: null
+  }));
+});
+
+app.delete('/', async (req: Request, res: Response) => {
+  console.log('Received DELETE MCP request');
+  res.writeHead(405).end(JSON.stringify({
+    jsonrpc: "2.0",
+    error: {
+      code: -32000,
+      message: "Method not allowed."
+    },
+    id: null
+  }));
+});
+
+
+// Start the server
+app.listen(PORT, (error) => {
+  if (error) {
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
+  console.log(`MCP Stateless Streamable HTTP Server listening on port ${PORT}`);
+});
 
-  const app = express();
-
-  // IMPORTANT: Parse JSON before X402 middleware
-  app.use(express.json());
-
-  // Setup X402 payment middleware
-  /*app.use(paymentMiddleware(
-    recipientAddress,
-    {
-      "POST /": { price: "$0.01", network }
-    },
-    process.env.CDP_API_KEY_ID ? facilitator : { url: "https://x402.org/facilitator" }
-  ));*/
-
-  // MCP endpoint handler
-  app.post('/', async (req: Request, res: Response) => {
-    console.log('Received POST request');
-
-    const server = createMcpServer();
-
-    try {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true
-      });
-
-      await server.connect(transport);
-
-      // Pass the parsed body from express.json()
-      await transport.handleRequest(req, res, req.body);
-
-      res.on('close', () => {
-        transport.close();
-        server.close();
-      });
-
-    } catch (error) {
-      console.error('Error handling MCP request:', error);
-
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: '2.0',
-          error: {
-            code: -32603,
-            message: 'Internal server error',
-          },
-          id: null,
-        });
-      }
-    }
-  });
-
-  // Handle GET requests
-  app.get('/', async (req: Request, res: Response) => {
-    console.log('Received GET request');
-    res.status(200).json({
-      message: 'X402 MCP Server is running',
-      price: '$0.01 USDC per POST request',
-      network
-    });
-  });
-
-  const server = app.listen(PORT, () => {
-    console.log(`X402 MCP Server running on http://localhost:${PORT}`);
-    console.log(`Payment: $0.01 USDC per request on ${network}`);
-    console.log(`Recipient: ${recipientAddress}`);
-  });
-
-  // Graceful shutdown handling
-  process.on('SIGINT', () => {
-    console.log('\nShutting down server...');
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
-    });
-  });
-}
-
-main().catch(console.error);
+// Handle server shutdown
+process.on('SIGINT', async () => {
+  console.log('Shutting down server...');
+  process.exit(0);
+});
