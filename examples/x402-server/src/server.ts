@@ -1,6 +1,5 @@
 import express from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { paymentMiddleware } from "x402-express";
 import { facilitator } from "@coinbase/x402";
 import dotenv from "dotenv";
@@ -27,7 +26,7 @@ const facilitatorConfig = process.env.CDP_API_KEY_ID && process.env.CDP_API_KEY_
   ? facilitator  // Use CDP facilitator for mainnet
   : { url: "https://x402.org/facilitator" } ; // Use public test facilitator
 
-// Create MCP server
+// Create MCP server with tools
 const mcpServer = new Server({
   name: "x402-example-server",
   version: "1.0.0"
@@ -37,82 +36,69 @@ const mcpServer = new Server({
   }
 });
 
-// Add a tool that requires payment
-mcpServer.setRequestHandler("tools/list", async () => {
-  return {
-    tools: [
-      {
-        name: "get_premium_data",
-        description: "Get premium data (costs $0.01 USDC)",
-        inputSchema: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "The query to search for"
-            }
-          },
-          required: ["query"]
-        }
-      },
-      {
-        name: "calculate_cost",
-        description: "Calculate the cost of an operation (costs $0.005 USDC)",
-        inputSchema: {
-          type: "object",
-          properties: {
-            amount: {
-              type: "number",
-              description: "The amount to calculate cost for"
-            },
-            rate: {
-              type: "number",
-              description: "The rate to apply"
-            }
-          },
-          required: ["amount", "rate"]
-        }
+// Add tools that require payment
+mcpServer.addTool({
+  name: "get_premium_data",
+  description: "Get premium data (costs $0.01 USDC)",
+  inputSchema: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description: "The query to search for"
       }
-    ]
-  };
-});
-
-// Handle tool calls
-mcpServer.setRequestHandler("tools/call", async (request) => {
-  const { name, arguments: args } = request.params;
-
-  switch (name) {
-    case "get_premium_data":
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Premium data for query "${args.query}": This is valuable information that costs $0.01 USDC. Results: ${Math.random() * 1000} matching records found.`
-          }
-        ]
-      };
-
-    case "calculate_cost":
-      const cost = args.amount * args.rate;
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Cost calculation: ${args.amount} * ${args.rate} = ${cost} (This calculation cost $0.005 USDC)`
-          }
-        ]
-      };
-
-    default:
-      throw new Error(`Unknown tool: ${name}`);
+    },
+    required: ["query"]
+  },
+  handler: async (args: { query: string }) => {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Premium data for query "${args.query}": This is valuable information that costs $0.01 USDC. Results: ${Math.floor(Math.random() * 1000)} matching records found.`
+        }
+      ]
+    };
   }
 });
 
-// Configure payment middleware for MCP endpoint
+mcpServer.addTool({
+  name: "calculate_cost",
+  description: "Calculate the cost of an operation (costs $0.01 USDC)",
+  inputSchema: {
+    type: "object",
+    properties: {
+      amount: {
+        type: "number",
+        description: "The amount to calculate cost for"
+      },
+      rate: {
+        type: "number",
+        description: "The rate to apply"
+      }
+    },
+    required: ["amount", "rate"]
+  },
+  handler: async (args: { amount: number; rate: number }) => {
+    const cost = args.amount * args.rate;
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Cost calculation: ${args.amount} * ${args.rate} = ${cost} (This calculation cost $0.01 USDC)`
+        }
+      ]
+    };
+  }
+});
+
+// Configure payment middleware for all MCP requests
+// The middleware will intercept all requests and require payment
 app.use(paymentMiddleware(
   recipientAddress,
   {
-    "POST /mcp": {
+    // Require payment for all POST requests (MCP uses POST)
+    "POST /*": {
       price: "$0.01",
       network: network,
     },
@@ -120,26 +106,36 @@ app.use(paymentMiddleware(
   facilitatorConfig
 ));
 
-// Create MCP transport and handle requests
-const transport = new StreamableHTTPServerTransport();
+// Parse JSON bodies
+app.use(express.json());
 
-// MCP endpoint
-app.post("/mcp", express.json(), async (req, res) => {
+// Handle all requests - MCP SDK will handle the routing
+app.use(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+
+  // Create a fetch-like request for the MCP SDK
+  const mcpRequest = {
+    method: req.method,
+    url: url.toString(),
+    headers: req.headers as Record<string, string>,
+    body: req.body ? JSON.stringify(req.body) : undefined
+  };
+
   try {
-    const result = await transport.handleRequest(req.body);
-    res.json(result);
+    // Let the MCP SDK handle the request
+    const handler = mcpServer.createHttpRequestHandler();
+    const response = await handler(mcpRequest);
+
+    // Send the response
+    res.status(response.statusCode || 200);
+    for (const [key, value] of Object.entries(response.headers || {})) {
+      res.setHeader(key, value);
+    }
+    res.send(response.body);
   } catch (error) {
     console.error("MCP request error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
-});
-
-// Connect transport to server
-transport.connect(mcpServer);
-
-// Health check endpoint (free)
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", server: "x402-mcp-example" });
 });
 
 const PORT = process.env.PORT || 3001;
@@ -154,13 +150,10 @@ app.listen(PORT, () => {
     console.log("\n⚠️  WARNING: Running on MAINNET - real USDC payments!");
   }
 
-  console.log("\nEndpoints:");
-  console.log(`  POST /mcp - MCP endpoint ($0.01 USDC per request)`);
-  console.log(`  GET /health - Health check (free)`);
-
+  console.log("\nPayment required: $0.01 USDC per request");
   console.log("\nAvailable MCP tools:");
-  console.log(`  - get_premium_data: Get premium data ($0.01 per request)`);
-  console.log(`  - calculate_cost: Calculate costs ($0.01 per request)`);
+  console.log(`  - get_premium_data: Get premium data`);
+  console.log(`  - calculate_cost: Calculate costs`);
 
   if (!process.env.ATXP_DESTINATION) {
     console.error("\n❌ ERROR: ATXP_DESTINATION environment variable is required!");

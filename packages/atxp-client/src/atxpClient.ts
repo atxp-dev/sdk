@@ -1,6 +1,6 @@
 import { ClientConfig, FetchWrapper } from "./types.js";
 import { MemoryOAuthDb, ConsoleLogger, DEFAULT_AUTHORIZATION_SERVER, FetchLike } from "@atxp/common";
-import { wrapWithATXP } from "./atxpFetcher.js";
+import { atxpFetch } from "./atxpFetcher.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
@@ -60,7 +60,7 @@ export function buildStreamableTransport(args: ClientArgs): StreamableHTTPClient
   const config = buildClientConfig(args);
 
   // Apply the ATXP wrapper to the fetch function
-  const wrappedFetch = wrapWithATXP(config);
+  const wrappedFetch = atxpFetch(config);
 
   const transport = new StreamableHTTPClientTransport(new URL(args.mcpServer), {fetch: wrappedFetch});
   return transport;

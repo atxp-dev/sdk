@@ -1,4 +1,4 @@
-import { atxpClient, ATXPAccount, RemoteSigner, type FetchWrapper, type ClientConfig, wrapWithATXP, type FetchLike } from "@atxp/client";
+import { atxpClient, ATXPAccount, RemoteSigner, type FetchWrapper, type ClientConfig, atxpFetch, type FetchLike } from "@atxp/client";
 import { wrapWithX402 } from "@atxp/x402";
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from "dotenv";
@@ -12,7 +12,7 @@ dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 async function testMCPServer() {
-  const serverUrl = process.env.X402_SERVER_URL || "http://localhost:3001/mcp";
+  const serverUrl = process.env.X402_SERVER_URL || "http://localhost:3001";
   const signerUrl = process.env.ATXP_REMOTE_SIGNER_URL || "http://localhost:3002";
 
   console.log("Testing X402 MCP Server with ATXP Client");
@@ -80,7 +80,7 @@ async function testMCPServer() {
     wrappedFetch = wrapWithX402({ ...config, fetchFn: wrappedFetch });
 
     // Apply ATXP wrapper next (handles OAuth and ATXP payments)
-    wrappedFetch = wrapWithATXP({ ...config, fetchFn: wrappedFetch });
+    wrappedFetch = atxpFetch({ ...config, fetchFn: wrappedFetch });
 
     // Create client with the composed wrapped fetch
     const client = await atxpClient({

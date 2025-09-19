@@ -16,10 +16,7 @@ export {
 
 // HTTP fetcher with ATXP support
 export {
-  type ATXPFetcherConfig,
-  atxpFetch,
-  wrapWithATXP,
-  ATXPFetcher
+  atxpFetch
 } from './atxpFetcher.js';
 
 // Payment makers for different networks

@@ -6,24 +6,6 @@ import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
-export interface ATXPFetcherConfig {
-  // TODO: Take an Account instead of userId and paymentMakers
-  accountId: string;
-  db: OAuthDb;
-  paymentMakers: {[key: string]: PaymentMaker};
-  fetchFn?: FetchLike;
-  sideChannelFetch?: FetchLike;
-  strict?: boolean;
-  allowInsecureRequests?: boolean;
-  allowedAuthorizationServers?: AuthorizationServerUrl[];
-  approvePayment?: (payment: ProspectivePayment) => Promise<boolean>;
-  logger?: Logger;
-  onAuthorize?: (args: { authorizationServer: AuthorizationServerUrl, userId: string }) => Promise<void>;
-  onAuthorizeFailure?: (args: { authorizationServer: AuthorizationServerUrl, userId: string, error: Error }) => Promise<void>;
-  onPayment?: (args: { payment: ProspectivePayment }) => Promise<void>;
-  onPaymentFailure?: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
-}
-
 /**
  * Creates an ATXP fetch wrapper that handles OAuth authentication and payments.
  * This follows the wrapper pattern for fetch functions.
@@ -31,7 +13,7 @@ export interface ATXPFetcherConfig {
  * @param config - The client configuration
  * @returns A wrapped fetch function that handles ATXP protocol
  */
-export function wrapWithATXP(config: ClientConfig): FetchLike {
+export function atxpFetch(config: ClientConfig): FetchLike {
   const fetcher = new ATXPFetcher({
     accountId: config.account.accountId,
     db: config.oAuthDb,
@@ -50,16 +32,7 @@ export function wrapWithATXP(config: ClientConfig): FetchLike {
   return fetcher.fetch;
 }
 
-// Keep the old function for backward compatibility, but mark as deprecated
-/**
- * @deprecated Use wrapWithATXP instead
- */
-export function atxpFetch(config: ATXPFetcherConfig): FetchLike {
-  const fetcher = new ATXPFetcher(config);
-  return fetcher.fetch;
-}
-
-export class ATXPFetcher {
+class ATXPFetcher {
   protected oauthClient: OAuthClient;
   protected paymentMakers: Map<string, PaymentMaker>;
   protected sideChannelFetch: FetchLike;
@@ -72,22 +45,38 @@ export class ATXPFetcher {
   protected onAuthorizeFailure: (args: { authorizationServer: AuthorizationServerUrl, userId: string, error: Error }) => Promise<void>;
   protected onPayment: (args: { payment: ProspectivePayment }) => Promise<void>;
   protected onPaymentFailure: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
-  constructor({
-    accountId,
-    db,
-    paymentMakers,
-    fetchFn = fetch,
-    sideChannelFetch = fetchFn,
-    strict = true,
-    allowInsecureRequests = process.env.NODE_ENV === 'development',
-    allowedAuthorizationServers = [DEFAULT_AUTHORIZATION_SERVER],
-    approvePayment = async (): Promise<boolean> => true,
-    logger = new ConsoleLogger(),
-    onAuthorize = async () => {},
-    onAuthorizeFailure = async () => {},
-    onPayment = async () => {},
-    onPaymentFailure = async () => {}
-  }: ATXPFetcherConfig) {
+  constructor(config: {
+    accountId: string;
+    db: OAuthDb;
+    paymentMakers: {[key: string]: PaymentMaker};
+    fetchFn?: FetchLike;
+    sideChannelFetch?: FetchLike;
+    strict?: boolean;
+    allowInsecureRequests?: boolean;
+    allowedAuthorizationServers?: AuthorizationServerUrl[];
+    approvePayment?: (payment: ProspectivePayment) => Promise<boolean>;
+    logger?: Logger;
+    onAuthorize?: (args: { authorizationServer: AuthorizationServerUrl, userId: string }) => Promise<void>;
+    onAuthorizeFailure?: (args: { authorizationServer: AuthorizationServerUrl, userId: string, error: Error }) => Promise<void>;
+    onPayment?: (args: { payment: ProspectivePayment }) => Promise<void>;
+    onPaymentFailure?: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
+  }) {
+    const {
+      accountId,
+      db,
+      paymentMakers,
+      fetchFn = fetch,
+      sideChannelFetch = fetchFn,
+      strict = true,
+      allowInsecureRequests = process.env.NODE_ENV === 'development',
+      allowedAuthorizationServers = [DEFAULT_AUTHORIZATION_SERVER],
+      approvePayment = async (): Promise<boolean> => true,
+      logger = new ConsoleLogger(),
+      onAuthorize = async () => {},
+      onAuthorizeFailure = async () => {},
+      onPayment = async () => {},
+      onPaymentFailure = async () => {}
+    } = config;
     // Use React Native safe fetch if in React Native environment
     const safeFetchFn = getIsReactNative() ? createReactNativeSafeFetch(fetchFn) : fetchFn;
     const safeSideChannelFetch = getIsReactNative() ? createReactNativeSafeFetch(sideChannelFetch) : sideChannelFetch;
