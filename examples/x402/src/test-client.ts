@@ -18,12 +18,16 @@ async function main() {
 
   //const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
   const account = new BaseAccount(process.env.BASE_RPC!, process.env.BASE_PRIVATE_KEY! as `0x${string}`);
-  const mcpClient = await atxpClient({
+  const config = {
+    account, 
+    logger: new ConsoleLogger({level: LogLevel.DEBUG}),
     mcpServer: serverUrl,
-    account,
-    allowedAuthorizationServers: ['http://localhost:3010', 'https://auth.atxp.ai', 'https://atxp-accounts-staging.onrender.com/'],
-    allowHttp: true,
-    logger: new ConsoleLogger({level: LogLevel.DEBUG})
+    allowHttp: true
+  };
+  const mcpClient = await atxpClient({
+    ...config,
+    fetchFn: wrapWithX402(config)
+
   });
   const res = await mcpClient.callTool({
     name: "secure-data",
