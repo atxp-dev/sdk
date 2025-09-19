@@ -9,16 +9,16 @@ vi.mock('@atxp/server', async (importOriginal) => {
   return {
     ...actual,
     requirePayment: vi.fn(),
-    withATXPContext: vi.fn()
+    withATXPContext: vi.fn(),
+    buildServerConfig: vi.fn()
   };
 });
 
-vi.mock('../workerContext.js', () => ({
-  getATXPWorkerContext: vi.fn()
-}));
-
-import { requirePayment as mockRequirePaymentSDK, withATXPContext as mockWithATXPContext } from '@atxp/server';
-import { getATXPWorkerContext } from '../workerContext.js';
+import {
+  requirePayment as mockRequirePaymentSDK,
+  withATXPContext as mockWithATXPContext,
+  buildServerConfig as mockBuildServerConfig
+} from '@atxp/server';
 
 describe('requirePayment', () => {
   beforeEach(() => {
@@ -26,56 +26,67 @@ describe('requirePayment', () => {
     (mockWithATXPContext as any).mockImplementation(async (config, resource, tokenInfo, callback) => {
       await callback();
     });
+    (mockBuildServerConfig as any).mockImplementation((args) => ({
+      logger: { error: vi.fn() },
+      ...args
+    }));
   });
 
-  it('should require payment with existing config', async () => {
-    const mockConfig = { logger: { error: vi.fn() } };
-    const mockTokenCheck = {
-      token: 'test-token',
-      data: { active: true, sub: 'test-user' }
+  it('should require payment with config args', async () => {
+    const configOpts = {
+      payeeName: 'Test Payee',
+      paymentDestination: { type: 'chain', address: '0x1234', network: 'base' }
     };
-    (getATXPWorkerContext as any).mockReturnValue({ config: mockConfig, resource: new URL('https://example.com'), tokenCheck: mockTokenCheck });
 
-    const paymentConfig = {
-      price: new BigNumber(0.01),
-      authenticatedUser: 'test-user',
-      userToken: 'test-token',
-      atxpInitParams: {
-        destination: '0x1234567890123456789012345678901234567890',
-        network: 'base' as const,
-        resourceUrl: 'https://example.com/'
+    const mcpProps = {
+      resource: new URL('https://example.com'),
+      tokenCheck: {
+        token: 'test-token',
+        data: { active: true, sub: 'test-user' }
       }
     };
 
-    await requirePayment(paymentConfig);
+    const paymentConfig = {
+      price: new BigNumber(0.01)
+    };
 
+    await requirePayment(paymentConfig, configOpts, mcpProps);
+
+    expect(mockBuildServerConfig).toHaveBeenCalledWith(configOpts);
     expect(mockWithATXPContext).toHaveBeenCalledWith(
-      mockConfig,
-      new URL('https://example.com/'),
-      mockTokenCheck,
+      expect.objectContaining({ logger: expect.any(Object) }),
+      mcpProps.resource,
+      mcpProps.tokenCheck,
       expect.any(Function)
     );
-
     expect(mockRequirePaymentSDK).toHaveBeenCalledWith(paymentConfig);
   });
 
-  it('should throw error when no ATXP config found', async () => {
-    (getATXPWorkerContext as any).mockReturnValue(null);
-
-    const paymentConfig = {
-      price: new BigNumber(0.01),
-      authenticatedUser: 'test-user',
-      userToken: 'test-token',
-      atxpInitParams: {
-        destination: '0x1234567890123456789012345678901234567890',
-        network: 'base' as const,
-        resourceUrl: 'https://example.com/'
-      }
+  it('should handle null token check', async () => {
+    const configOpts = {
+      payeeName: 'Test Payee',
+      paymentDestination: { type: 'chain', address: '0x1234', network: 'base' }
     };
 
-    await expect(requirePayment(paymentConfig)).rejects.toThrow('No ATXP config found - payments cannot be processed');
-    expect(mockWithATXPContext).not.toHaveBeenCalled();
-    expect(mockRequirePaymentSDK).not.toHaveBeenCalled();
+    const mcpProps = {
+      resource: new URL('https://example.com'),
+      tokenCheck: null
+    };
+
+    const paymentConfig = {
+      price: new BigNumber(0.01)
+    };
+
+    await requirePayment(paymentConfig, configOpts, mcpProps);
+
+    expect(mockBuildServerConfig).toHaveBeenCalledWith(configOpts);
+    expect(mockWithATXPContext).toHaveBeenCalledWith(
+      expect.objectContaining({ logger: expect.any(Object) }),
+      mcpProps.resource,
+      null,
+      expect.any(Function)
+    );
+    expect(mockRequirePaymentSDK).toHaveBeenCalledWith(paymentConfig);
   });
 
 });
