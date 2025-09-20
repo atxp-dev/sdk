@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { wrapWithX402 } from './x402Wrapper.js';
-import { BaseAccount } from '@atxp/client';
+import { ATXPAccount } from '@atxp/client';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 
 vi.mock('x402/client', () => ({
@@ -12,7 +12,7 @@ vi.mock('x402/client', () => ({
 }));
 
 describe('wrapWithX402', () => {
-  let mockAccount: BaseAccount;
+  let mockAccount: ATXPAccount;
   let mockFetch: ReturnType<typeof vi.fn>;
   let mockLogger: ConsoleLogger;
   let mockApprovePayment: ReturnType<typeof vi.fn>;
@@ -20,22 +20,29 @@ describe('wrapWithX402', () => {
   let mockOnPaymentFailure: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    // Mock BaseAccount
-    mockAccount = {
-      accountId: '0x1234567890123456789012345678901234567890',
-      network: 'base',
-      getSigner: vi.fn().mockResolvedValue({
+    // Create a mock ATXPAccount instance using the proper connection string format
+    mockAccount = new ATXPAccount('https://test.com?connection_token=test-token');
+
+    // Override the fetchFn to mock the ensure-currency call
+    mockAccount.fetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        message: 'Currency ensured',
+        balance: { usdc: '100', iou: '0' }
+      }), { status: 200 })
+    );
+
+    // Override the getSigner method
+    mockAccount.getSigner = vi.fn().mockResolvedValue({
+      address: '0x1234567890123456789012345678901234567890',
+      signTypedData: vi.fn().mockResolvedValue('0xmockedsignature'),
+      account: {
         address: '0x1234567890123456789012345678901234567890',
-        signTypedData: vi.fn().mockResolvedValue('0xmockedsignature'),
-        account: {
-          address: '0x1234567890123456789012345678901234567890',
-        },
-        chain: {
-          id: 8453,
-        },
-        transport: {},
-      }),
-    } as unknown as BaseAccount;
+      },
+      chain: {
+        id: 8453,
+      },
+      transport: {},
+    });
 
     // Mock fetch
     mockFetch = vi.fn();
@@ -47,6 +54,23 @@ describe('wrapWithX402', () => {
     mockApprovePayment = vi.fn().mockResolvedValue(true);
     mockOnPayment = vi.fn();
     mockOnPaymentFailure = vi.fn();
+  });
+
+  it('should throw an error if account is not an ATXPAccount', () => {
+    // Create a non-ATXPAccount object
+    const nonATXPAccount = {
+      accountId: '0x1234567890123456789012345678901234567890',
+      network: 'base',
+      getSigner: vi.fn(),
+    };
+
+    expect(() => {
+      wrapWithX402({
+        account: nonATXPAccount as any,
+        fetchFn: mockFetch,
+        logger: mockLogger,
+      });
+    }).toThrow('Only ATXPAccount is supported for X402 payments');
   });
 
   it('should pass through normal requests without modification', async () => {
