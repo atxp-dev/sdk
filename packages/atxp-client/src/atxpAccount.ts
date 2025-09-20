@@ -1,6 +1,8 @@
 import type { Account, PaymentMaker } from './types.js';
 import type { FetchLike, Network, Currency } from '@atxp/common'
 import BigNumber from 'bignumber.js';
+import { LocalAccount } from 'viem';
+import { ATXPLocalAccount } from './atxpLocalAccount.js';
 
 function toBasicAuth(token: string): string {
   // Basic auth is base64("username:password"), password is blank
@@ -30,24 +32,26 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
   }
 
   async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
-    const body = {
-      amount: amount.toString(),
-      currency,
-      receiver,
-      memo,
-    };
+    // Make a regular payment via the /pay endpoint
     const response = await this.fetchFn(`${this.origin}/pay`, {
       method: 'POST',
       headers: {
         'Authorization': toBasicAuth(this.token),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        amount: amount.toString(),
+        currency,
+        receiver,
+        memo,
+      }),
     });
+
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`ATXPAccount: /pay failed: ${response.status} ${response.statusText} ${text}`);
     }
+
     const json = await response.json() as { txHash?: string };
     if (!json?.txHash) {
       throw new Error('ATXPAccount: /pay did not return txHash');
@@ -82,16 +86,32 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 export class ATXPAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
+  origin: string;
+  token: string;
+  fetchFn: FetchLike;
 
   constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: Network }) {
     const { origin, token } = parseConnectionString(connectionString);
     const fetchFn = opts?.fetchFn ?? fetch;
     const network = opts?.network ?? 'base';
 
+    // Store for use in X402 payment creation
+    this.origin = origin;
+    this.token = token;
+    this.fetchFn = fetchFn;
+
     // Use token as a stable accountId namespace to keep OAuth/ATXP state per-connection
     this.accountId = `atxp:${token}`;
     this.paymentMakers = {
       [network]: new ATXPHttpPaymentMaker(origin, token, fetchFn),
     };
+  }
+
+  async getSigner(): Promise<LocalAccount> {
+    return ATXPLocalAccount.create(
+      this.origin,
+      this.token,
+      this.fetchFn
+    );
   }
 }

@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { atxpClient, ATXPAccount } from '@atxp/client';
+import { atxpClient, ATXPAccount, BaseAccount } from '@atxp/client';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import 'dotenv/config';
 

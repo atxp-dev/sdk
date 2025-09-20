@@ -17,8 +17,8 @@ const createConfig = (packageName, options = {}) => {
   const isExternal = (id) => {
     // Check exact matches first
     const exactMatches = [
-      '@atxp/common', '@atxp/client', '@atxp/server', '@atxp/redis', 
-      '@atxp/sqlite', '@atxp/base', '@modelcontextprotocol/sdk',
+      '@atxp/common', '@atxp/client', '@atxp/server', '@atxp/redis',
+      '@atxp/sqlite', '@atxp/base', '@atxp/x402', '@modelcontextprotocol/sdk',
       '@modelcontextprotocol/sdk/types.js', '@modelcontextprotocol/sdk/client',
       'bignumber.js', 'oauth4webapi', 'jose', 'tweetnacl', 'tweetnacl-util',
       ...platformExternals[platform],

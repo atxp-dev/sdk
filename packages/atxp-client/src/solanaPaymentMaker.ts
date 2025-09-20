@@ -31,9 +31,9 @@ export class SolanaPaymentMaker implements PaymentMaker {
     this.source = Keypair.fromSecretKey(bs58.decode(sourceSecretKey));
     this.logger = logger ?? new ConsoleLogger();
   }
-  
+
   generateJWT = async({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> => {
-    // Solana/Web3.js secretKey is 64 bytes: 
+    // Solana/Web3.js secretKey is 64 bytes:
     // first 32 bytes are the private scalar, last 32 are the public key.
     // JWK expects only the 32-byte private scalar for 'd'
     const jwk = {
@@ -64,10 +64,10 @@ export class SolanaPaymentMaker implements PaymentMaker {
         USDC_MINT,
         this.source.publicKey
       );
-      
+
       const tokenAccount = await getAccount(this.connection, tokenAccountAddress);
       const balance = new BigNumber(tokenAccount.amount.toString()).dividedBy(10 ** 6); // USDC has 6 decimals
-      
+
       if (balance.lt(amount)) {
         this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
         throw new InsufficientFundsError(currency, amount, balance, 'solana');
@@ -76,11 +76,11 @@ export class SolanaPaymentMaker implements PaymentMaker {
       const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
         units: 10000,
       });
-      
+
       const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
         microLamports: 20000,
       });
-      
+
       const transaction = await createTransfer(
         this.connection,
         this.source.publicKey,
@@ -91,7 +91,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
           memo,
         }
       );
-      
+
       transaction.add(modifyComputeUnits);
       transaction.add(addPriorityFee);
 
@@ -105,7 +105,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
       if (error instanceof InsufficientFundsError || error instanceof PaymentNetworkError) {
         throw error;
       }
-      
+
       // Wrap other errors in PaymentNetworkError
       throw new PaymentNetworkError(`Payment failed on Solana network: ${(error as Error).message}`, error as Error);
     }

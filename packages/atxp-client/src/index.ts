@@ -1,6 +1,5 @@
 // Main client functionality
 export {
-  type ClientArgs,
   DEFAULT_CLIENT_CONFIG,
   buildClientConfig,
   buildStreamableTransport,
@@ -16,9 +15,7 @@ export {
 
 // HTTP fetcher with ATXP support
 export {
-  type ATXPFetcherConfig,
-  atxpFetch,
-  ATXPFetcher
+  atxpFetch
 } from './atxpFetcher.js';
 
 // Payment makers for different networks
@@ -55,7 +52,13 @@ export {
   type Account,
   type ProspectivePayment,
   type ClientConfig,
+  type ClientArgs,
+  type FetchWrapper,
   InsufficientFundsError,
   PaymentNetworkError,
   type PaymentMaker
 } from './types.js';
+
+export {
+  ATXPLocalAccount
+} from './atxpLocalAccount.js';

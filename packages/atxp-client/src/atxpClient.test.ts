@@ -13,7 +13,7 @@ describe('atxpClient', () => {
       .postOnce('https://example.com/mcp', CTH.authRequiredResponse())
       .post('https://example.com/mcp', CTH.mcpResponseHandler(CTH.mcpToolResponse(1, 'hello world')));
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
-      // Respond to /authorize call 
+      // Respond to /authorize call
       .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
         const state = new URL(req.args[0] as any).searchParams.get('state');
         return {
@@ -117,7 +117,7 @@ describe('atxpClient', () => {
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
-      account, 
+      account,
       fetchFn: f.fetchHandler
     });
 

@@ -183,4 +183,5 @@ export class MainWalletPaymentMaker implements PaymentMaker {
 
     this.logger.info(`Transaction confirmed with ${confirmations} confirmations`);
   }
+
 }

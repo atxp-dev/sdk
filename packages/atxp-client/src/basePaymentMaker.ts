@@ -20,7 +20,7 @@ type ExtendedWalletClient = WalletClient & PublicActions;
 // Helper function to convert to base64url that works in both Node.js and browsers
 function toBase64Url(data: string): string {
   // Convert string to base64
-  const base64 = typeof Buffer !== 'undefined' 
+  const base64 = typeof Buffer !== 'undefined'
     ? Buffer.from(data).toString('base64')
     : btoa(data);
   // Convert base64 to base64url
@@ -81,7 +81,7 @@ export class BasePaymentMaker implements PaymentMaker {
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
     const headerObj = { alg: 'ES256K' };
-    
+
     const payloadObj = {
       sub: this.signingClient.account!.address,
       iss: 'accounts.atxp.ai',
@@ -99,7 +99,7 @@ export class BasePaymentMaker implements PaymentMaker {
     const messageBytes = typeof Buffer !== 'undefined'
       ? Buffer.from(message, 'utf8')
       : new TextEncoder().encode(message);
-    
+
     const signResult = await this.signingClient.signMessage({
       account: this.signingClient.account!,
       message: { raw: messageBytes },
@@ -131,9 +131,9 @@ export class BasePaymentMaker implements PaymentMaker {
         functionName: 'balanceOf',
         args: [this.signingClient.account!.address],
       }) as bigint;
-      
+
       const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** USDC_DECIMALS);
-      
+
       if (balance.lt(amount)) {
         this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
         throw new InsufficientFundsErrorClass(currency, amount, balance, 'base');
@@ -141,7 +141,7 @@ export class BasePaymentMaker implements PaymentMaker {
 
       // Convert amount to USDC units (6 decimals) as BigInt
       const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
-      
+
       const data = encodeFunctionData({
         abi: ERC20_ABI,
         functionName: "transfer",
@@ -155,28 +155,29 @@ export class BasePaymentMaker implements PaymentMaker {
         value: parseEther('0'),
         maxPriorityFeePerGas: parseEther('0.000000001')
       });
-      
+
       // Wait for transaction confirmation with more blocks to ensure propagation
       this.logger.info(`Waiting for transaction confirmation: ${hash}`);
-      const receipt = await this.signingClient.waitForTransactionReceipt({ 
+      const receipt = await this.signingClient.waitForTransactionReceipt({
         hash: hash as Hex,
         confirmations: 1
       });
-      
+
       if (receipt.status === 'reverted') {
         throw new PaymentNetworkErrorClass(`Transaction reverted: ${hash}`, new Error('Transaction reverted on chain'));
       }
-      
+
       this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
-      
+
       return hash;
     } catch (error) {
       if (error instanceof InsufficientFundsErrorClass || error instanceof PaymentNetworkErrorClass) {
         throw error;
       }
-      
+
       // Wrap other errors in PaymentNetworkError
       throw new PaymentNetworkErrorClass(`Payment failed on Base network: ${(error as Error).message}`, error as Error);
     }
   }
+
 }

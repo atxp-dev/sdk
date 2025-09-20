@@ -42,6 +42,15 @@ export type ClientConfig = {
   onPaymentFailure: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
 }
 
+// ClientArgs for creating clients - required fields plus optional overrides
+type RequiredClientConfigFields = 'mcpServer' | 'account';
+type RequiredClientConfig = Pick<ClientConfig, RequiredClientConfigFields>;
+type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
+export type ClientArgs = RequiredClientConfig & Partial<OptionalClientConfig>;
+
+// Type for a fetch wrapper function that takes ClientArgs and returns wrapped fetch
+export type FetchWrapper = (config: ClientArgs) => FetchLike;
+
 export class InsufficientFundsError extends Error {
   constructor(
     public readonly currency: Currency,
@@ -62,7 +71,7 @@ export class InsufficientFundsError extends Error {
 
 export class PaymentNetworkError extends Error {
   constructor(message: string, public readonly originalError?: Error) {
-    super(`Payment failed due to network error: ${message}. Please check your network connection and try again.`);
+    super(`Payment failed due to network error: ${message}`);
     this.name = 'PaymentNetworkError';
   }
 }
