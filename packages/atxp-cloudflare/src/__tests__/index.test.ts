@@ -14,21 +14,18 @@ describe('index exports', () => {
     expect(typeof index.buildATXPConfig).toBe('function');
   });
 
-  it('should export context management functions', () => {
-    expect(index.getATXPWorkerContext).toBeDefined();
-    expect(typeof index.getATXPWorkerContext).toBe('function');
-
-    expect(index.setATXPWorkerContext).toBeDefined();
-    expect(typeof index.setATXPWorkerContext).toBe('function');
+  it('should export type definitions', () => {
+    // Type exports don't exist at runtime, but we can check the module structure
+    expect(Object.keys(index)).toEqual(
+      expect.arrayContaining(['atxpCloudflare', 'requirePayment', 'buildATXPConfig'])
+    );
   });
 
   it('should have all expected exports', () => {
     const expectedExports = [
       'atxpCloudflare',
       'requirePayment',
-      'buildATXPConfig',
-      'getATXPWorkerContext',
-      'setATXPWorkerContext'
+      'buildATXPConfig'
     ];
 
     expectedExports.forEach(exportName => {

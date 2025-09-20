@@ -1,16 +1,11 @@
 import { RequirePaymentConfig } from "@atxp/common";
-import { requirePayment as requirePaymentSDK, withATXPContext } from "@atxp/server";
-import { getATXPWorkerContext } from "./workerContext.js";
+import { ATXPArgs, buildServerConfig, requirePayment as requirePaymentSDK, withATXPContext } from "@atxp/server";
+import { ATXPMCPAgentProps } from "./types.js";
 
-export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
-  const workerContext = getATXPWorkerContext();
+export async function requirePayment(paymentConfig: RequirePaymentConfig, configOpts: ATXPArgs, {resource, tokenCheck}: ATXPMCPAgentProps): Promise<void> {
+  const config = buildServerConfig(configOpts);
 
-  // If no config and we have init params, initialize ATXP in this Durable Object
-  if (!workerContext) {
-    throw new Error('No ATXP config found - payments cannot be processed');
-  }
-
-  await withATXPContext(workerContext.config, workerContext.resource, workerContext.tokenCheck, async () => {
+  await withATXPContext(config, resource, tokenCheck, async () => {
     await requirePaymentSDK(paymentConfig);
   });
 }

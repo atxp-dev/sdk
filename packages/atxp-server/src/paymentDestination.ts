@@ -49,7 +49,7 @@ export class ATXPPaymentDestination implements PaymentDestination {
     const { origin, token } = parseConnectionString(connectionString);
     this.accountServerURL = origin;
     this.token = token;
-    this.fetchFn = opts?.fetchFn ?? fetch;
+    this.fetchFn = opts?.fetchFn ?? fetch.bind(globalThis);
     this.logger = opts?.logger ?? new ConsoleLogger({ prefix: '[atxp-payment-destination]' });
   }
 

@@ -1,7 +1,12 @@
-import { ATXPConfig, checkTokenWebApi, getOAuthMetadata, getProtectedResourceMetadata, parseMcpRequestsWebApi, sendOAuthChallengeWebApi, sendOAuthMetadataWebApi, sendProtectedResourceMetadataWebApi } from "@atxp/server";
+import { ATXPConfig, checkTokenWebApi, getOAuthMetadata, getProtectedResourceMetadata, parseMcpRequestsWebApi, sendOAuthChallengeWebApi, sendOAuthMetadataWebApi, sendProtectedResourceMetadataWebApi, TokenCheck } from "@atxp/server";
 import { ATXPCloudflareOptions } from "./types.js";
-import { setATXPWorkerContext } from "./workerContext.js";
+
 import { buildATXPConfig } from "./buildATXPConfig.js";
+
+type HandleRequestResult = { response: Response } | {
+  resource: URL;
+  tokenCheck: TokenCheck | null;
+}
 
 /**
  * Convenience function to create ATXP Cloudflare Worker with environment-based configuration
@@ -60,17 +65,24 @@ export function atxpCloudflare(options: ATXPCloudflareOptions) {
 
         // Handle ATXP middleware processing
         const atxpResponse = await handleRequest(config, request);
-        if (atxpResponse) {
-          return atxpResponse;
+        if (atxpResponse && 'response' in atxpResponse) {
+          return atxpResponse.response;
         }
+
+        // Set up props with ATXP context if available
+        const origProps = ctx.props || {};
+        const agentProps = atxpResponse ? {...origProps, ...atxpResponse} : origProps;
+
+        config.logger.debug(`[DEBUG] atxpResponse: ${JSON.stringify(atxpResponse)}`);
+        config.logger.debug(`[DEBUG] agentProps: ${JSON.stringify(agentProps)}`);
 
         // Route to appropriate MCP endpoints
         if (url.pathname === sse || url.pathname === sse + "/message") {
-          return mcpAgent.serveSSE(sse).fetch(request, env, ctx);
+          return mcpAgent.serveSSE(sse).fetch(request, env, {...ctx, props: agentProps});
         }
 
         if (url.pathname === mcp || url.pathname === root) {
-          return mcpAgent.serve(url.pathname).fetch(request, env, ctx);
+          return mcpAgent.serve(url.pathname).fetch(request, env, {...ctx, props: agentProps});
         }
 
         return new Response("Not found", { status: 404 });
@@ -89,7 +101,7 @@ export function atxpCloudflare(options: ATXPCloudflareOptions) {
   };
 }
 
-async function handleRequest(config: ATXPConfig, request: Request): Promise<Response | null> {
+async function handleRequest(config: ATXPConfig, request: Request): Promise<HandleRequestResult | null> {
   try {
     const logger = config.logger;
     const requestUrl = new URL(request.url);
@@ -106,7 +118,7 @@ async function handleRequest(config: ATXPConfig, request: Request): Promise<Resp
     // If there are no MCP requests, let the request continue without authentication
     if (mcpRequests.length === 0) {
       logger.debug('No MCP requests found - letting request continue without ATXP processing');
-      return null;
+      return { resource, tokenCheck: null};
     }
 
     // Check the token using proper OAuth logic
@@ -119,24 +131,20 @@ async function handleRequest(config: ATXPConfig, request: Request): Promise<Resp
     const challengeResponse = sendOAuthChallengeWebApi(tokenCheck);
     if (challengeResponse) {
       logger.debug('Sending OAuth challenge response');
-      return challengeResponse;
+      return { response: challengeResponse };
     }
 
     // Create and store context for this request using SDK-compatible structure
-    setATXPWorkerContext(config, resource, tokenCheck);
-
-    // Let the request continue to MCP handling
-    return null;
-
+    return { resource, tokenCheck };
   } catch (error) {
     config.logger.error(`Critical error in ATXP middleware: ${error instanceof Error ? error.message : String(error)}`);
 
-    return new Response(JSON.stringify({
+    return { response: new Response(JSON.stringify({
       error: 'server_error',
       error_description: 'An internal server error occurred in ATXP middleware'
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
-    });
+    })};
   }
 }

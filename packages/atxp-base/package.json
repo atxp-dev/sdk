@@ -1,6 +1,6 @@
 {
   "name": "@atxp/base",
-  "version": "0.4.0",
+  "version": "0.5.1",
   "description": "ATXP for Base Mini Apps",
   "license": "MIT",
   "repository": {
@@ -33,8 +33,8 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/client": "0.4.0",
-    "@atxp/common": "0.4.0",
+    "@atxp/client": "0.5.1",
+    "@atxp/common": "0.5.1",
     "@base-org/account": "^2.1.0",
     "bignumber.js": "^9.3.0"
   },
