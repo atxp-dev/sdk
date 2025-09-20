@@ -1,4 +1,4 @@
-import { ProspectivePayment, FetchWrapper, ClientArgs } from '@atxp/client';
+import { ProspectivePayment, type FetchWrapper, type ClientArgs } from '@atxp/client';
 import { FetchLike, Network } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
