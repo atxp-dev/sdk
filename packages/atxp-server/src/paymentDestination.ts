@@ -123,15 +123,16 @@ export class ATXPPaymentDestination implements PaymentDestination {
     this.logger.debug(`Getting payment destinations for buyer: ${buyerAddress}, amount: ${fundingAmount.amount.toString()} ${fundingAmount.currency}`);
 
     const url = new URL(`${this.accountServerURL}/addresses`);
-    url.searchParams.set('connectionToken', this.token);
-    url.searchParams.set('buyerAddress', buyerAddress);
-    url.searchParams.set('amount', fundingAmount.amount.toString());
+
+    // Use Basic auth with the token, like ATXPLocalAccount does
+    const authHeader = `Basic ${Buffer.from(`${this.token}:`).toString('base64')}`;
 
     this.logger.debug(`Making request to: ${url.toString()}`);
 
     const response = await this.fetchFn(url.toString(), {
       method: 'GET',
       headers: {
+        'Authorization': authHeader,
         'Accept': 'application/json',
       },
     });
