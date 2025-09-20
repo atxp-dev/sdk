@@ -22,11 +22,22 @@ export type AuthorizationServerUrl = UrlString;
 export type Currency = 'USDC';
 export type Network = 'solana' | 'base';
 
-export type PaymentRequestData = {
-  amount: BigNumber;
-  currency: Currency;
+export type PaymentRequestDestination = {
   network: Network;
-  destination: string;
+  currency: Currency;
+  address: string;
+  amount: BigNumber;
+}
+
+export type PaymentRequestData = {
+  // New multi-destination format
+  destinations?: PaymentRequestDestination[];
+  // Legacy single destination fields (for backwards compatibility)
+  amount?: BigNumber;
+  currency?: Currency;
+  network?: Network;
+  destination?: string;
+  // Common fields
   source: string;
   resource: URL;
   resourceName: string;

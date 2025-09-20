@@ -13,6 +13,8 @@ export type PaymentAddress = {
 
 export interface PaymentDestination {
   destination(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress>;
+  // New method for getting multiple destinations
+  destinations?(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]>;
 }
 
 export class ChainPaymentDestination implements PaymentDestination {
@@ -26,6 +28,12 @@ export class ChainPaymentDestination implements PaymentDestination {
       destination: this.address,
       network: this.network
     };
+  }
+
+  async destinations(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]> {
+    // Return single destination as array for backwards compatibility
+    const dest = await this.destination(fundingAmount, buyerAddress);
+    return [dest];
   }
 }
 
@@ -55,7 +63,7 @@ export class ATXPPaymentDestination implements PaymentDestination {
 
   async destination(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress> {
     this.logger.debug(`Getting payment destination for buyer: ${buyerAddress}, amount: ${fundingAmount.amount.toString()} ${fundingAmount.currency}`);
-    
+
     const url = new URL(`${this.accountServerURL}/destination`);
     url.searchParams.set('connectionToken', this.token);
     url.searchParams.set('buyerAddress', buyerAddress);
@@ -109,5 +117,72 @@ export class ATXPPaymentDestination implements PaymentDestination {
       destination: json.destination,
       network
     };
+  }
+
+  async destinations(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]> {
+    this.logger.debug(`Getting payment destinations for buyer: ${buyerAddress}, amount: ${fundingAmount.amount.toString()} ${fundingAmount.currency}`);
+
+    const url = new URL(`${this.accountServerURL}/addresses`);
+    url.searchParams.set('connectionToken', this.token);
+    url.searchParams.set('buyerAddress', buyerAddress);
+    url.searchParams.set('amount', fundingAmount.amount.toString());
+
+    this.logger.debug(`Making request to: ${url.toString()}`);
+
+    const response = await this.fetchFn(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      this.logger.error(`/addresses failed: ${response.status} ${response.statusText} ${text}`);
+      throw new Error(`ATXPPaymentDestination: /addresses failed: ${response.status} ${response.statusText} ${text}`);
+    }
+
+    const json = await response.json() as Array<{ destination?: string; chainType?: string }>;
+    if (!Array.isArray(json) || json.length === 0) {
+      this.logger.error('/addresses did not return any destinations');
+      throw new Error('ATXPPaymentDestination: /addresses did not return any destinations');
+    }
+
+    const addresses: PaymentAddress[] = [];
+    for (const item of json) {
+      if (!item?.destination || !item?.chainType) {
+        this.logger.warn('Skipping invalid address entry');
+        continue;
+      }
+
+      // Map chainType to expected network values
+      let network: Network;
+      switch (item.chainType) {
+        case 'ethereum':
+          network = 'base'; // Base is an Ethereum L2
+          break;
+        case 'base':
+          network = 'base'; // Already correct
+          break;
+        case 'solana':
+          network = 'solana';
+          break;
+        default:
+          this.logger.warn(`Unknown chainType: ${item.chainType}, skipping`);
+          continue;
+      }
+
+      addresses.push({
+        destination: item.destination,
+        network
+      });
+    }
+
+    if (addresses.length === 0) {
+      throw new Error('ATXPPaymentDestination: no valid addresses returned');
+    }
+
+    this.logger.debug(`Successfully got ${addresses.length} payment destinations`);
+    return addresses;
   }
 }

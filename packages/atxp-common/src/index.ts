@@ -35,6 +35,7 @@ export {
   type AuthorizationServerUrl,
   type Currency,
   type Network,
+  type PaymentRequestDestination,
   type PaymentRequestData,
   type CustomJWTPayload,
   type ClientCredentials,

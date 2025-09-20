@@ -123,6 +123,81 @@ export class ATXPFetcher {
     }
   };
 
+  protected handleMultiDestinationPayment = async (
+    paymentRequestData: PaymentRequestData,
+    paymentRequestUrl: string,
+    paymentRequestId: string
+  ): Promise<boolean> => {
+    if (!paymentRequestData.destinations || paymentRequestData.destinations.length === 0) {
+      return false;
+    }
+
+    // Try each destination in order
+    for (const dest of paymentRequestData.destinations) {
+      const paymentMaker = this.paymentMakers.get(dest.network);
+      if (!paymentMaker) {
+        this.logger.debug(`ATXP: payment network '${dest.network}' not available, trying next destination`);
+        continue;
+      }
+
+      const prospectivePayment : ProspectivePayment = {
+        accountId: this.accountId,
+        resourceUrl: paymentRequestData.resource?.toString() ?? '',
+        resourceName: paymentRequestData.resourceName ?? '',
+        network: dest.network,
+        currency: dest.currency,
+        amount: dest.amount,
+        iss: paymentRequestData.iss ?? '',
+      };
+
+      if (!await this.approvePayment(prospectivePayment)){
+        this.logger.info(`ATXP: payment request denied by callback function for destination on ${dest.network}`);
+        continue;
+      }
+
+      let paymentId: string;
+      try {
+        paymentId = await paymentMaker.makePayment(dest.amount, dest.currency, dest.address, paymentRequestData.iss);
+        this.logger.info(`ATXP: made payment of ${dest.amount} ${dest.currency} on ${dest.network}: ${paymentId}`);
+        await this.onPayment({ payment: prospectivePayment });
+
+        // Submit payment to the server
+        const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
+        const response = await this.sideChannelFetch(paymentRequestUrl.toString(), {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${jwt}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            transactionId: paymentId,
+            network: dest.network,
+            currency: dest.currency
+          })
+        });
+
+        this.logger.debug(`ATXP: payment was ${response.ok ? 'successfully' : 'not successfully'} PUT to ${paymentRequestUrl} : status ${response.status} ${response.statusText}`);
+
+        if(!response.ok) {
+          const msg = `ATXP: payment to ${paymentRequestUrl} failed: HTTP ${response.status} ${await response.text()}`;
+          this.logger.info(msg);
+          throw new Error(msg);
+        }
+
+        return true;
+      } catch (error: unknown) {
+        const typedError = error as Error;
+        this.logger.warn(`ATXP: payment failed on ${dest.network}: ${typedError.message}`);
+        await this.onPaymentFailure({ payment: prospectivePayment, error: typedError });
+        // Try next destination
+        continue;
+      }
+    }
+
+    this.logger.info(`ATXP: no suitable payment destination found among ${paymentRequestData.destinations.length} options`);
+    return false;
+  }
+
   protected handlePaymentRequestError = async (paymentRequestError: McpError): Promise<boolean> => {
     if (paymentRequestError.code !== PAYMENT_REQUIRED_ERROR_CODE) {
       throw new Error(`ATXP: expected payment required error (code ${PAYMENT_REQUIRED_ERROR_CODE}); got code ${paymentRequestError.code}`);
@@ -145,6 +220,12 @@ export class ATXPFetcher {
       throw new Error(`ATXP: payment request ${paymentRequestId} not found on server ${paymentRequestUrl}`);
     }
 
+    // Handle multi-destination format
+    if (paymentRequestData.destinations && paymentRequestData.destinations.length > 0) {
+      return this.handleMultiDestinationPayment(paymentRequestData, paymentRequestUrl, paymentRequestId);
+    }
+
+    // Handle legacy single destination format
     const requestedNetwork = paymentRequestData.network;
     if (!requestedNetwork) {
       throw new Error(`Payment network not provided`);
@@ -228,7 +309,8 @@ export class ATXPFetcher {
       },
       body: JSON.stringify({
         transactionId: paymentId,
-        network: requestedNetwork
+        network: requestedNetwork,
+        currency: currency
       })
     });
 
