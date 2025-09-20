@@ -1,4 +1,4 @@
-import { ProspectivePayment, type FetchWrapper, type ClientArgs } from '@atxp/client';
+import { ProspectivePayment, type FetchWrapper, type ClientArgs, ATXPAccount } from '@atxp/client';
 import { FetchLike, Network } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
@@ -25,6 +25,11 @@ function isX402Challenge(obj: unknown): obj is X402Challenge {
 export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
   const { account, logger, fetchFn = fetch, approvePayment, onPayment, onPaymentFailure } = config;
   const log = logger ?? console;
+
+  // Check if account is an ATXPAccount - X402 support requires ATXPAccount
+  if (!(account instanceof ATXPAccount)) {
+    throw new Error('Only ATXPAccount is supported for X402 payments');
+  }
 
   // Check if account has getSigner method
   const accountWithSigner = account as { getSigner?: () => Promise<LocalAccount> };
