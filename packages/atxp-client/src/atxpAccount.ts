@@ -1,5 +1,6 @@
 import type { Account, PaymentMaker } from './types.js';
 import type { FetchLike, Network, Currency } from '@atxp/common'
+import { crypto } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { LocalAccount } from 'viem';
 import { ATXPLocalAccount } from './atxpLocalAccount.js';
@@ -10,14 +11,15 @@ function toBasicAuth(token: string): string {
   return `Basic ${b64}`;
 }
 
-function parseConnectionString(connectionString: string): { origin: string; token: string } {
+function parseConnectionString(connectionString: string): { origin: string; token: string; accountId: string | null } {
   const url = new URL(connectionString);
   const origin = url.origin;
   const token = url.searchParams.get('connection_token') || '';
+  const accountId = url.searchParams.get('account_id');
   if (!token) {
     throw new Error('ATXPAccount: connection string missing connection token');
   }
-  return { origin, token };
+  return { origin, token, accountId };
 }
 
 class ATXPHttpPaymentMaker implements PaymentMaker {
@@ -91,7 +93,7 @@ export class ATXPAccount implements Account {
   fetchFn: FetchLike;
 
   constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: Network }) {
-    const { origin, token } = parseConnectionString(connectionString);
+    const { origin, token, accountId } = parseConnectionString(connectionString);
     const fetchFn = opts?.fetchFn ?? fetch;
     const network = opts?.network ?? 'base';
 
@@ -100,8 +102,11 @@ export class ATXPAccount implements Account {
     this.token = token;
     this.fetchFn = fetchFn;
 
-    // Use token as a stable accountId namespace to keep OAuth/ATXP state per-connection
-    this.accountId = `atxp:${token}`;
+    if (accountId) {
+      this.accountId = `atxp:${accountId}`;
+    } else {
+      this.accountId = `atxp:${crypto.randomUUID()}`;
+    }
     this.paymentMakers = {
       [network]: new ATXPHttpPaymentMaker(origin, token, fetchFn),
     };
