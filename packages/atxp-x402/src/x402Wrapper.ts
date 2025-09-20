@@ -159,8 +159,14 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
           throw new Error(`Failed to ensure sufficient USDC: ${errorText}`);
         }
 
-        const ensureResult = await ensureResponse.json() as { message?: string; balance?: { usdc: string; iou: string } };
+        const ensureResult = await ensureResponse.json() as { message?: string; balance?: { usdc: string; iou: string }; txHash?: string };
         log.info(`Currency ensured: ${ensureResult.message}, USDC: ${ensureResult.balance?.usdc}, IOU: ${ensureResult.balance?.iou}`);
+
+        // If a transaction hash was returned (meaning funds were moved to EOA), log it
+        if (ensureResult.txHash) {
+          log.info(`USDC moved to EOA for X402 payment - Transaction hash: ${ensureResult.txHash}`);
+          log.info(`View on Basescan: https://basescan.org/tx/${ensureResult.txHash}`);
+        }
       }
 
       // Create the X402 payment header using the x402 library
