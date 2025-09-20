@@ -100,10 +100,10 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   const existingPaymentId = await paymentConfig.getExistingPaymentId?.();
   if (existingPaymentId) {
     config.logger.info(`Found existing payment ID ${existingPaymentId}`);
-    throw paymentRequiredError(config.server, existingPaymentId, charge.amount)
+    throw paymentRequiredError(config.server, existingPaymentId, paymentConfig.price)
   }
 
   const paymentId = await config.paymentServer.createPaymentRequest(charge);
   config.logger.info(`Created payment request ${paymentId}`);
-  throw paymentRequiredError(config.server, paymentId, charge.amount);
+  throw paymentRequiredError(config.server, paymentId, paymentConfig.price);
 }

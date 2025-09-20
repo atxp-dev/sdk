@@ -1,6 +1,5 @@
 import { PaymentServer, ChargeResponse, Charge } from "./types.js";
-import { Network, Currency, AuthorizationServerUrl, FetchLike, Logger, PaymentRequestData } from "@atxp/common";
-import BigNumber from "bignumber.js";
+import { AuthorizationServerUrl, FetchLike, Logger, PaymentRequestData } from "@atxp/common";
 
 /**
  * ATXP Payment Server implementation
