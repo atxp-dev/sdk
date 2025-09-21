@@ -46,8 +46,8 @@ async function main() {
   try {
     validateEnv();
 
-    const account = new SolanaAccount(process.env.SOLANA_ENDPOINT!, process.env.SOLANA_PRIVATE_KEY!);
-    //const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
+    //const account = new SolanaAccount(process.env.SOLANA_ENDPOINT!, process.env.SOLANA_PRIVATE_KEY!);
+    const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
     //const account = new BaseAccount(process.env.BASE_RPC!, process.env.BASE_PRIVATE_KEY! as `0x${string}`);
     const mcpClient = await atxpClient({
       mcpServer: url,

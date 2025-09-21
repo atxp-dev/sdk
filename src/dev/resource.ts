@@ -53,8 +53,8 @@ console.log('Starting MCP server with destination', destinationAddress);
 app.use(atxpExpress({
   paymentDestination: destination,
   resource: `http://localhost:${PORT}`,
-  server: 'http://localhost:3010',
-  //server: 'https://auth.atxp.ai',
+  //server: 'http://localhost:3010',
+  server: 'https://auth.atxp.ai',
   mountPath: '/',
   payeeName: 'ATXP Client Example Resource Server',
   allowHttp: true,
