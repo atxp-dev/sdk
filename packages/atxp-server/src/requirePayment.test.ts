@@ -20,10 +20,12 @@ describe('requirePayment', () => {
     await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
       await expect(requirePayment({price: BigNumber(0.01)})).resolves.not.toThrow();
       expect(paymentServer.charge).toHaveBeenCalledWith({
-        amount: BigNumber(0.01),
-        currency: config.currency,
-        network: 'base',
-        destination: TH.DESTINATION,
+        destinations: [{
+          network: 'base',
+          currency: config.currency,
+          address: TH.DESTINATION,
+          amount: BigNumber(0.01)
+        }],
         source: 'test-user',
         payeeName: config.payeeName,
       });
@@ -51,10 +53,12 @@ describe('requirePayment', () => {
       } catch (err: any) {
         expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
         expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-          amount: BigNumber(0.01),
-          currency: config.currency,
-          network: 'base',
-          destination: TH.DESTINATION,
+          destinations: [{
+            network: 'base',
+            currency: config.currency,
+            address: TH.DESTINATION,
+            amount: BigNumber(0.01)
+          }],
           source: 'test-user',
           payeeName: config.payeeName,
         });

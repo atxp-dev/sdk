@@ -1,6 +1,5 @@
 import { PaymentServer, ChargeResponse, Charge } from "./types.js";
-import { Network, Currency, AuthorizationServerUrl, FetchLike, Logger, PaymentRequestData } from "@atxp/common";
-import BigNumber from "bignumber.js";
+import { AuthorizationServerUrl, FetchLike, Logger, PaymentRequestData } from "@atxp/common";
 
 /**
  * ATXP Payment Server implementation
@@ -22,10 +21,8 @@ export class ATXPPaymentServer implements PaymentServer {
     private readonly fetchFn: FetchLike = fetch.bind(globalThis)) {
   }
 
-  charge = async({source, destination, network, currency, amount}: 
-    {source: string, destination: string, network: Network, currency: Currency, amount: BigNumber}): Promise<ChargeResponse> => {
-    const body = {source, destination, network, currency, amount};
-    const chargeResponse = await this.makeRequest('POST', '/charge', body);
+  charge = async(chargeRequest: Charge): Promise<ChargeResponse> => {
+    const chargeResponse = await this.makeRequest('POST', '/charge', chargeRequest);
     const json = await chargeResponse.json() as PaymentRequestData | null;
     if (chargeResponse.status === 200) {
       return {success: true, requiredPayment: null};
