@@ -1,6 +1,6 @@
 {
   "name": "@atxp/server",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "ATXP Server - MCP server implementation with payment processing capabilities",
   "license": "MIT",
   "repository": {
@@ -38,7 +38,7 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/common": "0.5.1",
+    "@atxp/common": "0.6.0",
     "@modelcontextprotocol/sdk": "^1.15.0",
     "bignumber.js": "^9.3.0",
     "oauth4webapi": "^3.5.0"
