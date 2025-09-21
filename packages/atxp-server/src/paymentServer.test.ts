@@ -34,7 +34,7 @@ describe('ATXPPaymentServer', () => {
     const parsedBody = JSON.parse(call?.options.body as string);
     expect(parsedBody).toEqual({
       ...chargeParams,
-      amount: chargeParams.amount.toString()
+      amount: chargeParams?.amount?.toString()
     });
 
     // Credentials were fetched from the real database
@@ -90,7 +90,7 @@ describe('ATXPPaymentServer', () => {
     const parsedBody = JSON.parse(call?.options.body as string);
     expect(parsedBody).toMatchObject({
       ...paymentRequestParams,
-      amount: paymentRequestParams.amount.toString()
+      amount: paymentRequestParams.amount?.toString()
     });
   });
 
