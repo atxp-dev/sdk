@@ -10,3 +10,12 @@ export type {
   ATXPCloudflareOptions,
   ATXPMCPAgentProps
 } from './types.js';
+
+// Re-export configuration utilities from @atxp/server for convenience
+export {
+  type ATXPArgs,
+  DEFAULT_CONFIG,
+  buildServerConfig,
+  ChainPaymentDestination,
+  ATXPPaymentDestination
+} from '@atxp/server';
