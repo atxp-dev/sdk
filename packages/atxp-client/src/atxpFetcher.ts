@@ -140,13 +140,16 @@ export class ATXPFetcher {
         continue;
       }
 
+      // Convert amount to BigNumber since it comes as a string from JSON
+      const amount = new BigNumber(dest.amount);
+
       const prospectivePayment : ProspectivePayment = {
         accountId: this.accountId,
         resourceUrl: paymentRequestData.resource?.toString() ?? '',
         resourceName: paymentRequestData.resourceName ?? '',
         network: dest.network,
         currency: dest.currency,
-        amount: dest.amount,
+        amount: amount,
         iss: paymentRequestData.iss ?? '',
       };
 
@@ -157,8 +160,8 @@ export class ATXPFetcher {
 
       let paymentId: string;
       try {
-        paymentId = await paymentMaker.makePayment(dest.amount, dest.currency, dest.address, paymentRequestData.iss);
-        this.logger.info(`ATXP: made payment of ${dest.amount} ${dest.currency} on ${dest.network}: ${paymentId}`);
+        paymentId = await paymentMaker.makePayment(amount, dest.currency, dest.address, paymentRequestData.iss);
+        this.logger.info(`ATXP: made payment of ${amount.toString()} ${dest.currency} on ${dest.network}: ${paymentId}`);
         await this.onPayment({ payment: prospectivePayment });
 
         // Submit payment to the server
