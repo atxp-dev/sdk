@@ -41,7 +41,12 @@ export class ATXPLocalAccount implements LocalAccount {
     fetchFn: FetchLike = fetch as FetchLike
   ): Promise<ATXPLocalAccount> {
     // The /address endpoint uses Basic auth like other authenticated endpoints
-    const response = await fetchFn(`${origin}/address`, {
+    // For X402, we need the Ethereum/Base address with USDC currency
+    const url = new URL(`${origin}/address`);
+    url.searchParams.set('network', 'base'); // X402 operates on Base
+    url.searchParams.set('currency', 'USDC'); // Always USDC for X402
+
+    const response = await fetchFn(url.toString(), {
       method: 'GET',
       headers: {
         'Authorization': toBasicAuth(token)
@@ -53,18 +58,19 @@ export class ATXPLocalAccount implements LocalAccount {
       throw new Error(`Failed to fetch destination address: ${response.status} ${response.statusText} ${errorText}`);
     }
 
-    const data = await response.json() as { address?: string; chainType?: string };
+    const data = await response.json() as { address?: string; network?: string; currency?: string };
     const address = data.address;
     if (!address) {
       throw new Error('Address endpoint did not return an address');
     }
 
-    // Check that the account is an Ethereum account (required for X402/EVM operations)
-    if (!data.chainType) {
-      throw new Error('Address endpoint did not return a chainType');
+    // Check that the account is an Ethereum/Base account (required for X402/EVM operations)
+    const network = data.network;
+    if (!network) {
+      throw new Error('Address endpoint did not return a network');
     }
-    if (data.chainType !== 'ethereum') {
-      throw new Error(`ATXPLocalAccount requires an Ethereum account, but got ${data.chainType} account`);
+    if (network !== 'ethereum' && network !== 'base') {
+      throw new Error(`ATXPLocalAccount requires an Ethereum/Base account, but got ${network} account`);
     }
 
     return new ATXPLocalAccount(address as Address, origin, token, fetchFn);
