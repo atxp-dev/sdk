@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { requirePayment, ChainPaymentDestination } from '@atxp/server';
+import { requirePayment, ChainPaymentDestination, ATXPPaymentDestination } from '@atxp/server';
 import { atxpExpress } from '@atxp/express';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import 'dotenv/config';
@@ -46,13 +46,15 @@ const app = express();
 app.use(express.json());
 
 const destinationAddress = process.env.ATXP_DESTINATION!;
-const destination = new ChainPaymentDestination(destinationAddress, 'base');
+//const destination = new ChainPaymentDestination(destinationAddress, 'base');
+const destination = new ATXPPaymentDestination(destinationAddress);
+
 console.log('Starting MCP server with destination', destinationAddress);
 app.use(atxpExpress({
   paymentDestination: destination,
   resource: `http://localhost:${PORT}`,
-  //server: 'http://localhost:3010',
-  server: 'https://auth.atxp.ai',
+  server: 'http://localhost:3010',
+  //server: 'https://auth.atxp.ai',
   mountPath: '/',
   payeeName: 'ATXP Client Example Resource Server',
   allowHttp: true,
