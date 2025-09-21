@@ -32,7 +32,7 @@ describe('ATXPPaymentDestination', () => {
       ok: true,
       json: async () => ({
         destination: '0x1234567890123456789012345678901234567890',
-        chainType: 'base'
+        network: 'base'
       })
     });
 
@@ -44,7 +44,7 @@ describe('ATXPPaymentDestination', () => {
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=100',
+      'https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=100&currency=USDC',
       {
         method: 'GET',
         headers: {
@@ -89,7 +89,7 @@ describe('ATXPPaymentDestination', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        chainType: 'base'
+        network: 'base'
       })
     });
 
@@ -101,7 +101,7 @@ describe('ATXPPaymentDestination', () => {
     )).rejects.toThrow('ATXPPaymentDestination: /destination did not return destination');
   });
 
-  it('should throw an error if response is missing chainType', async () => {
+  it('should throw an error if response is missing network', async () => {
     const connectionString = 'https://accounts.example.com/?connection_token=abc123';
     mockFetch.mockResolvedValue({
       ok: true,
@@ -115,7 +115,7 @@ describe('ATXPPaymentDestination', () => {
     await expect(atxpDestination.destination(
       { amount: new BigNumber('100'), currency: 'USDC' },
       '0xbuyer'
-    )).rejects.toThrow('ATXPPaymentDestination: /destination did not return chainType');
+    )).rejects.toThrow('ATXPPaymentDestination: /destination did not return network');
   });
 
   it('should handle decimal amounts correctly', async () => {
@@ -124,7 +124,7 @@ describe('ATXPPaymentDestination', () => {
       ok: true,
       json: async () => ({
         destination: '0x1234567890123456789012345678901234567890',
-        chainType: 'base'
+        network: 'base'
       })
     });
 
@@ -136,18 +136,18 @@ describe('ATXPPaymentDestination', () => {
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=0.01',
+      'https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=0.01&currency=USDC',
       expect.any(Object)
     );
   });
 
-  it('should map ethereum chainType to base network', async () => {
+  it('should map ethereum network to base network', async () => {
     const connectionString = 'https://accounts.example.com/?connection_token=abc123';
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
         destination: '0x1234567890123456789012345678901234567890',
-        chainType: 'ethereum' // This should be mapped to 'base'
+        network: 'ethereum' // This should be mapped to 'base'
       })
     });
 
@@ -164,13 +164,13 @@ describe('ATXPPaymentDestination', () => {
     });
   });
 
-  it('should handle solana chainType correctly', async () => {
+  it('should handle solana network correctly', async () => {
     const connectionString = 'https://accounts.example.com/?connection_token=abc123';
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
         destination: 'SolanaAddress123456789',
-        chainType: 'solana'
+        network: 'solana'
       })
     });
 
@@ -209,7 +209,7 @@ describe('ATXPPaymentDestination', () => {
         ok: true,
         json: async () => ({
           destination: '0x1234567890123456789012345678901234567890',
-          chainType: 'base'
+          network: 'base'
         })
       });
 
@@ -224,8 +224,8 @@ describe('ATXPPaymentDestination', () => {
       );
 
       expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destination for buyer: 0xbuyer, amount: 100 USDC');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=100');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Successfully got payment destination: 0x1234567890123456789012345678901234567890 on base (chainType: base)');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=100&currency=USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Successfully got payment destination: 0x1234567890123456789012345678901234567890 on base');
     });
 
     it('should log errors when API request fails', async () => {
@@ -269,7 +269,7 @@ describe('ATXPPaymentDestination', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
-          chainType: 'base'
+          network: 'base'
         })
       });
 
@@ -286,7 +286,7 @@ describe('ATXPPaymentDestination', () => {
       expect(mockLogger.error).toHaveBeenCalledWith('/destination did not return destination');
     });
 
-    it('should log errors when response is missing chainType', async () => {
+    it('should log errors when response is missing network', async () => {
       const connectionString = 'https://accounts.example.com/?connection_token=abc123';
       const mockLogger: Logger = {
         debug: vi.fn(),
@@ -313,8 +313,8 @@ describe('ATXPPaymentDestination', () => {
       )).rejects.toThrow();
 
       expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destination for buyer: 0xbuyer, amount: 100 USDC');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=100');
-      expect(mockLogger.error).toHaveBeenCalledWith('/destination did not return chainType');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=100&currency=USDC');
+      expect(mockLogger.error).toHaveBeenCalledWith('/destination did not return network');
     });
   });
 });
