@@ -71,6 +71,7 @@ jobs:
           npm version $VERSION --no-git-tag-version -w packages/atxp-base
           npm version $VERSION --no-git-tag-version -w packages/atxp-express
           npm version $VERSION --no-git-tag-version -w packages/atxp-cloudflare
+          npm version $VERSION --no-git-tag-version -w packages/atxp-x402
           
           # Update cross-package dependencies to match new version
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-client
@@ -82,7 +83,9 @@ jobs:
           npm pkg set dependencies."@atxp/server"=$VERSION -w packages/atxp-express
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-cloudflare
           npm pkg set dependencies."@atxp/server"=$VERSION -w packages/atxp-cloudflare
-          
+          npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-x402
+          npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-x402
+                    
           # Regenerate package-lock.json with updated versions
           npm install
           
@@ -104,3 +107,4 @@ jobs:
           npm publish -w packages/atxp-base --provenance --access public
           npm publish -w packages/atxp-express --provenance --access public
           npm publish -w packages/atxp-cloudflare --provenance --access public
+          npm publish -w packages/atxp-x402 --provenance --access public
