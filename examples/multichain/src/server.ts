@@ -6,25 +6,32 @@ import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
 import { requirePayment, ChainPaymentDestination, ATXPPaymentDestination } from '@atxp/server';
+import type { AuthorizationServerUrl } from '@atxp/common';
 import { atxpExpress } from '@atxp/express';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const PORT = 3009;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
+const PORT = process.env.PORT || 3009;
 
 const getServer = () => {
   // Create an MCP server with implementation details
   const server = new McpServer({
-    name: 'stateless-streamable-http-server',
+    name: 'multichain-example-server',
     version: '1.0.0',
   }, { capabilities: { logging: {} } });
 
-  // Register a tool specifically for testing resumability
+  // Register a tool that requires payment
   server.tool(
-    'secure-data',
-    'Secure data',
+    'multi-chain-tool',
+    'A tool that accepts payments from multiple chains',
     {
-      message: z.string().optional().describe('Message to secure'),
+      message: z.string().optional().describe('Message to process'),
     },
     async ({ message }: { message?: string }): Promise<CallToolResult> => {
       await requirePayment({price: BigNumber(0.01)});
@@ -32,7 +39,7 @@ const getServer = () => {
         content: [
           {
             type: 'text',
-            text: `Secure data: ${message || 'No message provided'}`,
+            text: `Payment received! Processed message: ${message || 'No message provided'}`,
           }
         ],
       };
@@ -45,22 +52,25 @@ const getServer = () => {
 const app = express();
 app.use(express.json());
 
+// Use ATXPPaymentDestination for multi-chain support
+// This will use the accounts.atxp.ai service which supports both Base and Solana
 const destinationAddress = process.env.ATXP_DESTINATION!;
-//const destination = new ChainPaymentDestination(destinationAddress, 'base');
 const destination = new ATXPPaymentDestination(destinationAddress);
 
-console.log('Starting MCP server with destination', destinationAddress);
-app.use(atxpExpress({
+console.log('Starting multichain MCP server with destination', destinationAddress);
+console.log(`Server will listen on port ${PORT}`);
+
+const atxpRouter = atxpExpress({
   paymentDestination: destination,
   resource: `http://localhost:${PORT}`,
-  //server: 'http://localhost:3010',
-  server: 'https://auth.atxp.ai',
+  server: (process.env.ATXP_AUTH_SERVER || 'https://auth.atxp.ai') as AuthorizationServerUrl,
   mountPath: '/',
-  payeeName: 'ATXP Client Example Resource Server',
+  payeeName: 'Multichain Example Server',
   allowHttp: true,
   logger: new ConsoleLogger({level: LogLevel.DEBUG})
-}));
+});
 
+app.use(atxpRouter as any);
 
 app.post('/', async (req: Request, res: Response) => {
   const server = getServer();
@@ -115,14 +125,14 @@ app.delete('/', async (req: Request, res: Response) => {
   }));
 });
 
-
 // Start the server
-app.listen(PORT, (error) => {
+app.listen(PORT as number, (error?: Error) => {
   if (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
   }
-  console.log(`MCP Stateless Streamable HTTP Server listening on port ${PORT}`);
+  console.log(`Multichain Example Server listening on port ${PORT}`);
+  console.log('Ready to accept payments from both Base and Solana chains!');
 });
 
 // Handle server shutdown

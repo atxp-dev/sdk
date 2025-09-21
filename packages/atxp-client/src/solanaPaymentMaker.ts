@@ -73,8 +73,10 @@ export class SolanaPaymentMaker implements PaymentMaker {
         throw new InsufficientFundsError(currency, amount, balance, 'solana');
       }
 
+      // Increase compute units to handle both memo and token transfer
+      // Memo uses ~6000 CUs, token transfer needs ~6500 CUs
       const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
-        units: 10000,
+        units: 50000,
       });
 
       const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
