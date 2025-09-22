@@ -143,70 +143,205 @@ export class OAuthResourceClient {
   }
 
   getAuthorizationServer = async (resourceServerUrl: string): Promise<oauth.AuthorizationServer> => {
+    const originalUrl = resourceServerUrl;
     resourceServerUrl = this.normalizeResourceServerUrl(resourceServerUrl);
-    
+
+    this.logger.info(`[DEBUG] getAuthorizationServer called with originalUrl: ${originalUrl}`);
+    this.logger.info(`[DEBUG] normalized resourceServerUrl: ${resourceServerUrl}`);
+
     try {
       const resourceUrl = new URL(resourceServerUrl);
+      this.logger.info(`[DEBUG] constructed resourceUrl: ${resourceUrl.toString()}`);
 
-      const prmResponse = await oauth.resourceDiscoveryRequest(resourceUrl, {
-        [oauth.customFetch]: this.sideChannelFetch,
-        [oauth.allowInsecureRequests]: this.allowInsecureRequests
-      });
+      const fullPrmUrl = `${resourceUrl.toString()}/.well-known/oauth-protected-resource`;
+      this.logger.info(`[DEBUG] making resourceDiscoveryRequest to: ${fullPrmUrl}`);
+      this.logger.info(`[DEBUG] sideChannelFetch type: ${typeof this.sideChannelFetch}`);
+      this.logger.info(`[DEBUG] allowInsecureRequests: ${this.allowInsecureRequests}`);
+
+      // Test direct fetch call to see if it's blocked
+      try {
+        this.logger.info(`[DEBUG] Testing direct fetch call to: ${fullPrmUrl}`);
+        const testResponse = await this.sideChannelFetch(fullPrmUrl);
+        this.logger.info(`[DEBUG] Direct fetch test succeeded with status: ${testResponse.status}`);
+      } catch (testError) {
+        this.logger.warn(`[DEBUG] Direct fetch test failed: ${testError}`);
+        this.logger.warn(`[DEBUG] Direct fetch error type: ${testError?.constructor?.name}`);
+        this.logger.warn(`[DEBUG] Direct fetch error message: ${(testError as Error)?.message}`);
+        if (testError instanceof TypeError && (testError as Error).message.includes('Load failed')) {
+          this.logger.warn(`[DEBUG] Direct fetch got "Load failed" - this confirms network blocking`);
+        }
+      }
+
+      let prmResponse;
+      try {
+        this.logger.info(`[DEBUG] About to call oauth.resourceDiscoveryRequest with customFetch`);
+        prmResponse = await oauth.resourceDiscoveryRequest(resourceUrl, {
+          [oauth.customFetch]: this.sideChannelFetch,
+          [oauth.allowInsecureRequests]: this.allowInsecureRequests
+        });
+        this.logger.info(`[DEBUG] resourceDiscoveryRequest response status: ${prmResponse.status}`);
+      } catch (prmError) {
+        this.logger.warn(`[DEBUG] oauth.resourceDiscoveryRequest failed: ${prmError}`);
+        this.logger.warn(`[DEBUG] prmError type: ${prmError?.constructor?.name}`);
+        this.logger.warn(`[DEBUG] prmError message: ${(prmError as Error)?.message}`);
+
+        // If oauth4webapi request fails, fall back to our working direct fetch approach
+        if ((prmError as Error)?.message?.includes('interrupted by user') ||
+            (prmError as Error)?.message?.includes('Load failed')) {
+          this.logger.warn(`[DEBUG] oauth4webapi request was blocked, trying direct fetch fallback`);
+          try {
+            const directResponse = await this.sideChannelFetch(fullPrmUrl);
+            this.logger.info(`[DEBUG] Direct fetch fallback status: ${directResponse.status}`);
+
+            // If direct fetch also returns 404, skip processing and go straight to OAuth AS fallback
+            if (directResponse.status === 404) {
+              this.logger.info(`[DEBUG] Direct fetch returned 404, skipping PRM processing and jumping to OAuth AS fallback`);
+              // Skip all processing and go directly to the OAuth AS fallback logic
+              const rsUrl = new URL(resourceServerUrl);
+              const rsAsUrl = rsUrl.protocol + '//' + rsUrl.host + '/.well-known/oauth-authorization-server';
+              this.logger.info(`[DEBUG] Direct fallback: making request to ${rsAsUrl}`);
+
+              try {
+                const rsAsResponse = await this.sideChannelFetch(rsAsUrl);
+                this.logger.info(`[DEBUG] Direct fallback response status: ${rsAsResponse.status}`);
+
+                if (rsAsResponse.status === 200) {
+                  const rsAsBody = await rsAsResponse.json();
+                  const authServer = rsAsBody.issuer;
+                  this.logger.info(`[DEBUG] Found authServer from direct fallback: ${authServer}`);
+
+                  if (authServer) {
+                    const authServerUrl = new URL(authServer);
+                    const res = await this.authorizationServerFromUrl(authServerUrl);
+                    return res;
+                  }
+                }
+
+                throw new Error('No authorization_servers found in protected resource metadata');
+              } catch (fallbackError) {
+                this.logger.warn(`[DEBUG] Direct OAuth AS fallback failed: ${fallbackError}`);
+                throw fallbackError;
+              }
+            } else {
+              prmResponse = directResponse;
+            }
+          } catch (directError) {
+            this.logger.warn(`[DEBUG] Direct fetch fallback also failed: ${directError}`);
+            throw prmError; // throw original error
+          }
+        } else {
+          throw prmError;
+        }
+      }
 
       const fallbackToRsAs = !this.strict && prmResponse.status === 404;
+      this.logger.info(`[DEBUG] fallbackToRsAs: ${fallbackToRsAs}, strict: ${this.strict}`);
 
       let authServer: string | undefined = undefined;
       if (!fallbackToRsAs) {
-        const resourceServer = await oauth.processResourceDiscoveryResponse(resourceUrl, prmResponse);
-        authServer = resourceServer.authorization_servers?.[0];
+        this.logger.info('[DEBUG] processing resource discovery response');
+        try {
+          const resourceServer = await oauth.processResourceDiscoveryResponse(resourceUrl, prmResponse);
+          authServer = resourceServer.authorization_servers?.[0];
+          this.logger.info(`[DEBUG] found authServer from PRM: ${authServer}`);
+        } catch (processError) {
+          this.logger.warn(`[DEBUG] processResourceDiscoveryResponse failed: ${processError}`);
+          throw processError;
+        }
       } else {
-        // Some older servers serve OAuth metadata from the MCP server instead of PRM data, 
+        // Some older servers serve OAuth metadata from the MCP server instead of PRM data,
         // so if the PRM data isn't found, we'll try to get the AS metadata from the MCP server
         this.logger.info('Protected Resource Metadata document not found, looking for OAuth metadata on resource server');
         // Trim off the path - OAuth metadata is also singular for a server and served from the root
         const rsUrl = new URL(resourceServerUrl);
         const rsAsUrl = rsUrl.protocol + '//' + rsUrl.host + '/.well-known/oauth-authorization-server';
+        this.logger.info(`[DEBUG] fallback: making request to ${rsAsUrl}`);
         // Don't use oauth4webapi for this, because these servers might be specifiying an issuer that is not
         // themselves (in order to use a separate AS by just hosting the OAuth metadata on the MCP server)
         //   This is against the OAuth spec, but some servers do it anyway
-        const rsAsResponse = await this.sideChannelFetch(rsAsUrl);
-        if (rsAsResponse.status === 200) {
-          const rsAsBody = await rsAsResponse.json();
-          authServer = rsAsBody.issuer;
+        try {
+          const rsAsResponse = await this.sideChannelFetch(rsAsUrl);
+          this.logger.info(`[DEBUG] fallback response status: ${rsAsResponse.status}`);
+          if (rsAsResponse.status === 200) {
+            const rsAsBody = await rsAsResponse.json();
+            authServer = rsAsBody.issuer;
+            this.logger.info(`[DEBUG] found authServer from fallback: ${authServer}`);
+          } else {
+            this.logger.info(`[DEBUG] fallback request failed with status ${rsAsResponse.status}: ${rsAsResponse.statusText}`);
+          }
+        } catch (fallbackError) {
+          this.logger.warn(`[DEBUG] fallback request threw error: ${fallbackError}`);
+          this.logger.warn(`[DEBUG] fallback error type: ${fallbackError?.constructor?.name}`);
+          this.logger.warn(`[DEBUG] fallback error message: ${(fallbackError as Error)?.message}`);
+          if (fallbackError instanceof TypeError && (fallbackError as Error).message.includes('Load failed')) {
+            this.logger.warn(`[DEBUG] This is the "Load failed" error we're debugging - URL was: ${rsAsUrl}`);
+          }
         }
       }
 
       if (!authServer) {
+        this.logger.warn(`[DEBUG] No authorization server found. PRM response status: ${prmResponse.status}, fallback attempted: ${fallbackToRsAs}`);
         throw new Error('No authorization_servers found in protected resource metadata');
       }
 
+      this.logger.info(`[DEBUG] proceeding with authServer: ${authServer}`);
       const authServerUrl = new URL(authServer);
       const res = await this.authorizationServerFromUrl(authServerUrl);
       return res;
     } catch (error) {
       this.logger.warn(`Error fetching authorization server configuration: ${error}`);
+      this.logger.warn(`[DEBUG] Error type: ${error?.constructor?.name}`);
+      this.logger.warn(`[DEBUG] Error message: ${(error as Error)?.message}`);
+      this.logger.warn(`[DEBUG] Original resourceServerUrl: ${originalUrl}`);
+      this.logger.warn(`[DEBUG] Normalized resourceServerUrl: ${resourceServerUrl}`);
+      if (error instanceof TypeError && (error as Error).message.includes('Load failed')) {
+        this.logger.warn(`[DEBUG] This is the "Load failed" TypeError we're debugging!`);
+      }
       this.logger.warn((error as Error).stack || '');
       throw error;
     }
   }
 
   authorizationServerFromUrl = async (authServerUrl: URL): Promise<oauth.AuthorizationServer> => {
+    this.logger.info(`[DEBUG] authorizationServerFromUrl called with: ${authServerUrl.toString()}`);
+
     try {
       // Explicitly throw for a tricky edge case to trigger tests
       if (authServerUrl.toString().includes('/.well-known/oauth-protected-resource')) {
         throw new Error('Authorization server URL is a PRM URL, which is not supported. It must be an AS URL.');
       }
 
+      // Construct the discovery URL
+      const discoveryUrl = `${authServerUrl.toString()}/.well-known/oauth-authorization-server`;
+      this.logger.info(`[DEBUG] making OAuth discovery request to: ${discoveryUrl}`);
+
       // Now, get the authorization server metadata
-      const response = await oauth.discoveryRequest(authServerUrl, {
-        algorithm: 'oauth2',
-        [oauth.customFetch]: this.sideChannelFetch,
-        [oauth.allowInsecureRequests]: this.allowInsecureRequests
-      });
-      const authorizationServer = await oauth.processDiscoveryResponse(authServerUrl, response);
-      return authorizationServer;
+      try {
+        const response = await oauth.discoveryRequest(authServerUrl, {
+          algorithm: 'oauth2',
+          [oauth.customFetch]: this.sideChannelFetch,
+          [oauth.allowInsecureRequests]: this.allowInsecureRequests
+        });
+        this.logger.info(`[DEBUG] OAuth discovery response status: ${response.status}`);
+        if (response.status !== 200) {
+          this.logger.warn(`[DEBUG] OAuth discovery failed with status ${response.status}: ${response.statusText}`);
+        }
+
+        const authorizationServer = await oauth.processDiscoveryResponse(authServerUrl, response);
+        this.logger.info(`[DEBUG] successfully processed discovery response, issuer: ${authorizationServer.issuer}`);
+        return authorizationServer;
+      } catch (discoveryError) {
+        this.logger.warn(`[DEBUG] OAuth discovery request threw error: ${discoveryError}`);
+        this.logger.warn(`[DEBUG] discovery error type: ${discoveryError?.constructor?.name}`);
+        this.logger.warn(`[DEBUG] discovery error message: ${(discoveryError as Error)?.message}`);
+        if (discoveryError instanceof TypeError && (discoveryError as Error).message.includes('Load failed')) {
+          this.logger.warn(`[DEBUG] This is the "Load failed" error in OAuth discovery - URL was: ${discoveryUrl}`);
+        }
+        throw discoveryError;
+      }
     } catch (error: any) {
       this.logger.warn(`Error fetching authorization server configuration: ${error}`);
+      this.logger.warn(`[DEBUG] authServerUrl was: ${authServerUrl.toString()}`);
       throw error;
     }
   }
