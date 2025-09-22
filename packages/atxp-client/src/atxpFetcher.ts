@@ -160,7 +160,7 @@ export class ATXPFetcher {
 
       let paymentId: string;
       try {
-        paymentId = await paymentMaker.makePayment(amount, dest.currency, dest.address, paymentRequestData.iss);
+        paymentId = await paymentMaker.makePayment(amount, dest.currency, dest.address, paymentRequestData.iss, paymentRequestId);
         this.logger.info(`ATXP: made payment of ${amount.toString()} ${dest.currency} on ${dest.network}: ${paymentId}`);
         await this.onPayment({ payment: prospectivePayment });
 
@@ -279,7 +279,7 @@ export class ATXPFetcher {
 
     let paymentId: string;
     try {
-      paymentId = await paymentMaker.makePayment(amount, currency, destination, paymentRequestData.iss);
+      paymentId = await paymentMaker.makePayment(amount, currency, destination, paymentRequestData.iss, paymentRequestId);
       this.logger.info(`ATXP: made payment of ${amount} ${currency} on ${requestedNetwork}: ${paymentId}`);
       
       // Call onPayment callback after successful payment
