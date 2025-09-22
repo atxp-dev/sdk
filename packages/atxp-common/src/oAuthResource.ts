@@ -144,14 +144,30 @@ export class OAuthResourceClient {
 
   getAuthorizationServer = async (resourceServerUrl: string): Promise<oauth.AuthorizationServer> => {
     resourceServerUrl = this.normalizeResourceServerUrl(resourceServerUrl);
-    
+
     try {
       const resourceUrl = new URL(resourceServerUrl);
 
-      const prmResponse = await oauth.resourceDiscoveryRequest(resourceUrl, {
-        [oauth.customFetch]: this.sideChannelFetch,
-        [oauth.allowInsecureRequests]: this.allowInsecureRequests
-      });
+      let prmResponse;
+      try {
+        prmResponse = await oauth.resourceDiscoveryRequest(resourceUrl, {
+          [oauth.customFetch]: this.sideChannelFetch,
+          [oauth.allowInsecureRequests]: this.allowInsecureRequests
+        });
+      } catch (prmError) {
+        // We have seen oauth4webapi request failures due to requesting an incorrect URL
+        if ((prmError as Error)?.message?.includes('interrupted by user') ||
+            (prmError as Error)?.message?.includes('Load failed')) {
+          try {
+            const fullPrmUrl = `${resourceUrl.origin}/.well-known/oauth-protected-resource`;
+            prmResponse = await this.sideChannelFetch(fullPrmUrl);
+          } catch {
+            throw prmError; // throw original error if fallback fails
+          }
+        } else {
+          throw prmError;
+        }
+      }
 
       const fallbackToRsAs = !this.strict && prmResponse.status === 404;
 
@@ -160,12 +176,12 @@ export class OAuthResourceClient {
         const resourceServer = await oauth.processResourceDiscoveryResponse(resourceUrl, prmResponse);
         authServer = resourceServer.authorization_servers?.[0];
       } else {
-        // Some older servers serve OAuth metadata from the MCP server instead of PRM data, 
+        // Some older servers serve OAuth metadata from the MCP server instead of PRM data,
         // so if the PRM data isn't found, we'll try to get the AS metadata from the MCP server
         this.logger.info('Protected Resource Metadata document not found, looking for OAuth metadata on resource server');
         // Trim off the path - OAuth metadata is also singular for a server and served from the root
         const rsUrl = new URL(resourceServerUrl);
-        const rsAsUrl = rsUrl.protocol + '//' + rsUrl.host + '/.well-known/oauth-authorization-server';
+        const rsAsUrl = rsUrl.origin + '/.well-known/oauth-authorization-server';
         // Don't use oauth4webapi for this, because these servers might be specifiying an issuer that is not
         // themselves (in order to use a separate AS by just hosting the OAuth metadata on the MCP server)
         //   This is against the OAuth spec, but some servers do it anyway

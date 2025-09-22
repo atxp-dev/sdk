@@ -162,3 +162,220 @@ describe('OAuthResourceClient Race Condition Fix', () => {
     expect(locks.size).toBe(0);
   });
 });
+
+// Mock oauth4webapi at the top level
+vi.mock('oauth4webapi', () => ({
+  resourceDiscoveryRequest: vi.fn(),
+  processResourceDiscoveryResponse: vi.fn(),
+  discoveryRequest: vi.fn(),
+  processDiscoveryResponse: vi.fn(),
+  customFetch: Symbol('customFetch'),
+  allowInsecureRequests: Symbol('allowInsecureRequests'),
+}));
+
+describe('OAuthResourceClient URL normalization and fallback', () => {
+  let client: OAuthResourceClient;
+  let db: MemoryOAuthDb;
+  let mockFetch: any;
+  let mockOAuth: any;
+
+  beforeEach(async () => {
+    mockFetch = vi.fn();
+    db = new MemoryOAuthDb();
+    client = new OAuthResourceClient({
+      db,
+      sideChannelFetch: mockFetch,
+      allowInsecureRequests: true,
+      logger: mockLogger
+    });
+
+    // Get the mocked oauth4webapi module
+    mockOAuth = await import('oauth4webapi');
+    vi.clearAllMocks();
+  });
+
+  describe('URL normalization', () => {
+    it('should remove trailing slashes to prevent double slashes', async () => {
+      const resourceServerUrl = 'https://image.mcp.atxp.ai/';
+
+      // Mock oauth4webapi call to be interrupted (simulate mobile blocking)
+      mockOAuth.resourceDiscoveryRequest.mockRejectedValue(
+        new Error('Request interrupted by user')
+      );
+
+      // Mock successful direct fetch fallback returning 404 to trigger OAuth AS fallback
+      mockFetch
+        .mockResolvedValueOnce({
+          status: 404,
+          json: async () => ({}),
+        }) // Direct PRM fetch
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({
+            issuer: 'https://auth.atxp.ai'
+          }),
+        }); // OAuth AS fallback
+
+      // Mock authorizationServerFromUrl
+      vi.spyOn(client, 'authorizationServerFromUrl').mockResolvedValue(mockAuthServer);
+
+      await client.getAuthorizationServer(resourceServerUrl);
+
+      // Verify URLs called don't have double slashes
+      const fetchCalls = mockFetch.mock.calls;
+
+      // Direct PRM fetch call
+      expect(fetchCalls[0][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-protected-resource');
+
+      // OAuth AS fallback call
+      expect(fetchCalls[1][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-authorization-server');
+    });
+
+    it('should handle multiple trailing slashes correctly', async () => {
+      const resourceServerUrl = 'https://image.mcp.atxp.ai////';
+
+      mockOAuth.resourceDiscoveryRequest.mockRejectedValue(
+        new Error('Request interrupted by user')
+      );
+
+      mockFetch
+        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct PRM fetch
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({ issuer: 'https://auth.atxp.ai' })
+        }); // OAuth AS
+
+      vi.spyOn(client, 'authorizationServerFromUrl').mockResolvedValue(mockAuthServer);
+
+      await client.getAuthorizationServer(resourceServerUrl);
+
+      // Should normalize multiple trailing slashes
+      expect(mockFetch.mock.calls[0][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-protected-resource');
+      expect(mockFetch.mock.calls[1][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-authorization-server');
+    });
+
+    it('should handle URLs without trailing slashes correctly', async () => {
+      const resourceServerUrl = 'https://image.mcp.atxp.ai';
+
+      mockOAuth.resourceDiscoveryRequest.mockRejectedValue(
+        new Error('Request interrupted by user')
+      );
+
+      mockFetch
+        .mockResolvedValueOnce({ status: 404, json: async () => ({}) })
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({ issuer: 'https://auth.atxp.ai' })
+        });
+
+      vi.spyOn(client, 'authorizationServerFromUrl').mockResolvedValue(mockAuthServer);
+
+      await client.getAuthorizationServer(resourceServerUrl);
+
+      // Should add single slash correctly
+      expect(mockFetch.mock.calls[0][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-protected-resource');
+      expect(mockFetch.mock.calls[1][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-authorization-server');
+    });
+  });
+
+  describe('Farcaster mobile fallback', () => {
+    it('should handle "Request interrupted by user" error', async () => {
+      const resourceServerUrl = 'https://image.mcp.atxp.ai';
+
+      mockOAuth.resourceDiscoveryRequest.mockRejectedValue(
+        new Error('Request interrupted by user')
+      );
+
+      mockFetch
+        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct PRM fetch
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({ issuer: 'https://auth.atxp.ai' })
+        }); // OAuth AS success
+
+      vi.spyOn(client, 'authorizationServerFromUrl').mockResolvedValue(mockAuthServer);
+
+      const result = await client.getAuthorizationServer(resourceServerUrl);
+
+      expect(result).toEqual(mockAuthServer);
+    });
+
+    it('should handle "Load failed" error', async () => {
+      const resourceServerUrl = 'https://image.mcp.atxp.ai';
+
+      mockOAuth.resourceDiscoveryRequest.mockRejectedValue(
+        new TypeError('Load failed')
+      );
+
+      mockFetch
+        .mockResolvedValueOnce({ status: 404, json: async () => ({}) })
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({ issuer: 'https://auth.atxp.ai' })
+        });
+
+      vi.spyOn(client, 'authorizationServerFromUrl').mockResolvedValue(mockAuthServer);
+
+      const result = await client.getAuthorizationServer(resourceServerUrl);
+
+      expect(result).toEqual(mockAuthServer);
+    });
+
+    it('should fall through when oauth4webapi succeeds', async () => {
+      const resourceServerUrl = 'https://image.mcp.atxp.ai';
+
+      // Mock oauth4webapi succeeding with a 404 (triggering normal fallback path)
+      const mockResponse = { status: 404, json: async () => ({}) };
+      mockOAuth.resourceDiscoveryRequest.mockResolvedValue(mockResponse as any);
+
+      // Mock the normal OAuth AS fallback path
+      mockFetch.mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ issuer: 'https://auth.atxp.ai' })
+      });
+
+      vi.spyOn(client, 'authorizationServerFromUrl').mockResolvedValue(mockAuthServer);
+
+      const result = await client.getAuthorizationServer(resourceServerUrl);
+
+      expect(result).toEqual(mockAuthServer);
+    });
+
+    it('should throw error when both oauth4webapi and direct fetch fail', async () => {
+      const resourceServerUrl = 'https://image.mcp.atxp.ai';
+
+      const originalError = new Error('Request interrupted by user');
+      mockOAuth.resourceDiscoveryRequest.mockRejectedValue(originalError);
+
+      mockFetch.mockRejectedValue(new Error('Direct fetch also failed'));
+
+      await expect(client.getAuthorizationServer(resourceServerUrl)).rejects.toThrow('Request interrupted by user');
+    });
+  });
+
+  describe('OAuth AS fallback success scenarios', () => {
+    it('should successfully discover authorization server via fallback', async () => {
+      const resourceServerUrl = 'https://image.mcp.atxp.ai';
+
+      mockOAuth.resourceDiscoveryRequest.mockRejectedValue(
+        new Error('Request interrupted by user')
+      );
+
+      mockFetch
+        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct PRM fetch
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({
+            issuer: 'https://auth.atxp.ai',
+            authorization_endpoint: 'https://auth.atxp.ai/authorize'
+          })
+        }); // OAuth AS success
+
+      vi.spyOn(client, 'authorizationServerFromUrl').mockResolvedValue(mockAuthServer);
+
+      const result = await client.getAuthorizationServer(resourceServerUrl);
+
+      expect(result).toEqual(mockAuthServer);
+    });
+  });
+});
