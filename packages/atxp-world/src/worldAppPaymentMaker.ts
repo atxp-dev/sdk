@@ -6,6 +6,7 @@ import {
   type PaymentMaker
 } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
+import BigNumber from 'bignumber.js';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';

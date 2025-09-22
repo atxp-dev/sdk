@@ -7,6 +7,7 @@ import {
   type Hex
 } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
+import BigNumber from 'bignumber.js';
 import { createWalletClient, custom, encodeFunctionData } from 'viem';
 
 const USDC_DECIMALS = 6;
