@@ -203,16 +203,12 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
         new Error('Request interrupted by user')
       );
 
-      // Mock successful direct fetch fallback
+      // Mock successful direct fetch fallback returning 404 to trigger OAuth AS fallback
       mockFetch
         .mockResolvedValueOnce({
           status: 404,
           json: async () => ({}),
-        }) // Direct test fetch
-        .mockResolvedValueOnce({
-          status: 404,
-          json: async () => ({}),
-        }) // Fallback PRM fetch
+        }) // Direct PRM fetch
         .mockResolvedValueOnce({
           status: 200,
           json: async () => ({
@@ -228,11 +224,11 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       // Verify URLs called don't have double slashes
       const fetchCalls = mockFetch.mock.calls;
 
-      // Direct test call
+      // Direct PRM fetch call
       expect(fetchCalls[0][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-protected-resource');
 
       // OAuth AS fallback call
-      expect(fetchCalls[2][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-authorization-server');
+      expect(fetchCalls[1][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-authorization-server');
     });
 
     it('should handle multiple trailing slashes correctly', async () => {
@@ -243,8 +239,7 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       );
 
       mockFetch
-        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct test
-        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Fallback PRM
+        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct PRM fetch
         .mockResolvedValueOnce({
           status: 200,
           json: async () => ({ issuer: 'https://auth.atxp.ai' })
@@ -256,7 +251,7 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
 
       // Should normalize multiple trailing slashes
       expect(mockFetch.mock.calls[0][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-protected-resource');
-      expect(mockFetch.mock.calls[2][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-authorization-server');
+      expect(mockFetch.mock.calls[1][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-authorization-server');
     });
 
     it('should handle URLs without trailing slashes correctly', async () => {
@@ -267,7 +262,6 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       );
 
       mockFetch
-        .mockResolvedValueOnce({ status: 404, json: async () => ({}) })
         .mockResolvedValueOnce({ status: 404, json: async () => ({}) })
         .mockResolvedValueOnce({
           status: 200,
@@ -280,7 +274,7 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
 
       // Should add single slash correctly
       expect(mockFetch.mock.calls[0][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-protected-resource');
-      expect(mockFetch.mock.calls[2][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-authorization-server');
+      expect(mockFetch.mock.calls[1][0]).toBe('https://image.mcp.atxp.ai/.well-known/oauth-authorization-server');
     });
   });
 
@@ -293,8 +287,7 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       );
 
       mockFetch
-        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct test
-        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Fallback PRM
+        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct PRM fetch
         .mockResolvedValueOnce({
           status: 200,
           json: async () => ({ issuer: 'https://auth.atxp.ai' })
@@ -305,9 +298,6 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       const result = await client.getAuthorizationServer(resourceServerUrl);
 
       expect(result).toEqual(mockAuthServer);
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('oauth4webapi request was blocked, trying direct fetch fallback')
-      );
     });
 
     it('should handle "Load failed" error', async () => {
@@ -319,7 +309,6 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
 
       mockFetch
         .mockResolvedValueOnce({ status: 404, json: async () => ({}) })
-        .mockResolvedValueOnce({ status: 404, json: async () => ({}) })
         .mockResolvedValueOnce({
           status: 200,
           json: async () => ({ issuer: 'https://auth.atxp.ai' })
@@ -330,35 +319,26 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       const result = await client.getAuthorizationServer(resourceServerUrl);
 
       expect(result).toEqual(mockAuthServer);
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('oauth4webapi request was blocked, trying direct fetch fallback')
-      );
     });
 
     it('should fall through when oauth4webapi succeeds', async () => {
       const resourceServerUrl = 'https://image.mcp.atxp.ai';
 
+      // Mock oauth4webapi succeeding with a 404 (triggering normal fallback path)
       const mockResponse = { status: 404, json: async () => ({}) };
       mockOAuth.resourceDiscoveryRequest.mockResolvedValue(mockResponse as any);
 
-      mockFetch.mockResolvedValueOnce({ status: 404, json: async () => ({}) }); // Direct test only
-
       // Mock the normal OAuth AS fallback path
-      mockFetch
-        .mockResolvedValueOnce({
-          status: 200,
-          json: async () => ({ issuer: 'https://auth.atxp.ai' })
-        });
+      mockFetch.mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ issuer: 'https://auth.atxp.ai' })
+      });
 
       vi.spyOn(client, 'authorizationServerFromUrl').mockResolvedValue(mockAuthServer);
 
       const result = await client.getAuthorizationServer(resourceServerUrl);
 
       expect(result).toEqual(mockAuthServer);
-      // Should NOT see the fallback warning since oauth4webapi succeeded
-      expect(mockLogger.warn).not.toHaveBeenCalledWith(
-        expect.stringContaining('oauth4webapi request was blocked')
-      );
     });
 
     it('should throw error when both oauth4webapi and direct fetch fail', async () => {
@@ -367,15 +347,9 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       const originalError = new Error('Request interrupted by user');
       mockOAuth.resourceDiscoveryRequest.mockRejectedValue(originalError);
 
-      mockFetch
-        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct test
-        .mockRejectedValue(new Error('Direct fetch also failed')); // Fallback fails
+      mockFetch.mockRejectedValue(new Error('Direct fetch also failed'));
 
       await expect(client.getAuthorizationServer(resourceServerUrl)).rejects.toThrow('Request interrupted by user');
-
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Direct fetch fallback also failed')
-      );
     });
   });
 
@@ -388,8 +362,7 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       );
 
       mockFetch
-        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct test
-        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Fallback PRM
+        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // Direct PRM fetch
         .mockResolvedValueOnce({
           status: 200,
           json: async () => ({
@@ -403,9 +376,6 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       const result = await client.getAuthorizationServer(resourceServerUrl);
 
       expect(result).toEqual(mockAuthServer);
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Found authServer from direct fallback: https://auth.atxp.ai')
-      );
     });
   });
 });

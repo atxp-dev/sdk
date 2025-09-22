@@ -146,9 +146,7 @@ export class OAuthResourceClient {
     resourceServerUrl = this.normalizeResourceServerUrl(resourceServerUrl);
 
     try {
-      // Ensure no trailing slash to prevent double slash in URL construction
-      const cleanUrl = resourceServerUrl.replace(/\/+$/, '');
-      const resourceUrl = new URL(cleanUrl);
+      const resourceUrl = new URL(resourceServerUrl);
 
       let prmResponse;
       try {
@@ -157,43 +155,14 @@ export class OAuthResourceClient {
           [oauth.allowInsecureRequests]: this.allowInsecureRequests
         });
       } catch (prmError) {
-        // If oauth4webapi request fails, fall back to our working direct fetch approach
+        // We have seen oauth4webapi request failures due to requesting an incorrect URL
         if ((prmError as Error)?.message?.includes('interrupted by user') ||
             (prmError as Error)?.message?.includes('Load failed')) {
           try {
-            const fullPrmUrl = `${resourceUrl.toString()}/.well-known/oauth-protected-resource`;
-            const directResponse = await this.sideChannelFetch(fullPrmUrl);
-
-            // If direct fetch also returns 404, skip processing and go straight to OAuth AS fallback
-            if (directResponse.status === 404) {
-              // Skip all processing and go directly to the OAuth AS fallback logic
-              const cleanRsUrl = resourceServerUrl.replace(/\/+$/, '');
-              const rsUrl = new URL(cleanRsUrl);
-              const rsAsUrl = rsUrl.protocol + '//' + rsUrl.host + '/.well-known/oauth-authorization-server';
-
-              try {
-                const rsAsResponse = await this.sideChannelFetch(rsAsUrl);
-
-                if (rsAsResponse.status === 200) {
-                  const rsAsBody = await rsAsResponse.json();
-                  const authServer = rsAsBody.issuer;
-
-                  if (authServer) {
-                    const authServerUrl = new URL(authServer);
-                    const res = await this.authorizationServerFromUrl(authServerUrl);
-                    return res;
-                  }
-                }
-
-                throw new Error('No authorization_servers found in protected resource metadata');
-              } catch (fallbackError) {
-                throw fallbackError;
-              }
-            } else {
-              prmResponse = directResponse;
-            }
-          } catch (directError) {
-            throw prmError; // throw original error
+            const fullPrmUrl = `${resourceUrl.origin}/.well-known/oauth-protected-resource`;
+            prmResponse = await this.sideChannelFetch(fullPrmUrl);
+          } catch {
+            throw prmError; // throw original error if fallback fails
           }
         } else {
           throw prmError;
@@ -211,20 +180,15 @@ export class OAuthResourceClient {
         // so if the PRM data isn't found, we'll try to get the AS metadata from the MCP server
         this.logger.info('Protected Resource Metadata document not found, looking for OAuth metadata on resource server');
         // Trim off the path - OAuth metadata is also singular for a server and served from the root
-        const cleanRsUrl = resourceServerUrl.replace(/\/+$/, '');
-        const rsUrl = new URL(cleanRsUrl);
-        const rsAsUrl = rsUrl.protocol + '//' + rsUrl.host + '/.well-known/oauth-authorization-server';
+        const rsUrl = new URL(resourceServerUrl);
+        const rsAsUrl = rsUrl.origin + '/.well-known/oauth-authorization-server';
         // Don't use oauth4webapi for this, because these servers might be specifiying an issuer that is not
         // themselves (in order to use a separate AS by just hosting the OAuth metadata on the MCP server)
         //   This is against the OAuth spec, but some servers do it anyway
-        try {
-          const rsAsResponse = await this.sideChannelFetch(rsAsUrl);
-          if (rsAsResponse.status === 200) {
-            const rsAsBody = await rsAsResponse.json();
-            authServer = rsAsBody.issuer;
-          }
-        } catch (fallbackError) {
-          // Fallback error is logged but not rethrown to allow for graceful degradation
+        const rsAsResponse = await this.sideChannelFetch(rsAsUrl);
+        if (rsAsResponse.status === 200) {
+          const rsAsBody = await rsAsResponse.json();
+          authServer = rsAsBody.issuer;
         }
       }
 
