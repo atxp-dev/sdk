@@ -3,7 +3,7 @@ import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
-import { getSpendPermissionModule } from './spendPermissionUtils.js';
+import { prepareSpendCallData } from './spendPermissionShim.js';
 import { 
   createEIP1271JWT, 
   createEIP1271AuthData,
@@ -116,9 +116,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
 
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
     const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
-    // Dynamically import prepareSpendCallData based on environment
-    const { prepareSpendCallData } = await getSpendPermissionModule();
-    const spendCalls = await prepareSpendCallData(this.spendPermission, amountInUSDCUnits);
+    const spendCalls = await prepareSpendCallData({ permission: this.spendPermission, amount: amountInUSDCUnits });
     
     // Add a second call to transfer USDC from the smart wallet to the receiver
     let transferCallData = encodeFunctionData({
