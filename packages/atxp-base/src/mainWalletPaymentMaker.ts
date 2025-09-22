@@ -3,11 +3,11 @@ import { encodeFunctionData, toHex } from 'viem';
 import { USDC_CONTRACT_ADDRESS_BASE, type Hex } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import { ConsoleLogger, Logger, Currency } from '@atxp/common';
-import { 
-  createEIP1271JWT, 
+import {
+  createEIP1271JWT,
   createEIP1271AuthData,
-  constructEIP1271Message 
-} from './eip1271JwtHelper.js';
+  constructEIP1271Message
+} from '@atxp/common';
 
 const USDC_DECIMALS = 6;
 

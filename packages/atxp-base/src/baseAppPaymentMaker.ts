@@ -4,11 +4,11 @@ import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { prepareSpendCallData } from './spendPermissionShim.js';
-import { 
-  createEIP1271JWT, 
+import {
+  createEIP1271JWT,
   createEIP1271AuthData,
-  constructEIP1271Message 
-} from './eip1271JwtHelper.js';
+  constructEIP1271Message
+} from '@atxp/common';
 
 const USDC_DECIMALS = 6;
 

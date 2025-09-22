@@ -1,6 +1,6 @@
 /**
  * EIP-1271 JWT helper utilities for creating properly formatted JWTs
- * from EIP-1271 auth data for World Chain.
+ * from EIP-1271 auth data.
  */
 
 interface EIP1271AuthData {

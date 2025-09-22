@@ -79,3 +79,19 @@ export {
   createReactNativeSafeFetch,
   crypto
 } from './platform/index.js';
+
+// EIP-1271 JWT utilities
+export {
+  createEIP1271JWT,
+  createLegacyEIP1271Auth,
+  createEIP1271AuthData,
+  constructEIP1271Message
+} from './eip1271JwtHelper.js';
+
+// Storage abstractions
+export {
+  type IStorage,
+  JsonStorage,
+  BrowserStorage,
+  MemoryStorage
+} from './storage.js';

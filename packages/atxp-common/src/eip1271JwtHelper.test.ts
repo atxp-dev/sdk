@@ -5,9 +5,9 @@ import {
   constructEIP1271Message
 } from './eip1271JwtHelper.js';
 
-describe('EIP-1271 JWT Helper - World Chain Tests', () => {
+describe('EIP-1271 JWT Helper', () => {
   it('should generate exact JWT from hardcoded parameters', () => {
-    // These are the exact parameters that should produce the JWT used in World Chain PayMCP tests
+    // These are the exact parameters that should produce consistent JWTs for testing
     const walletAddress = '0x1234567890123456789012345678901234567890';
     const timestamp = 1640995200;
     const codeChallenge = 'test_challenge_123';
@@ -81,6 +81,35 @@ describe('EIP-1271 JWT Helper - World Chain Tests', () => {
     expect(decodedSignature).toBe(signature);
   });
 
+  it('should generate JWT without optional fields', () => {
+    const walletAddress = '0xabcdef0123456789012345678901234567890123';
+    const timestamp = 1700000000;
+    const signature = '0x' + 'b'.repeat(256);
+
+    const message = constructEIP1271Message({
+      walletAddress,
+      timestamp
+    });
+
+    const authData = createEIP1271AuthData({
+      walletAddress,
+      message,
+      signature,
+      timestamp
+    });
+
+    const jwt = createEIP1271JWT(authData);
+
+    // Parse JWT
+    const [, payload] = jwt.split('.');
+    const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString());
+
+    // Verify optional fields are not present
+    expect(decodedPayload.code_challenge).toBeUndefined();
+    expect(decodedPayload.payment_request_id).toBeUndefined();
+    expect(decodedPayload.nonce).toBeUndefined();
+  });
+
   it('should handle messages without payment request ID', () => {
     const walletAddress = '0x1234567890123456789012345678901234567890';
     const timestamp = 1640995200;
@@ -107,11 +136,11 @@ describe('EIP-1271 JWT Helper - World Chain Tests', () => {
 
   it('should create auth data with all required fields', () => {
     const walletAddress = '0x9876543210987654321098765432109876543210';
-    const message = 'Test message for World Chain';
-    const signature = '0x' + 'b'.repeat(256);
+    const message = 'Test message';
+    const signature = '0x' + 'c'.repeat(256);
     const timestamp = 1640995300;
-    const codeChallenge = 'world_test_challenge';
-    const paymentRequestId = 'world_req_123';
+    const codeChallenge = 'test_challenge';
+    const paymentRequestId = 'req_123';
 
     const authData = createEIP1271AuthData({
       walletAddress,
@@ -135,10 +164,10 @@ describe('EIP-1271 JWT Helper - World Chain Tests', () => {
 
   it('should create auth data without optional payment request ID', () => {
     const walletAddress = '0x9876543210987654321098765432109876543210';
-    const message = 'Test message for World Chain';
-    const signature = '0x' + 'c'.repeat(256);
+    const message = 'Test message';
+    const signature = '0x' + 'd'.repeat(256);
     const timestamp = 1640995400;
-    const codeChallenge = 'world_test_challenge_2';
+    const codeChallenge = 'test_challenge_2';
 
     const authData = createEIP1271AuthData({
       walletAddress,
@@ -167,7 +196,7 @@ describe('EIP-1271 JWT Helper - World Chain Tests', () => {
       walletAddress: '0x1111111111111111111111111111111111111111',
       timestamp: 1640995200,
       codeChallenge: 'challenge1',
-      signature: '0x' + 'a'.repeat(256)
+      signature: '0x' + 'e'.repeat(256)
     };
 
     const message1 = constructEIP1271Message(baseParams);

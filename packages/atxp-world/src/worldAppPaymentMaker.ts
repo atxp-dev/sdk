@@ -15,7 +15,7 @@ import {
   createEIP1271JWT,
   createEIP1271AuthData,
   constructEIP1271Message
-} from './eip1271JwtHelper.js';
+} from '@atxp/common';
 
 const USDC_DECIMALS = 6;
 
