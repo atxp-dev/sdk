@@ -1,5 +1,5 @@
 import { createConfig } from '../../rollup.config.js';
 
-export default createConfig('atxp-world', {
+export default createConfig('atxp-worldcoin', {
   platform: 'neutral' // Browser/React Native
 });
