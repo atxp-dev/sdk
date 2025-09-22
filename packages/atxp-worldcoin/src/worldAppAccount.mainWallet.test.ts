@@ -32,11 +32,8 @@ vi.mock('viem', async () => {
 
 import { WorldAppAccount } from './worldAppAccount.js';
 import { MemoryStorage } from './storage.js';
-import { WORLD_CHAIN_MAINNET } from '@atxp/client';
-import BigNumber from 'bignumber.js';
 import {
   TEST_WALLET_ADDRESS,
-  TEST_RECEIVER_ADDRESS,
   mockProvider,
   setupInitializationMocks
 } from './testHelpers.js';
