@@ -42,6 +42,13 @@ export {
 } from './baseConstants.js';
 
 export {
+  USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
+  USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA,
+  WORLD_CHAIN_MAINNET,
+  WORLD_CHAIN_SEPOLIA
+} from './worldConstants.js';
+
+export {
   BaseAccount
 } from './baseAccount.js';
 
