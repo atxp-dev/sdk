@@ -55,30 +55,9 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     paymentRequestId: string;
     codeChallenge: string;
   }): Promise<string> {
-    // Create a simple message for the user to sign
     const timestamp = Math.floor(Date.now() / 1000);
-    const chainName = this.chainId === WORLD_CHAIN_SEPOLIA.id ? 'World Chain Sepolia' : 'World Chain';
 
-    const message = [
-      'PayMCP Authorization Request',
-      '',
-      `Wallet: ${this.walletAddress}`,
-      `Chain: ${chainName}`,
-      `Timestamp: ${timestamp}`,
-      `Code Challenge: ${codeChallenge}`,
-      `Payment Request ID: ${paymentRequestId}`,
-      '',
-      '',
-      'Sign this message to authorize payment processing.'
-    ].join('\n');
-
-    // Sign the message using the wallet
-    const signature = await this.provider.request({
-      method: 'personal_sign',
-      params: [message, this.walletAddress]
-    });
-
-    // Create a simple JWT structure for main wallet mode
+    // Create proper JWT header and payload for ES256K
     const header = {
       alg: 'ES256K',
       typ: 'JWT'
@@ -95,14 +74,33 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       chain_id: this.chainId
     };
 
-    // Encode to base64url
+    // Encode header and payload to base64url
     const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
     const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+
+    // Create the message that ES256K should actually sign (header.payload)
+    const messageToSign = `${encodedHeader}.${encodedPayload}`;
+
+    this.logger.info(`ES256K signing JWT message: ${messageToSign}`);
+
+    // Sign the actual JWT header.payload string using personal_sign
+    const signature = await this.provider.request({
+      method: 'personal_sign',
+      params: [messageToSign, this.walletAddress]
+    });
+
+    // Use the legacy format (base64url of hex string with 0x prefix)
+    // This matches what the ES256K verification expects
     const encodedSignature = Buffer.from(signature as string).toString('base64url');
 
     const jwt = `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
 
-    this.logger.info(`Generated JWT for main wallet: ${this.walletAddress}`);
+    this.logger.info(`Generated ES256K JWT for main wallet: ${this.walletAddress}`);
+    this.logger.info(`JWT Debug - Original signature: ${signature}`);
+    this.logger.info(`JWT Debug - Using LEGACY FORMAT (0x prefix as base64url)`);
+    this.logger.info(`JWT Debug - Encoded signature (base64url): ${encodedSignature}`);
+    this.logger.info(`JWT Debug - Final JWT: ${jwt}`);
+
     return jwt;
   }
 
