@@ -33,7 +33,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     this.fetchFn = fetchFn;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string): Promise<string> {
     // Make a regular payment via the /pay endpoint
     const response = await this.fetchFn(`${this.origin}/pay`, {
       method: 'POST',
@@ -46,6 +46,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
         currency,
         receiver,
         memo,
+        ...(paymentRequestId && { paymentRequestId })
       }),
     });
 
