@@ -20,7 +20,7 @@ export type UrlString = `http://${string}` | `https://${string}`;
 export type AuthorizationServerUrl = UrlString;
 
 export type Currency = 'USDC';
-export type Network = 'solana' | 'base';
+export type Network = 'solana' | 'base' | 'world';
 
 export type PaymentRequestDestination = {
   network: Network;

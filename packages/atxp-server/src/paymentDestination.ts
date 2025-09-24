@@ -175,10 +175,9 @@ export class ATXPPaymentDestination implements PaymentDestination {
           network = 'base'; // Base is an Ethereum L2
           break;
         case 'base':
-          network = 'base'; // Already correct
-          break;
+        case 'world':
         case 'solana':
-          network = 'solana';
+          network = networkFromItem
           break;
         default:
           this.logger.warn(`Unknown network: ${networkFromItem}, skipping`);
