@@ -25,7 +25,6 @@ export function buildServerConfig(args: ATXPArgs): ATXPConfig {
   // Read environment variables at runtime, not module load time
   const envDefaults = {
     ...DEFAULT_CONFIG,
-    atxpAuthClientToken: process.env.ATXP_AUTH_CLIENT_TOKEN,
     allowHttp: process.env.NODE_ENV === 'development',
   };
   const withDefaults = { ...envDefaults, ...args };
