@@ -30,7 +30,7 @@ vi.mock('viem', async () => {
   };
 });
 
-import { WorldAppAccount } from './worldAppAccount.js';
+import { WorldchainAccount } from './worldchainAccount.js';
 import { MemoryStorage } from './storage.js';
 import {
   TEST_WALLET_ADDRESS,
@@ -38,7 +38,7 @@ import {
   setupInitializationMocks
 } from './testHelpers.js';
 
-describe('WorldAppAccount - Main Wallet Mode', () => {
+describe('WorldchainAccount - Main Wallet Mode', () => {
   let mockStorage: MemoryStorage;
 
   beforeEach(() => {
@@ -59,7 +59,7 @@ describe('WorldAppAccount - Main Wallet Mode', () => {
       });
 
       // Initialize account in main wallet mode
-      const account = await WorldAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
@@ -90,7 +90,7 @@ describe('WorldAppAccount - Main Wallet Mode', () => {
       });
 
       // Initialize account in main wallet mode with custom chainId
-      const account = await WorldAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
@@ -115,7 +115,7 @@ describe('WorldAppAccount - Main Wallet Mode', () => {
       });
 
       // Initialize account - should not throw despite wallet_connect failure
-      const account = await WorldAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
@@ -136,7 +136,7 @@ describe('WorldAppAccount - Main Wallet Mode', () => {
       });
 
       // Initialize account in main wallet mode
-      const account = await WorldAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
@@ -147,7 +147,7 @@ describe('WorldAppAccount - Main Wallet Mode', () => {
       const paymentMaker = account.paymentMakers.world;
       expect(paymentMaker).toBeDefined();
 
-      // Verify it's the MainWalletPaymentMaker (not the WorldAppPaymentMaker)
+      // Verify it's the MainWalletPaymentMaker (not the WorldchainPaymentMaker)
       // This would be tested more thoroughly in the payment maker specific tests
       expect(paymentMaker.constructor.name).toBe('MainWalletPaymentMaker');
     });
@@ -156,7 +156,7 @@ describe('WorldAppAccount - Main Wallet Mode', () => {
   describe('constructor validation', () => {
     it('should throw when main wallet mode requires address and provider', () => {
       expect(() => {
-        new WorldAppAccount(
+        new WorldchainAccount(
           null, // No spend permission in main wallet mode
           null, // No ephemeral wallet in main wallet mode
           undefined, // logger
@@ -175,7 +175,7 @@ describe('WorldAppAccount - Main Wallet Mode', () => {
       } as any;
 
       expect(() => {
-        new WorldAppAccount(
+        new WorldchainAccount(
           null, // Missing spend permission
           mockEphemeralWallet,
           undefined, // logger

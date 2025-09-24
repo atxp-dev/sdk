@@ -5,7 +5,7 @@ import {
   WORLD_CHAIN_MAINNET,
   WORLD_CHAIN_SEPOLIA
 } from '@atxp/client';
-import { WorldAppPaymentMaker } from './worldAppPaymentMaker.js';
+import { WorldchainPaymentMaker } from './worldchainPaymentMaker.js';
 import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
 import { generatePrivateKey } from 'viem/accounts';
 import { Hex } from '@atxp/client';
@@ -18,7 +18,7 @@ import { ConsoleLogger, Logger } from '@atxp/common';
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
 
-export class WorldAppAccount implements Account {
+export class WorldchainAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
 
@@ -36,7 +36,7 @@ export class WorldAppAccount implements Account {
       logger?: Logger;
       chainId?: number; // 480 for mainnet, 4801 for testnet
     },
-  ): Promise<WorldAppAccount> {
+  ): Promise<WorldchainAccount> {
     const logger = config.logger || new ConsoleLogger();
     const useEphemeralWallet = config.useEphemeralWallet ?? true;
     const chainId = config.chainId || WORLD_CHAIN_MAINNET.id;
@@ -57,7 +57,7 @@ export class WorldAppAccount implements Account {
     // If using main wallet mode, return early with main wallet payment maker
     if (!useEphemeralWallet) {
       logger.info(`Using main wallet mode for address: ${config.walletAddress}`);
-      return new WorldAppAccount(
+      return new WorldchainAccount(
         null, // No spend permission in main wallet mode
         null, // No ephemeral wallet in main wallet mode
         logger,
@@ -76,7 +76,7 @@ export class WorldAppAccount implements Account {
     const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
     if (existingData) {
       const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey);
-      return new WorldAppAccount(existingData.permission, ephemeralSmartWallet, logger, undefined, undefined, chainId);
+      return new WorldchainAccount(existingData.permission, ephemeralSmartWallet, logger, undefined, undefined, chainId);
     }
 
     const privateKey = generatePrivateKey();
@@ -98,7 +98,7 @@ export class WorldAppAccount implements Account {
     // Save wallet and permission
     storage.set(storageKey, {privateKey, permission});
 
-    return new WorldAppAccount(permission, smartWallet, logger, undefined, undefined, chainId);
+    return new WorldchainAccount(permission, smartWallet, logger, undefined, undefined, chainId);
   }
 
   private static loadSavedWalletAndPermission(
@@ -156,7 +156,7 @@ export class WorldAppAccount implements Account {
       }
       this.accountId = ephemeralSmartWallet.address;
       this.paymentMakers = {
-        'world': new WorldAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId),
+        'world': new WorldchainPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId),
       };
     } else {
       // Main wallet mode

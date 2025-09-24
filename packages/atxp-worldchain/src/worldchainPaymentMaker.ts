@@ -58,7 +58,7 @@ async function waitForTransactionConfirmations(
   }
 }
 
-export class WorldAppPaymentMaker implements PaymentMaker {
+export class WorldchainPaymentMaker implements PaymentMaker {
   private logger: Logger;
   private spendPermission: SpendPermission;
   private smartWallet: EphemeralSmartWallet;

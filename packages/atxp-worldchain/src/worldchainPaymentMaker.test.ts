@@ -21,7 +21,7 @@ vi.mock('viem', async () => {
   };
 });
 
-import { WorldAppPaymentMaker } from './worldAppPaymentMaker.js';
+import { WorldchainPaymentMaker } from './worldchainPaymentMaker.js';
 import { USDC_CONTRACT_ADDRESS_WORLD_MAINNET } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import {
@@ -32,12 +32,12 @@ import {
   TEST_RECEIVER_ADDRESS
 } from './testHelpers.js';
 
-describe('WorldAppPaymentMaker.generateJWT', () => {
+describe('WorldchainPaymentMaker.generateJWT', () => {
   it('should generate EIP-1271 auth data with default payload', async () => {
     const permission = mockSpendPermission();
     const smartWallet = mockEphemeralSmartWallet();
 
-    const paymentMaker = new WorldAppPaymentMaker(permission, smartWallet);
+    const paymentMaker = new WorldchainPaymentMaker(permission, smartWallet);
     const authData = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: 'testCodeChallenge'});
 
     // Should return JWT format (header.payload.signature)
@@ -71,7 +71,7 @@ describe('WorldAppPaymentMaker.generateJWT', () => {
     const permission = mockSpendPermission();
     const smartWallet = mockEphemeralSmartWallet();
 
-    const paymentMaker = new WorldAppPaymentMaker(permission, smartWallet);
+    const paymentMaker = new WorldchainPaymentMaker(permission, smartWallet);
     const paymentRequestId = 'id1';
     const authData = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
 
@@ -86,7 +86,7 @@ describe('WorldAppPaymentMaker.generateJWT', () => {
   });
 });
 
-describe('WorldAppPaymentMaker.makePayment', () => {
+describe('WorldchainPaymentMaker.makePayment', () => {
   it('should successfully make a USDC payment', async () => {
     const permission = mockSpendPermission();
     const bundlerClient = mockBundlerClient();
@@ -98,7 +98,7 @@ describe('WorldAppPaymentMaker.makePayment', () => {
       { to: USDC_CONTRACT_ADDRESS_WORLD_MAINNET, data: '0xmockencodeddata', value: 0n }
     ]);
 
-    const paymentMaker = new WorldAppPaymentMaker(permission, smartWallet);
+    const paymentMaker = new WorldchainPaymentMaker(permission, smartWallet);
 
     // Make payment
     const amount = new BigNumber(5.25); // 5.25 USDC
@@ -143,7 +143,7 @@ describe('WorldAppPaymentMaker.makePayment', () => {
       { to: USDC_CONTRACT_ADDRESS_WORLD_MAINNET, data: '0xmockencodeddata', value: 0n }
     ]);
 
-    const paymentMaker = new WorldAppPaymentMaker(permission, smartWallet);
+    const paymentMaker = new WorldchainPaymentMaker(permission, smartWallet);
 
     // Make payment - should throw
     await expect(paymentMaker.makePayment(
@@ -165,7 +165,7 @@ describe('WorldAppPaymentMaker.makePayment', () => {
       { to: USDC_CONTRACT_ADDRESS_WORLD_MAINNET, data: '0xmockencodeddata', value: 0n }
     ]);
 
-    const paymentMaker = new WorldAppPaymentMaker(permission, smartWallet);
+    const paymentMaker = new WorldchainPaymentMaker(permission, smartWallet);
 
     // Make zero amount payment
     const txHash = await paymentMaker.makePayment(
@@ -196,7 +196,7 @@ describe('WorldAppPaymentMaker.makePayment', () => {
       { to: USDC_CONTRACT_ADDRESS_WORLD_MAINNET, data: '0xmockencodeddata', value: 0n }
     ]);
 
-    const paymentMaker = new WorldAppPaymentMaker(permission, smartWallet);
+    const paymentMaker = new WorldchainPaymentMaker(permission, smartWallet);
 
     // Test various fractional amounts
     const testCases = [

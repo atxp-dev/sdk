@@ -35,7 +35,7 @@ vi.mock('viem', async () => {
   };
 });
 
-import { WorldAppAccount } from './worldAppAccount.js';
+import { WorldchainAccount } from './worldchainAccount.js';
 import { MemoryStorage } from './storage.js';
 import { WORLD_CHAIN_MAINNET, USDC_CONTRACT_ADDRESS_WORLD_MAINNET } from '@atxp/client';
 import BigNumber from 'bignumber.js';
@@ -59,7 +59,7 @@ import {
   expectTimestampAround
 } from './testHelpers.js';
 
-describe('WorldAppAccount', () => {
+describe('WorldchainAccount', () => {
   let mockStorage: MemoryStorage;
 
   beforeEach(() => {
@@ -86,7 +86,7 @@ describe('WorldAppAccount', () => {
       });
 
       // Initialize account
-      const account = await WorldAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         storage: mockStorage
@@ -150,7 +150,7 @@ describe('WorldAppAccount', () => {
       });
 
       // Initialize account
-      const account = await WorldAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         storage: mockStorage
@@ -187,7 +187,7 @@ describe('WorldAppAccount', () => {
       });
 
       // Initialize account
-      const account = await WorldAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         storage: mockStorage
@@ -226,7 +226,7 @@ describe('WorldAppAccount', () => {
       const customAllowance = 100n;
       const customPeriod = 30;
 
-      await WorldAppAccount.initialize({
+      await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         allowance: customAllowance,
@@ -256,7 +256,7 @@ describe('WorldAppAccount', () => {
         spendPermission: permission
       });
 
-      await WorldAppAccount.initialize({
+      await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         chainId: 4801, // World Chain Sepolia
@@ -287,7 +287,7 @@ describe('WorldAppAccount', () => {
       });
 
       // Initialize account
-      await WorldAppAccount.initialize({
+      await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         storage: mockStorage
@@ -343,7 +343,7 @@ describe('WorldAppAccount', () => {
       });
 
       // Initialize account
-      await WorldAppAccount.initialize({
+      await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         storage: mockStorage
@@ -378,7 +378,7 @@ describe('WorldAppAccount', () => {
       });
 
       // Initialize account - should not throw despite wallet_connect failure
-      const account = await WorldAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         storage: mockStorage
@@ -405,7 +405,7 @@ describe('WorldAppAccount', () => {
       });
 
       // Initialize should throw
-      await expect(WorldAppAccount.initialize({
+      await expect(WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         storage: mockStorage
@@ -422,7 +422,7 @@ describe('WorldAppAccount', () => {
       expect(mockStorage.get(storageKey)).toBe('test-data');
 
       // Clear the data
-      WorldAppAccount.clearAllStoredData(TEST_WALLET_ADDRESS, mockStorage);
+      WorldchainAccount.clearAllStoredData(TEST_WALLET_ADDRESS, mockStorage);
 
       // Verify data was removed
       expect(mockStorage.get(storageKey)).toBeNull();
@@ -434,7 +434,7 @@ describe('WorldAppAccount', () => {
       (global as any).window = undefined;
 
       expect(() => {
-        WorldAppAccount.clearAllStoredData(TEST_WALLET_ADDRESS);
+        WorldchainAccount.clearAllStoredData(TEST_WALLET_ADDRESS);
       }).toThrow('clearAllStoredData requires a storage to be provided outside of browser environments');
 
       // Restore window
@@ -467,7 +467,7 @@ describe('WorldAppAccount', () => {
       const { prepareSpendCallData } = await setupPaymentMocks({ spendCalls });
 
       // Initialize account
-      const account = await WorldAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         storage: mockStorage
