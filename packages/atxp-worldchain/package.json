@@ -1,12 +1,12 @@
 {
-  "name": "@atxp/worldcoin",
+  "name": "@atxp/worldchain",
   "version": "0.6.1",
   "description": "ATXP for World Chain Mini Apps",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/atxp-dev/sdk.git",
-    "directory": "packages/atxp-worldcoin"
+    "directory": "packages/atxp-worldchain"
   },
   "type": "module",
   "sideEffects": false,
