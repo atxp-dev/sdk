@@ -56,7 +56,8 @@ import {
   mockEphemeralSmartWallet,
   getStorageKey,
   removeTimestamps,
-  expectTimestampAround
+  expectTimestampAround,
+  createTestWorldchainPaymentMaker
 } from './testHelpers.js';
 
 describe('WorldchainAccount', () => {
@@ -472,6 +473,10 @@ describe('WorldchainAccount', () => {
         provider: provider,
         storage: mockStorage
       });
+
+      // Replace the payment maker with a test version that has short delays
+      const testPaymentMaker = await createTestWorldchainPaymentMaker(permission, ephemeralWallet);
+      account.paymentMakers.world = testPaymentMaker;
 
       // Make a payment
       const paymentMaker = account.paymentMakers.world;

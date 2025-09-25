@@ -2,6 +2,7 @@
 import { vi, expect } from 'vitest';
 import type { SpendPermission } from './types.js';
 import type { EphemeralSmartWallet } from './smartWalletHelpers.js';
+import type { ConfirmationDelays } from './worldchainPaymentMaker.js';
 import { USDC_CONTRACT_ADDRESS_WORLD_MAINNET, WORLD_CHAIN_MAINNET } from '@atxp/client';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import type { Address, Hex } from 'viem';
@@ -13,6 +14,12 @@ export const TEST_RECEIVER_ADDRESS = '0x1234567890123456789012345678901234567890
 export const TEST_PRIVATE_KEY = generatePrivateKey();
 export const TEST_PAYMASTER_URL = 'https://worldchain-bundler.example.com';
 export const TEST_BUNDLER_URL = 'https://worldchain-bundler.example.com';
+
+// Test confirmation delays (much shorter for tests)
+export const TEST_CONFIRMATION_DELAYS: ConfirmationDelays = {
+  networkPropagationMs: 10, // 10ms instead of 5 seconds
+  confirmationFailedMs: 20  // 20ms instead of 15 seconds
+};
 
 // Mock provider
 export function mockProvider({
@@ -200,6 +207,22 @@ export function mockSpendCalls({
   ]
 } = {}) {
   return calls;
+}
+
+// Helper to create a test payment maker with short delays
+export async function createTestWorldchainPaymentMaker(
+  permission: SpendPermission = mockSpendPermission(),
+  smartWallet: EphemeralSmartWallet = mockEphemeralSmartWallet()
+) {
+  const { WorldchainPaymentMaker } = await import('./worldchainPaymentMaker.js');
+  return new WorldchainPaymentMaker(
+    permission,
+    smartWallet,
+    undefined,
+    undefined,
+    undefined,
+    TEST_CONFIRMATION_DELAYS
+  );
 }
 
 // Helper to setup initialization mocks

@@ -35,11 +35,22 @@ const ERC20_ABI = [
   }
 ] as const;
 
+export interface ConfirmationDelays {
+  networkPropagationMs: number;
+  confirmationFailedMs: number;
+}
+
+const DEFAULT_CONFIRMATION_DELAYS: ConfirmationDelays = {
+  networkPropagationMs: 5000,
+  confirmationFailedMs: 15000
+};
+
 async function waitForTransactionConfirmations(
   smartWallet: EphemeralSmartWallet,
   txHash: string,
   confirmations: number,
-  logger: Logger
+  logger: Logger,
+  delays: ConfirmationDelays = DEFAULT_CONFIRMATION_DELAYS
 ): Promise<void> {
   try {
     const publicClient = smartWallet.client.account?.client;
@@ -54,16 +65,16 @@ async function waitForTransactionConfirmations(
       logger.info(`Transaction confirmed with 1 confirmation`);
 
       // Add extra delay for network propagation
-      logger.info('Adding 5 second delay for network propagation...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      logger.info(`Adding ${delays.networkPropagationMs}ms delay for network propagation...`);
+      await new Promise(resolve => setTimeout(resolve, delays.networkPropagationMs));
     } else {
       logger.warn('Unable to wait for confirmations: client does not support waitForTransactionReceipt');
     }
   } catch (error) {
     logger.warn(`Could not wait for additional confirmations: ${error}`);
     // Add longer delay if confirmation failed
-    logger.info('Confirmation failed, adding 15 second delay for transaction to propagate...');
-    await new Promise(resolve => setTimeout(resolve, 15000));
+    logger.info(`Confirmation failed, adding ${delays.confirmationFailedMs}ms delay for transaction to propagate...`);
+    await new Promise(resolve => setTimeout(resolve, delays.confirmationFailedMs));
   }
 }
 
@@ -73,13 +84,15 @@ export class WorldchainPaymentMaker implements PaymentMaker {
   private smartWallet: EphemeralSmartWallet;
   private chainId: number;
   private customRpcUrl?: string;
+  private confirmationDelays: ConfirmationDelays;
 
   constructor(
     spendPermission: SpendPermission,
     smartWallet: EphemeralSmartWallet,
     logger?: Logger,
     chainId: number = WORLD_CHAIN_MAINNET.id,
-    customRpcUrl?: string
+    customRpcUrl?: string,
+    confirmationDelays?: ConfirmationDelays
   ) {
     if (!spendPermission) {
       throw new Error('Spend permission is required');
@@ -92,6 +105,7 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     this.smartWallet = smartWallet;
     this.chainId = chainId;
     this.customRpcUrl = customRpcUrl;
+    this.confirmationDelays = confirmationDelays ?? DEFAULT_CONFIRMATION_DELAYS;
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
@@ -214,7 +228,7 @@ export class WorldchainPaymentMaker implements PaymentMaker {
 
     // Wait for additional confirmations to ensure the transaction is well-propagated
     // This helps avoid the "Transaction receipt could not be found" error
-    await waitForTransactionConfirmations(this.smartWallet, txHash, 2, this.logger);
+    await waitForTransactionConfirmations(this.smartWallet, txHash, 2, this.logger, this.confirmationDelays);
 
     // Return the actual transaction hash, not the user operation hash
     // The payment verification system needs the on-chain transaction hash

@@ -5,7 +5,7 @@ import {
   WORLD_CHAIN_MAINNET,
   WORLD_CHAIN_SEPOLIA
 } from '@atxp/client';
-import { WorldchainPaymentMaker } from './worldchainPaymentMaker.js';
+import { WorldchainPaymentMaker, type ConfirmationDelays } from './worldchainPaymentMaker.js';
 import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
 import { generatePrivateKey } from 'viem/accounts';
 import { Hex } from '@atxp/client';

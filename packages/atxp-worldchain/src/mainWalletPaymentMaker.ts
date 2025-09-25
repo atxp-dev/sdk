@@ -86,8 +86,6 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     // Create the message that ES256K should actually sign (header.payload)
     const messageToSign = `${encodedHeader}.${encodedPayload}`;
 
-    this.logger.info(`ES256K signing JWT message: ${messageToSign}`);
-
     // Sign the actual JWT header.payload string using personal_sign
     const signature = await this.provider.request({
       method: 'personal_sign',
@@ -101,10 +99,6 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     const jwt = `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
 
     this.logger.info(`Generated ES256K JWT for main wallet: ${this.walletAddress}`);
-    this.logger.info(`JWT Debug - Original signature: ${signature}`);
-    this.logger.info(`JWT Debug - Using LEGACY FORMAT (0x prefix as base64url)`);
-    this.logger.info(`JWT Debug - Encoded signature (base64url): ${encodedSignature}`);
-    this.logger.info(`JWT Debug - Final JWT: ${jwt}`);
 
     return jwt;
   }
@@ -171,29 +165,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     });
 
     this.logger.info(`Payment sent successfully. TxHash: ${txHash}`);
-    this.logger.info(`🌐 Transaction URL: https://worldscan.org/tx/${txHash}`);
-    this.logger.info(`🔗 Using custom RPC: ${this.customRpcUrl ? 'YES' : 'NO'} - ${this.customRpcUrl || 'default public endpoint'}`);
-
-    // Log the transaction details immediately after sending
-    this.logger.info('🕐 Checking transaction status immediately after sending...');
-    try {
-      const immediateRpcUrl = this.customRpcUrl || chainConfig.rpcUrls.default.http[0];
-      const publicClient = createPublicClient({
-        chain: chainConfig,
-        transport: http(immediateRpcUrl, {
-          timeout: 10000, // Short timeout for immediate check
-          retryCount: 1
-        })
-      });
-
-      const tx = await publicClient.getTransaction({ hash: txHash });
-      this.logger.info(`📋 Transaction found immediately: ${tx ? 'YES' : 'NO'}`);
-      if (tx) {
-        this.logger.info(`📦 Block number: ${tx.blockNumber || 'pending'}`);
-      }
-    } catch (immediateError) {
-      this.logger.warn(`🔍 Immediate transaction lookup failed: ${immediateError}`);
-    }
+    this.logger.info(`Transaction URL: https://worldscan.org/tx/${txHash}`);
 
     // Wait for transaction confirmation to ensure it's mined
     // This prevents "Transaction receipt could not be found" errors
@@ -203,7 +175,6 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       // Create a public client to wait for the transaction receipt
       // Use custom RPC URL if provided for better consistency with auth server
       const rpcUrl = this.customRpcUrl || chainConfig.rpcUrls.default.http[0];
-      this.logger.info(`Using RPC URL for transaction confirmation: ${rpcUrl}`);
 
       const publicClient = createPublicClient({
         chain: chainConfig,
@@ -222,34 +193,12 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       this.logger.info(`Transaction confirmed with 1 confirmation`);
 
       // Add extra delay to ensure the transaction is well propagated across network
-      this.logger.info('Adding 5 second delay for network propagation...');
       await new Promise(resolve => setTimeout(resolve, 5000));
     } catch (error) {
       this.logger.warn(`Could not wait for confirmations: ${error}`);
       // Add a much longer delay if confirmation failed - World Chain can be slow
-      this.logger.info('Confirmation failed, adding 30 second delay for transaction to propagate across World Chain network...');
+      this.logger.info('Confirmation failed, adding delay for transaction to propagate...');
       await new Promise(resolve => setTimeout(resolve, 30000));
-
-      // Also try to manually check if transaction exists using a different method
-      this.logger.info('Attempting manual transaction verification...');
-      try {
-        const manualRpcUrl = this.customRpcUrl || chainConfig.rpcUrls.default.http[0];
-        const publicClient = createPublicClient({
-          chain: chainConfig,
-          transport: http(manualRpcUrl, {
-            timeout: 45000, // Even longer timeout for manual check
-            retryCount: 5,
-            retryDelay: 2000
-          })
-        });
-
-        const tx = await publicClient.getTransaction({ hash: txHash });
-        if (tx) {
-          this.logger.info(`Manual verification successful - transaction found: ${tx.blockNumber ? 'mined' : 'pending'}`);
-        }
-      } catch (manualError) {
-        this.logger.warn(`Manual verification also failed: ${manualError}`);
-      }
     }
 
     return txHash;
