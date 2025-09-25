@@ -467,34 +467,24 @@ export class ATXPFetcher {
   }
 
   protected checkForATXPResponse = async (response: Response): Promise<void> => {
-    this.logger.debug(`🔍 ATXP: checkForATXPResponse called for ${response.url} status ${response.status}`);
     const clonedResponse = response.clone();
     const body = await clonedResponse.text();
-    this.logger.debug(`🔍 ATXP: Response body length: ${body.length}`);
     if (body.length === 0) {
-      this.logger.debug(`🔍 ATXP: Empty response body, skipping payment check`);
       return;
     }
-
-    this.logger.debug(`🔍 ATXP: Response body preview: ${body.substring(0, 500)}...`);
 
     let paymentRequests: {url: AuthorizationServerUrl, id: string}[] = [];
     try {
       // Check if the response is SSE formatted
       if (isSSEResponse(body)) {
-        this.logger.debug('🔍 ATXP: Detected SSE-formatted response, parsing SSE messages for payment requirements');
+        this.logger.debug('Detected SSE-formatted response, parsing SSE messages for payment requirements');
         const messages = await parseMcpMessages(body);
-        this.logger.debug(`🔍 ATXP: Parsed ${messages.length} SSE messages`);
         paymentRequests = messages.flatMap(message => parsePaymentRequests(message)).filter(pr => pr !== null);
       } else {
-        this.logger.debug('🔍 ATXP: Parsing JSON response for payment requirements');
         const json = JSON.parse(body);
-        this.logger.debug(`🔍 ATXP: Parsed JSON: ${JSON.stringify(json, null, 2)}`);
         const messages = await parseMcpMessages(json);
-        this.logger.debug(`🔍 ATXP: Parsed ${messages.length} MCP messages`);
         paymentRequests = messages.flatMap(message => parsePaymentRequests(message)).filter(pr => pr !== null);
       }
-      this.logger.debug(`🔍 ATXP: Found ${paymentRequests.length} payment requests: ${JSON.stringify(paymentRequests)}`);
     } catch (error) {
       this.logger.error(`ATXP: error checking for payment requirements in MCP response: ${error}`);
       this.logger.debug(body);
@@ -510,27 +500,15 @@ export class ATXPFetcher {
   }
 
   fetch: FetchLike = async (url, init) => {
-    this.logger.debug(`🌐 ATXP: fetch called for ${url} with method ${init?.method || 'GET'}`);
-    this.logger.debug(`🌐 ATXP: Payment makers available: [${Array.from(this.paymentMakers.keys()).join(', ')}]`);
     let response: Response | null = null;
     let fetchError: Error | null = null;
-    const startTime = Date.now(); // Move outside try block
     try {
       // Try to fetch the resource
-      this.logger.debug(`🌐 ATXP: Making initial HTTP request...`);
       response = await this.oauthClient.fetch(url, init);
-      const endTime = Date.now();
-      this.logger.debug(`🌐 ATXP: HTTP request completed in ${endTime - startTime}ms with status ${response.status}`);
       await this.checkForATXPResponse(response);
-      this.logger.debug(`🌐 ATXP: checkForATXPResponse completed, returning response`);
       return response;
     } catch (error: unknown) {
       fetchError = error as Error;
-      const endTime = Date.now();
-      this.logger.debug(`🚨 ATXP: Caught error after ${endTime - startTime}ms: ${fetchError.message}`);
-      this.logger.debug(`🚨 ATXP: Error type: ${error?.constructor?.name}`);
-      this.logger.debug(`🚨 ATXP: Error code: ${(error as {code?: number})?.code}`);
-      this.logger.debug(`🚨 ATXP: Full error object: ${JSON.stringify(error, null, 2)}`);
 
       // If we get an OAuth authentication required error, handle it
       if (error instanceof OAuthAuthenticationRequiredError) {
@@ -546,23 +524,20 @@ export class ATXPFetcher {
           // If we throw an error again, it could be a payment error - don't just fail, see
           // if we can handle it in the payment flow below
           fetchError = eTwo as Error;
-          this.logger.debug(`🚨 ATXP: Caught second error after auth retry: ${fetchError.message}`);
         }
       }
 
       // Check for MCP error with payment required code - use duck typing since instanceof may fail with bundling
       const mcpError = (fetchError as Error & { code?: number })?.code === PAYMENT_REQUIRED_ERROR_CODE ? fetchError as McpError : null;
-      this.logger.debug(`🚨 ATXP: MCP error check - code: ${(fetchError as {code?: number})?.code}, PAYMENT_REQUIRED_ERROR_CODE: ${PAYMENT_REQUIRED_ERROR_CODE}, matches: ${!!mcpError}`);
 
       if (mcpError) {
-        this.logger.info(`💰 Payment required - ATXP client starting payment flow ${(mcpError?.data as {paymentRequestUrl: string}|undefined)?.paymentRequestUrl}`);
+        this.logger.info(`Payment required - ATXP client starting payment flow ${(mcpError?.data as {paymentRequestUrl: string}|undefined)?.paymentRequestUrl}`);
         if(await this.handlePaymentRequestError(mcpError)) {
-          this.logger.debug(`💰 ATXP: Payment handled successfully, retrying request`);
           // Retry the request once - we should be auth'd now
           response = await this.oauthClient.fetch(url, init);
           await this.checkForATXPResponse(response);
         } else {
-          this.logger.info(`💰 ATXP: payment request was not completed successfully`);
+          this.logger.info(`ATXP: payment request was not completed successfully`);
         }
         if(response) {
           return response;
@@ -572,7 +547,6 @@ export class ATXPFetcher {
       }
 
       // If it's not an authentication or payment error, rethrow
-      this.logger.debug(`🚨 ATXP: Rethrowing unhandled error: ${fetchError.message}`);
       throw error;
     }
   }
