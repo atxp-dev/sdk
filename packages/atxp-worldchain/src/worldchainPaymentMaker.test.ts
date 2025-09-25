@@ -21,7 +21,6 @@ vi.mock('viem', async () => {
   };
 });
 
-import { WorldchainPaymentMaker } from './worldchainPaymentMaker.js';
 import { USDC_CONTRACT_ADDRESS_WORLD_MAINNET } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import {
