@@ -3,6 +3,8 @@ import {
   USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA,
   WORLD_CHAIN_MAINNET,
   WORLD_CHAIN_SEPOLIA,
+  getWorldChainMainnetWithRPC,
+  getWorldChainSepoliaWithRPC,
   type PaymentMaker
 } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
@@ -46,15 +48,22 @@ async function waitForTransactionConfirmations(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (publicClient as any).waitForTransactionReceipt({
         hash: txHash,
-        confirmations: confirmations
+        confirmations: 1, // Reduce confirmations to speed up
+        timeout: 60000 // 60 second timeout
       });
-      logger.info(`Transaction confirmed with ${confirmations} confirmations`);
+      logger.info(`Transaction confirmed with 1 confirmation`);
+
+      // Add extra delay for network propagation
+      logger.info('Adding 5 second delay for network propagation...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
     } else {
       logger.warn('Unable to wait for confirmations: client does not support waitForTransactionReceipt');
     }
   } catch (error) {
     logger.warn(`Could not wait for additional confirmations: ${error}`);
-    // Continue anyway - the transaction is already mined
+    // Add longer delay if confirmation failed
+    logger.info('Confirmation failed, adding 15 second delay for transaction to propagate...');
+    await new Promise(resolve => setTimeout(resolve, 15000));
   }
 }
 
@@ -63,12 +72,14 @@ export class WorldchainPaymentMaker implements PaymentMaker {
   private spendPermission: SpendPermission;
   private smartWallet: EphemeralSmartWallet;
   private chainId: number;
+  private customRpcUrl?: string;
 
   constructor(
     spendPermission: SpendPermission,
     smartWallet: EphemeralSmartWallet,
     logger?: Logger,
-    chainId: number = WORLD_CHAIN_MAINNET.id
+    chainId: number = WORLD_CHAIN_MAINNET.id,
+    customRpcUrl?: string
   ) {
     if (!spendPermission) {
       throw new Error('Spend permission is required');
@@ -80,6 +91,7 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     this.spendPermission = spendPermission;
     this.smartWallet = smartWallet;
     this.chainId = chainId;
+    this.customRpcUrl = customRpcUrl;
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
@@ -122,12 +134,22 @@ export class WorldchainPaymentMaker implements PaymentMaker {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
 
-    // Determine USDC contract address based on chain
+    // Determine USDC contract address and chain config based on chain
     const usdcAddress = this.chainId === WORLD_CHAIN_SEPOLIA.id
       ? USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA
       : USDC_CONTRACT_ADDRESS_WORLD_MAINNET;
 
-    const chainName = this.chainId === WORLD_CHAIN_SEPOLIA.id ? 'World Chain Sepolia' : 'World Chain';
+    const chainConfig = this.customRpcUrl
+      ? (this.chainId === WORLD_CHAIN_SEPOLIA.id
+          ? getWorldChainSepoliaWithRPC(this.customRpcUrl)
+          : getWorldChainMainnetWithRPC(this.customRpcUrl))
+      : (this.chainId === WORLD_CHAIN_SEPOLIA.id
+          ? WORLD_CHAIN_SEPOLIA
+          : WORLD_CHAIN_MAINNET);
+
+    const chainName = chainConfig.name;
+    const rpcUrl = this.customRpcUrl || chainConfig.rpcUrls.default.http[0];
+    this.logger.info(`Using RPC URL for smart wallet operations: ${rpcUrl}`);
 
     this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ${receiver} on ${chainName} with memo: ${memo}`);
 

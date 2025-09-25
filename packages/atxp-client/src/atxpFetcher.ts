@@ -514,19 +514,23 @@ export class ATXPFetcher {
     this.logger.debug(`🌐 ATXP: Payment makers available: [${Array.from(this.paymentMakers.keys()).join(', ')}]`);
     let response: Response | null = null;
     let fetchError: Error | null = null;
+    const startTime = Date.now(); // Move outside try block
     try {
       // Try to fetch the resource
       this.logger.debug(`🌐 ATXP: Making initial HTTP request...`);
       response = await this.oauthClient.fetch(url, init);
-      this.logger.debug(`🌐 ATXP: HTTP request completed with status ${response.status}`);
+      const endTime = Date.now();
+      this.logger.debug(`🌐 ATXP: HTTP request completed in ${endTime - startTime}ms with status ${response.status}`);
       await this.checkForATXPResponse(response);
       this.logger.debug(`🌐 ATXP: checkForATXPResponse completed, returning response`);
       return response;
     } catch (error: unknown) {
       fetchError = error as Error;
-      this.logger.debug(`🚨 ATXP: Caught error in fetch: ${fetchError.message}`);
+      const endTime = Date.now();
+      this.logger.debug(`🚨 ATXP: Caught error after ${endTime - startTime}ms: ${fetchError.message}`);
       this.logger.debug(`🚨 ATXP: Error type: ${error?.constructor?.name}`);
       this.logger.debug(`🚨 ATXP: Error code: ${(error as {code?: number})?.code}`);
+      this.logger.debug(`🚨 ATXP: Full error object: ${JSON.stringify(error, null, 2)}`);
 
       // If we get an OAuth authentication required error, handle it
       if (error instanceof OAuthAuthenticationRequiredError) {

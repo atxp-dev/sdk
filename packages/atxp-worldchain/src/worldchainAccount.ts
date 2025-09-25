@@ -35,6 +35,7 @@ export class WorldchainAccount implements Account {
       storage?: IStorage<string>;
       logger?: Logger;
       chainId?: number; // 480 for mainnet, 4801 for testnet
+      customRpcUrl?: string; // Custom RPC URL (e.g., with API key)
     },
   ): Promise<WorldchainAccount> {
     const logger = config.logger || new ConsoleLogger();
@@ -63,7 +64,8 @@ export class WorldchainAccount implements Account {
         logger,
         config.walletAddress,
         config.provider,
-        chainId
+        chainId,
+        config.customRpcUrl
       );
     }
 
@@ -76,7 +78,7 @@ export class WorldchainAccount implements Account {
     const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
     if (existingData) {
       const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey);
-      return new WorldchainAccount(existingData.permission, ephemeralSmartWallet, logger, undefined, undefined, chainId);
+      return new WorldchainAccount(existingData.permission, ephemeralSmartWallet, logger, undefined, undefined, chainId, config.customRpcUrl);
     }
 
     const privateKey = generatePrivateKey();
@@ -98,7 +100,7 @@ export class WorldchainAccount implements Account {
     // Save wallet and permission
     storage.set(storageKey, {privateKey, permission});
 
-    return new WorldchainAccount(permission, smartWallet, logger, undefined, undefined, chainId);
+    return new WorldchainAccount(permission, smartWallet, logger, undefined, undefined, chainId, config.customRpcUrl);
   }
 
   private static loadSavedWalletAndPermission(
@@ -147,7 +149,8 @@ export class WorldchainAccount implements Account {
     logger?: Logger,
     mainWalletAddress?: string,
     provider?: MainWalletProvider,
-    chainId: number = WORLD_CHAIN_MAINNET.id
+    chainId: number = WORLD_CHAIN_MAINNET.id,
+    customRpcUrl?: string
   ) {
     if (ephemeralSmartWallet) {
       // Ephemeral wallet mode
@@ -156,7 +159,7 @@ export class WorldchainAccount implements Account {
       }
       this.accountId = ephemeralSmartWallet.address;
       this.paymentMakers = {
-        'world': new WorldchainPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId),
+        'world': new WorldchainPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId, customRpcUrl),
       };
     } else {
       // Main wallet mode
@@ -165,7 +168,7 @@ export class WorldchainAccount implements Account {
       }
       this.accountId = mainWalletAddress;
       this.paymentMakers = {
-        'world': new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId),
+        'world': new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId, customRpcUrl),
       };
     }
   }

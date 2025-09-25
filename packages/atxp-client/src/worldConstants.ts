@@ -34,6 +34,17 @@ export const WORLD_CHAIN_MAINNET: WorldChain = {
   }
 } as const;
 
+/**
+ * Get World Chain Mainnet configuration with custom RPC URL (e.g., with API key)
+ * @param rpcUrl - Custom RPC URL, e.g., 'https://worldchain-mainnet.g.alchemy.com/v2/YOUR_API_KEY'
+ */
+export const getWorldChainMainnetWithRPC = (rpcUrl: string): WorldChain => ({
+  ...WORLD_CHAIN_MAINNET,
+  rpcUrls: {
+    default: { http: [rpcUrl] }
+  }
+});
+
 // World Chain Sepolia Testnet (Chain ID: 4801)
 export const WORLD_CHAIN_SEPOLIA: WorldChain = {
   id: 4801,
@@ -47,3 +58,14 @@ export const WORLD_CHAIN_SEPOLIA: WorldChain = {
   },
   testnet: true
 } as const;
+
+/**
+ * Get World Chain Sepolia configuration with custom RPC URL (e.g., with API key)
+ * @param rpcUrl - Custom RPC URL, e.g., 'https://worldchain-sepolia.g.alchemy.com/v2/YOUR_API_KEY'
+ */
+export const getWorldChainSepoliaWithRPC = (rpcUrl: string): WorldChain => ({
+  ...WORLD_CHAIN_SEPOLIA,
+  rpcUrls: {
+    default: { http: [rpcUrl] }
+  }
+});

@@ -60,7 +60,16 @@ export function buildStreamableTransport(args: ClientArgs): StreamableHTTPClient
   // Apply the ATXP wrapper to the fetch function
   const wrappedFetch = atxpFetch(config);
 
-  const transport = new StreamableHTTPClientTransport(new URL(args.mcpServer), {fetch: wrappedFetch});
+  // Configure timeout and reconnection options
+  const transport = new StreamableHTTPClientTransport(new URL(args.mcpServer), {
+    fetch: wrappedFetch,
+    reconnectionOptions: {
+      maxReconnectionDelay: 60000,        // 1 minute max delay
+      initialReconnectionDelay: 2000,      // Start with 2 second delay
+      reconnectionDelayGrowFactor: 2.0,    // Double delay each retry
+      maxRetries: 5                        // More retry attempts
+    }
+  });
   return transport;
 }
 
@@ -69,7 +78,28 @@ export async function atxpClient(args: ClientArgs): Promise<Client> {
   const transport = buildStreamableTransport(config);
 
   const client = new Client(config.clientInfo, config.clientOptions);
-  await client.connect(transport);
 
+  // Add timeout to client connection with improved error handling
+  const connectWithTimeout = async (): Promise<void> => {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Client connection timeout after 30 seconds'));
+      }, 30000); // 30 second timeout for initial connection
+    });
+
+    const connectPromise = client.connect(transport);
+
+    try {
+      await Promise.race([connectPromise, timeoutPromise]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
+      config.logger.warn(`MCP client connection failed: ${errorMessage}`);
+      throw new Error(`Failed to connect to MCP server: ${errorMessage}`);
+    }
+  };
+
+  await connectWithTimeout();
+
+  config.logger.info('ATXP MCP client connected successfully');
   return client;
 }

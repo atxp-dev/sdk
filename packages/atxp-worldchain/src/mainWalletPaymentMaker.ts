@@ -3,12 +3,14 @@ import {
   USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA,
   WORLD_CHAIN_MAINNET,
   WORLD_CHAIN_SEPOLIA,
+  getWorldChainMainnetWithRPC,
+  getWorldChainSepoliaWithRPC,
   type PaymentMaker,
   type Hex
 } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import BigNumber from 'bignumber.js';
-import { createWalletClient, custom, encodeFunctionData } from 'viem';
+import { createWalletClient, createPublicClient, custom, encodeFunctionData, http } from 'viem';
 
 const USDC_DECIMALS = 6;
 
@@ -35,17 +37,20 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   private provider: MainWalletProvider;
   private logger: Logger;
   private chainId: number;
+  private customRpcUrl?: string;
 
   constructor(
     walletAddress: string,
     provider: MainWalletProvider,
     logger?: Logger,
-    chainId: number = WORLD_CHAIN_MAINNET.id
+    chainId: number = WORLD_CHAIN_MAINNET.id,
+    customRpcUrl?: string
   ) {
     this.walletAddress = walletAddress;
     this.provider = provider;
     this.logger = logger ?? new ConsoleLogger();
     this.chainId = chainId;
+    this.customRpcUrl = customRpcUrl;
   }
 
   async generateJWT({
@@ -119,9 +124,13 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       ? USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA
       : USDC_CONTRACT_ADDRESS_WORLD_MAINNET;
 
-    const chainConfig = this.chainId === WORLD_CHAIN_SEPOLIA.id
-      ? WORLD_CHAIN_SEPOLIA
-      : WORLD_CHAIN_MAINNET;
+    const chainConfig = this.customRpcUrl
+      ? (this.chainId === WORLD_CHAIN_SEPOLIA.id
+          ? getWorldChainSepoliaWithRPC(this.customRpcUrl)
+          : getWorldChainMainnetWithRPC(this.customRpcUrl))
+      : (this.chainId === WORLD_CHAIN_SEPOLIA.id
+          ? WORLD_CHAIN_SEPOLIA
+          : WORLD_CHAIN_MAINNET);
 
     const chainName = chainConfig.name;
 
@@ -157,10 +166,92 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       account: this.walletAddress as `0x${string}`,
       to: usdcAddress,
       data: transferCallData,
-      value: 0n
+      value: 0n,
+      chain: chainConfig
     });
 
     this.logger.info(`Payment sent successfully. TxHash: ${txHash}`);
+    this.logger.info(`🌐 Transaction URL: https://worldscan.org/tx/${txHash}`);
+    this.logger.info(`🔗 Using custom RPC: ${this.customRpcUrl ? 'YES' : 'NO'} - ${this.customRpcUrl || 'default public endpoint'}`);
+
+    // Log the transaction details immediately after sending
+    this.logger.info('🕐 Checking transaction status immediately after sending...');
+    try {
+      const immediateRpcUrl = this.customRpcUrl || chainConfig.rpcUrls.default.http[0];
+      const publicClient = createPublicClient({
+        chain: chainConfig,
+        transport: http(immediateRpcUrl, {
+          timeout: 10000, // Short timeout for immediate check
+          retryCount: 1
+        })
+      });
+
+      const tx = await publicClient.getTransaction({ hash: txHash });
+      this.logger.info(`📋 Transaction found immediately: ${tx ? 'YES' : 'NO'}`);
+      if (tx) {
+        this.logger.info(`📦 Block number: ${tx.blockNumber || 'pending'}`);
+      }
+    } catch (immediateError) {
+      this.logger.warn(`🔍 Immediate transaction lookup failed: ${immediateError}`);
+    }
+
+    // Wait for transaction confirmation to ensure it's mined
+    // This prevents "Transaction receipt could not be found" errors
+    try {
+      this.logger.info(`Waiting for transaction confirmation...`);
+
+      // Create a public client to wait for the transaction receipt
+      // Use custom RPC URL if provided for better consistency with auth server
+      const rpcUrl = this.customRpcUrl || chainConfig.rpcUrls.default.http[0];
+      this.logger.info(`Using RPC URL for transaction confirmation: ${rpcUrl}`);
+
+      const publicClient = createPublicClient({
+        chain: chainConfig,
+        transport: http(rpcUrl, {
+          timeout: 30000, // 30 second timeout for individual RPC calls
+          retryCount: 3,  // Retry failed requests
+          retryDelay: 1000 // 1 second delay between retries
+        })
+      });
+
+      await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+        confirmations: 1, // Reduce to 1 confirmation to speed up
+        timeout: 120000 // 2 minute timeout - World Chain can be slow
+      });
+      this.logger.info(`Transaction confirmed with 1 confirmation`);
+
+      // Add extra delay to ensure the transaction is well propagated across network
+      this.logger.info('Adding 5 second delay for network propagation...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    } catch (error) {
+      this.logger.warn(`Could not wait for confirmations: ${error}`);
+      // Add a much longer delay if confirmation failed - World Chain can be slow
+      this.logger.info('Confirmation failed, adding 30 second delay for transaction to propagate across World Chain network...');
+      await new Promise(resolve => setTimeout(resolve, 30000));
+
+      // Also try to manually check if transaction exists using a different method
+      this.logger.info('Attempting manual transaction verification...');
+      try {
+        const manualRpcUrl = this.customRpcUrl || chainConfig.rpcUrls.default.http[0];
+        const publicClient = createPublicClient({
+          chain: chainConfig,
+          transport: http(manualRpcUrl, {
+            timeout: 45000, // Even longer timeout for manual check
+            retryCount: 5,
+            retryDelay: 2000
+          })
+        });
+
+        const tx = await publicClient.getTransaction({ hash: txHash });
+        if (tx) {
+          this.logger.info(`Manual verification successful - transaction found: ${tx.blockNumber ? 'mined' : 'pending'}`);
+        }
+      } catch (manualError) {
+        this.logger.warn(`Manual verification also failed: ${manualError}`);
+      }
+    }
+
     return txHash;
   }
 }
