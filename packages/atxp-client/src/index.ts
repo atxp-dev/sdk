@@ -43,11 +43,8 @@ export {
 
 export {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
-  USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA,
   WORLD_CHAIN_MAINNET,
-  WORLD_CHAIN_SEPOLIA,
   getWorldChainMainnetWithRPC,
-  getWorldChainSepoliaWithRPC,
   type WorldChain
 } from './worldConstants.js';
 

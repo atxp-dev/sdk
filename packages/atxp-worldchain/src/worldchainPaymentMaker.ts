@@ -1,10 +1,7 @@
 import {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
-  USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA,
   WORLD_CHAIN_MAINNET,
-  WORLD_CHAIN_SEPOLIA,
   getWorldChainMainnetWithRPC,
-  getWorldChainSepoliaWithRPC,
   type PaymentMaker
 } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
@@ -134,7 +131,7 @@ async function waitForTransactionConfirmations(
  *
  * // With custom configuration
  * const paymentMaker = new WorldchainPaymentMaker(permission, wallet, {
- *   chainId: WORLD_CHAIN_SEPOLIA.id,
+ *   chainId: 480, // World Chain Mainnet
  *   customRpcUrl: 'https://my-rpc.com',
  *   logger: myLogger
  * });
@@ -226,18 +223,12 @@ export class WorldchainPaymentMaker implements PaymentMaker {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
 
-    // Determine USDC contract address and chain config based on chain
-    const usdcAddress = this.chainId === WORLD_CHAIN_SEPOLIA.id
-      ? USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA
-      : USDC_CONTRACT_ADDRESS_WORLD_MAINNET;
+    // Use World Chain Mainnet configuration
+    const usdcAddress = USDC_CONTRACT_ADDRESS_WORLD_MAINNET;
 
     const chainConfig = this.customRpcUrl
-      ? (this.chainId === WORLD_CHAIN_SEPOLIA.id
-          ? getWorldChainSepoliaWithRPC(this.customRpcUrl)
-          : getWorldChainMainnetWithRPC(this.customRpcUrl))
-      : (this.chainId === WORLD_CHAIN_SEPOLIA.id
-          ? WORLD_CHAIN_SEPOLIA
-          : WORLD_CHAIN_MAINNET);
+      ? getWorldChainMainnetWithRPC(this.customRpcUrl)
+      : WORLD_CHAIN_MAINNET;
 
     const chainName = chainConfig.name;
     const rpcUrl = this.customRpcUrl || chainConfig.rpcUrls.default.http[0];

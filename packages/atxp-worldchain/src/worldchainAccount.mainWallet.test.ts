@@ -83,7 +83,7 @@ describe('WorldchainAccount - Main Wallet Mode', () => {
 
     it('should use custom chainId in main wallet mode', async () => {
       const provider = mockProvider();
-      const customChainId = 4801; // World Chain Sepolia
+      const customChainId = 480; // World Chain Mainnet
 
       await setupInitializationMocks({
         provider

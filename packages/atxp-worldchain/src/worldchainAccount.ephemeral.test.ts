@@ -244,33 +244,6 @@ describe('WorldchainAccount', () => {
       );
     });
 
-    it('should use custom chainId when provided', async () => {
-      const bundlerClient = mockBundlerClient();
-      const provider = mockProvider();
-      const ephemeralWallet = mockEphemeralSmartWallet({ client: bundlerClient });
-      const permission = mockSpendPermission({ chainId: 4801 }); // Sepolia testnet
-
-      const mocks = await setupInitializationMocks({
-        bundlerClient,
-        provider,
-        ephemeralWallet,
-        spendPermission: permission
-      });
-
-      await WorldchainAccount.initialize({
-        walletAddress: TEST_WALLET_ADDRESS,
-        provider: provider,
-        chainId: 4801, // World Chain Sepolia
-        storage: mockStorage
-      });
-
-      // Verify custom chainId was used
-      expect(mocks.requestSpendPermission).toHaveBeenCalledWith(
-        expect.objectContaining({
-          chainId: 4801
-        })
-      );
-    });
 
     it('should make all required blockchain calls when creating new account', async () => {
       const provider = mockProvider();

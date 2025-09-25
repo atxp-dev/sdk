@@ -1,6 +1,6 @@
 import { Eip1193Provider, SpendPermission } from "./types.js";
 import { createWalletClient, custom, encodeFunctionData } from 'viem';
-import { WORLD_CHAIN_MAINNET, WORLD_CHAIN_SEPOLIA } from '@atxp/client';
+import { WORLD_CHAIN_MAINNET } from '@atxp/client';
 
 /*
 This shim replaces spend permission functionality with ERC20 approvals for World Chain.
@@ -67,21 +67,18 @@ export async function requestSpendPermission(params: {
   account: string;
   spender: string;
   token: string;
-  chainId: 480 | 4801; // World Chain mainnet or testnet
+  chainId: 480; // World Chain mainnet
   allowance: bigint;
   periodInDays: number; // this is ignored in the shim implementation
   provider: Eip1193Provider;
 }): Promise<SpendPermission> {
-  // Support both World Chain mainnet and testnet
-  const supportedChainIds: (480 | 4801)[] = [WORLD_CHAIN_MAINNET.id as 480, WORLD_CHAIN_SEPOLIA.id as 4801];
-  if (!supportedChainIds.includes(params.chainId)) {
-    throw new Error(`Chain ID ${params.chainId} is not supported. Supported chains: ${supportedChainIds.join(', ')}`);
+  // Support World Chain mainnet only
+  if (params.chainId !== WORLD_CHAIN_MAINNET.id) {
+    throw new Error(`Chain ID ${params.chainId} is not supported. Only World Chain mainnet (${WORLD_CHAIN_MAINNET.id}) is supported.`);
   }
 
-  // Determine which chain config to use
-  const chainConfig = params.chainId === WORLD_CHAIN_SEPOLIA.id
-    ? WORLD_CHAIN_SEPOLIA
-    : WORLD_CHAIN_MAINNET;
+  // Use World Chain mainnet config
+  const chainConfig = WORLD_CHAIN_MAINNET;
 
   const client = createWalletClient({
     chain: chainConfig,

@@ -1,9 +1,7 @@
 import type { Account, PaymentMaker } from '@atxp/client';
 import {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
-  USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA,
-  WORLD_CHAIN_MAINNET,
-  WORLD_CHAIN_SEPOLIA
+  WORLD_CHAIN_MAINNET
 } from '@atxp/client';
 import { WorldchainPaymentMaker } from './worldchainPaymentMaker.js';
 import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
@@ -34,7 +32,7 @@ export class WorldchainAccount implements Account {
       periodInDays?: number;
       storage?: IStorage<string>;
       logger?: Logger;
-      chainId?: number; // 480 for mainnet, 4801 for testnet
+      chainId?: number; // 480 for mainnet
       customRpcUrl?: string; // Custom RPC URL (e.g., with API key)
     },
   ): Promise<WorldchainAccount> {
@@ -42,10 +40,8 @@ export class WorldchainAccount implements Account {
     const useEphemeralWallet = config.useEphemeralWallet ?? true;
     const chainId = config.chainId || WORLD_CHAIN_MAINNET.id;
 
-    // Determine USDC contract address based on chain
-    const usdcAddress = chainId === WORLD_CHAIN_SEPOLIA.id
-      ? USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA
-      : USDC_CONTRACT_ADDRESS_WORLD_MAINNET;
+    // Use World Chain Mainnet USDC address
+    const usdcAddress = USDC_CONTRACT_ADDRESS_WORLD_MAINNET;
 
     // Some wallets don't support wallet_connect, so
     // will just continue if it fails
@@ -91,7 +87,7 @@ export class WorldchainAccount implements Account {
       account: config.walletAddress,
       spender: smartWallet.address,
       token: usdcAddress,
-      chainId: chainId as 480 | 4801,
+      chainId: chainId as 480,
       allowance: config?.allowance ?? DEFAULT_ALLOWANCE,
       periodInDays: config?.periodInDays ?? DEFAULT_PERIOD_IN_DAYS,
       provider: config.provider,
