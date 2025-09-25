@@ -35,14 +35,55 @@ const ERC20_ABI = [
   }
 ] as const;
 
+/**
+ * Configuration for transaction confirmation delays
+ */
 export interface ConfirmationDelays {
+  /** Network propagation delay in milliseconds (must be >= 0) */
   networkPropagationMs: number;
+  /** Confirmation failed delay in milliseconds (must be >= 0) */
   confirmationFailedMs: number;
 }
 
+/**
+ * Options for configuring WorldchainPaymentMaker
+ */
+export interface WorldchainPaymentMakerOptions {
+  /** Logger instance for debug output */
+  logger?: Logger;
+  /** Chain ID (defaults to World Chain Mainnet) */
+  chainId?: number;
+  /** Custom RPC URL for the chain */
+  customRpcUrl?: string;
+  /** Custom confirmation delays (defaults to production values) */
+  confirmationDelays?: ConfirmationDelays;
+}
+
+/**
+ * Validates confirmation delays configuration
+ */
+function validateConfirmationDelays(delays: ConfirmationDelays): void {
+  if (delays.networkPropagationMs < 0) {
+    throw new Error('networkPropagationMs must be non-negative');
+  }
+  if (delays.confirmationFailedMs < 0) {
+    throw new Error('confirmationFailedMs must be non-negative');
+  }
+}
+
 const DEFAULT_CONFIRMATION_DELAYS: ConfirmationDelays = {
-  networkPropagationMs: 5000,
-  confirmationFailedMs: 15000
+  networkPropagationMs: 5000, // 5 seconds for production
+  confirmationFailedMs: 15000  // 15 seconds for production
+};
+
+/**
+ * Gets default confirmation delays based on environment
+ */
+export const getDefaultConfirmationDelays = (): ConfirmationDelays => {
+  if (process.env.NODE_ENV === 'test') {
+    return { networkPropagationMs: 10, confirmationFailedMs: 20 };
+  }
+  return DEFAULT_CONFIRMATION_DELAYS;
 };
 
 async function waitForTransactionConfirmations(
@@ -78,6 +119,27 @@ async function waitForTransactionConfirmations(
   }
 }
 
+/**
+ * Payment maker for World Chain transactions using smart wallets and spend permissions
+ *
+ * @example
+ * ```typescript
+ * // For production use (default delays)
+ * const paymentMaker = new WorldchainPaymentMaker(permission, wallet);
+ *
+ * // For testing (fast delays)
+ * const paymentMaker = new WorldchainPaymentMaker(permission, wallet, {
+ *   confirmationDelays: { networkPropagationMs: 10, confirmationFailedMs: 20 }
+ * });
+ *
+ * // With custom configuration
+ * const paymentMaker = new WorldchainPaymentMaker(permission, wallet, {
+ *   chainId: WORLD_CHAIN_SEPOLIA.id,
+ *   customRpcUrl: 'https://my-rpc.com',
+ *   logger: myLogger
+ * });
+ * ```
+ */
 export class WorldchainPaymentMaker implements PaymentMaker {
   private logger: Logger;
   private spendPermission: SpendPermission;
@@ -86,13 +148,17 @@ export class WorldchainPaymentMaker implements PaymentMaker {
   private customRpcUrl?: string;
   private confirmationDelays: ConfirmationDelays;
 
+  /**
+   * Creates a new WorldchainPaymentMaker instance
+   *
+   * @param spendPermission - The spend permission for transactions
+   * @param smartWallet - The smart wallet instance to use
+   * @param options - Optional configuration
+   */
   constructor(
     spendPermission: SpendPermission,
     smartWallet: EphemeralSmartWallet,
-    logger?: Logger,
-    chainId: number = WORLD_CHAIN_MAINNET.id,
-    customRpcUrl?: string,
-    confirmationDelays?: ConfirmationDelays
+    options: WorldchainPaymentMakerOptions = {}
   ) {
     if (!spendPermission) {
       throw new Error('Spend permission is required');
@@ -100,12 +166,24 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     if (!smartWallet) {
       throw new Error('Smart wallet is required');
     }
+
+    // Extract and validate options
+    const {
+      logger,
+      chainId = WORLD_CHAIN_MAINNET.id,
+      customRpcUrl,
+      confirmationDelays
+    } = options;
+
+    const finalDelays = confirmationDelays ?? getDefaultConfirmationDelays();
+    validateConfirmationDelays(finalDelays);
+
     this.logger = logger ?? new ConsoleLogger();
     this.spendPermission = spendPermission;
     this.smartWallet = smartWallet;
     this.chainId = chainId;
     this.customRpcUrl = customRpcUrl;
-    this.confirmationDelays = confirmationDelays ?? DEFAULT_CONFIRMATION_DELAYS;
+    this.confirmationDelays = finalDelays;
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {

@@ -475,7 +475,7 @@ describe('WorldchainAccount', () => {
       });
 
       // Replace the payment maker with a test version that has short delays
-      const testPaymentMaker = await createTestWorldchainPaymentMaker(permission, ephemeralWallet);
+      const testPaymentMaker = createTestWorldchainPaymentMaker(permission, ephemeralWallet);
       account.paymentMakers.world = testPaymentMaker;
 
       // Make a payment

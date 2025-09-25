@@ -159,7 +159,11 @@ export class WorldchainAccount implements Account {
       }
       this.accountId = ephemeralSmartWallet.address;
       this.paymentMakers = {
-        'world': new WorldchainPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId, customRpcUrl),
+        'world': new WorldchainPaymentMaker(spendPermission, ephemeralSmartWallet, {
+          logger,
+          chainId,
+          customRpcUrl
+        }),
       };
     } else {
       // Main wallet mode
