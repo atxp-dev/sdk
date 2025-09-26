@@ -7,6 +7,8 @@ ATXP Redis Database - Redis OAuth database implementation for Authorization Toke
 
 The ATXP Redis Database package provides distributed OAuth token storage using Redis. It's designed for scalable applications that need shared token storage across multiple server instances or require high-performance, in-memory token caching.
 
-## Getting Started:
+## Support
 
-Learn more about ATXP in [the docs](https://docs.atxp.ai/atxp).
+For detailed API documentation, configuration options, and advanced usage patterns, please refer to our [complete documentation](https://docs.atxp.ai/).
+
+Have questions or need help? Join our [Discord community](https://discord.gg/FuJXHhe9aW) - we're happy to help!

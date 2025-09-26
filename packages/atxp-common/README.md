@@ -9,3 +9,9 @@ The ATXP Common package provides shared utilities, types, and core functionality
 ## Getting Started:
 
 Learn more about ATXP in [the docs](https://docs.atxp.ai/atxp).
+
+## Support
+
+For detailed API documentation, configuration options, and advanced usage patterns, please refer to our [complete documentation](https://docs.atxp.ai/).
+
+Have questions or need help? Join our [Discord community](https://discord.gg/FuJXHhe9aW) - we're happy to help!

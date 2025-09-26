@@ -4,6 +4,12 @@ ATXP is a framework for building and running agents that can interact with the w
 
 ATXP Base provides a `BaseAppAccount` implementation for using `@atxp/client` with [Base Mini Apps](https://www.base.org/build/mini-apps).
 
+## Support
+
+For detailed API documentation, configuration options, and advanced usage patterns, please refer to our [complete documentation](https://docs.atxp.ai/).
+
+Have questions or need help? Join our [Discord community](https://discord.gg/FuJXHhe9aW) - we're happy to help!
+
 ## Initializing the account
 In your Base Mini App's React code:
 ```
