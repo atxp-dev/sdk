@@ -11,6 +11,11 @@ The `@atxp/x402` package provides a fetch wrapper that automatically handles X40
 3. Retry the original request with payment proof
 4. Handle payment failures and retries
 
+
+## Documentation
+
+For complete documentation, refer to our [docs page](https://docs.atxp.ai/client/mcp_servers/x402).
+
 ## Installation
 
 ```bash
