@@ -50,7 +50,7 @@ describe('createMiniKitWorldchainAccount', () => {
   it('should create a MiniKit Worldchain account with default parameters', async () => {
     const walletAddress = '0x1234567890123456789012345678901234567890';
 
-    const account = await createMiniKitWorldchainAccount({ walletAddress });
+    const account = await createMiniKitWorldchainAccount({ walletAddress, miniKit: MiniKit });
 
     expect(WorldchainAccount.initialize).toHaveBeenCalledWith({
       walletAddress,
@@ -70,7 +70,8 @@ describe('createMiniKitWorldchainAccount', () => {
     const account = await createMiniKitWorldchainAccount({
       walletAddress,
       logger: mockLogger,
-      customRpcUrl
+      customRpcUrl,
+      miniKit: MiniKit
     });
 
     expect(WorldchainAccount.initialize).toHaveBeenCalledWith({
@@ -89,7 +90,7 @@ describe('createMiniKitWorldchainAccount', () => {
 
     beforeEach(async () => {
       const walletAddress = '0x1234567890123456789012345678901234567890';
-      await createMiniKitWorldchainAccount({ walletAddress, logger: mockLogger });
+      await createMiniKitWorldchainAccount({ walletAddress, logger: mockLogger, miniKit: MiniKit });
 
       const initializeCall = (WorldchainAccount.initialize as Mock).mock.calls[0];
       provider = initializeCall[0].provider;
@@ -167,7 +168,7 @@ describe('handleSendTransaction (via provider)', () => {
     const mockLogger = { ...loggerSpy } as any;
 
     const walletAddress = '0x1234567890123456789012345678901234567890';
-    await createMiniKitWorldchainAccount({ walletAddress, logger: mockLogger });
+    await createMiniKitWorldchainAccount({ walletAddress, logger: mockLogger, miniKit: MiniKit });
 
     const initializeCall = (WorldchainAccount.initialize as Mock).mock.calls[0];
     provider = initializeCall[0].provider;
