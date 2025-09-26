@@ -9,3 +9,5 @@ export {
   BrowserCache,
   MemoryCache
 } from './cache.js';
+
+export { createMiniKitWorldchainAccount } from './minikit.js';

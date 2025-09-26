@@ -16,7 +16,7 @@ import { WORLD_CHAIN_MAINNET } from '@atxp/client';
 
 // For now, we'll use a generic approach for World Chain
 // This may need to be updated when World Chain provides specific infrastructure
-const DEFAULT_WORLD_CHAIN_RPC = 'https://worldchain-mainnet.g.alchemy.com/public';
+export const DEFAULT_WORLD_CHAIN_RPC = 'https://worldchain-mainnet.g.alchemy.com/public';
 
 export interface EphemeralSmartWallet {
   address: Address;

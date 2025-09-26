@@ -38,7 +38,8 @@
     "bignumber.js": "^9.3.0"
   },
   "peerDependencies": {
-    "viem": "^2.34.0"
+    "viem": "^2.34.0",
+    "@worldcoin/minikit-js": "^1.9.6"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

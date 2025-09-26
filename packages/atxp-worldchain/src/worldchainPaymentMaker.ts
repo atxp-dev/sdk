@@ -1,7 +1,6 @@
 import {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
   WORLD_CHAIN_MAINNET,
-  getWorldChainMainnetWithRPC,
   type PaymentMaker
 } from '@atxp/client';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
@@ -208,14 +207,7 @@ export class WorldchainPaymentMaker implements PaymentMaker {
       paymentRequestId
     });
 
-    const jwtToken = createEIP1271JWT(authData);
-
-    this.logger.info(`codeChallenge: ${codeChallenge}`);
-    this.logger.info(`paymentRequestId: ${paymentRequestId}`);
-    this.logger.info(`walletAddress: ${this.smartWallet.account.address}`);
-    this.logger.info(`Generated EIP-1271 JWT: ${jwtToken}`);
-
-    return jwtToken;
+    return createEIP1271JWT(authData);
   }
 
   async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
@@ -225,17 +217,6 @@ export class WorldchainPaymentMaker implements PaymentMaker {
 
     // Use World Chain Mainnet configuration
     const usdcAddress = USDC_CONTRACT_ADDRESS_WORLD_MAINNET;
-
-    const chainConfig = this.customRpcUrl
-      ? getWorldChainMainnetWithRPC(this.customRpcUrl)
-      : WORLD_CHAIN_MAINNET;
-
-    const chainName = chainConfig.name;
-    const rpcUrl = this.customRpcUrl || chainConfig.rpcUrls.default.http[0];
-    this.logger.info(`Using RPC URL for smart wallet operations: ${rpcUrl}`);
-
-    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ${receiver} on ${chainName} with memo: ${memo}`);
-
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
     const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
     const spendCalls = await prepareSpendCallData({ permission: this.spendPermission, amount: amountInUSDCUnits });
