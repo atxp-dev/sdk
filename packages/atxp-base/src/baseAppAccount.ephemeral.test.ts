@@ -413,14 +413,14 @@ describe('BaseAppAccount', () => {
       expect(mockCache.get(cacheKey)).toBeNull();
     });
 
-    it('should throw error when called outside browser without storage', () => {
+    it('should throw error when called outside browser without cache', () => {
       // Mock window as undefined (non-browser environment)
       const originalWindow = global.window;
       (global as any).window = undefined;
 
       expect(() => {
         BaseAppAccount.clearAllCachedData(TEST_WALLET_ADDRESS);
-      }).toThrow('clearAllStoredData requires a storage to be provided outside of browser environments');
+      }).toThrow('clearAllCachedData requires a cache to be provided outside of browser environments');
 
       // Restore window
       (global as any).window = originalWindow;
