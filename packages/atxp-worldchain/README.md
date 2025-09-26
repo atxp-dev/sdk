@@ -6,6 +6,12 @@ ATXP for World Chain Mini Apps - Enable seamless payments in World Chain applica
 
 `@atxp/worldchain` provides a complete solution for integrating ATXP (Autonomous Transaction eXecution Protocol) payments into World Chain Mini Apps. It handles World Chain-specific wallet interactions, USDC transfers, and MiniKit integration while abstracting away the complexity of blockchain transactions.
 
+## Support
+
+For detailed API documentation, configuration options, and advanced usage patterns, please refer to our [complete documentation](https://docs.atxp.ai/).
+
+Have questions or need help? Join our [Discord community](https://discord.gg/FuJXHhe9aW) - we're happy to help!
+
 ## Installation
 
 ```bash
