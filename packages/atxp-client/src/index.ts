@@ -42,6 +42,13 @@ export {
 } from './baseConstants.js';
 
 export {
+  USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
+  WORLD_CHAIN_MAINNET,
+  getWorldChainMainnetWithRPC,
+  type WorldChain
+} from './worldConstants.js';
+
+export {
   BaseAccount
 } from './baseAccount.js';
 

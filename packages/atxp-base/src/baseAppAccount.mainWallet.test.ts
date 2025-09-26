@@ -30,7 +30,7 @@ vi.mock('viem', async () => {
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BaseAppAccount } from './baseAppAccount.js';
 import { MainWalletPaymentMaker } from './mainWalletPaymentMaker.js';
-import { MemoryStorage } from './storage.js';
+import { MemoryCache } from './cache.js';
 import BigNumber from 'bignumber.js';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import {
@@ -39,11 +39,11 @@ import {
 } from './testHelpers.js';
 
 describe('BaseAppAccount - Main Wallet Mode', () => {
-  let storage: MemoryStorage;
+  let cache: MemoryCache;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    storage = new MemoryStorage();
+    cache = new MemoryCache();
   });
 
   afterEach(() => {
@@ -58,7 +58,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage,
+        cache,
       });
 
       // Should have main wallet address as account ID
@@ -72,8 +72,8 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       
       // Should NOT create ephemeral wallet or request spend permission
       // Storage should remain empty (no ephemeral wallet data saved)
-      const storageKey = `atxp-base-permission-${TEST_WALLET_ADDRESS}`;
-      expect(storage.get(storageKey)).toBeNull();
+      const cacheKey = `atxp-base-permission-${TEST_WALLET_ADDRESS}`;
+      expect(cache.get(cacheKey)).toBeNull();
     });
 
     it('should make correct blockchain calls in main wallet mode', async () => {
@@ -83,7 +83,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage,
+        cache,
       });
       
       // Verify wallet_connect attempt
@@ -101,7 +101,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage,
+        cache,
       });
 
       expect(account.accountId).toBe(TEST_WALLET_ADDRESS);
@@ -120,7 +120,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage,
+        cache,
       });
 
       // Get the payment maker and verify it has the right properties
@@ -135,19 +135,19 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       });
     });
 
-    it('should not interact with storage in main wallet mode', async () => {
+    it('should not interact with cache in main wallet mode', async () => {
       const provider = mockProvider();
 
-      // Spy on storage methods
-      const getSpy = vi.spyOn(storage, 'get');
-      const setSpy = vi.spyOn(storage, 'set');
-      const deleteSpy = vi.spyOn(storage, 'delete');
+      // Spy on cache methods
+      const getSpy = vi.spyOn(cache, 'get');
+      const setSpy = vi.spyOn(cache, 'set');
+      const deleteSpy = vi.spyOn(cache, 'delete');
 
       await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage,
+        cache,
       });
 
       // Storage should not be accessed in main wallet mode
@@ -169,7 +169,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage,
+        cache,
         // useEphemeralWallet not specified - should default to true
       });
 
@@ -183,11 +183,11 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
   describe('clearAllStoredData in main wallet mode', () => {
     it('should handle clearAllStoredData even though main wallet stores no data', () => {
-      const setSpy = vi.spyOn(storage, 'set');
-      const deleteSpy = vi.spyOn(storage, 'delete');
+      const setSpy = vi.spyOn(cache, 'set');
+      const deleteSpy = vi.spyOn(cache, 'delete');
       
       // Should not throw
-      BaseAppAccount.clearAllStoredData(TEST_WALLET_ADDRESS, storage);
+      BaseAppAccount.clearAllCachedData(TEST_WALLET_ADDRESS, cache);
       
       // Should attempt to delete even if nothing was stored
       expect(deleteSpy).toHaveBeenCalledWith(`atxp-base-permission-${TEST_WALLET_ADDRESS}`);
@@ -211,7 +211,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage,
+        cache,
       });
 
       const paymentMaker = account.paymentMakers['base'];
@@ -251,7 +251,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage,
+        cache,
       });
 
       const paymentMaker = account.paymentMakers['base'];

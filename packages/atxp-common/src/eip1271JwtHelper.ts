@@ -22,7 +22,7 @@ interface EIP1271JWTHeader {
 interface EIP1271JWTPayload {
   sub: string;           // walletAddress
   iss: string;           // issuer
-  aud: string;           // audience  
+  aud: string;           // audience
   iat: number;           // timestamp
   exp: number;           // expiration (timestamp + 3600)
   msg: string;           // the signed message
@@ -33,7 +33,7 @@ interface EIP1271JWTPayload {
 // Helper function to convert to base64url that works in both Node.js and browsers
 function toBase64Url(data: string): string {
   // Convert string to base64
-  const base64 = typeof Buffer !== 'undefined' 
+  const base64 = typeof Buffer !== 'undefined'
     ? Buffer.from(data).toString('base64')
     : btoa(data);
   // Convert base64 to base64url
@@ -67,7 +67,7 @@ export function createEIP1271JWT(authData: EIP1271AuthData): string {
   // Encode header and payload
   const encodedHeader = toBase64Url(JSON.stringify(header));
   const encodedPayload = toBase64Url(JSON.stringify(payload));
-  
+
   // EIP-1271 signature goes in JWT signature section
   const encodedSignature = toBase64Url(authData.signature);
 
@@ -88,7 +88,7 @@ export function createLegacyEIP1271Auth(authData: EIP1271AuthData): string {
  */
 export function createEIP1271AuthData({
   walletAddress,
-  message, 
+  message,
   signature,
   timestamp,
   nonce,
@@ -137,19 +137,19 @@ export function constructEIP1271Message({
     `Wallet: ${walletAddress}`,
     `Timestamp: ${timestamp}`
   ];
-  
+
   if (nonce !== undefined && nonce !== null) {
     messageParts.push(`Nonce: ${nonce}`);
   }
-  
+
   if (codeChallenge) {
     messageParts.push(`Code Challenge: ${codeChallenge}`);
   }
-  
+
   if (paymentRequestId) {
     messageParts.push(`Payment Request ID: ${paymentRequestId}`);
   }
-  
+
   messageParts.push('', '', 'Sign this message to prove you control this wallet.');
   return messageParts.join('\n');
 }

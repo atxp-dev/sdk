@@ -1,5 +1,5 @@
-export { BaseAppAccount } from './baseAppAccount.js';
-export { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
+export { WorldchainAccount } from './worldchainAccount.js';
+export { WorldchainPaymentMaker } from './worldchainPaymentMaker.js';
 export { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
 export type { SpendPermission } from './types.js';
 export {
@@ -9,3 +9,5 @@ export {
   BrowserCache,
   MemoryCache
 } from './cache.js';
+
+export { createMiniKitWorldchainAccount } from './minikit.js';

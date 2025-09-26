@@ -2,9 +2,9 @@
 import { vi, expect } from 'vitest';
 import type { SpendPermission } from './types.js';
 import type { EphemeralSmartWallet } from './smartWalletHelpers.js';
-import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
+import { WorldchainPaymentMaker, type ConfirmationDelays, type WorldchainPaymentMakerOptions } from './worldchainPaymentMaker.js';
+import { USDC_CONTRACT_ADDRESS_WORLD_MAINNET, WORLD_CHAIN_MAINNET } from '@atxp/client';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { base } from 'viem/chains';
 import type { Address, Hex } from 'viem';
 
 // Common test constants
@@ -12,8 +12,14 @@ export const TEST_WALLET_ADDRESS = '0x1234567890123456789012345678901234567890' 
 export const TEST_SMART_WALLET_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address;
 export const TEST_RECEIVER_ADDRESS = '0x1234567890123456789012345678901234567890' as Address;
 export const TEST_PRIVATE_KEY = generatePrivateKey();
-export const TEST_PAYMASTER_URL = 'https://api.developer.coinbase.com/rpc/v1/base/snPdXqIzOGhRkGNJvEHM5bl9Hm3yRO3m';
-export const TEST_BUNDLER_URL = 'https://api.developer.coinbase.com/rpc/v1/base';
+export const TEST_PAYMASTER_URL = 'https://worldchain-bundler.example.com';
+export const TEST_BUNDLER_URL = 'https://worldchain-bundler.example.com';
+
+// Test confirmation delays (much shorter for tests)
+export const TEST_CONFIRMATION_DELAYS: ConfirmationDelays = {
+  networkPropagationMs: 10, // 10ms instead of 5 seconds
+  confirmationFailedMs: 20  // 20ms instead of 15 seconds
+};
 
 // Mock provider
 export function mockProvider({
@@ -29,14 +35,14 @@ export function mockSpendPermission({
   signature = '0xmocksignature' as Hex,
   account = TEST_WALLET_ADDRESS,
   spender = TEST_SMART_WALLET_ADDRESS,
-  token = USDC_CONTRACT_ADDRESS_BASE,
+  token = USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
   allowance = '10000000', // 10 USDC
   period = 604800, // 7 days
   start = Math.floor(Date.now() / 1000),
   end = Math.floor(Date.now() / 1000) + 604800,
   salt = '1',
   extraData = '0x' as Hex,
-  chainId = base.id
+  chainId = WORLD_CHAIN_MAINNET.id
 } = {}): SpendPermission {
   return {
     signature,
@@ -59,20 +65,20 @@ export function mockSpendPermission({
 export function removeTimestamps<T extends Record<string, any>>(obj: T): T {
   // Common timestamp field names
   const timestampFields = ['timestamp', 'start', 'end', 'createdAt', 'updatedAt', 'expiresAt', 'issuedAt'];
-  
+
   // Deep clone the object to avoid mutations
   const result = JSON.parse(JSON.stringify(obj));
-  
+
   // Recursive function to remove timestamps
   function removeFromObject(target: any): void {
     if (!target || typeof target !== 'object') return;
-    
+
     // Handle arrays
     if (Array.isArray(target)) {
       target.forEach(item => removeFromObject(item));
       return;
     }
-    
+
     // Handle objects
     for (const key in target) {
       if (timestampFields.includes(key)) {
@@ -86,7 +92,7 @@ export function removeTimestamps<T extends Record<string, any>>(obj: T): T {
       }
     }
   }
-  
+
   removeFromObject(result);
   return result;
 }
@@ -178,7 +184,7 @@ export function mockEphemeralSmartWallet({
   privateKey = TEST_PRIVATE_KEY
 } = {}): EphemeralSmartWallet {
   const signer = privateKeyToAccount(privateKey);
-  
+
   return {
     address,
     account,
@@ -203,7 +209,68 @@ export function mockSpendCalls({
   return calls;
 }
 
+/**
+ * Helper to create a WorldchainPaymentMaker for testing with fast confirmation delays
+ *
+ * @param permission - Spend permission (defaults to mock)
+ * @param smartWallet - Smart wallet (defaults to mock)
+ * @param options - Additional options
+ * @returns WorldchainPaymentMaker configured for testing
+ */
+export function createTestWorldchainPaymentMaker(
+  permission: SpendPermission = mockSpendPermission(),
+  smartWallet: EphemeralSmartWallet = mockEphemeralSmartWallet(),
+  options: Partial<WorldchainPaymentMakerOptions> = {}
+): WorldchainPaymentMaker {
+  const testOptions: WorldchainPaymentMakerOptions = {
+    confirmationDelays: TEST_CONFIRMATION_DELAYS,
+    ...options
+  };
 
+  return new WorldchainPaymentMaker(permission, smartWallet, testOptions);
+}
+
+/**
+ * Builder pattern for creating test payment makers with fluent API
+ */
+export class TestWorldchainPaymentMakerBuilder {
+  private permission?: SpendPermission;
+  private smartWallet?: EphemeralSmartWallet;
+  private options: WorldchainPaymentMakerOptions = {};
+
+  withPermission(permission: SpendPermission) {
+    this.permission = permission;
+    return this;
+  }
+
+  withSmartWallet(wallet: EphemeralSmartWallet) {
+    this.smartWallet = wallet;
+    return this;
+  }
+
+  withTestDelays(delays?: ConfirmationDelays) {
+    this.options.confirmationDelays = delays ?? TEST_CONFIRMATION_DELAYS;
+    return this;
+  }
+
+  withChainId(chainId: number) {
+    this.options.chainId = chainId;
+    return this;
+  }
+
+  withCustomRpc(rpcUrl: string) {
+    this.options.customRpcUrl = rpcUrl;
+    return this;
+  }
+
+  build(): WorldchainPaymentMaker {
+    return createTestWorldchainPaymentMaker(
+      this.permission,
+      this.smartWallet,
+      this.options
+    );
+  }
+}
 
 // Helper to setup initialization mocks
 export async function setupInitializationMocks({
@@ -218,11 +285,22 @@ export async function setupInitializationMocks({
   const { requestSpendPermission } = await import('./spendPermissionShim.js');
   const { toEphemeralSmartWallet } = await import('./smartWalletHelpers.js');
 
-  (createPublicClient as any).mockReturnValue({});
-  (toCoinbaseSmartAccount as any).mockResolvedValue(smartAccount);
-  (createBundlerClient as any).mockReturnValue(bundlerClient);
-  (requestSpendPermission as any).mockResolvedValue(spendPermission);
-  (toEphemeralSmartWallet as any).mockResolvedValue(ephemeralWallet);
+  // Ensure mocks are properly initialized
+  if (createPublicClient && typeof (createPublicClient as any).mockReturnValue === 'function') {
+    (createPublicClient as any).mockReturnValue({});
+  }
+  if (toCoinbaseSmartAccount && typeof (toCoinbaseSmartAccount as any).mockResolvedValue === 'function') {
+    (toCoinbaseSmartAccount as any).mockResolvedValue(smartAccount);
+  }
+  if (createBundlerClient && typeof (createBundlerClient as any).mockReturnValue === 'function') {
+    (createBundlerClient as any).mockReturnValue(bundlerClient);
+  }
+  if (requestSpendPermission && typeof (requestSpendPermission as any).mockResolvedValue === 'function') {
+    (requestSpendPermission as any).mockResolvedValue(spendPermission);
+  }
+  if (toEphemeralSmartWallet && typeof (toEphemeralSmartWallet as any).mockResolvedValue === 'function') {
+    (toEphemeralSmartWallet as any).mockResolvedValue(ephemeralWallet);
+  }
 
   return {
     toCoinbaseSmartAccount,
@@ -249,5 +327,5 @@ export async function setupPaymentMocks({
 
 // Cache key helper
 export function getCacheKey(walletAddress: string): string {
-  return `atxp-base-permission-${walletAddress}`;
+  return `atxp-world-permission-${walletAddress}`;
 }

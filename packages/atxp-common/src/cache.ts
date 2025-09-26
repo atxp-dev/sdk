@@ -1,58 +1,45 @@
-import { SpendPermission } from './types.js';
-import { Hex } from '@atxp/client';
-
 /**
- * Stored permission data structure
- */
-export interface Intermediary {
-  /** Ephemeral wallet private key */
-  privateKey: Hex;
-  /** Spend permission from Base */
-  permission: SpendPermission;
-}
-
-/**
- * Storage interface for abstracting storage mechanisms
+ * Cache interface for abstracting cache mechanisms
  * This allows for easy mocking in tests and potential future
- * support for different storage backends (e.g., React Native AsyncStorage)
+ * support for different cache backends (e.g., React Native AsyncStorage)
  */
-export interface IStorage<T = string> {
+export interface ICache<T = string> {
   get(key: string): T | null;
   set(key: string, value: T): void;
   delete(key: string): void;
 }
 
 /**
- * Type-safe storage wrapper for permission data
+ * Type-safe cache wrapper for JSON data
  */
-export class IntermediaryStorage {
-  constructor(private storage: IStorage<string>) {}
+export class JsonCache<T> {
+  constructor(private cache: ICache<string>) {}
 
-  get(key: string): Intermediary | null {
-    const data = this.storage.get(key);
+  get(key: string): T | null {
+    const data = this.cache.get(key);
     if (!data) return null;
-    
+
     try {
       const parsed = JSON.parse(data);
-      return parsed as Intermediary;
+      return parsed as T;
     } catch {
       return null;
     }
   }
 
-  set(key: string, data: Intermediary): void {
-    this.storage.set(key, JSON.stringify(data));
+  set(key: string, data: T): void {
+    this.cache.set(key, JSON.stringify(data));
   }
 
   delete(key: string): void {
-    this.storage.delete(key);
+    this.cache.delete(key);
   }
 }
 
 /**
  * Browser localStorage implementation
  */
-export class BrowserStorage implements IStorage<string> {
+export class BrowserCache implements ICache<string> {
   private isAvailable(): boolean {
     return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
   }
@@ -74,9 +61,9 @@ export class BrowserStorage implements IStorage<string> {
 }
 
 /**
- * In-memory storage implementation for testing
+ * In-memory cache implementation for testing
  */
-export class MemoryStorage implements IStorage<string> {
+export class MemoryCache implements ICache<string> {
   private store: Map<string, string> = new Map();
 
   get(key: string): string | null {
@@ -95,3 +82,4 @@ export class MemoryStorage implements IStorage<string> {
     this.store.clear();
   }
 }
+

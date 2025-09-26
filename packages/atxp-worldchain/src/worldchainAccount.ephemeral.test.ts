@@ -30,15 +30,14 @@ vi.mock('viem', async () => {
     encodeFunctionData: vi.fn(() => '0xmockencodeddata'),
     createWalletClient: vi.fn(() => ({
       sendTransaction: vi.fn().mockResolvedValue('0xtxhash'),
-      getChainId: vi.fn().mockResolvedValue(8453) // Base mainnet chain ID
+      getChainId: vi.fn().mockResolvedValue(480) // World Chain mainnet chain ID
     }))
   };
 });
 
-import { BaseAppAccount } from './baseAppAccount.js';
+import { WorldchainAccount } from './worldchainAccount.js';
 import { MemoryCache } from './cache.js';
-import { base } from 'viem/chains';
-import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
+import { WORLD_CHAIN_MAINNET, USDC_CONTRACT_ADDRESS_WORLD_MAINNET } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import {
   TEST_WALLET_ADDRESS,
@@ -57,10 +56,11 @@ import {
   mockEphemeralSmartWallet,
   getCacheKey,
   removeTimestamps,
-  expectTimestampAround
+  expectTimestampAround,
+  createTestWorldchainPaymentMaker
 } from './testHelpers.js';
 
-describe('BaseAppAccount', () => {
+describe('WorldchainAccount', () => {
   let mockCache: MemoryCache;
 
   beforeEach(() => {
@@ -87,7 +87,7 @@ describe('BaseAppAccount', () => {
       });
 
       // Initialize account
-      const account = await BaseAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         cache: mockCache
@@ -97,28 +97,28 @@ describe('BaseAppAccount', () => {
       expect(account).toBeDefined();
       expect(account.accountId).toBe(TEST_SMART_WALLET_ADDRESS);
       expect(account.paymentMakers).toBeDefined();
-      expect(account.paymentMakers.base).toBeDefined();
+      expect(account.paymentMakers.world).toBeDefined();
 
       // Verify mocks were called
       expect(mocks.toEphemeralSmartWallet).toHaveBeenCalled();
       expect(mocks.requestSpendPermission).toHaveBeenCalledWith({
         account: TEST_WALLET_ADDRESS,
         spender: TEST_SMART_WALLET_ADDRESS,
-        token: USDC_CONTRACT_ADDRESS_BASE,
-        chainId: base.id,
+        token: USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
+        chainId: WORLD_CHAIN_MAINNET.id,
         allowance: 10n,
         periodInDays: 7,
         provider: provider
       });
 
-      // Verify smart wallet was deployed
+      // Verify smart wallet was deployed (no paymaster for World Chain initially)
       expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
         calls: [{
           to: TEST_SMART_WALLET_ADDRESS,
           value: 0n,
           data: '0x'
-        }],
-        paymaster: true
+        }]
+        // Note: paymaster omitted for World Chain
       });
 
       // Verify data was stored
@@ -151,7 +151,7 @@ describe('BaseAppAccount', () => {
       });
 
       // Initialize account
-      const account = await BaseAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         cache: mockCache
@@ -188,7 +188,7 @@ describe('BaseAppAccount', () => {
       });
 
       // Initialize account
-      const account = await BaseAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         cache: mockCache
@@ -204,7 +204,7 @@ describe('BaseAppAccount', () => {
       expect(storedData).toBeTruthy();
       const parsedData = JSON.parse(storedData!);
       expect(parsedData.permission).toMatchObject(removeTimestamps(newPermission));
-      
+
       // Verify timestamps are reasonable
       expectTimestampAround(parsedData.permission.permission.start, 0);
       expectTimestampAround(parsedData.permission.permission.end, 604800);
@@ -227,7 +227,7 @@ describe('BaseAppAccount', () => {
       const customAllowance = 100n;
       const customPeriod = 30;
 
-      await BaseAppAccount.initialize({
+      await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         allowance: customAllowance,
@@ -243,6 +243,7 @@ describe('BaseAppAccount', () => {
         })
       );
     });
+
 
     it('should make all required blockchain calls when creating new account', async () => {
       const provider = mockProvider();
@@ -260,7 +261,7 @@ describe('BaseAppAccount', () => {
       });
 
       // Initialize account
-      await BaseAppAccount.initialize({
+      await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         cache: mockCache
@@ -269,21 +270,15 @@ describe('BaseAppAccount', () => {
       // Verify wallet_connect attempt
       expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
 
-      // Note: createPublicClient not called in new implementation
-
-      // Note: toCoinbaseSmartAccount not called directly in new implementation
-
-      // Note: createBundlerClient not called directly in new implementation
-
-      // Verify smart wallet deployment
+      // Verify smart wallet deployment (without paymaster for World Chain)
       expect(bundlerClient.sendUserOperation).toHaveBeenCalledTimes(1);
       expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
         calls: [{
           to: TEST_SMART_WALLET_ADDRESS,
           value: 0n,
           data: '0x'
-        }],
-        paymaster: true
+        }]
+        // Note: no paymaster for World Chain
       });
       expect(bundlerClient.waitForUserOperationReceipt).toHaveBeenCalledWith({
         hash: '0xoperationhash'
@@ -294,8 +289,8 @@ describe('BaseAppAccount', () => {
       expect(mocks.requestSpendPermission).toHaveBeenCalledWith({
         account: TEST_WALLET_ADDRESS,
         spender: TEST_SMART_WALLET_ADDRESS,
-        token: USDC_CONTRACT_ADDRESS_BASE,
-        chainId: base.id,
+        token: USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
+        chainId: WORLD_CHAIN_MAINNET.id,
         allowance: 10n,
         periodInDays: 7,
         provider: provider
@@ -314,7 +309,7 @@ describe('BaseAppAccount', () => {
       const provider = mockProvider();
       const bundlerClient = mockBundlerClient();
       const smartAccount = mockSmartAccount();
-      
+
       const mocks = await setupInitializationMocks({
         provider,
         bundlerClient,
@@ -322,7 +317,7 @@ describe('BaseAppAccount', () => {
       });
 
       // Initialize account
-      await BaseAppAccount.initialize({
+      await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         cache: mockCache
@@ -330,12 +325,6 @@ describe('BaseAppAccount', () => {
 
       // Verify wallet_connect attempt still happens
       expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
-
-      // Note: createPublicClient not called in new implementation
-
-      // Note: toCoinbaseSmartAccount not called directly when reusing account
-
-      // Note: createBundlerClient not called directly in new implementation
 
       // Verify NO smart wallet deployment
       expect(bundlerClient.sendUserOperation).not.toHaveBeenCalled();
@@ -350,7 +339,7 @@ describe('BaseAppAccount', () => {
       const provider = mockProvider({
         request: vi.fn().mockRejectedValue(new Error('Wallet does not support wallet_connect'))
       });
-      
+
       const bundlerClient = mockBundlerClient();
       const ephemeralWallet = mockEphemeralSmartWallet({ client: bundlerClient });
       const permission = mockSpendPermission();
@@ -363,7 +352,7 @@ describe('BaseAppAccount', () => {
       });
 
       // Initialize account - should not throw despite wallet_connect failure
-      const account = await BaseAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         cache: mockCache
@@ -390,7 +379,7 @@ describe('BaseAppAccount', () => {
       });
 
       // Initialize should throw
-      await expect(BaseAppAccount.initialize({
+      await expect(WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         cache: mockCache
@@ -398,16 +387,16 @@ describe('BaseAppAccount', () => {
     });
   });
 
-  describe('clearAllStoredData', () => {
+  describe('clearAllCachedData', () => {
     it('should remove stored data for the given wallet address', () => {
       const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
-      
+
       // Store some data
       mockCache.set(cacheKey, 'test-data');
       expect(mockCache.get(cacheKey)).toBe('test-data');
 
       // Clear the data
-      BaseAppAccount.clearAllCachedData(TEST_WALLET_ADDRESS, mockCache);
+      WorldchainAccount.clearAllCachedData(TEST_WALLET_ADDRESS, mockCache);
 
       // Verify data was removed
       expect(mockCache.get(cacheKey)).toBeNull();
@@ -419,7 +408,7 @@ describe('BaseAppAccount', () => {
       (global as any).window = undefined;
 
       expect(() => {
-        BaseAppAccount.clearAllCachedData(TEST_WALLET_ADDRESS);
+        WorldchainAccount.clearAllCachedData(TEST_WALLET_ADDRESS);
       }).toThrow('clearAllCachedData requires a cache to be provided outside of browser environments');
 
       // Restore window
@@ -452,14 +441,18 @@ describe('BaseAppAccount', () => {
       const { prepareSpendCallData } = await setupPaymentMocks({ spendCalls });
 
       // Initialize account
-      const account = await BaseAppAccount.initialize({
+      const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         cache: mockCache
       });
 
+      // Replace the payment maker with a test version that has short delays
+      const testPaymentMaker = createTestWorldchainPaymentMaker(permission, ephemeralWallet);
+      account.paymentMakers.world = testPaymentMaker;
+
       // Make a payment
-      const paymentMaker = account.paymentMakers.base;
+      const paymentMaker = account.paymentMakers.world;
       const amount = new BigNumber(1.5); // 1.5 USDC
       const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
 
@@ -472,7 +465,7 @@ describe('BaseAppAccount', () => {
           { to: '0xcontract1', data: '0xdata1', value: 0n },
           { to: '0xcontract2', data: '0xdata2', value: 0n },
           expect.objectContaining({
-            to: USDC_CONTRACT_ADDRESS_BASE,
+            to: USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
             data: expect.any(String), // Contains encoded memo
             value: 0n
           })
