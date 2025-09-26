@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import 'dotenv/config'
-import { atxpClient, SolanaAccount } from '@atxp/client';
+import { atxpClient, ATXPAccount } from '@atxp/client';
 
 // Debug function that only prints when DEBUG environment variable is set
 function debug(...args: any[]) {
@@ -19,7 +19,7 @@ interface ServiceConfig {
 
 const SERVICES: Record<string, ServiceConfig> = {
   image: {
-    mcpServer: 'https://image.corp.novellum.ai',
+    mcpServer: 'https://image.mcp.atxp.ai',
     toolName: 'image_create_image',
     description: 'image generation',
     getArguments: (prompt: string) => ({ prompt }),
@@ -36,7 +36,7 @@ const SERVICES: Record<string, ServiceConfig> = {
     }
   },
   search: {
-    mcpServer: 'https://search.corp.novellum.ai',
+    mcpServer: 'https://search.mcp.atxp.ai',
     toolName: 'search_search',
     description: 'search',
     getArguments: (prompt: string) => ({ query: prompt }),
@@ -73,26 +73,18 @@ async function main() {
   debug(`Using ${serviceConfig.description} service with prompt: "${prompt}"`);
 
   // Validate environment variables
-  const solanaEndpoint = process.env.SOLANA_ENDPOINT;
-  const solanaPrivateKey = process.env.SOLANA_PRIVATE_KEY;
+  const atxpConnectionString = process.env.ATXP_CONNECTION_STRING;
 
-  if (!solanaEndpoint) {
-    console.error('Error: SOLANA_ENDPOINT environment variable is required');
-    console.error('Example: SOLANA_ENDPOINT=https://api.mainnet-beta.solana.com');
+  if (!atxpConnectionString) {
+    console.error('Error: ATXP_CONNECTION_STRING environment variable is required');
+    console.error('Example: ATXP_CONNECTION_STRING=https://accounts.atxp.ai/?connection_token=your_connection_token_here');
     process.exit(1);
   }
-
-  if (!solanaPrivateKey) {
-    console.error('Error: SOLANA_PRIVATE_KEY environment variable is required');
-    console.error('Example: SOLANA_PRIVATE_KEY=your_base58_encoded_private_key');
-    process.exit(1);
-  }
-
   try {
     // Create MCP client using atxpClient function
     const client = await atxpClient({
       mcpServer: serviceConfig.mcpServer as any,
-      account: new SolanaAccount(solanaEndpoint, solanaPrivateKey),
+      account: new ATXPAccount(atxpConnectionString),
     });
 
     // Call the appropriate tool using the MCP client
