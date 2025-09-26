@@ -5,8 +5,9 @@ MCP server demonstrating batch payment processing.
 ## Features
 
 - Simple greeting tool with batch payment
-- Middleware expects $0.05 total payment
-- Tool requires $0.01 per batch
+- Middleware request $0.05 per payment
+- Tool requires $0.01 per call
+- Payments are triggered every 5 tool calls
 
 ## Setup
 
@@ -51,7 +52,7 @@ A personalized greeting that requires batch payment.
 ## Payment Configuration
 
 - Middleware expects: $0.05 total payment
-- Tool requires: $0.01 per batch
+- Tool requires: $0.01 per call
 
 ## Running
 
