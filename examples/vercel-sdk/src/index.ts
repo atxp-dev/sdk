@@ -15,7 +15,7 @@ interface ServiceConfig {
 
 const SERVICES: Record<string, ServiceConfig> = {
   image: {
-    mcpServer: 'https://image.corp.novellum.ai',
+    mcpServer: 'https://image.mcp.atxp.ai',
     toolName: 'image_create_image',
     description: 'image generation',
     getArguments: (prompt: string) => ({ prompt }),
@@ -32,7 +32,7 @@ const SERVICES: Record<string, ServiceConfig> = {
     }
   },
   search: {
-    mcpServer: 'https://search.corp.novellum.ai',
+    mcpServer: 'https://search.mcp.atxp.ai',
     toolName: 'search_search',
     description: 'search',
     getArguments: (prompt: string) => ({ query: prompt }),

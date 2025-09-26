@@ -13,12 +13,12 @@ interface ServiceConfig {
 
 const SERVICES: Record<string, ServiceConfig> = {
   image: {
-    mcpServer: 'https://image.corp.novellum.ai',
+    mcpServer: 'https://image.mcp.atxp.ai',
     toolName: 'image_create_image',
     description: 'image generation',
   },
   search: {
-    mcpServer: 'https://search.corp.novellum.ai',
+    mcpServer: 'https://search.mcp.atxp.ai',
     toolName: 'search_search',
     description: 'search',
   }
