@@ -6,7 +6,7 @@ type RequiredATXPConfigFields = 'paymentDestination';
 type RequiredATXPConfig = Pick<ATXPConfig, RequiredATXPConfigFields>;
 type OptionalATXPConfig = Omit<ATXPConfig, RequiredATXPConfigFields>;
 export type ATXPArgs = RequiredATXPConfig & Partial<OptionalATXPConfig>;
-type BuildableATXPConfigFields = 'oAuthDb' | 'oAuthClient' | 'paymentServer' | 'logger';
+type BuildableATXPConfigFields = 'oAuthDb' | 'oAuthClient' | 'paymentServer' | 'logger' | 'minimumPayment';
 
 export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConfigFields>> = {
   mountPath: '/',
@@ -20,6 +20,11 @@ export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConf
 export function buildServerConfig(args: ATXPArgs): ATXPConfig {
   if(!args.paymentDestination) {
     throw new Error('paymentDestination is required');
+  }
+
+  // Validate minimumPayment if provided
+  if (args.minimumPayment && args.minimumPayment.isGreaterThan(1)) {
+    throw new Error('minimumPayment cannot exceed $1.00');
   }
 
   // Read environment variables at runtime, not module load time

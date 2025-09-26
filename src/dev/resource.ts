@@ -5,8 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { requirePayment, ChainPaymentDestination, ATXPPaymentDestination } from '@atxp/server';
-import { atxpExpress } from '@atxp/express';
+import { atxpExpress, atxpAccountId, requirePayment, ATXPPaymentDestination } from '@atxp/express';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import 'dotenv/config';
 
@@ -27,12 +26,13 @@ const getServer = () => {
       message: z.string().optional().describe('Message to secure'),
     },
     async ({ message }: { message?: string }): Promise<CallToolResult> => {
+      const userId = atxpAccountId();
       await requirePayment({price: BigNumber(0.01)});
       return {
         content: [
           {
             type: 'text',
-            text: `Secure data: ${message || 'No message provided'}`,
+            text: `Secure data for user ${userId}: ${message || 'No message provided'}`,
           }
         ],
       };
@@ -45,20 +45,20 @@ const getServer = () => {
 const app = express();
 app.use(express.json());
 
+const logger = new ConsoleLogger({level: LogLevel.DEBUG});
+
 const destinationAddress = process.env.ATXP_DESTINATION!;
 //const destination = new ChainPaymentDestination(destinationAddress, 'base');
-const destination = new ATXPPaymentDestination(destinationAddress);
+const destination = new ATXPPaymentDestination(destinationAddress, { logger });
 
 console.log('Starting MCP server with destination', destinationAddress);
 app.use(atxpExpress({
   paymentDestination: destination,
-  resource: `http://localhost:${PORT}`,
   //server: 'http://localhost:3010',
-  server: 'https://auth.atxp.ai',
-  mountPath: '/',
   payeeName: 'ATXP Client Example Resource Server',
+  minimumPayment: BigNumber(0.05),
   allowHttp: true,
-  logger: new ConsoleLogger({level: LogLevel.DEBUG})
+  logger
 }));
 
 

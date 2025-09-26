@@ -1,0 +1,28 @@
+{
+  "name": "atxp-batch-payments-example",
+  "version": "1.0.0",
+  "description": "Example MCP server demonstrating batch payment processing",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "prebuild": "cd ../.. && npm run build",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "./dev.sh",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@atxp/express": "*",
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "express": "^5.0.1",
+    "zod": "^3.24.1",
+    "bignumber.js": "^9.1.2",
+    "dotenv": "^17.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

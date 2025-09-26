@@ -69,11 +69,16 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     throw new Error('No user found');
   }
 
+  // Use the maximum of minimumPayment and requested price
+  const paymentAmount = config.minimumPayment && config.minimumPayment.isGreaterThan(paymentConfig.price)
+    ? config.minimumPayment
+    : paymentConfig.price;
+
   // Get payment destinations (with caching)
   const paymentAddresses = await getCachedPaymentDestinations(
     config,
     user,
-    paymentConfig.price,
+    paymentAmount,
     config.currency
   );
 
@@ -83,7 +88,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
       network: addr.network,
       currency: config.currency,
       address: addr.destination,
-      amount: paymentConfig.price // Each destination gets the full amount
+      amount: paymentConfig.price // Each destination gets the requested amount for charge
     })),
     source: user,
     payeeName: config.payeeName,
@@ -100,10 +105,22 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   const existingPaymentId = await paymentConfig.getExistingPaymentId?.();
   if (existingPaymentId) {
     config.logger.info(`Found existing payment ID ${existingPaymentId}`);
-    throw paymentRequiredError(config.server, existingPaymentId, paymentConfig.price)
+    throw paymentRequiredError(config.server, existingPaymentId, paymentAmount)
   }
 
-  const paymentId = await config.paymentServer.createPaymentRequest(charge);
+  // For createPaymentRequest, use the minimumPayment if configured
+  const paymentRequest = {
+    ...charge,
+    amount: paymentAmount,
+    destinations: paymentAddresses.map(addr => ({
+      network: addr.network,
+      currency: config.currency,
+      address: addr.destination,
+      amount: paymentAmount // Use minimumPayment or requested amount
+    }))
+  };
+
+  const paymentId = await config.paymentServer.createPaymentRequest(paymentRequest);
   config.logger.info(`Created payment request ${paymentId}`);
-  throw paymentRequiredError(config.server, paymentId, paymentConfig.price);
+  throw paymentRequiredError(config.server, paymentId, paymentAmount);
 }

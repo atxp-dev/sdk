@@ -28,5 +28,6 @@ export type {
 } from '@atxp/server';
 
 export {
-  requirePayment
+  requirePayment,
+  atxpAccountId
 } from '@atxp/server';
