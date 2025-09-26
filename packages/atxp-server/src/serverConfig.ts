@@ -6,9 +6,9 @@ type RequiredATXPConfigFields = 'paymentDestination';
 type RequiredATXPConfig = Pick<ATXPConfig, RequiredATXPConfigFields>;
 type OptionalATXPConfig = Omit<ATXPConfig, RequiredATXPConfigFields>;
 export type ATXPArgs = RequiredATXPConfig & Partial<OptionalATXPConfig>;
-type BuildableATXPConfigFields = 'oAuthDb' | 'oAuthClient' | 'paymentServer' | 'logger';
+type BuildableATXPConfigFields = 'oAuthDb' | 'oAuthClient' | 'paymentServer' | 'logger' | 'minimumPayment';
 
-export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConfigFields | 'minimumPayment'>> = {
+export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConfigFields>> = {
   mountPath: '/',
   currency: 'USDC' as const,
   server: DEFAULT_AUTHORIZATION_SERVER,
