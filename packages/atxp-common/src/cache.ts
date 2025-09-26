@@ -1,22 +1,22 @@
 /**
- * Storage interface for abstracting storage mechanisms
+ * Cache interface for abstracting cache mechanisms
  * This allows for easy mocking in tests and potential future
- * support for different storage backends (e.g., React Native AsyncStorage)
+ * support for different cache backends (e.g., React Native AsyncStorage)
  */
-export interface IStorage<T = string> {
+export interface ICache<T = string> {
   get(key: string): T | null;
   set(key: string, value: T): void;
   delete(key: string): void;
 }
 
 /**
- * Type-safe storage wrapper for JSON data
+ * Type-safe cache wrapper for JSON data
  */
-export class JsonStorage<T> {
-  constructor(private storage: IStorage<string>) {}
+export class JsonCache<T> {
+  constructor(private cache: ICache<string>) {}
 
   get(key: string): T | null {
-    const data = this.storage.get(key);
+    const data = this.cache.get(key);
     if (!data) return null;
 
     try {
@@ -28,18 +28,18 @@ export class JsonStorage<T> {
   }
 
   set(key: string, data: T): void {
-    this.storage.set(key, JSON.stringify(data));
+    this.cache.set(key, JSON.stringify(data));
   }
 
   delete(key: string): void {
-    this.storage.delete(key);
+    this.cache.delete(key);
   }
 }
 
 /**
  * Browser localStorage implementation
  */
-export class BrowserStorage implements IStorage<string> {
+export class BrowserCache implements ICache<string> {
   private isAvailable(): boolean {
     return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
   }
@@ -61,9 +61,9 @@ export class BrowserStorage implements IStorage<string> {
 }
 
 /**
- * In-memory storage implementation for testing
+ * In-memory cache implementation for testing
  */
-export class MemoryStorage implements IStorage<string> {
+export class MemoryCache implements ICache<string> {
   private store: Map<string, string> = new Map();
 
   get(key: string): string | null {
@@ -82,3 +82,4 @@ export class MemoryStorage implements IStorage<string> {
     this.store.clear();
   }
 }
+

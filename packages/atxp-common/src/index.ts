@@ -88,10 +88,10 @@ export {
   constructEIP1271Message
 } from './eip1271JwtHelper.js';
 
-// Storage abstractions
+// Cache abstractions
 export {
-  type IStorage,
-  JsonStorage,
-  BrowserStorage,
-  MemoryStorage
-} from './storage.js';
+  type ICache,
+  JsonCache,
+  BrowserCache,
+  MemoryCache
+} from './cache.js';

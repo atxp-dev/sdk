@@ -36,7 +36,7 @@ vi.mock('viem', async () => {
 });
 
 import { BaseAppAccount } from './baseAppAccount.js';
-import { MemoryStorage } from './storage.js';
+import { MemoryCache } from './cache.js';
 import { base } from 'viem/chains';
 import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
 import BigNumber from 'bignumber.js';
@@ -55,16 +55,16 @@ import {
   mockProvider,
   mockSpendCalls,
   mockEphemeralSmartWallet,
-  getStorageKey,
+  getCacheKey,
   removeTimestamps,
   expectTimestampAround
 } from './testHelpers.js';
 
 describe('BaseAppAccount', () => {
-  let mockStorage: MemoryStorage;
+  let mockCache: MemoryCache;
 
   beforeEach(() => {
-    mockStorage = new MemoryStorage();
+    mockCache = new MemoryCache();
     vi.clearAllMocks();
   });
 
@@ -90,7 +90,7 @@ describe('BaseAppAccount', () => {
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify account creation
@@ -122,8 +122,8 @@ describe('BaseAppAccount', () => {
       });
 
       // Verify data was stored
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      const storedData = mockStorage.get(storageKey);
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      const storedData = mockCache.get(cacheKey);
       expect(storedData).toBeTruthy();
       const parsedData = JSON.parse(storedData!);
       expect(parsedData.privateKey).toBeDefined();
@@ -133,8 +133,8 @@ describe('BaseAppAccount', () => {
     it('should reuse existing account when valid stored data exists', async () => {
       // Pre-store valid permission
       const permission = mockSpendPermission();
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      mockStorage.set(storageKey, JSON.stringify({
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      mockCache.set(cacheKey, JSON.stringify({
         privateKey: TEST_PRIVATE_KEY,
         permission
       }));
@@ -154,7 +154,7 @@ describe('BaseAppAccount', () => {
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify account was loaded from storage
@@ -169,8 +169,8 @@ describe('BaseAppAccount', () => {
     it('should create new account when stored permission is expired', async () => {
       // Pre-store expired permission
       const expiredPermission = mockExpiredSpendPermission();
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      mockStorage.set(storageKey, JSON.stringify({
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      mockCache.set(cacheKey, JSON.stringify({
         privateKey: TEST_PRIVATE_KEY,
         permission: expiredPermission
       }));
@@ -191,7 +191,7 @@ describe('BaseAppAccount', () => {
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify new account was created
@@ -200,7 +200,7 @@ describe('BaseAppAccount', () => {
       expect(mocks.requestSpendPermission).toHaveBeenCalled();
 
       // Verify old data was removed and new data stored
-      const storedData = mockStorage.get(storageKey);
+      const storedData = mockCache.get(cacheKey);
       expect(storedData).toBeTruthy();
       const parsedData = JSON.parse(storedData!);
       expect(parsedData.permission).toMatchObject(removeTimestamps(newPermission));
@@ -232,7 +232,7 @@ describe('BaseAppAccount', () => {
         provider: provider,
         allowance: customAllowance,
         periodInDays: customPeriod,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify custom values were used
@@ -263,7 +263,7 @@ describe('BaseAppAccount', () => {
       await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify wallet_connect attempt
@@ -305,8 +305,8 @@ describe('BaseAppAccount', () => {
     it('should skip deployment and permission when reusing stored account', async () => {
       // Pre-store valid permission
       const permission = mockSpendPermission();
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      mockStorage.set(storageKey, JSON.stringify({
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      mockCache.set(cacheKey, JSON.stringify({
         privateKey: TEST_PRIVATE_KEY,
         permission
       }));
@@ -325,7 +325,7 @@ describe('BaseAppAccount', () => {
       await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify wallet_connect attempt still happens
@@ -366,7 +366,7 @@ describe('BaseAppAccount', () => {
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify initialization continued despite wallet_connect failure
@@ -393,24 +393,24 @@ describe('BaseAppAccount', () => {
       await expect(BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       })).rejects.toThrow('Smart wallet deployment failed');
     });
   });
 
   describe('clearAllStoredData', () => {
     it('should remove stored data for the given wallet address', () => {
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
       
       // Store some data
-      mockStorage.set(storageKey, 'test-data');
-      expect(mockStorage.get(storageKey)).toBe('test-data');
+      mockCache.set(cacheKey, 'test-data');
+      expect(mockCache.get(cacheKey)).toBe('test-data');
 
       // Clear the data
-      BaseAppAccount.clearAllStoredData(TEST_WALLET_ADDRESS, mockStorage);
+      BaseAppAccount.clearAllCachedData(TEST_WALLET_ADDRESS, mockCache);
 
       // Verify data was removed
-      expect(mockStorage.get(storageKey)).toBeNull();
+      expect(mockCache.get(cacheKey)).toBeNull();
     });
 
     it('should throw error when called outside browser without storage', () => {
@@ -419,7 +419,7 @@ describe('BaseAppAccount', () => {
       (global as any).window = undefined;
 
       expect(() => {
-        BaseAppAccount.clearAllStoredData(TEST_WALLET_ADDRESS);
+        BaseAppAccount.clearAllCachedData(TEST_WALLET_ADDRESS);
       }).toThrow('clearAllStoredData requires a storage to be provided outside of browser environments');
 
       // Restore window
@@ -431,8 +431,8 @@ describe('BaseAppAccount', () => {
     it('should make payment using the ephemeral wallet', async () => {
       // Pre-store valid data
       const permission = mockSpendPermission();
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      mockStorage.set(storageKey, JSON.stringify({
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      mockCache.set(cacheKey, JSON.stringify({
         privateKey: TEST_PRIVATE_KEY,
         permission
       }));
@@ -455,7 +455,7 @@ describe('BaseAppAccount', () => {
       const account = await BaseAppAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Make a payment

@@ -7,7 +7,7 @@ import { base } from 'viem/chains';
 import { Hex } from '@atxp/client';
 import { SpendPermission, Eip1193Provider } from './types.js';
 import { requestSpendPermission } from './spendPermissionShim.js';
-import { IStorage, BrowserStorage, IntermediaryStorage, type Intermediary } from './storage.js';
+import { ICache, BrowserCache, IntermediaryCache, type Intermediary } from './cache.js';
 import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { ConsoleLogger, Logger } from '@atxp/common';
 
@@ -18,7 +18,7 @@ export class BaseAppAccount implements Account {
   accountId: string;
   paymentMakers: { [key: string]: PaymentMaker };
 
-  private static toStorageKey(userWalletAddress: string): string {
+  private static toCacheKey(userWalletAddress: string): string {
     return `atxp-base-permission-${userWalletAddress}`;
   }
 
@@ -28,7 +28,7 @@ export class BaseAppAccount implements Account {
       useEphemeralWallet?: boolean;
       allowance?: bigint;
       periodInDays?: number;
-      storage?: IStorage<string>;
+      cache?: ICache<string>;
       logger?: Logger
     },
   ): Promise<BaseAppAccount> {
@@ -56,13 +56,13 @@ export class BaseAppAccount implements Account {
       );
     }
 
-    // Initialize storage
-    const baseStorage = config?.storage || new BrowserStorage();
-    const storage = new IntermediaryStorage(baseStorage);
-    const storageKey = this.toStorageKey(config.walletAddress);
+    // Initialize cache
+    const baseCache = config?.cache || new BrowserCache();
+    const cache = new IntermediaryCache(baseCache);
+    const cacheKey = this.toCacheKey(config.walletAddress);
 
     // Try to load existing permission
-    const existingData = this.loadSavedWalletAndPermission(storage, storageKey);
+    const existingData = this.loadSavedWalletAndPermission(cache, cacheKey);
     if (existingData) {
       const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey);
       return new BaseAppAccount(existingData.permission, ephemeralSmartWallet, logger);
@@ -85,27 +85,27 @@ export class BaseAppAccount implements Account {
     });
     
     // Save wallet and permission
-    storage.set(storageKey, {privateKey, permission});
+    cache.set(cacheKey, {privateKey, permission});
 
     return new BaseAppAccount(permission, smartWallet, logger);
   }
 
   private static loadSavedWalletAndPermission(
-    permissionStorage: IntermediaryStorage,
-    storageKey: string
+    permissionCache: IntermediaryCache,
+    cacheKey: string
   ): Intermediary | null {
-    const storedData = permissionStorage.get(storageKey);
-    if (!storedData) return null;
-    
+    const cachedData = permissionCache.get(cacheKey);
+    if (!cachedData) return null;
+
     // Check if permission is not expired
     const now = Math.floor(Date.now() / 1000);
-    const permissionEnd = parseInt(storedData.permission.permission.end.toString());
+    const permissionEnd = parseInt(cachedData.permission.permission.end.toString());
     if (permissionEnd <= now) {
-      permissionStorage.delete(storageKey);
+      permissionCache.delete(cacheKey);
       return null;
     }
 
-    return storedData;
+    return cachedData;
   }
 
   private static async deploySmartWallet(
@@ -163,17 +163,17 @@ export class BaseAppAccount implements Account {
    * Throws error if used in server-side environment.
    */
 
-  static clearAllStoredData(userWalletAddress: string, storage?: IStorage<string>): void {
-    // In non-browser environments, require an explicit storage parameter
-    if (!storage) {
-      const browserStorage = new BrowserStorage();
-      // Check if BrowserStorage would work (i.e., we're in a browser)
+  static clearAllCachedData(userWalletAddress: string, cache?: ICache<string>): void {
+    // In non-browser environments, require an explicit cache parameter
+    if (!cache) {
+      const browserCache = new BrowserCache();
+      // Check if BrowserCache would work (i.e., we're in a browser)
       if (typeof window === 'undefined') {
-        throw new Error('clearAllStoredData requires a storage to be provided outside of browser environments');
+        throw new Error('clearAllCachedData requires a cache to be provided outside of browser environments');
       }
-      storage = browserStorage;
+      cache = browserCache;
     }
 
-    storage.delete(this.toStorageKey(userWalletAddress));
+    cache.delete(this.toCacheKey(userWalletAddress));
   }
 }

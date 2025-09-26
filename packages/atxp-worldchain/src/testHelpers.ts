@@ -325,7 +325,7 @@ export async function setupPaymentMocks({
   };
 }
 
-// Storage key helper
-export function getStorageKey(walletAddress: string): string {
+// Cache key helper
+export function getCacheKey(walletAddress: string): string {
   return `atxp-world-permission-${walletAddress}`;
 }

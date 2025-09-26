@@ -31,7 +31,7 @@ vi.mock('viem', async () => {
 });
 
 import { WorldchainAccount } from './worldchainAccount.js';
-import { MemoryStorage } from './storage.js';
+import { MemoryCache } from './cache.js';
 import {
   TEST_WALLET_ADDRESS,
   mockProvider,
@@ -39,10 +39,10 @@ import {
 } from './testHelpers.js';
 
 describe('WorldchainAccount - Main Wallet Mode', () => {
-  let mockStorage: MemoryStorage;
+  let mockCache: MemoryCache;
 
   beforeEach(() => {
-    mockStorage = new MemoryStorage();
+    mockCache = new MemoryCache();
     vi.clearAllMocks();
   });
 
@@ -63,7 +63,7 @@ describe('WorldchainAccount - Main Wallet Mode', () => {
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify account creation
@@ -78,7 +78,7 @@ describe('WorldchainAccount - Main Wallet Mode', () => {
       // In main wallet mode, no storage should be used for permissions
       // Check if any World Chain specific keys were stored
       const worldStorageKey = `atxp-world-permission-${TEST_WALLET_ADDRESS}`;
-      expect(mockStorage.get(worldStorageKey)).toBeNull();
+      expect(mockCache.get(worldStorageKey)).toBeNull();
     });
 
     it('should use custom chainId in main wallet mode', async () => {
@@ -95,7 +95,7 @@ describe('WorldchainAccount - Main Wallet Mode', () => {
         provider: provider,
         useEphemeralWallet: false,
         chainId: customChainId,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify account was created with correct payment maker
@@ -119,7 +119,7 @@ describe('WorldchainAccount - Main Wallet Mode', () => {
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify initialization succeeded despite wallet_connect failure
@@ -140,7 +140,7 @@ describe('WorldchainAccount - Main Wallet Mode', () => {
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Get the payment maker

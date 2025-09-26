@@ -6,9 +6,9 @@ describe('API Compatibility', () => {
   describe('BaseAppAccount', () => {
     it('should export the expected static methods', () => {
       expect(typeof BaseAppAccount.initialize).toBe('function');
-      expect(typeof BaseAppAccount.clearAllStoredData).toBe('function');
-      // toStorageKey is private, so we test it indirectly through clearAllStoredData
-      expect(typeof BaseAppAccount.clearAllStoredData).toBe('function');
+      expect(typeof BaseAppAccount.clearAllCachedData).toBe('function');
+      // toCacheKey is private, so we test it indirectly through clearAllCachedData
+      expect(typeof BaseAppAccount.clearAllCachedData).toBe('function');
     });
 
     it('should support both ephemeral and main wallet modes', () => {
@@ -16,14 +16,14 @@ describe('API Compatibility', () => {
       const ephemeralConfig = {
         apiKey: 'test',
         walletAddress: '0x123' as `0x${string}`,
-        storage: {} as any
+        cache: {} as any
       };
       
       const mainWalletConfig = {
         walletAddress: '0x123' as `0x${string}`,
         useEphemeralWallet: false,
         provider: {} as any,
-        storage: {} as any
+        cache: {} as any
       };
 
       // These should be valid configurations (we're just checking types/structure)

@@ -36,7 +36,7 @@ vi.mock('viem', async () => {
 });
 
 import { WorldchainAccount } from './worldchainAccount.js';
-import { MemoryStorage } from './storage.js';
+import { MemoryCache } from './cache.js';
 import { WORLD_CHAIN_MAINNET, USDC_CONTRACT_ADDRESS_WORLD_MAINNET } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import {
@@ -54,17 +54,17 @@ import {
   mockProvider,
   mockSpendCalls,
   mockEphemeralSmartWallet,
-  getStorageKey,
+  getCacheKey,
   removeTimestamps,
   expectTimestampAround,
   createTestWorldchainPaymentMaker
 } from './testHelpers.js';
 
 describe('WorldchainAccount', () => {
-  let mockStorage: MemoryStorage;
+  let mockCache: MemoryCache;
 
   beforeEach(() => {
-    mockStorage = new MemoryStorage();
+    mockCache = new MemoryCache();
     vi.clearAllMocks();
   });
 
@@ -90,7 +90,7 @@ describe('WorldchainAccount', () => {
       const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify account creation
@@ -122,8 +122,8 @@ describe('WorldchainAccount', () => {
       });
 
       // Verify data was stored
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      const storedData = mockStorage.get(storageKey);
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      const storedData = mockCache.get(cacheKey);
       expect(storedData).toBeTruthy();
       const parsedData = JSON.parse(storedData!);
       expect(parsedData.privateKey).toBeDefined();
@@ -133,8 +133,8 @@ describe('WorldchainAccount', () => {
     it('should reuse existing account when valid stored data exists', async () => {
       // Pre-store valid permission
       const permission = mockSpendPermission();
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      mockStorage.set(storageKey, JSON.stringify({
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      mockCache.set(cacheKey, JSON.stringify({
         privateKey: TEST_PRIVATE_KEY,
         permission
       }));
@@ -154,7 +154,7 @@ describe('WorldchainAccount', () => {
       const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify account was loaded from storage
@@ -169,8 +169,8 @@ describe('WorldchainAccount', () => {
     it('should create new account when stored permission is expired', async () => {
       // Pre-store expired permission
       const expiredPermission = mockExpiredSpendPermission();
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      mockStorage.set(storageKey, JSON.stringify({
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      mockCache.set(cacheKey, JSON.stringify({
         privateKey: TEST_PRIVATE_KEY,
         permission: expiredPermission
       }));
@@ -191,7 +191,7 @@ describe('WorldchainAccount', () => {
       const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify new account was created
@@ -200,7 +200,7 @@ describe('WorldchainAccount', () => {
       expect(mocks.requestSpendPermission).toHaveBeenCalled();
 
       // Verify old data was removed and new data stored
-      const storedData = mockStorage.get(storageKey);
+      const storedData = mockCache.get(cacheKey);
       expect(storedData).toBeTruthy();
       const parsedData = JSON.parse(storedData!);
       expect(parsedData.permission).toMatchObject(removeTimestamps(newPermission));
@@ -232,7 +232,7 @@ describe('WorldchainAccount', () => {
         provider: provider,
         allowance: customAllowance,
         periodInDays: customPeriod,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify custom values were used
@@ -264,7 +264,7 @@ describe('WorldchainAccount', () => {
       await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify wallet_connect attempt
@@ -300,8 +300,8 @@ describe('WorldchainAccount', () => {
     it('should skip deployment and permission when reusing stored account', async () => {
       // Pre-store valid permission
       const permission = mockSpendPermission();
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      mockStorage.set(storageKey, JSON.stringify({
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      mockCache.set(cacheKey, JSON.stringify({
         privateKey: TEST_PRIVATE_KEY,
         permission
       }));
@@ -320,7 +320,7 @@ describe('WorldchainAccount', () => {
       await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify wallet_connect attempt still happens
@@ -355,7 +355,7 @@ describe('WorldchainAccount', () => {
       const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Verify initialization continued despite wallet_connect failure
@@ -382,24 +382,24 @@ describe('WorldchainAccount', () => {
       await expect(WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       })).rejects.toThrow('Smart wallet deployment failed');
     });
   });
 
-  describe('clearAllStoredData', () => {
+  describe('clearAllCachedData', () => {
     it('should remove stored data for the given wallet address', () => {
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
 
       // Store some data
-      mockStorage.set(storageKey, 'test-data');
-      expect(mockStorage.get(storageKey)).toBe('test-data');
+      mockCache.set(cacheKey, 'test-data');
+      expect(mockCache.get(cacheKey)).toBe('test-data');
 
       // Clear the data
-      WorldchainAccount.clearAllStoredData(TEST_WALLET_ADDRESS, mockStorage);
+      WorldchainAccount.clearAllCachedData(TEST_WALLET_ADDRESS, mockCache);
 
       // Verify data was removed
-      expect(mockStorage.get(storageKey)).toBeNull();
+      expect(mockCache.get(cacheKey)).toBeNull();
     });
 
     it('should throw error when called outside browser without storage', () => {
@@ -408,8 +408,8 @@ describe('WorldchainAccount', () => {
       (global as any).window = undefined;
 
       expect(() => {
-        WorldchainAccount.clearAllStoredData(TEST_WALLET_ADDRESS);
-      }).toThrow('clearAllStoredData requires a storage to be provided outside of browser environments');
+        WorldchainAccount.clearAllCachedData(TEST_WALLET_ADDRESS);
+      }).toThrow('clearAllCachedData requires a storage to be provided outside of browser environments');
 
       // Restore window
       (global as any).window = originalWindow;
@@ -420,8 +420,8 @@ describe('WorldchainAccount', () => {
     it('should make payment using the ephemeral wallet', async () => {
       // Pre-store valid data
       const permission = mockSpendPermission();
-      const storageKey = getStorageKey(TEST_WALLET_ADDRESS);
-      mockStorage.set(storageKey, JSON.stringify({
+      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
+      mockCache.set(cacheKey, JSON.stringify({
         privateKey: TEST_PRIVATE_KEY,
         permission
       }));
@@ -444,7 +444,7 @@ describe('WorldchainAccount', () => {
       const account = await WorldchainAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
-        storage: mockStorage
+        cache: mockCache
       });
 
       // Replace the payment maker with a test version that has short delays
