@@ -6,8 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { atxpExpress, requirePayment, getUserId } from '@atxp/express';
-import { ATXPPaymentDestination } from '@atxp/server';
+import { atxpExpress, requirePayment, getUserId, ATXPPaymentDestination } from '@atxp/express';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3011;
 

@@ -236,4 +236,90 @@ describe('requirePayment', () => {
     });
   });
 
+  describe('minimumPayment with price comparison', () => {
+    it('should use requested price when it exceeds minimumPayment for both charge and createPaymentRequest', async () => {
+      const paymentServer = TH.paymentServer({
+        charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'})
+      });
+      const config = TH.config({
+        paymentServer,
+        minimumPayment: BigNumber(0.05) // Minimum is $0.05
+      });
+
+      await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
+        try {
+          await requirePayment({price: BigNumber(0.10)}); // Request $0.10, which is higher than minimum
+        } catch (err: any) {
+          expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
+
+          // Should use requested amount (0.10) for charge since it's higher than minimumPayment
+          expect(paymentServer.charge).toHaveBeenCalledWith({
+            destinations: [{
+              network: 'base',
+              currency: config.currency,
+              address: TH.DESTINATION,
+              amount: BigNumber(0.10) // Uses requested amount
+            }],
+            source: 'test-user',
+            payeeName: config.payeeName,
+          });
+
+          // Should also use requested amount (0.10) for createPaymentRequest since it's higher
+          expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
+            destinations: [{
+              network: 'base',
+              currency: config.currency,
+              address: TH.DESTINATION,
+              amount: BigNumber(0.10) // Uses requested amount, not minimumPayment
+            }],
+            source: 'test-user',
+            payeeName: config.payeeName,
+          });
+        }
+      });
+    });
+
+    it('should use minimumPayment when it exceeds requested price for createPaymentRequest only', async () => {
+      const paymentServer = TH.paymentServer({
+        charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'})
+      });
+      const config = TH.config({
+        paymentServer,
+        minimumPayment: BigNumber(0.05) // Minimum is $0.05
+      });
+
+      await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
+        try {
+          await requirePayment({price: BigNumber(0.01)}); // Request $0.01, which is lower than minimum
+        } catch (err: any) {
+          expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
+
+          // Should use requested amount (0.01) for charge
+          expect(paymentServer.charge).toHaveBeenCalledWith({
+            destinations: [{
+              network: 'base',
+              currency: config.currency,
+              address: TH.DESTINATION,
+              amount: BigNumber(0.01) // Uses requested amount for charge
+            }],
+            source: 'test-user',
+            payeeName: config.payeeName,
+          });
+
+          // Should use minimumPayment (0.05) for createPaymentRequest since it's higher
+          expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
+            destinations: [{
+              network: 'base',
+              currency: config.currency,
+              address: TH.DESTINATION,
+              amount: BigNumber(0.05) // Uses minimumPayment since it's higher
+            }],
+            source: 'test-user',
+            payeeName: config.payeeName,
+          });
+        }
+      });
+    });
+  });
+
 });

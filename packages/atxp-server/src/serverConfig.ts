@@ -22,6 +22,11 @@ export function buildServerConfig(args: ATXPArgs): ATXPConfig {
     throw new Error('paymentDestination is required');
   }
 
+  // Validate minimumPayment if provided
+  if (args.minimumPayment && args.minimumPayment.isGreaterThan(1)) {
+    throw new Error('minimumPayment cannot exceed $1.00');
+  }
+
   // Read environment variables at runtime, not module load time
   const envDefaults = {
     ...DEFAULT_CONFIG,

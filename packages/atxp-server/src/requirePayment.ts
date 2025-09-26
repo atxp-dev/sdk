@@ -69,8 +69,10 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     throw new Error('No user found');
   }
 
-  // Use minimumPayment if configured, otherwise use the requested price
-  const paymentAmount = config.minimumPayment || paymentConfig.price;
+  // Use the maximum of minimumPayment and requested price
+  const paymentAmount = config.minimumPayment && config.minimumPayment.isGreaterThan(paymentConfig.price)
+    ? config.minimumPayment
+    : paymentConfig.price;
 
   // Get payment destinations (with caching)
   const paymentAddresses = await getCachedPaymentDestinations(
