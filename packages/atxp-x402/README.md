@@ -35,7 +35,6 @@ npm install @atxp/x402
 ```typescript
 import { wrapWithX402 } from '@atxp/x402';
 import { ATXPAccount } from '@atxp/client';
-import { ConsoleLogger } from '@atxp/common';
 
 // Create your ATXP account
 const account = new ATXPAccount({
@@ -45,72 +44,12 @@ const account = new ATXPAccount({
 // Wrap fetch with X402 payment handling
 const paymentEnabledFetch = wrapWithX402({
   account,
-  logger: new ConsoleLogger(),
   mcpServer: 'https://your-mcp-server.com'
 });
 
 // Use the wrapped fetch - payments will be handled automatically
 const response = await paymentEnabledFetch('https://api.example.com/premium-data');
 ```
-
-### With Payment Callbacks
-
-```typescript
-const paymentEnabledFetch = wrapWithX402({
-  account,
-  logger: new ConsoleLogger(),
-  mcpServer: 'https://your-mcp-server.com',
-
-  // Optional: Custom payment approval logic
-  approvePayment: async (payment) => {
-    console.log(`Approve payment of ${payment.amount} ${payment.currency}?`);
-    return true; // or implement your approval logic
-  },
-
-  // Optional: Payment success callback
-  onPayment: (payment) => {
-    console.log(`Payment completed: ${payment.amount} ${payment.currency}`);
-  },
-
-  // Optional: Payment failure callback
-  onPaymentFailure: (error, payment) => {
-    console.error('Payment failed:', error);
-  }
-});
-```
-
-### Custom Fetch Function
-
-```typescript
-import fetch from 'node-fetch';
-
-const paymentEnabledFetch = wrapWithX402({
-  account,
-  fetchFn: fetch, // Use custom fetch implementation
-  logger: new ConsoleLogger(),
-  mcpServer: 'https://your-mcp-server.com'
-});
-```
-
-## API Reference
-
-### `wrapWithX402(config: ClientArgs): FetchLike`
-
-Creates a fetch wrapper that handles X402 payment challenges automatically.
-
-#### Parameters
-
-- `config.account`: ATXPAccount instance (required)
-- `config.mcpServer`: MCP server URL (required)
-- `config.logger`: Logger instance (optional, defaults to console)
-- `config.fetchFn`: Custom fetch function (optional, defaults to global fetch)
-- `config.approvePayment`: Payment approval callback (optional)
-- `config.onPayment`: Payment success callback (optional)
-- `config.onPaymentFailure`: Payment failure callback (optional)
-
-#### Returns
-
-A wrapped fetch function that automatically handles X402 payments.
 
 ## How It Works
 
