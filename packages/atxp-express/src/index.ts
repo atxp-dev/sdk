@@ -29,5 +29,5 @@ export type {
 
 export {
   requirePayment,
-  atxpAccountId as getUserId
+  atxpAccountId
 } from '@atxp/server';

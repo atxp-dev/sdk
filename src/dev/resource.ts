@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { atxpExpress, getUserId, requirePayment, ATXPPaymentDestination } from '@atxp/express';
+import { atxpExpress, atxpAccountId, requirePayment, ATXPPaymentDestination } from '@atxp/express';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import 'dotenv/config';
 
@@ -26,7 +26,7 @@ const getServer = () => {
       message: z.string().optional().describe('Message to secure'),
     },
     async ({ message }: { message?: string }): Promise<CallToolResult> => {
-      const userId = getUserId();
+      const userId = atxpAccountId();
       await requirePayment({price: BigNumber(0.01)});
       return {
         content: [

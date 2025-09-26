@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { atxpExpress, requirePayment, getUserId, ATXPPaymentDestination } from '@atxp/express';
+import { atxpExpress, requirePayment, atxpAccountId, ATXPPaymentDestination } from '@atxp/express';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3011;
 
@@ -28,7 +28,7 @@ async function main() {
       message: z.string().optional().describe('Optional custom message'),
     },
     async ({ message }: { message?: string }): Promise<CallToolResult> => {
-      const userId = getUserId();
+      const userId = atxpAccountId();
 
       console.log('💰 Requiring payment of $0.01...');
       await requirePayment({ price: BigNumber(0.01) });
