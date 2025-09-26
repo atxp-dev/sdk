@@ -109,8 +109,9 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   }
 
   // For createPaymentRequest, use the minimumPayment if configured
-  const paymentRequestCharge = {
+  const paymentRequest = {
     ...charge,
+    amount: paymentAmount,
     destinations: paymentAddresses.map(addr => ({
       network: addr.network,
       currency: config.currency,
@@ -119,7 +120,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     }))
   };
 
-  const paymentId = await config.paymentServer.createPaymentRequest(paymentRequestCharge);
+  const paymentId = await config.paymentServer.createPaymentRequest(paymentRequest);
   config.logger.info(`Created payment request ${paymentId}`);
   throw paymentRequiredError(config.server, paymentId, paymentAmount);
 }
