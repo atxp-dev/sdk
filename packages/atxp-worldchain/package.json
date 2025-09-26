@@ -1,6 +1,6 @@
 {
   "name": "@atxp/worldchain",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "description": "ATXP for World Chain Mini Apps",
   "license": "MIT",
   "repository": {
@@ -33,13 +33,13 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/client": "0.6.4",
-    "@atxp/common": "0.6.4",
+    "@atxp/client": "0.7.0",
+    "@atxp/common": "0.7.0",
     "bignumber.js": "^9.3.0"
   },
   "peerDependencies": {
-    "viem": "^2.34.0",
-    "@worldcoin/minikit-js": "^1.9.6"
+    "@worldcoin/minikit-js": "^1.9.6",
+    "viem": "^2.34.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

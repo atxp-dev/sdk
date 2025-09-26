@@ -1,6 +1,6 @@
 {
   "name": "@atxp/common",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "description": "ATXP Core - Shared utilities and types for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
