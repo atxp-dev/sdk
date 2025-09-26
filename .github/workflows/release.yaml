@@ -96,7 +96,10 @@ jobs:
           git add package.json package-lock.json packages/*/package.json
           git commit -m "bump version to $VERSION [skip ci]"
           git push origin HEAD:${{ github.event.repository.default_branch }}
-      
+
+      - name: Rebuild packages after version update
+        run: npm run build
+
       - name: Publish packages to NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
