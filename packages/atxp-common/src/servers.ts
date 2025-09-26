@@ -1,13 +1,13 @@
 export const Servers = {
-  browse: 'https://browse.mcp.novellum.ai',
-  filestore: 'https://filestore.mcp.novellum.ai',
-  database: 'https://database.mcp.novellum.ai',
-  code: 'https://code.mcp.novellum.ai',
-  search: 'https://search.mcp.novellum.ai', 
-  crawl: 'https://crawl.mcp.novellum.ai',
-  video: 'https://video.mcp.novellum.ai',
-  image: 'https://image.mcp.novellum.ai',
-  music: 'https://music.mcp.novellum.ai',
-  research: 'https://research.mcp.novellum.ai',
-  shop: 'https://shop.mcp.novellum.ai'
+  browse: 'https://browse.mcp.atxp.ai',
+  filestore: 'https://filestore.mcp.atxp.ai',
+  database: 'https://database.mcp.atxp.ai',
+  code: 'https://code.mcp.atxp.ai',
+  search: 'https://search.mcp.atxp.ai', 
+  crawl: 'https://crawl.mcp.atxp.ai',
+  video: 'https://video.mcp.atxp.ai',
+  image: 'https://image.mcp.atxp.ai',
+  music: 'https://music.mcp.atxp.ai',
+  research: 'https://research.mcp.atxp.ai',
+  shop: 'https://shop.mcp.atxp.ai'
 } as const;
