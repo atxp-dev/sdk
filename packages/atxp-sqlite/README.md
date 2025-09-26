@@ -9,4 +9,6 @@ The ATXP SQLite Database package provides persistent OAuth token storage using S
 
 ## Getting Started:
 
-Learn more about ATXP in [the docs](https://docs.atxp.ai/atxp).
+For detailed API documentation, configuration options, and advanced usage patterns, please refer to our [complete documentation](https://docs.atxp.ai/).
+
+Have questions or need help? Join our [Discord community](https://discord.gg/FuJXHhe9aW) - we're happy to help!
