@@ -53,7 +53,6 @@ describe('requirePayment', () => {
       } catch (err: any) {
         expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
         expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-          amount: BigNumber(0.01),
           destinations: [{
             network: 'base',
             currency: config.currency,
@@ -155,7 +154,6 @@ describe('requirePayment', () => {
 
           // Should use minimumPayment (0.05) for createPaymentRequest
           expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-            amount: BigNumber(0.05),
             destinations: [{
               network: 'base',
               currency: config.currency,
@@ -224,7 +222,6 @@ describe('requirePayment', () => {
 
           // Should use the requested amount (0.01) for createPaymentRequest
           expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-            amount: BigNumber(0.01),
             destinations: [{
               network: 'base',
               currency: config.currency,
@@ -269,7 +266,6 @@ describe('requirePayment', () => {
 
           // Should also use requested amount (0.10) for createPaymentRequest since it's higher
           expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-            amount: BigNumber(0.10),
             destinations: [{
               network: 'base',
               currency: config.currency,
@@ -312,7 +308,6 @@ describe('requirePayment', () => {
 
           // Should use minimumPayment (0.05) for createPaymentRequest since it's higher
           expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-            amount: BigNumber(0.05),
             destinations: [{
               network: 'base',
               currency: config.currency,

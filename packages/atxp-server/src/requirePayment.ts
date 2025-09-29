@@ -110,8 +110,8 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
 
   // For createPaymentRequest, use the minimumPayment if configured
   const paymentRequest = {
-    ...charge,
-    amount: paymentAmount,
+    source: charge.source,
+    payeeName: charge.payeeName,
     destinations: paymentAddresses.map(addr => ({
       network: addr.network,
       currency: config.currency,
