@@ -38,13 +38,20 @@ export {
 } from './atxpAccount.js';
 
 export {
-  USDC_CONTRACT_ADDRESS_BASE
+  USDC_CONTRACT_ADDRESS_BASE,
+  USDC_CONTRACT_ADDRESS_BASE_SEPOLIA,
+  getBaseUSDCAddress
 } from './baseConstants.js';
 
 export {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
+  USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA,
   WORLD_CHAIN_MAINNET,
+  WORLD_CHAIN_SEPOLIA,
   getWorldChainMainnetWithRPC,
+  getWorldChainSepoliaWithRPC,
+  getWorldChainByChainId,
+  getWorldChainUSDCAddress,
   type WorldChain
 } from './worldConstants.js';
 

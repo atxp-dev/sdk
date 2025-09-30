@@ -1,4 +1,5 @@
-import { USDC_CONTRACT_ADDRESS_BASE, type PaymentMaker } from '@atxp/client';
+import { getBaseUSDCAddress, type PaymentMaker } from '@atxp/client';
+import { base } from 'viem/chains';
 import { Logger, Currency, ConsoleLogger } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
@@ -55,11 +56,14 @@ export class BaseAppPaymentMaker implements PaymentMaker {
   private logger: Logger;
   private spendPermission: SpendPermission;
   private smartWallet: EphemeralSmartWallet;
+  private chainId: number;
+  private usdcAddress: string;
 
   constructor(
     spendPermission: SpendPermission,
     smartWallet: EphemeralSmartWallet,
-    logger?: Logger
+    logger?: Logger,
+    chainId: number = base.id
   ) {
     if (!spendPermission) {
       throw new Error('Spend permission is required');
@@ -70,6 +74,8 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     this.logger = logger ?? new ConsoleLogger();
     this.spendPermission = spendPermission;
     this.smartWallet = smartWallet;
+    this.chainId = chainId;
+    this.usdcAddress = getBaseUSDCAddress(chainId);
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
@@ -138,7 +144,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     }
     
     const transferCall = {
-      to: USDC_CONTRACT_ADDRESS_BASE as Hex,
+      to: this.usdcAddress as Hex,
       data: transferCallData,
       value: '0x0' as Hex
     };

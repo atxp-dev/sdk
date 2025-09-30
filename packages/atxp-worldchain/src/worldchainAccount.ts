@@ -1,6 +1,6 @@
 import type { Account, PaymentMaker } from '@atxp/client';
 import {
-  USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
+  getWorldChainUSDCAddress,
   WORLD_CHAIN_MAINNET
 } from '@atxp/client';
 import { WorldchainPaymentMaker } from './worldchainPaymentMaker.js';
@@ -40,8 +40,8 @@ export class WorldchainAccount implements Account {
     const useEphemeralWallet = config.useEphemeralWallet ?? true;
     const chainId = config.chainId || WORLD_CHAIN_MAINNET.id;
 
-    // Use World Chain Mainnet USDC address
-    const usdcAddress = USDC_CONTRACT_ADDRESS_WORLD_MAINNET;
+    // Get USDC address for the specified chain
+    const usdcAddress = getWorldChainUSDCAddress(chainId);
 
     // Some wallets don't support wallet_connect, so
     // will just continue if it fails
@@ -73,12 +73,12 @@ export class WorldchainAccount implements Account {
     // Try to load existing permission
     const existingData = this.loadSavedWalletAndPermission(cache, cacheKey);
     if (existingData) {
-      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey);
+      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey, config.customRpcUrl, chainId);
       return new WorldchainAccount(existingData.permission, ephemeralSmartWallet, logger, undefined, undefined, chainId, config.customRpcUrl);
     }
 
     const privateKey = generatePrivateKey();
-    const smartWallet = await toEphemeralSmartWallet(privateKey);
+    const smartWallet = await toEphemeralSmartWallet(privateKey, config.customRpcUrl, chainId);
     logger.info(`Generated ephemeral wallet: ${smartWallet.address}`);
     await this.deploySmartWallet(smartWallet);
     logger.info(`Deployed smart wallet: ${smartWallet.address}`);
@@ -87,7 +87,7 @@ export class WorldchainAccount implements Account {
       account: config.walletAddress,
       spender: smartWallet.address,
       token: usdcAddress,
-      chainId: chainId as 480,
+      chainId: chainId,
       allowance: config?.allowance ?? DEFAULT_ALLOWANCE,
       periodInDays: config?.periodInDays ?? DEFAULT_PERIOD_IN_DAYS,
       provider: config.provider,
