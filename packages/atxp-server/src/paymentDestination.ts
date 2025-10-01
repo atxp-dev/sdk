@@ -110,6 +110,12 @@ export class ATXPPaymentDestination implements PaymentDestination {
       case 'base':
         network = 'base'; // Already correct
         break;
+      case 'base_sepolia':
+        network = 'base_sepolia';
+        break;
+      case 'world_sepolia':
+        network = 'world_sepolia';
+        break;
       case 'solana':
         network = 'solana';
         break;
@@ -175,7 +181,9 @@ export class ATXPPaymentDestination implements PaymentDestination {
           network = 'base'; // Base is an Ethereum L2
           break;
         case 'base':
+        case 'base_sepolia':
         case 'world':
+        case 'world_sepolia':
         case 'solana':
           network = networkFromItem
           break;
