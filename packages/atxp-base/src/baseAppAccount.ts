@@ -1,5 +1,5 @@
 import type { Account, PaymentMaker } from '@atxp/client';
-import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
+import { getBaseUSDCAddress } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
 import { generatePrivateKey } from 'viem/accounts';
@@ -29,13 +29,18 @@ export class BaseAppAccount implements Account {
       allowance?: bigint;
       periodInDays?: number;
       cache?: ICache<string>;
-      logger?: Logger
+      logger?: Logger;
+      chainId?: number; // 8453 for mainnet, 84532 for sepolia
     },
   ): Promise<BaseAppAccount> {
     const logger = config.logger || new ConsoleLogger();
     const useEphemeralWallet = config.useEphemeralWallet ?? true; // Default to true for backward compatibility
-    
-    // Some wallets don't support wallet_connect, so 
+    const chainId = config.chainId || base.id; // Default to Base mainnet
+
+    // Get USDC address for the specified chain
+    const usdcAddress = getBaseUSDCAddress(chainId);
+
+    // Some wallets don't support wallet_connect, so
     // will just continue if it fails
     try {
       await config.provider.request({ method: 'wallet_connect' });
@@ -52,7 +57,8 @@ export class BaseAppAccount implements Account {
         null, // No ephemeral wallet in main wallet mode
         logger,
         config.walletAddress,
-        config.provider
+        config.provider,
+        chainId
       );
     }
 
@@ -64,21 +70,21 @@ export class BaseAppAccount implements Account {
     // Try to load existing permission
     const existingData = this.loadSavedWalletAndPermission(cache, cacheKey);
     if (existingData) {
-      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey);
-      return new BaseAppAccount(existingData.permission, ephemeralSmartWallet, logger);
+      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey, chainId);
+      return new BaseAppAccount(existingData.permission, ephemeralSmartWallet, logger, undefined, undefined, chainId);
     }
 
     const privateKey = generatePrivateKey();
-    const smartWallet = await toEphemeralSmartWallet(privateKey);
+    const smartWallet = await toEphemeralSmartWallet(privateKey, chainId);
     logger.info(`Generated ephemeral wallet: ${smartWallet.address}`);
     await this.deploySmartWallet(smartWallet);
     logger.info(`Deployed smart wallet: ${smartWallet.address}`);
-    
+
     const permission = await requestSpendPermission({
       account: config.walletAddress,
       spender: smartWallet.address,
-      token: USDC_CONTRACT_ADDRESS_BASE,
-      chainId: base.id,
+      token: usdcAddress,
+      chainId: chainId,
       allowance: config?.allowance ?? DEFAULT_ALLOWANCE,
       periodInDays: config?.periodInDays ?? DEFAULT_PERIOD_IN_DAYS,
       provider: config.provider,
@@ -87,7 +93,7 @@ export class BaseAppAccount implements Account {
     // Save wallet and permission
     cache.set(cacheKey, {privateKey, permission});
 
-    return new BaseAppAccount(permission, smartWallet, logger);
+    return new BaseAppAccount(permission, smartWallet, logger, undefined, undefined, chainId);
   }
 
   private static loadSavedWalletAndPermission(
@@ -134,7 +140,8 @@ export class BaseAppAccount implements Account {
     ephemeralSmartWallet: EphemeralSmartWallet | null,
     logger?: Logger,
     mainWalletAddress?: string,
-    provider?: MainWalletProvider
+    provider?: MainWalletProvider,
+    chainId: number = base.id
   ) {
     if (ephemeralSmartWallet) {
       // Ephemeral wallet mode
@@ -143,7 +150,7 @@ export class BaseAppAccount implements Account {
       }
       this.accountId = ephemeralSmartWallet.address;
       this.paymentMakers = {
-        'base': new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger),
+        'base': new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId),
       };
     } else {
       // Main wallet mode
@@ -152,7 +159,7 @@ export class BaseAppAccount implements Account {
       }
       this.accountId = mainWalletAddress;
       this.paymentMakers = {
-        'base': new MainWalletPaymentMaker(mainWalletAddress, provider, logger),
+        'base': new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId),
       };
     }
   }

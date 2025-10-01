@@ -1,6 +1,7 @@
 import { Eip1193Provider, SpendPermission } from "./types.js";
 import { createWalletClient, custom, encodeFunctionData } from 'viem';
-import { base } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
+import type { Chain } from 'viem/chains';
 
 /*
 This shim replaces the Base Account SDK's requestSpendPermission and prepareSpendCallData functions with
@@ -71,6 +72,20 @@ const ERC20_ABI = [
   }
 ] as const;
 
+/**
+ * Get Base chain configuration by chain ID
+ */
+function getBaseChainConfig(chainId: number): Chain {
+  switch (chainId) {
+    case 8453: // Base mainnet
+      return base;
+    case 84532: // Base Sepolia
+      return baseSepolia;
+    default:
+      throw new Error(`Unsupported Base Chain ID: ${chainId}. Supported chains: 8453 (mainnet), 84532 (sepolia)`);
+  }
+}
+
 export async function requestSpendPermission(params: {
   account: string;
   spender: string;
@@ -80,12 +95,11 @@ export async function requestSpendPermission(params: {
   periodInDays: number; // this is ignored
   provider: Eip1193Provider;
 }): Promise<SpendPermission> {
-  if (params.chainId !== base.id) {
-    throw new Error(`Chain ID ${params.chainId} is not supported`);
-  }
+  // Validate chain ID and get chain config
+  const chainConfig = getBaseChainConfig(params.chainId);
 
   const client = createWalletClient({
-    chain: base,
+    chain: chainConfig,
     transport: custom(params.provider)
   });
   

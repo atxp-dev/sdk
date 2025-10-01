@@ -3,7 +3,8 @@ import { SendTransactionInput } from "@worldcoin/minikit-js";
 import type { MiniKit as MiniKitType } from "@worldcoin/minikit-js";
 import { ConsoleLogger, Logger } from "@atxp/common";
 import { WorldchainAccount } from "./worldchainAccount.js";
-import { DEFAULT_WORLD_CHAIN_RPC } from "./smartWalletHelpers.js";
+import { getDefaultWorldChainRPC } from "./smartWalletHelpers.js";
+import { WORLD_CHAIN_MAINNET } from "@atxp/client";
 
 /**
  * Loads and initializes a Worldchain account with MiniKit integration
@@ -15,45 +16,49 @@ import { DEFAULT_WORLD_CHAIN_RPC } from "./smartWalletHelpers.js";
  * @param walletAddress - The wallet address to use for the account
  * @param logger - Optional logger instance for debugging and monitoring
  * @param customRpcUrl - Optional custom RPC URL for Worldchain. If not provided, uses the public RPC endpoint
+ * @param chainId - Optional chain ID (defaults to 480 for mainnet, can be 4801 for sepolia)
  * @param miniKit - The MiniKit instance to use for transactions and signing
  * @returns Promise that resolves to an initialized WorldchainAccount instance
- * 
+ *
  * @example
  * ```typescript
- * // Using public RPC endpoint
+ * // Using public RPC endpoint (mainnet)
  * const account = await createMiniKitWorldchainAccount({
  *   walletAddress: "0x1234...",
  *   logger: new ConsoleLogger(),
  *   miniKit: MiniKit
  * });
  *
- * // Using custom RPC endpoint
+ * // Using sepolia testnet
  * const account = await createMiniKitWorldchainAccount({
  *   walletAddress: "0x1234...",
  *   logger: new ConsoleLogger(),
- *   customRpcUrl: "https://your-custom-rpc-endpoint.com",
+ *   chainId: 4801,
  *   miniKit: MiniKit
  * });
  * ```
- * 
+ *
  * @remarks
  * The function creates a custom provider that supports:
  * - `eth_accounts`: Returns the wallet address
- * - `eth_chainId`: Returns Worldchain chain ID (0x1e0 / 480)
+ * - `eth_chainId`: Returns Worldchain chain ID (configurable)
  * - `eth_requestAccounts`: Returns the wallet address
  * - `eth_sendTransaction`: Handles USDC transfers and other transactions via MiniKit
  * - `personal_sign`: Signs messages using MiniKit
- * 
+ *
  * The account is configured with:
  * - 10 USDC allowance
  * - 30-day period for permissions
- * - Worldchain mainnet RPC endpoint (public or custom)
+ * - Worldchain RPC endpoint (public or custom)
  * - Regular wallet mode (no ephemeral wallet)
- * 
+ *
  * @throws {Error} When MiniKit operations fail or unsupported transaction types are encountered
  */
-export const createMiniKitWorldchainAccount = async ({walletAddress, logger: loggerParam, customRpcUrl, miniKit}: {walletAddress: string, logger?: Logger, customRpcUrl?: string, miniKit: typeof MiniKitType}) => {
+export const createMiniKitWorldchainAccount = async ({walletAddress, logger: loggerParam, customRpcUrl, chainId, miniKit}: {walletAddress: string, logger?: Logger, customRpcUrl?: string, chainId?: number, miniKit: typeof MiniKitType}) => {
   const logger = loggerParam || new ConsoleLogger();
+  const effectiveChainId = chainId || WORLD_CHAIN_MAINNET.id;
+  const chainIdHex = '0x' + effectiveChainId.toString(16);
+
   // If no connector client from wagmi, create a simple MiniKit provider
   const provider = {
       request: async (args: { method: string; params: unknown[] }) => {
@@ -62,7 +67,7 @@ export const createMiniKitWorldchainAccount = async ({walletAddress, logger: log
           case 'eth_accounts':
             return [walletAddress];
           case 'eth_chainId':
-            return '0x1e0'; // Worldchain chain ID (480)
+            return chainIdHex;
           case 'eth_requestAccounts':
             return [walletAddress];
           case 'eth_sendTransaction':
@@ -83,7 +88,8 @@ export const createMiniKitWorldchainAccount = async ({walletAddress, logger: log
     allowance: parseUnits("10", 6), // 10 USDC
     useEphemeralWallet: false, // Regular wallet mode (smart wallet infrastructure not available on World Chain)
     periodInDays: 30,
-    customRpcUrl: customRpcUrl || DEFAULT_WORLD_CHAIN_RPC  // Public RPC URL as default
+    chainId: effectiveChainId,
+    customRpcUrl: customRpcUrl || getDefaultWorldChainRPC(effectiveChainId)  // Use appropriate default RPC URL
   });
 
   return worldchainAccount;

@@ -58,6 +58,7 @@ describe('createMiniKitWorldchainAccount', () => {
       allowance: BigInt('10000000'),
       useEphemeralWallet: false,
       periodInDays: 30,
+      chainId: 480,
       customRpcUrl: 'https://worldchain-mainnet.g.alchemy.com/public'
     });
     expect(account).toBe(mockWorldchainAccount);
@@ -80,6 +81,7 @@ describe('createMiniKitWorldchainAccount', () => {
       allowance: BigInt('10000000'),
       useEphemeralWallet: false,
       periodInDays: 30,
+      chainId: 480,
       customRpcUrl
     });
     expect(account).toBe(mockWorldchainAccount);

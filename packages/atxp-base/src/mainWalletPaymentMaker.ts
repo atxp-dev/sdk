@@ -1,6 +1,7 @@
 import { PaymentMaker } from '@atxp/client';
 import { encodeFunctionData, toHex } from 'viem';
-import { USDC_CONTRACT_ADDRESS_BASE, type Hex } from '@atxp/client';
+import { getBaseUSDCAddress, type Hex } from '@atxp/client';
+import { base } from 'viem/chains';
 import BigNumber from 'bignumber.js';
 import { ConsoleLogger, Logger, Currency } from '@atxp/common';
 import {
@@ -20,13 +21,18 @@ export type MainWalletProvider = {
 
 export class MainWalletPaymentMaker implements PaymentMaker {
   private logger: Logger;
-  
+  private chainId: number;
+  private usdcAddress: string;
+
   constructor(
     private walletAddress: string,
     private provider: MainWalletProvider,
-    logger?: Logger
+    logger?: Logger,
+    chainId: number = base.id
   ) {
     this.logger = logger || new ConsoleLogger();
+    this.chainId = chainId;
+    this.usdcAddress = getBaseUSDCAddress(chainId);
   }
 
   async generateJWT(payload: {
@@ -125,7 +131,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       method: 'eth_sendTransaction',
       params: [{
         from: this.walletAddress,
-        to: USDC_CONTRACT_ADDRESS_BASE,
+        to: this.usdcAddress,
         data: transferData,
         value: '0x0'
       }]
