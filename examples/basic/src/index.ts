@@ -93,8 +93,8 @@ async function main() {
       arguments: serviceConfig.getArguments(prompt)
     });
 
-    debug(`${serviceConfig.description} request successful!`);
-    debug('Result:', serviceConfig.getResult(result));
+    console.log(`${serviceConfig.description} request successful!`);
+    console.log('Result:', serviceConfig.getResult(result));
 
   } catch (error) {
     console.error(`Error with ${serviceConfig.description}:`, error);
