@@ -1,6 +1,6 @@
 {
   "name": "@atxp/atxp-monorepo",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "ATXP SDK Monorepo - Authorization Token Exchange Protocol packages",
   "license": "MIT",
   "type": "module",
