@@ -12,9 +12,7 @@ export type PaymentAddress = {
 }
 
 export interface PaymentDestination {
-  destination(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress>;
-  // New method for getting multiple destinations
-  destinations?(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]>;
+  destinations(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]>;
 }
 
 export class ChainPaymentDestination implements PaymentDestination {
@@ -23,17 +21,11 @@ export class ChainPaymentDestination implements PaymentDestination {
     private readonly network: Network
   ) {}
 
-  async destination(_fundingAmount: FundingAmount, _buyerAddress: string): Promise<PaymentAddress> {
-    return {
+  async destinations(_fundingAmount: FundingAmount, _buyerAddress: string): Promise<PaymentAddress[]> {
+    return [{
       destination: this.address,
       network: this.network
-    };
-  }
-
-  async destinations(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]> {
-    // Return single destination as array for backwards compatibility
-    const dest = await this.destination(fundingAmount, buyerAddress);
-    return [dest];
+    }];
   }
 }
 
@@ -59,76 +51,6 @@ export class ATXPPaymentDestination implements PaymentDestination {
     this.token = token;
     this.fetchFn = opts?.fetchFn ?? fetch.bind(globalThis);
     this.logger = opts?.logger ?? new ConsoleLogger({ prefix: '[atxp-payment-destination]' });
-  }
-
-  async destination(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress> {
-    this.logger.debug(`Getting payment destination for buyer: ${buyerAddress}, amount: ${fundingAmount.amount.toString()} ${fundingAmount.currency}`);
-
-    const url = new URL(`${this.accountServerURL}/destination`);
-    url.searchParams.set('connectionToken', this.token);
-    url.searchParams.set('buyerAddress', buyerAddress);
-    url.searchParams.set('amount', fundingAmount.amount.toString());
-    // Add currency parameter if provided
-    if (fundingAmount.currency) {
-      url.searchParams.set('currency', fundingAmount.currency);
-    }
-
-    this.logger.debug(`Making request to: ${url.toString()}`);
-
-    const response = await this.fetchFn(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      this.logger.error(`/destination failed: ${response.status} ${response.statusText} ${text}`);
-      throw new Error(`ATXPPaymentDestination: /destination failed: ${response.status} ${response.statusText} ${text}`);
-    }
-
-    const json = await response.json() as { destination?: string; network?: string; currency?: string };
-    if (!json?.destination) {
-      this.logger.error('/destination did not return destination');
-      throw new Error('ATXPPaymentDestination: /destination did not return destination');
-    }
-
-    const networkFromResponse = json.network;
-    if (!networkFromResponse) {
-      this.logger.error('/destination did not return network');
-      throw new Error('ATXPPaymentDestination: /destination did not return network');
-    }
-
-    // Map network values if needed
-    // The accounts service might return 'ethereum' for Base wallets, but the payment system expects 'base'
-    let network: Network;
-    switch (networkFromResponse) {
-      case 'ethereum':
-        network = 'base'; // Base is an Ethereum L2
-        break;
-      case 'base':
-        network = 'base'; // Already correct
-        break;
-      case 'base_sepolia':
-        network = 'base_sepolia';
-        break;
-      case 'world_sepolia':
-        network = 'world_sepolia';
-        break;
-      case 'solana':
-        network = 'solana';
-        break;
-      default:
-        this.logger.warn(`Unknown network: ${networkFromResponse}, defaulting to base`);
-        network = 'base';
-    }
-
-    this.logger.debug(`Successfully got payment destination: ${json.destination} on ${network}`);
-    return {
-      destination: json.destination,
-      network
-    };
   }
 
   async destinations(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]> {
