@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config'
 import { atxpClient, ATXPAccount } from '@atxp/client';
+import { AuthorizationServerUrl } from '@atxp/common';
 
 // Debug function that only prints when DEBUG environment variable is set
 function debug(...args: any[]) {
@@ -19,7 +20,7 @@ interface ServiceConfig {
 
 const SERVICES: Record<string, ServiceConfig> = {
   image: {
-    mcpServer: 'https://image.mcp.atxp.ai',
+    mcpServer: process.env.IMAGE_MCP_SERVER || 'https://image.mcp.atxp.ai',
     toolName: 'image_create_image',
     description: 'image generation',
     getArguments: (prompt: string) => ({ prompt }),
@@ -36,7 +37,7 @@ const SERVICES: Record<string, ServiceConfig> = {
     }
   },
   search: {
-    mcpServer: 'https://search.mcp.atxp.ai',
+    mcpServer: process.env.SEARCH_MCP_SERVER || 'https://search.mcp.atxp.ai',
     toolName: 'search_search',
     description: 'search',
     getArguments: (prompt: string) => ({ query: prompt }),
@@ -85,6 +86,7 @@ async function main() {
     const client = await atxpClient({
       mcpServer: serviceConfig.mcpServer as any,
       account: new ATXPAccount(atxpConnectionString),
+      allowedAuthorizationServers: process.env.ALLOWED_AUTHORIZATION_SERVERS?.split(',').map((url) => url as AuthorizationServerUrl) || ['https://auth.atxp.ai'],
     });
 
     // Call the appropriate tool using the MCP client

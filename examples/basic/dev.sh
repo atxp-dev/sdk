@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# Build the main library first
-cd ../.. && npm run build
+# Build the main library first (skip if SKIP_BUILD is set)
+if [ -z "$SKIP_BUILD" ]; then
+  cd ../.. && npm run build && cd examples/basic
+fi
 
-# Go back to examples directory and run the development server
-cd examples/basic && npx tsx src/index.ts "$@" 
+# Run the development server
+npx tsx src/index.ts "$@" 
