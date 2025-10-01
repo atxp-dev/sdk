@@ -38,15 +38,7 @@ async function getCachedPaymentDestinations(
   config.logger.debug(`Fetching payment destinations for user ${user}`);
 
   const fundingAmount: FundingAmount = { amount, currency };
-  let paymentAddresses: PaymentAddress[];
-
-  if ('destinations' in config.paymentDestination && typeof config.paymentDestination.destinations === 'function') {
-    paymentAddresses = await config.paymentDestination.destinations(fundingAmount, user);
-  } else {
-    // Fallback to single destination wrapped in array
-    const singleAddress = await config.paymentDestination.destination(fundingAmount, user);
-    paymentAddresses = [singleAddress];
-  }
+  const paymentAddresses = await config.paymentDestination.destinations(fundingAmount, user);
 
   // Cache the result
   destinationCache.set(cacheKey, {

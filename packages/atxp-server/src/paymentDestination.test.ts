@@ -7,15 +7,15 @@ describe('ChainPaymentDestination', () => {
   it('should return the configured address and network', async () => {
     const destination = new ChainPaymentDestination('0x1234567890123456789012345678901234567890', 'base');
 
-    const result = await destination.destination(
+    const result = await destination.destinations(
       { amount: new BigNumber('100'), currency: 'USDC' },
       '0xbuyer'
     );
 
-    expect(result).toEqual({
+    expect(result).toEqual([{
       destination: '0x1234567890123456789012345678901234567890',
       network: 'base'
-    });
+    }]);
   });
 });
 
@@ -26,37 +26,40 @@ describe('ATXPPaymentDestination', () => {
     mockFetch.mockClear();
   });
 
-  it('should make a request to the destination endpoint', async () => {
+  it('should make a request to the addresses endpoint and return all addresses', async () => {
     const connectionString = 'https://accounts.example.com/?connection_token=abc123';
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({
-        destination: '0x1234567890123456789012345678901234567890',
-        network: 'base'
-      })
+      json: async () => ([
+        {
+          address: '0x1234567890123456789012345678901234567890',
+          network: 'base'
+        }
+      ])
     });
 
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
-    const result = await atxpDestination.destination(
+    const result = await atxpDestination.destinations(
       { amount: new BigNumber('100'), currency: 'USDC' },
       '0xbuyer'
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=100&currency=USDC',
+      'https://accounts.example.com/addresses?currency=USDC',
       {
         method: 'GET',
         headers: {
+          'Authorization': 'Basic YWJjMTIzOg==',
           'Accept': 'application/json',
         },
       }
     );
 
-    expect(result).toEqual({
+    expect(result).toEqual([{
       destination: '0x1234567890123456789012345678901234567890',
       network: 'base'
-    });
+    }]);
   });
 
   it('should throw an error if connection string is missing token', () => {
@@ -78,65 +81,68 @@ describe('ATXPPaymentDestination', () => {
 
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
-    await expect(atxpDestination.destination(
+    await expect(atxpDestination.destinations(
       { amount: new BigNumber('100'), currency: 'USDC' },
       '0xbuyer'
-    )).rejects.toThrow('ATXPPaymentDestination: /destination failed: 401 Unauthorized Invalid token');
+    )).rejects.toThrow('ATXPPaymentDestination: /addresses failed: 401 Unauthorized Invalid token');
   });
 
-  it('should throw an error if response is missing destination', async () => {
+  it('should throw an error if response has no addresses', async () => {
     const connectionString = 'https://accounts.example.com/?connection_token=abc123';
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({
-        network: 'base'
-      })
+      json: async () => ([])
     });
 
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
-    await expect(atxpDestination.destination(
+    await expect(atxpDestination.destinations(
       { amount: new BigNumber('100'), currency: 'USDC' },
       '0xbuyer'
-    )).rejects.toThrow('ATXPPaymentDestination: /destination did not return destination');
+    )).rejects.toThrow('ATXPPaymentDestination: /addresses did not return any addresses');
   });
 
-  it('should throw an error if response is missing network', async () => {
+  it('should throw an error if response has invalid addresses', async () => {
     const connectionString = 'https://accounts.example.com/?connection_token=abc123';
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({
-        destination: '0x1234567890123456789012345678901234567890'
-      })
+      json: async () => ([
+        {
+          address: '0x1234567890123456789012345678901234567890'
+          // missing network
+        }
+      ])
     });
 
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
-    await expect(atxpDestination.destination(
+    await expect(atxpDestination.destinations(
       { amount: new BigNumber('100'), currency: 'USDC' },
       '0xbuyer'
-    )).rejects.toThrow('ATXPPaymentDestination: /destination did not return network');
+    )).rejects.toThrow('ATXPPaymentDestination: no valid addresses returned');
   });
 
-  it('should handle decimal amounts correctly', async () => {
+  it('should handle different currencies correctly', async () => {
     const connectionString = 'https://accounts.example.com/?connection_token=abc123';
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({
-        destination: '0x1234567890123456789012345678901234567890',
-        network: 'base'
-      })
+      json: async () => ([
+        {
+          address: '0x1234567890123456789012345678901234567890',
+          network: 'base'
+        }
+      ])
     });
 
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
-    await atxpDestination.destination(
+    await atxpDestination.destinations(
       { amount: new BigNumber('0.01'), currency: 'USDC' },
       '0xbuyer'
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=0.01&currency=USDC',
+      'https://accounts.example.com/addresses?currency=USDC',
       expect.any(Object)
     );
   });
@@ -145,46 +151,50 @@ describe('ATXPPaymentDestination', () => {
     const connectionString = 'https://accounts.example.com/?connection_token=abc123';
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({
-        destination: '0x1234567890123456789012345678901234567890',
-        network: 'ethereum' // This should be mapped to 'base'
-      })
+      json: async () => ([
+        {
+          address: '0x1234567890123456789012345678901234567890',
+          network: 'ethereum' // This should be mapped to 'base'
+        }
+      ])
     });
 
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
-    const result = await atxpDestination.destination(
+    const result = await atxpDestination.destinations(
       { amount: new BigNumber('0.01'), currency: 'USDC' },
       '0xbuyer'
     );
 
-    expect(result).toEqual({
+    expect(result).toEqual([{
       destination: '0x1234567890123456789012345678901234567890',
       network: 'base' // Should be mapped from 'ethereum' to 'base'
-    });
+    }]);
   });
 
   it('should handle solana network correctly', async () => {
     const connectionString = 'https://accounts.example.com/?connection_token=abc123';
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({
-        destination: 'SolanaAddress123456789',
-        network: 'solana'
-      })
+      json: async () => ([
+        {
+          address: 'SolanaAddress123456789',
+          network: 'solana'
+        }
+      ])
     });
 
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
-    const result = await atxpDestination.destination(
+    const result = await atxpDestination.destinations(
       { amount: new BigNumber('0.01'), currency: 'USDC' },
       '0xbuyer'
     );
 
-    expect(result).toEqual({
+    expect(result).toEqual([{
       destination: 'SolanaAddress123456789',
       network: 'solana'
-    });
+    }]);
   });
 
   describe('logger functionality', () => {
@@ -207,25 +217,27 @@ describe('ATXPPaymentDestination', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          destination: '0x1234567890123456789012345678901234567890',
-          network: 'base'
-        })
+        json: async () => ([
+          {
+            address: '0x1234567890123456789012345678901234567890',
+            network: 'base'
+          }
+        ])
       });
 
-      const atxpDestination = new ATXPPaymentDestination(connectionString, { 
-        fetchFn: mockFetch, 
-        logger: mockLogger 
+      const atxpDestination = new ATXPPaymentDestination(connectionString, {
+        fetchFn: mockFetch,
+        logger: mockLogger
       });
 
-      await atxpDestination.destination(
+      await atxpDestination.destinations(
         { amount: new BigNumber('100'), currency: 'USDC' },
         '0xbuyer'
       );
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destination for buyer: 0xbuyer, amount: 100 USDC');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=100&currency=USDC');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Successfully got payment destination: 0x1234567890123456789012345678901234567890 on base');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destinations for buyer: 0xbuyer, amount: 100 USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?currency=USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Successfully got 1 payment destinations');
     });
 
     it('should log errors when API request fails', async () => {
@@ -244,20 +256,20 @@ describe('ATXPPaymentDestination', () => {
         text: async () => 'Invalid token'
       });
 
-      const atxpDestination = new ATXPPaymentDestination(connectionString, { 
-        fetchFn: mockFetch, 
-        logger: mockLogger 
+      const atxpDestination = new ATXPPaymentDestination(connectionString, {
+        fetchFn: mockFetch,
+        logger: mockLogger
       });
 
-      await expect(atxpDestination.destination(
+      await expect(atxpDestination.destinations(
         { amount: new BigNumber('100'), currency: 'USDC' },
         '0xbuyer'
       )).rejects.toThrow();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('/destination failed: 401 Unauthorized Invalid token');
+      expect(mockLogger.error).toHaveBeenCalledWith('/addresses failed: 401 Unauthorized Invalid token');
     });
 
-    it('should log errors when response is missing destination', async () => {
+    it('should log errors when response has no addresses', async () => {
       const connectionString = 'https://accounts.example.com/?connection_token=abc123';
       const mockLogger: Logger = {
         debug: vi.fn(),
@@ -268,25 +280,23 @@ describe('ATXPPaymentDestination', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          network: 'base'
-        })
+        json: async () => ([])
       });
 
-      const atxpDestination = new ATXPPaymentDestination(connectionString, { 
-        fetchFn: mockFetch, 
-        logger: mockLogger 
+      const atxpDestination = new ATXPPaymentDestination(connectionString, {
+        fetchFn: mockFetch,
+        logger: mockLogger
       });
 
-      await expect(atxpDestination.destination(
+      await expect(atxpDestination.destinations(
         { amount: new BigNumber('100'), currency: 'USDC' },
         '0xbuyer'
       )).rejects.toThrow();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('/destination did not return destination');
+      expect(mockLogger.error).toHaveBeenCalledWith('/addresses did not return any addresses');
     });
 
-    it('should log errors when response is missing network', async () => {
+    it('should log warnings when response has invalid addresses', async () => {
       const connectionString = 'https://accounts.example.com/?connection_token=abc123';
       const mockLogger: Logger = {
         debug: vi.fn(),
@@ -297,24 +307,27 @@ describe('ATXPPaymentDestination', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          destination: '0x1234567890123456789012345678901234567890'
-        })
+        json: async () => ([
+          {
+            address: '0x1234567890123456789012345678901234567890'
+            // missing network
+          }
+        ])
       });
 
-      const atxpDestination = new ATXPPaymentDestination(connectionString, { 
-        fetchFn: mockFetch, 
-        logger: mockLogger 
+      const atxpDestination = new ATXPPaymentDestination(connectionString, {
+        fetchFn: mockFetch,
+        logger: mockLogger
       });
 
-      await expect(atxpDestination.destination(
+      await expect(atxpDestination.destinations(
         { amount: new BigNumber('100'), currency: 'USDC' },
         '0xbuyer'
       )).rejects.toThrow();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destination for buyer: 0xbuyer, amount: 100 USDC');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/destination?connectionToken=abc123&buyerAddress=0xbuyer&amount=100&currency=USDC');
-      expect(mockLogger.error).toHaveBeenCalledWith('/destination did not return network');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destinations for buyer: 0xbuyer, amount: 100 USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?currency=USDC');
+      expect(mockLogger.warn).toHaveBeenCalledWith('Skipping invalid address entry');
     });
   });
 });
