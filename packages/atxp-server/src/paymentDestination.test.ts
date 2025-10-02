@@ -46,7 +46,7 @@ describe('ATXPPaymentDestination', () => {
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.example.com/addresses?currency=USDC',
+      'https://accounts.example.com/addresses?buyerAddress=0xbuyer&amount=100&currency=USDC',
       {
         method: 'GET',
         headers: {
@@ -142,7 +142,7 @@ describe('ATXPPaymentDestination', () => {
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.example.com/addresses?currency=USDC',
+      'https://accounts.example.com/addresses?buyerAddress=0xbuyer&amount=0.01&currency=USDC',
       expect.any(Object)
     );
   });
@@ -236,7 +236,7 @@ describe('ATXPPaymentDestination', () => {
       );
 
       expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destinations for buyer: 0xbuyer, amount: 100 USDC');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?currency=USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?buyerAddress=0xbuyer&amount=100&currency=USDC');
       expect(mockLogger.debug).toHaveBeenCalledWith('Successfully got 1 payment destinations');
     });
 
@@ -326,7 +326,7 @@ describe('ATXPPaymentDestination', () => {
       )).rejects.toThrow();
 
       expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destinations for buyer: 0xbuyer, amount: 100 USDC');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?currency=USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?buyerAddress=0xbuyer&amount=100&currency=USDC');
       expect(mockLogger.warn).toHaveBeenCalledWith('Skipping invalid address entry');
     });
   });

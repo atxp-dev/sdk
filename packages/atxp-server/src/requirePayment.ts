@@ -4,50 +4,18 @@ import { PaymentAddress, FundingAmount } from "./paymentDestination.js";
 import { ATXPConfig } from "./types.js";
 import BigNumber from "bignumber.js";
 
-// Cache for payment destinations to avoid repeated HTTP calls
-// Key is "userId:amount:currency", value is cached destinations
-const destinationCache = new Map<string, {
-  destinations: PaymentAddress[];
-  timestamp: number;
-}>();
-
-// Cache duration: 5 minutes
-const CACHE_DURATION_MS = 5 * 60 * 1000;
-
 /**
  * Get payment destinations for a user, with caching to avoid repeated HTTP calls.
  * This is an internal helper function used by requirePayment.
  */
-async function getCachedPaymentDestinations(
+async function getPaymentDestinations(
   config: ATXPConfig,
   user: string,
   amount: BigNumber,
   currency: Currency
 ): Promise<PaymentAddress[]> {
-  const cacheKey = `${user}:${amount.toString()}:${currency}`;
-  const cached = destinationCache.get(cacheKey);
-  const now = Date.now();
-
-  // Return cached destinations if still valid
-  if (cached && (now - cached.timestamp) < CACHE_DURATION_MS) {
-    config.logger.debug(`Using cached payment destinations for user ${user}`);
-    return cached.destinations;
-  }
-
-  // Fetch fresh destinations
-  config.logger.debug(`Fetching payment destinations for user ${user}`);
-
   const fundingAmount: FundingAmount = { amount, currency };
-  const paymentAddresses = await config.paymentDestination.destinations(fundingAmount, user);
-
-  // Cache the result
-  destinationCache.set(cacheKey, {
-    destinations: paymentAddresses,
-    timestamp: now
-  });
-
-  config.logger.debug(`Cached ${paymentAddresses.length} payment destinations for user ${user}`);
-  return paymentAddresses;
+  return await config.paymentDestination.destinations(fundingAmount, user);
 }
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
@@ -67,7 +35,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     : paymentConfig.price;
 
   // Get payment destinations (with caching)
-  const paymentAddresses = await getCachedPaymentDestinations(
+  const paymentAddresses = await getPaymentDestinations(
     config,
     user,
     paymentAmount,
