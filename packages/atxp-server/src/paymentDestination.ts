@@ -56,7 +56,7 @@ export class ATXPPaymentDestination implements PaymentDestination {
   async destinations(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]> {
     this.logger.debug(`Getting payment destinations for buyer: ${buyerAddress}, amount: ${fundingAmount.amount.toString()} ${fundingAmount.currency}`);
 
-    const url = new URL(`${this.accountServerURL}/addresses`);
+    const url = new URL(`${this.accountServerURL}/addresses?buyerAddress=${buyerAddress}&amount=${fundingAmount.amount.toString()}`);
 
     // Add currency parameter if provided
     if (fundingAmount.currency) {
