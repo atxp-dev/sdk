@@ -189,6 +189,58 @@ describe('ATXPPaymentDestination', () => {
     }]);
   });
 
+  it('should handle atxp_base network correctly', async () => {
+    const connectionString = 'https://accounts.example.com/?connection_token=abc123';
+    const paymentInfoUrl = 'https://accounts.atxp.ai/payment_info/acc_123';
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ([
+        {
+          address: paymentInfoUrl,
+          network: 'atxp_base'
+        }
+      ])
+    });
+
+    const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
+
+    const result = await atxpDestination.destinations(
+      { amount: new BigNumber('0.01'), currency: 'USDC' }
+    );
+
+    expect(result).toEqual([{
+      destination: paymentInfoUrl,
+      network: 'atxp_base'
+    }]);
+  });
+
+  it('should handle atxp_base_sepolia network correctly', async () => {
+    const connectionString = 'https://accounts.example.com/?connection_token=abc123';
+    const paymentInfoUrl = 'https://accounts.atxp.ai/payment_info/acc_456';
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ([
+        {
+          address: paymentInfoUrl,
+          network: 'atxp_base_sepolia'
+        }
+      ])
+    });
+
+    const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
+
+    const result = await atxpDestination.destinations(
+      { amount: new BigNumber('0.01'), currency: 'USDC' }
+    );
+
+    expect(result).toEqual([{
+      destination: paymentInfoUrl,
+      network: 'atxp_base_sepolia'
+    }]);
+  });
+
   describe('logger functionality', () => {
     it('should use default ConsoleLogger when no logger is provided', () => {
       const connectionString = 'https://accounts.example.com/?connection_token=abc123';
