@@ -8,8 +8,7 @@ describe('ChainPaymentDestination', () => {
     const destination = new ChainPaymentDestination('0x1234567890123456789012345678901234567890', 'base');
 
     const result = await destination.destinations(
-      { amount: new BigNumber('100'), currency: 'USDC' },
-      '0xbuyer'
+      { amount: new BigNumber('100'), currency: 'USDC' }
     );
 
     expect(result).toEqual([{
@@ -41,12 +40,11 @@ describe('ATXPPaymentDestination', () => {
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
     const result = await atxpDestination.destinations(
-      { amount: new BigNumber('100'), currency: 'USDC' },
-      '0xbuyer'
+      { amount: new BigNumber('100'), currency: 'USDC' }
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.example.com/addresses?buyerAddress=0xbuyer&amount=100&currency=USDC',
+      'https://accounts.example.com/addresses?currency=USDC',
       {
         method: 'GET',
         headers: {
@@ -82,8 +80,7 @@ describe('ATXPPaymentDestination', () => {
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
     await expect(atxpDestination.destinations(
-      { amount: new BigNumber('100'), currency: 'USDC' },
-      '0xbuyer'
+      { amount: new BigNumber('100'), currency: 'USDC' }
     )).rejects.toThrow('ATXPPaymentDestination: /addresses failed: 401 Unauthorized Invalid token');
   });
 
@@ -97,8 +94,7 @@ describe('ATXPPaymentDestination', () => {
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
     await expect(atxpDestination.destinations(
-      { amount: new BigNumber('100'), currency: 'USDC' },
-      '0xbuyer'
+      { amount: new BigNumber('100'), currency: 'USDC' }
     )).rejects.toThrow('ATXPPaymentDestination: /addresses did not return any addresses');
   });
 
@@ -117,8 +113,7 @@ describe('ATXPPaymentDestination', () => {
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
     await expect(atxpDestination.destinations(
-      { amount: new BigNumber('100'), currency: 'USDC' },
-      '0xbuyer'
+      { amount: new BigNumber('100'), currency: 'USDC' }
     )).rejects.toThrow('ATXPPaymentDestination: no valid addresses returned');
   });
 
@@ -137,12 +132,11 @@ describe('ATXPPaymentDestination', () => {
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
     await atxpDestination.destinations(
-      { amount: new BigNumber('0.01'), currency: 'USDC' },
-      '0xbuyer'
+      { amount: new BigNumber('0.01'), currency: 'USDC' }
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.example.com/addresses?buyerAddress=0xbuyer&amount=0.01&currency=USDC',
+      'https://accounts.example.com/addresses?currency=USDC',
       expect.any(Object)
     );
   });
@@ -162,8 +156,7 @@ describe('ATXPPaymentDestination', () => {
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
     const result = await atxpDestination.destinations(
-      { amount: new BigNumber('0.01'), currency: 'USDC' },
-      '0xbuyer'
+      { amount: new BigNumber('0.01'), currency: 'USDC' }
     );
 
     expect(result).toEqual([{
@@ -187,8 +180,7 @@ describe('ATXPPaymentDestination', () => {
     const atxpDestination = new ATXPPaymentDestination(connectionString, { fetchFn: mockFetch });
 
     const result = await atxpDestination.destinations(
-      { amount: new BigNumber('0.01'), currency: 'USDC' },
-      '0xbuyer'
+      { amount: new BigNumber('0.01'), currency: 'USDC' }
     );
 
     expect(result).toEqual([{
@@ -231,12 +223,11 @@ describe('ATXPPaymentDestination', () => {
       });
 
       await atxpDestination.destinations(
-        { amount: new BigNumber('100'), currency: 'USDC' },
-        '0xbuyer'
+        { amount: new BigNumber('100'), currency: 'USDC' }
       );
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destinations for buyer: 0xbuyer, amount: 100 USDC');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?buyerAddress=0xbuyer&amount=100&currency=USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destinations for buyer: USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?currency=USDC');
       expect(mockLogger.debug).toHaveBeenCalledWith('Successfully got 1 payment destinations');
     });
 
@@ -262,8 +253,7 @@ describe('ATXPPaymentDestination', () => {
       });
 
       await expect(atxpDestination.destinations(
-        { amount: new BigNumber('100'), currency: 'USDC' },
-        '0xbuyer'
+        { amount: new BigNumber('100'), currency: 'USDC' }
       )).rejects.toThrow();
 
       expect(mockLogger.error).toHaveBeenCalledWith('/addresses failed: 401 Unauthorized Invalid token');
@@ -289,8 +279,7 @@ describe('ATXPPaymentDestination', () => {
       });
 
       await expect(atxpDestination.destinations(
-        { amount: new BigNumber('100'), currency: 'USDC' },
-        '0xbuyer'
+        { amount: new BigNumber('100'), currency: 'USDC' }
       )).rejects.toThrow();
 
       expect(mockLogger.error).toHaveBeenCalledWith('/addresses did not return any addresses');
@@ -321,12 +310,11 @@ describe('ATXPPaymentDestination', () => {
       });
 
       await expect(atxpDestination.destinations(
-        { amount: new BigNumber('100'), currency: 'USDC' },
-        '0xbuyer'
+        { amount: new BigNumber('100'), currency: 'USDC' }
       )).rejects.toThrow();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destinations for buyer: 0xbuyer, amount: 100 USDC');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?buyerAddress=0xbuyer&amount=100&currency=USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Getting payment destinations for buyer: USDC');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Making request to: https://accounts.example.com/addresses?currency=USDC');
       expect(mockLogger.warn).toHaveBeenCalledWith('Skipping invalid address entry');
     });
   });

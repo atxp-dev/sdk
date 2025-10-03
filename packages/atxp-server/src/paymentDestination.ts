@@ -12,7 +12,7 @@ export type PaymentAddress = {
 }
 
 export interface PaymentDestination {
-  destinations(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]>;
+  destinations(fundingAmount: FundingAmount): Promise<PaymentAddress[]>;
 }
 
 export class ChainPaymentDestination implements PaymentDestination {
@@ -21,7 +21,7 @@ export class ChainPaymentDestination implements PaymentDestination {
     private readonly network: Network
   ) {}
 
-  async destinations(_fundingAmount: FundingAmount, _buyerAddress: string): Promise<PaymentAddress[]> {
+  async destinations(_fundingAmount: FundingAmount): Promise<PaymentAddress[]> {
     return [{
       destination: this.address,
       network: this.network
@@ -53,10 +53,10 @@ export class ATXPPaymentDestination implements PaymentDestination {
     this.logger = opts?.logger ?? new ConsoleLogger({ prefix: '[atxp-payment-destination]' });
   }
 
-  async destinations(fundingAmount: FundingAmount, buyerAddress: string): Promise<PaymentAddress[]> {
-    this.logger.debug(`Getting payment destinations for buyer: ${buyerAddress}, amount: ${fundingAmount.amount.toString()} ${fundingAmount.currency}`);
+  async destinations(fundingAmount: FundingAmount): Promise<PaymentAddress[]> {
+    this.logger.debug(`Getting payment destinations for buyer: ${fundingAmount.currency}`);
 
-    const url = new URL(`${this.accountServerURL}/addresses?buyerAddress=${buyerAddress}&amount=${fundingAmount.amount.toString()}`);
+    const url = new URL(`${this.accountServerURL}/addresses`);
 
     // Add currency parameter if provided
     if (fundingAmount.currency) {

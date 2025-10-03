@@ -15,7 +15,7 @@ async function getPaymentDestinations(
   currency: Currency
 ): Promise<PaymentAddress[]> {
   const fundingAmount: FundingAmount = { amount, currency };
-  return await config.paymentDestination.destinations(fundingAmount, user);
+  return await config.paymentDestination.destinations(fundingAmount);
 }
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
