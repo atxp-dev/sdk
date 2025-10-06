@@ -1,6 +1,6 @@
 {
   "name": "@atxp/client",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "ATXP Client - MCP client with OAuth authentication and payment processing",
   "license": "MIT",
   "repository": {
@@ -33,7 +33,7 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/common": "0.7.3",
+    "@atxp/common": "0.7.4",
     "@modelcontextprotocol/sdk": "^1.15.0",
     "bignumber.js": "^9.3.0",
     "oauth4webapi": "^3.5.0"
