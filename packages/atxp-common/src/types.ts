@@ -29,6 +29,10 @@ export type PaymentRequestDestination = {
   amount: BigNumber;
 }
 
+export type Payment = PaymentRequestDestination & {
+  paymentId: string;
+}
+
 export type PaymentRequestData = {
   // New multi-destination format
   destinations?: PaymentRequestDestination[];

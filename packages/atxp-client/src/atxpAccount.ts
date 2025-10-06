@@ -25,11 +25,13 @@ function parseConnectionString(connectionString: string): { origin: string; toke
 class ATXPHttpPaymentMaker implements PaymentMaker {
   private origin: string;
   private token: string;
+  private network: Network;
   private fetchFn: FetchLike;
 
-  constructor(origin: string, token: string, fetchFn: FetchLike = fetch) {
+  constructor(origin: string, token: string, network: Network, fetchFn: FetchLike = fetch) {
     this.origin = origin;
     this.token = token;
+    this.network = network;
     this.fetchFn = fetchFn;
   }
 
@@ -43,6 +45,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
       },
       body: JSON.stringify({
         amount: amount.toString(),
+        network: this.network,
         currency,
         receiver,
         memo,
@@ -87,15 +90,14 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 
 export class ATXPAccount implements Account {
   accountId: string;
-  paymentMakers: { [key: string]: PaymentMaker };
+  paymentMakers: { [key in Network]: PaymentMaker };
   origin: string;
   token: string;
   fetchFn: FetchLike;
 
-  constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: Network }) {
+  constructor(connectionString: string, opts?: { fetchFn?: FetchLike; }) {
     const { origin, token, accountId } = parseConnectionString(connectionString);
     const fetchFn = opts?.fetchFn ?? fetch;
-    const network = opts?.network ?? 'base';
 
     // Store for use in X402 payment creation
     this.origin = origin;
@@ -108,7 +110,9 @@ export class ATXPAccount implements Account {
       this.accountId = `atxp:${crypto.randomUUID()}`;
     }
     this.paymentMakers = {
-      [network]: new ATXPHttpPaymentMaker(origin, token, fetchFn),
+      ['base']: new ATXPHttpPaymentMaker(origin, token, 'base', fetchFn),
+      ['solana']: new ATXPHttpPaymentMaker(origin, token, 'solana', fetchFn),
+      ['world']: new ATXPHttpPaymentMaker(origin, token, 'world', fetchFn),
     };
   }
 

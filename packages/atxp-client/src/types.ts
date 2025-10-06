@@ -1,5 +1,5 @@
 import { BigNumber } from "bignumber.js";
-import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike } from "@atxp/common";
+import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike, PaymentRequestDestination, Payment } from "@atxp/common";
 import { ClientOptions } from "@modelcontextprotocol/sdk/client/index.js";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
 
@@ -18,8 +18,6 @@ export type ProspectivePayment = {
   accountId: string;
   resourceUrl: string;
   resourceName: string;
-  network: Network;
-  currency: Currency;
   amount: BigNumber;
   iss: string;
 }
@@ -77,6 +75,6 @@ export class PaymentNetworkError extends Error {
 }
 
 export interface PaymentMaker {
-  makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string) => Promise<string>;
-  generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;
+  makePayment: (destinations: PaymentRequestDestination[], memo: string) => Promise<Payment | null>;
+  generateJWT: (params: {paymentRequestId: string, codeChallenge: string, network: Network}) => Promise<string>;
 }
