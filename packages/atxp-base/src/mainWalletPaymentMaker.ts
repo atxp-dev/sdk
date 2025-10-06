@@ -35,6 +35,10 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     this.usdcAddress = getBaseUSDCAddress(chainId);
   }
 
+  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
+    return this.walletAddress;
+  }
+
   async generateJWT(payload: {
     paymentRequestId: string;
     codeChallenge: string;
