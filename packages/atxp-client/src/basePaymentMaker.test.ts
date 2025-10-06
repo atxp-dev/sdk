@@ -69,3 +69,37 @@ describe('basePaymentMaker.generateJWT', () => {
   });
 });
 
+describe('basePaymentMaker.getSourceAddress', () => {
+  it('should return the wallet client address', () => {
+    const privateKey = generatePrivateKey();
+    const account = privateKeyToAccount(privateKey);
+    const walletClient = createWalletClient({
+      account,
+      chain: base,
+      transport: http('https://example.com')
+    });
+    const paymentMaker = new BasePaymentMaker('https://example.com', walletClient);
+
+    const sourceAddress = paymentMaker.getSourceAddress();
+
+    expect(sourceAddress).toBe(account.address);
+    expect(sourceAddress).toMatch(/^0x[a-fA-F0-9]{40}$/); // Valid Ethereum address format
+  });
+
+  it('should return consistent address across multiple calls', () => {
+    const privateKey = generatePrivateKey();
+    const account = privateKeyToAccount(privateKey);
+    const walletClient = createWalletClient({
+      account,
+      chain: base,
+      transport: http('https://example.com')
+    });
+    const paymentMaker = new BasePaymentMaker('https://example.com', walletClient);
+
+    const address1 = paymentMaker.getSourceAddress();
+    const address2 = paymentMaker.getSourceAddress();
+
+    expect(address1).toBe(address2);
+  });
+});
+
