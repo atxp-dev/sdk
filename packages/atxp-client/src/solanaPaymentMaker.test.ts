@@ -58,3 +58,37 @@ describe('solanaPaymentMaker.generateJWT', () => {
   });
 });
 
+describe('solanaPaymentMaker.getSourceAddress', () => {
+  it('should return the Solana public key as base58', () => {
+    const keypair = Keypair.generate();
+    const paymentMaker = new SolanaPaymentMaker('https://example.com', bs58.encode(keypair.secretKey));
+
+    const sourceAddress = paymentMaker.getSourceAddress();
+
+    expect(sourceAddress).toBe(keypair.publicKey.toBase58());
+  });
+
+  it('should return a valid base58 encoded address', () => {
+    const keypair = Keypair.generate();
+    const paymentMaker = new SolanaPaymentMaker('https://example.com', bs58.encode(keypair.secretKey));
+
+    const sourceAddress = paymentMaker.getSourceAddress();
+
+    // Should be a valid base58 string (typically 32-44 characters for Solana addresses)
+    expect(sourceAddress).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
+
+    // Should be decodable as base58
+    expect(() => bs58.decode(sourceAddress)).not.toThrow();
+  });
+
+  it('should return consistent address across multiple calls', () => {
+    const keypair = Keypair.generate();
+    const paymentMaker = new SolanaPaymentMaker('https://example.com', bs58.encode(keypair.secretKey));
+
+    const address1 = paymentMaker.getSourceAddress();
+    const address2 = paymentMaker.getSourceAddress();
+
+    expect(address1).toBe(address2);
+  });
+});
+
