@@ -182,6 +182,10 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     this.confirmationDelays = finalDelays;
   }
 
+  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
+    return this.smartWallet.account.address;
+  }
+
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);

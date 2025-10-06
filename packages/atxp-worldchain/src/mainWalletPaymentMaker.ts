@@ -50,6 +50,10 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     this.customRpcUrl = customRpcUrl;
   }
 
+  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
+    return this.walletAddress;
+  }
+
   async generateJWT({
     paymentRequestId,
     codeChallenge

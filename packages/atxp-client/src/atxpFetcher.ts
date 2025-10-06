@@ -1,6 +1,6 @@
 import { BigNumber } from 'bignumber.js';
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse } from '@atxp/common';
+import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Network, Currency } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch } from '@atxp/common';
@@ -123,6 +123,100 @@ export class ATXPFetcher {
     }
   };
 
+  /**
+   * Resolves atxp_base or atxp_base_sepolia destinations to real base network destinations
+   * by calling the payment_info endpoint to get the destination address and network
+   */
+  protected async resolveAtxpBaseDestination(
+    network: string,
+    paymentInfoUrl: string,
+    paymentRequestId: string,
+    amount: BigNumber,
+    currency: Currency,
+    receiver: string,
+    memo: string
+  ): Promise<{ destinationAddress: string; network: Network } | null> {
+    // Check if this is an atxp_base network that needs resolution
+    if (network !== 'atxp_base' && network !== 'atxp_base_sepolia') {
+      return null;
+    }
+
+    // Map atxp_base networks to their real counterparts
+    const realNetwork = network === 'atxp_base' ? 'base' : 'base_sepolia';
+
+    // Get the payment maker for the real network
+    const paymentMaker = this.paymentMakers.get(realNetwork);
+    if (!paymentMaker) {
+      this.logger.debug(`ATXP: payment network '${realNetwork}' not available for atxp_base resolution`);
+      return null;
+    }
+
+    // Get the buyer address (source address) from the payment maker
+    let buyerAddress: string;
+    try {
+      buyerAddress = await paymentMaker.getSourceAddress({
+        amount,
+        currency,
+        receiver,
+        memo
+      });
+    } catch (error) {
+      this.logger.warn(`ATXP: failed to get source address from payment maker for ${realNetwork}: ${(error as Error).message}`);
+      return null;
+    }
+
+    // Call the payment_info endpoint
+    this.logger.debug(`ATXP: resolving ${network} destination via ${paymentInfoUrl}`);
+    try {
+      const response = await this.sideChannelFetch(paymentInfoUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paymentRequestId,
+          buyerAddress,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        this.logger.warn(`ATXP: payment_info endpoint failed: ${response.status} ${response.statusText} ${text}`);
+        return null;
+      }
+
+      const data = await response.json() as {
+        status?: string;
+        destinationAddress?: string;
+        network?: string;
+      };
+
+      if (data.status !== 'success') {
+        this.logger.warn(`ATXP: payment_info endpoint returned non-success status: ${JSON.stringify(data)}`);
+        return null;
+      }
+
+      if (!data.destinationAddress) {
+        this.logger.warn(`ATXP: payment_info endpoint did not return destinationAddress`);
+        return null;
+      }
+
+      if (!data.network) {
+        this.logger.warn(`ATXP: payment_info endpoint did not return network`);
+        return null;
+      }
+
+      this.logger.info(`ATXP: resolved ${network} destination to ${data.destinationAddress} on ${data.network}`);
+      return {
+        destinationAddress: data.destinationAddress,
+        network: data.network as Network,
+      };
+    } catch (error) {
+      this.logger.warn(`ATXP: failed to resolve ${network} destination: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
   protected handleMultiDestinationPayment = async (
     paymentRequestData: PaymentRequestData,
     paymentRequestUrl: string,
@@ -134,34 +228,52 @@ export class ATXPFetcher {
 
     // Try each destination in order
     for (const dest of paymentRequestData.destinations) {
-      const paymentMaker = this.paymentMakers.get(dest.network);
-      if (!paymentMaker) {
-        this.logger.debug(`ATXP: payment network '${dest.network}' not available, trying next destination`);
-        continue;
-      }
-
       // Convert amount to BigNumber since it comes as a string from JSON
       const amount = new BigNumber(dest.amount);
+
+      // Resolve atxp_base destinations to real base network destinations
+      let destinationAddress = dest.address;
+      let destinationNetwork = dest.network;
+
+      const resolved = await this.resolveAtxpBaseDestination(
+        dest.network,
+        dest.address,
+        paymentRequestId,
+        amount,
+        dest.currency,
+        dest.address,
+        paymentRequestData.iss
+      );
+      if (resolved) {
+        destinationAddress = resolved.destinationAddress;
+        destinationNetwork = resolved.network;
+      }
+
+      const paymentMaker = this.paymentMakers.get(destinationNetwork);
+      if (!paymentMaker) {
+        this.logger.debug(`ATXP: payment network '${destinationNetwork}' not available, trying next destination`);
+        continue;
+      }
 
       const prospectivePayment : ProspectivePayment = {
         accountId: this.accountId,
         resourceUrl: paymentRequestData.resource?.toString() ?? '',
         resourceName: paymentRequestData.resourceName ?? '',
-        network: dest.network,
+        network: destinationNetwork,
         currency: dest.currency,
         amount: amount,
         iss: paymentRequestData.iss ?? '',
       };
 
       if (!await this.approvePayment(prospectivePayment)){
-        this.logger.info(`ATXP: payment request denied by callback function for destination on ${dest.network}`);
+        this.logger.info(`ATXP: payment request denied by callback function for destination on ${destinationNetwork}`);
         continue;
       }
 
       let paymentId: string;
       try {
-        paymentId = await paymentMaker.makePayment(amount, dest.currency, dest.address, paymentRequestData.iss);
-        this.logger.info(`ATXP: made payment of ${amount.toString()} ${dest.currency} on ${dest.network}: ${paymentId}`);
+        paymentId = await paymentMaker.makePayment(amount, dest.currency, destinationAddress, paymentRequestData.iss);
+        this.logger.info(`ATXP: made payment of ${amount.toString()} ${dest.currency} on ${destinationNetwork}: ${paymentId}`);
         await this.onPayment({ payment: prospectivePayment });
 
         // Submit payment to the server
@@ -174,7 +286,7 @@ export class ATXPFetcher {
           },
           body: JSON.stringify({
             transactionId: paymentId,
-            network: dest.network,
+            network: destinationNetwork,
             currency: dest.currency
           })
         });
@@ -190,7 +302,7 @@ export class ATXPFetcher {
         return true;
       } catch (error: unknown) {
         const typedError = error as Error;
-        this.logger.warn(`ATXP: payment failed on ${dest.network}: ${typedError.message}`);
+        this.logger.warn(`ATXP: payment failed on ${destinationNetwork}: ${typedError.message}`);
         await this.onPaymentFailure({ payment: prospectivePayment, error: typedError });
         // Try next destination
         continue;
@@ -257,9 +369,27 @@ export class ATXPFetcher {
       throw new Error(`Currency not provided`);
     }
 
-    const paymentMaker = this.paymentMakers.get(requestedNetwork);
+    // Resolve atxp_base destinations to real base network destinations
+    let destinationAddress = destination;
+    let destinationNetwork = requestedNetwork;
+
+    const resolved = await this.resolveAtxpBaseDestination(
+      requestedNetwork,
+      destination,
+      paymentRequestId,
+      amount,
+      currency,
+      destination,
+      paymentRequestData.iss
+    );
+    if (resolved) {
+      destinationAddress = resolved.destinationAddress;
+      destinationNetwork = resolved.network;
+    }
+
+    const paymentMaker = this.paymentMakers.get(destinationNetwork);
     if (!paymentMaker) {
-      this.logger.info(`ATXP: payment network '${requestedNetwork}' not set up for this client (available networks: ${Array.from(this.paymentMakers.keys()).join(', ')})`);
+      this.logger.info(`ATXP: payment network '${destinationNetwork}' not set up for this client (available networks: ${Array.from(this.paymentMakers.keys()).join(', ')})`);
       return false;
     }
 
@@ -267,7 +397,7 @@ export class ATXPFetcher {
       accountId: this.accountId,
       resourceUrl: paymentRequestData.resource?.toString() ?? '',
       resourceName: paymentRequestData.resourceName ?? '',
-      network: requestedNetwork,
+      network: destinationNetwork,
       currency,
       amount,
       iss: paymentRequestData.iss ?? '',
@@ -279,9 +409,9 @@ export class ATXPFetcher {
 
     let paymentId: string;
     try {
-      paymentId = await paymentMaker.makePayment(amount, currency, destination, paymentRequestData.iss);
-      this.logger.info(`ATXP: made payment of ${amount} ${currency} on ${requestedNetwork}: ${paymentId}`);
-      
+      paymentId = await paymentMaker.makePayment(amount, currency, destinationAddress, paymentRequestData.iss);
+      this.logger.info(`ATXP: made payment of ${amount} ${currency} on ${destinationNetwork}: ${paymentId}`);
+
       // Call onPayment callback after successful payment
       await this.onPayment({ payment: prospectivePayment });
     } catch (paymentError) {
@@ -312,7 +442,7 @@ export class ATXPFetcher {
       },
       body: JSON.stringify({
         transactionId: paymentId,
-        network: requestedNetwork,
+        network: destinationNetwork,
         currency: currency
       })
     });
