@@ -33,10 +33,32 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     this.fetchFn = fetchFn;
   }
 
-  getSourceAddress(): string {
-    // ATXPHttpPaymentMaker uses server-side accounts, so we don't have a direct address
-    // Return a placeholder or throw an error
-    throw new Error('ATXPHttpPaymentMaker does not support getSourceAddress() - accounts are managed server-side');
+  async getSourceAddress(params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<string> {
+    // Call the /address_for_payment endpoint to get the source address for this account
+    const response = await this.fetchFn(`${this.origin}/address_for_payment`, {
+      method: 'POST',
+      headers: {
+        'Authorization': toBasicAuth(this.token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: params.amount.toString(),
+        currency: params.currency,
+        receiver: params.receiver,
+        memo: params.memo,
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`ATXPAccount: /address_for_payment failed: ${response.status} ${response.statusText} ${text}`);
+    }
+
+    const json = await response.json() as { sourceAddress?: string; sourceNetwork?: string };
+    if (!json?.sourceAddress) {
+      throw new Error('ATXPAccount: /address_for_payment did not return sourceAddress');
+    }
+    return json.sourceAddress;
   }
 
   async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {

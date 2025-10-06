@@ -6,6 +6,7 @@ import * as CTH from '@atxp/common/src/commonTestHelpers.js';
 import { ATXPFetcher } from './atxpFetcher.js';
 import { OAuthDb, FetchLike, AuthorizationServerUrl, DEFAULT_AUTHORIZATION_SERVER } from '@atxp/common';
 import { PaymentMaker, ProspectivePayment } from './types.js';
+import BigNumber from 'bignumber.js';
 
 function mockBasePaymentMaker(sourceAddress = '0x1234567890123456789012345678901234567890'): PaymentMaker {
   return {
@@ -31,6 +32,14 @@ function atxpFetcher(
     approvePayment
   });
 }
+
+// Default test parameters for payment requests
+const defaultTestParams = {
+  amount: new BigNumber('10'),
+  currency: 'USDC' as const,
+  receiver: '0xTestReceiver123',
+  memo: 'test-issuer'
+};
 
 describe('atxpFetcher atxp_base resolution', () => {
   describe('resolveAtxpBaseDestination', () => {
@@ -58,7 +67,11 @@ describe('atxpFetcher atxp_base resolution', () => {
       const result = await (fetcher as any).resolveAtxpBaseDestination(
         'atxp_base',
         paymentInfoUrl,
-        paymentRequestId
+        paymentRequestId,
+        defaultTestParams.amount,
+        defaultTestParams.currency,
+        defaultTestParams.receiver,
+        defaultTestParams.memo
       );
 
       expect(result).toBeDefined();
@@ -95,7 +108,11 @@ describe('atxpFetcher atxp_base resolution', () => {
       const result = await (fetcher as any).resolveAtxpBaseDestination(
         'atxp_base_sepolia',
         paymentInfoUrl,
-        paymentRequestId
+        paymentRequestId,
+        defaultTestParams.amount,
+        defaultTestParams.currency,
+        defaultTestParams.receiver,
+        defaultTestParams.memo
       );
 
       expect(result).toBeDefined();
@@ -110,7 +127,11 @@ describe('atxpFetcher atxp_base resolution', () => {
       const result = await (fetcher as any).resolveAtxpBaseDestination(
         'base',
         'https://example.com/payment_info',
-        'pay_123'
+        'pay_123',
+        defaultTestParams.amount,
+        defaultTestParams.currency,
+        defaultTestParams.receiver,
+        defaultTestParams.memo
       );
 
       expect(result).toBeNull();
@@ -125,7 +146,11 @@ describe('atxpFetcher atxp_base resolution', () => {
       const result = await (fetcher as any).resolveAtxpBaseDestination(
         'atxp_base',
         'https://example.com/payment_info',
-        'pay_123'
+        'pay_123',
+        defaultTestParams.amount,
+        defaultTestParams.currency,
+        defaultTestParams.receiver,
+        defaultTestParams.memo
       );
 
       expect(result).toBeNull();
@@ -147,7 +172,11 @@ describe('atxpFetcher atxp_base resolution', () => {
       const result = await (fetcher as any).resolveAtxpBaseDestination(
         'atxp_base',
         paymentInfoUrl,
-        'pay_123'
+        'pay_123',
+        defaultTestParams.amount,
+        defaultTestParams.currency,
+        defaultTestParams.receiver,
+        defaultTestParams.memo
       );
 
       expect(result).toBeNull();
@@ -167,7 +196,11 @@ describe('atxpFetcher atxp_base resolution', () => {
       const result = await (fetcher as any).resolveAtxpBaseDestination(
         'atxp_base',
         paymentInfoUrl,
-        'pay_123'
+        'pay_123',
+        defaultTestParams.amount,
+        defaultTestParams.currency,
+        defaultTestParams.receiver,
+        defaultTestParams.memo
       );
 
       expect(result).toBeNull();
@@ -190,7 +223,11 @@ describe('atxpFetcher atxp_base resolution', () => {
       const result = await (fetcher as any).resolveAtxpBaseDestination(
         'atxp_base',
         paymentInfoUrl,
-        'pay_123'
+        'pay_123',
+        defaultTestParams.amount,
+        defaultTestParams.currency,
+        defaultTestParams.receiver,
+        defaultTestParams.memo
       );
 
       expect(result).toBeNull();
@@ -213,7 +250,11 @@ describe('atxpFetcher atxp_base resolution', () => {
       const result = await (fetcher as any).resolveAtxpBaseDestination(
         'atxp_base',
         paymentInfoUrl,
-        'pay_123'
+        'pay_123',
+        defaultTestParams.amount,
+        defaultTestParams.currency,
+        defaultTestParams.receiver,
+        defaultTestParams.memo
       );
 
       expect(result).toBeNull();
@@ -231,7 +272,11 @@ describe('atxpFetcher atxp_base resolution', () => {
       const result = await (fetcher as any).resolveAtxpBaseDestination(
         'atxp_base',
         'https://example.com/payment_info',
-        'pay_123'
+        'pay_123',
+        defaultTestParams.amount,
+        defaultTestParams.currency,
+        defaultTestParams.receiver,
+        defaultTestParams.memo
       );
 
       expect(result).toBeNull();
