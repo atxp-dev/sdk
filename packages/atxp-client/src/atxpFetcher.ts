@@ -34,7 +34,7 @@ export function atxpFetch(config: ClientConfig): FetchLike {
 
 export class ATXPFetcher {
   protected oauthClient: OAuthClient;
-  protected paymentMakers: Map<string, PaymentMaker>;
+  protected paymentMakers: PaymentMaker[];
   protected sideChannelFetch: FetchLike;
   protected db: OAuthDb;
   protected accountId: string;
@@ -132,40 +132,41 @@ export class ATXPFetcher {
       return false;
     }
 
-    // Try each destination in order
-    for (const dest of paymentRequestData.destinations) {
-      const paymentMaker = this.paymentMakers.get(dest.network);
-      if (!paymentMaker) {
-        this.logger.debug(`ATXP: payment network '${dest.network}' not available, trying next destination`);
-        continue;
-      }
+    const amounts = paymentRequestData.destinations.map(dest => dest.amount);
+    if(new Set(amounts).size !== 1) {
+      throw new Error(`ATXP: payment request destinations have different amounts: ${amounts.join(', ')}`);
+    }
 
-      // Convert amount to BigNumber since it comes as a string from JSON
-      const amount = new BigNumber(dest.amount);
+    // Convert amount to BigNumber since it comes as a string from JSON
+    const amount = BigNumber(amounts[0]);
 
-      const prospectivePayment : ProspectivePayment = {
-        accountId: this.accountId,
-        resourceUrl: paymentRequestData.resource?.toString() ?? '',
-        resourceName: paymentRequestData.resourceName ?? '',
-        network: dest.network,
-        currency: dest.currency,
-        amount: amount,
-        iss: paymentRequestData.iss ?? '',
-      };
+    const prospectivePayment : ProspectivePayment = {
+      accountId: this.accountId,
+      resourceUrl: paymentRequestData.resource?.toString() ?? '',
+      resourceName: paymentRequestData.resourceName ?? '',
+      amount: amount,
+      iss: paymentRequestData.iss ?? '',
+    };
 
-      if (!await this.approvePayment(prospectivePayment)){
-        this.logger.info(`ATXP: payment request denied by callback function for destination on ${dest.network}`);
-        continue;
-      }
+    if (!await this.approvePayment(prospectivePayment)){
+      this.logger.info(`ATXP: payment request denied by approvePayment function`);
+      return false;
+    }
 
-      let paymentId: string;
+    // Iterate through the payment makers - they'll either make a payment, or return null if they can't
+    for(const paymentMaker of this.paymentMakers) {
       try {
-        paymentId = await paymentMaker.makePayment(amount, dest.currency, dest.address, paymentRequestData.iss);
-        this.logger.info(`ATXP: made payment of ${amount.toString()} ${dest.currency} on ${dest.network}: ${paymentId}`);
+        const payment = await paymentMaker.makePayment(paymentRequestData.destinations, paymentRequestData.iss);
+        if (!payment) {
+          this.logger.info(`ATXP: payment request could not be paid by payment maker ${paymentMaker}`);
+          continue;
+        }
+        const {paymentId, network, currency} = payment;
+        this.logger.info(`ATXP: made payment of ${amount.toString()} ${currency} on ${network}: ${paymentId}`);
         await this.onPayment({ payment: prospectivePayment });
 
         // Submit payment to the server
-        const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
+        const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: '', network});
         const response = await this.sideChannelFetch(paymentRequestUrl.toString(), {
           method: 'PUT',
           headers: {
@@ -174,8 +175,8 @@ export class ATXPFetcher {
           },
           body: JSON.stringify({
             transactionId: paymentId,
-            network: dest.network,
-            currency: dest.currency
+            network: network,
+            currency: currency
           })
         });
 
@@ -190,14 +191,14 @@ export class ATXPFetcher {
         return true;
       } catch (error: unknown) {
         const typedError = error as Error;
-        this.logger.warn(`ATXP: payment failed on ${dest.network}: ${typedError.message}`);
+        this.logger.warn(`ATXP: payment failed on payment maker ${paymentMaker}: ${typedError.message}`);
         await this.onPaymentFailure({ payment: prospectivePayment, error: typedError });
         // Try next destination
         continue;
       }
     }
 
-    this.logger.info(`ATXP: no suitable payment destination found among ${paymentRequestData.destinations.length} options`);
+    this.logger.info(`ATXP: no payment maker was able to pay for payment destination found among ${paymentRequestData.destinations.length} options`);
     return false;
   }
 
@@ -224,108 +225,7 @@ export class ATXPFetcher {
     }
 
     // Handle multi-destination format
-    if (paymentRequestData.destinations && paymentRequestData.destinations.length > 0) {
-      return this.handleMultiDestinationPayment(paymentRequestData, paymentRequestUrl, paymentRequestId);
-    }
-
-    // Handle legacy single destination format
-    const requestedNetwork = paymentRequestData.network;
-    if (!requestedNetwork) {
-      throw new Error(`Payment network not provided`);
-    }
-
-    const destination = paymentRequestData.destination;
-    if (!destination) {
-      throw new Error(`destination not provided`);
-    }
-
-    let amount = new BigNumber(0);
-    if (!paymentRequestData.amount) {
-      throw new Error(`amount not provided`);
-    }
-    try{
-      amount = new BigNumber(paymentRequestData.amount);
-    } catch {
-      throw new Error(`Invalid amount ${paymentRequestData.amount}`);
-    }
-    if(amount.lte(0)) {
-      throw new Error(`Invalid amount ${paymentRequestData.amount}`);
-    }
-
-    const currency = paymentRequestData.currency;
-    if (!currency) {
-      throw new Error(`Currency not provided`);
-    }
-
-    const paymentMaker = this.paymentMakers.get(requestedNetwork);
-    if (!paymentMaker) {
-      this.logger.info(`ATXP: payment network '${requestedNetwork}' not set up for this client (available networks: ${Array.from(this.paymentMakers.keys()).join(', ')})`);
-      return false;
-    }
-
-    const prospectivePayment : ProspectivePayment = {
-      accountId: this.accountId,
-      resourceUrl: paymentRequestData.resource?.toString() ?? '',
-      resourceName: paymentRequestData.resourceName ?? '',
-      network: requestedNetwork,
-      currency,
-      amount,
-      iss: paymentRequestData.iss ?? '',
-    };
-    if (!await this.approvePayment(prospectivePayment)){
-      this.logger.info(`ATXP: payment request denied by callback function`);
-      return false;
-    }
-
-    let paymentId: string;
-    try {
-      paymentId = await paymentMaker.makePayment(amount, currency, destination, paymentRequestData.iss);
-      this.logger.info(`ATXP: made payment of ${amount} ${currency} on ${requestedNetwork}: ${paymentId}`);
-      
-      // Call onPayment callback after successful payment
-      await this.onPayment({ payment: prospectivePayment });
-    } catch (paymentError) {
-      // Call onPaymentFailure callback if payment fails
-      await this.onPaymentFailure({
-        payment: prospectivePayment,
-        error: paymentError as Error
-      });
-      throw paymentError;
-    }
-
-    const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
-
-    // Make a fetch call to the authorization URL with the payment ID
-    // redirect=false is a hack
-    // The OAuth spec calls for the authorization url to return with a redirect, but fetch
-    // on mobile will automatically follow the redirect (it doesn't support the redirect=manual option)
-    // We want the redirect URL so we can extract the code from it, not the contents of the 
-    // redirect URL (which might not even exist for agentic ATXP clients)
-    //   So ATXP servers are set up to instead return a 200 with the redirect URL in the body
-    // if we pass redirect=false.
-    // TODO: Remove the redirect=false hack once we have a way to handle the redirect on mobile
-    const response = await this.sideChannelFetch(paymentRequestUrl.toString(), {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        transactionId: paymentId,
-        network: requestedNetwork,
-        currency: currency
-      })
-    });
-
-    this.logger.debug(`ATXP: payment was ${response.ok ? 'successfully' : 'not successfully'} PUT to ${paymentRequestUrl} : status ${response.status} ${response.statusText}`);
-
-    if(!response.ok) {
-      const msg = `ATXP: payment to ${paymentRequestUrl} failed: HTTP ${response.status} ${await response.text()}`;
-      this.logger.info(msg);
-      throw new Error(msg);
-    }
-
-    return true;
+    return this.handleMultiDestinationPayment(paymentRequestData, paymentRequestUrl, paymentRequestId);
   }
 
   protected getPaymentRequestData = async (paymentRequestUrl: string): Promise<PaymentRequestData | null> => {
@@ -408,7 +308,7 @@ export class ATXPFetcher {
 
   protected authToService = async (error: OAuthAuthenticationRequiredError): Promise<void> => {
     // TODO: We need to generalize this - we can't assume that there's a single paymentMaker for the auth flow. 
-    if (this.paymentMakers.size > 1) {
+    if (this.paymentMakers.length > 1) {
       throw new Error(`ATXP: multiple payment makers found - cannot determine which one to use for auth`);
     }
 
