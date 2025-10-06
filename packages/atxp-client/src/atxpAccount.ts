@@ -90,7 +90,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 
 export class ATXPAccount implements Account {
   accountId: string;
-  paymentMakers: { [key in Network]: PaymentMaker };
+  paymentMakers: PaymentMaker[];
   origin: string;
   token: string;
   fetchFn: FetchLike;
@@ -109,11 +109,9 @@ export class ATXPAccount implements Account {
     } else {
       this.accountId = `atxp:${crypto.randomUUID()}`;
     }
-    this.paymentMakers = {
-      ['base']: new ATXPHttpPaymentMaker(origin, token, 'base', fetchFn),
-      ['solana']: new ATXPHttpPaymentMaker(origin, token, 'solana', fetchFn),
-      ['world']: new ATXPHttpPaymentMaker(origin, token, 'world', fetchFn),
-    };
+    this.paymentMakers = [
+      new ATXPHttpPaymentMaker(origin, token, 'base', fetchFn),
+    ];
   }
 
   async getSigner(): Promise<LocalAccount> {

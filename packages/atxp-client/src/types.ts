@@ -11,7 +11,7 @@ export type AccountIdString = `${AccountPrefix}${string}`;
 
 export type Account = {
   accountId: string;
-  paymentMakers: {[key: string]: PaymentMaker};
+  paymentMakers: PaymentMaker[];
 }
 
 export type ProspectivePayment = {
