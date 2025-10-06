@@ -66,6 +66,7 @@ describe('wrapWithX402', () => {
 
     expect(() => {
       wrapWithX402({
+        mcpServer: 'https://example.com/mcp',
         account: nonATXPAccount as any,
         fetchFn: mockFetch,
         logger: mockLogger,
@@ -78,6 +79,7 @@ describe('wrapWithX402', () => {
     mockFetch.mockResolvedValue(mockResponse);
 
     const wrappedFetch = wrapWithX402({
+      mcpServer: 'https://example.com/mcp',
       account: mockAccount,
       fetchFn: mockFetch,
       logger: mockLogger,
@@ -125,6 +127,7 @@ describe('wrapWithX402', () => {
       .mockResolvedValueOnce(successResponse);
 
     const wrappedFetch = wrapWithX402({
+      mcpServer: 'https://example.com/mcp',
       account: mockAccount,
       fetchFn: mockFetch,
       logger: mockLogger,
@@ -200,6 +203,7 @@ describe('wrapWithX402', () => {
     mockApprovePayment.mockResolvedValue(false);
 
     const wrappedFetch = wrapWithX402({
+      mcpServer: 'https://example.com/mcp',
       account: mockAccount,
       fetchFn: mockFetch,
       logger: mockLogger,
@@ -241,6 +245,7 @@ describe('wrapWithX402', () => {
     mockFetch.mockResolvedValue(response402);
 
     const wrappedFetch = wrapWithX402({
+      mcpServer: 'https://example.com/mcp',
       account: mockAccount,
       fetchFn: mockFetch,
       logger: mockLogger,
@@ -285,6 +290,7 @@ describe('wrapWithX402', () => {
     mockAccount.getSigner = vi.fn().mockRejectedValue(new Error('Signer error'));
 
     const wrappedFetch = wrapWithX402({
+      mcpServer: 'https://example.com/mcp',
       account: mockAccount,
       fetchFn: mockFetch,
       logger: mockLogger,
@@ -340,6 +346,7 @@ describe('wrapWithX402', () => {
     mockFetch.mockResolvedValue(response402);
 
     const wrappedFetch = wrapWithX402({
+      mcpServer: 'https://example.com/mcp',
       account: mockAccount,
       fetchFn: mockFetch,
       logger: mockLogger,

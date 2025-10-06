@@ -30,6 +30,7 @@ const createConfig = (packageName, options = {}) => {
     // Check regex patterns for deep imports
     const patterns = [
       /^viem/, // All viem imports including deep paths
+      /^x402/, // All x402 imports including subpath exports like x402/client
       /^@solana\/web3\.js/, /^@solana\/pay/, /^@solana\/buffer-layout/, /^@solana\/spl-token/,
       /^bs58/, /^react-native-url-polyfill/, /^expo-crypto/, /^@base-org\/account/
     ];
@@ -56,19 +57,8 @@ const createConfig = (packageName, options = {}) => {
 
   const plugins = [
     typescript({
-      tsconfig: false,
-      compilerOptions: {
-        target: 'es2020',
-        module: 'esnext',
-        lib: ['es2020', 'dom'],
-        moduleResolution: 'node',
-        allowSyntheticDefaultImports: true,
-        esModuleInterop: true,
-        skipLibCheck: true,
-        strict: true,
-        declaration: false,
-        sourceMap: true
-      }
+      tsconfig: './tsconfig.json',
+      exclude: ['**/*.test.ts', '**/*.spec.ts']
     }),
     resolve({
       preferBuiltins: platform === 'node',
