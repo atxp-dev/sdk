@@ -33,9 +33,8 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     this.fetchFn = fetchFn;
   }
 
-  async getSourceAddress(): Promise<string> {
+  async getSourceAddress(params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<string> {
     // Call the /address_for_payment endpoint to get the source address for this account
-    // Use minimal/dummy parameters since the address is determined by the account authentication
     const response = await this.fetchFn(`${this.origin}/address_for_payment`, {
       method: 'POST',
       headers: {
@@ -43,10 +42,10 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: '0',
-        currency: 'USDC',
-        receiver: '0x0000000000000000000000000000000000000000',
-        memo: '',
+        amount: params.amount.toString(),
+        currency: params.currency,
+        receiver: params.receiver,
+        memo: params.memo,
       }),
     });
 

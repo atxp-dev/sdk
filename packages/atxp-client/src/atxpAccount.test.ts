@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ATXPAccount } from './atxpAccount.js';
+import BigNumber from 'bignumber.js';
 
 describe('ATXPAccount', () => {
   describe('ATXPHttpPaymentMaker.getSourceAddress', () => {
@@ -19,7 +20,12 @@ describe('ATXPAccount', () => {
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
       const paymentMaker = account.paymentMakers['base'];
-      const result = await paymentMaker.getSourceAddress();
+      const result = await paymentMaker.getSourceAddress({
+        amount: new BigNumber('10'),
+        currency: 'USDC',
+        receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
+        memo: 'test payment'
+      });
 
       expect(result).toBe(sourceAddress);
       expect(mockFetch).toHaveBeenCalledWith(
@@ -37,10 +43,10 @@ describe('ATXPAccount', () => {
       // Verify the body contains the expected parameters
       const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(callBody).toEqual({
-        amount: '0',
+        amount: '10',
         currency: 'USDC',
-        receiver: '0x0000000000000000000000000000000000000000',
-        memo: ''
+        receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
+        memo: 'test payment'
       });
     });
 
@@ -59,7 +65,12 @@ describe('ATXPAccount', () => {
 
       const paymentMaker = account.paymentMakers['base'];
 
-      await expect(paymentMaker.getSourceAddress()).rejects.toThrow(
+      await expect(paymentMaker.getSourceAddress({
+        amount: new BigNumber('10'),
+        currency: 'USDC',
+        receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
+        memo: 'test payment'
+      })).rejects.toThrow(
         /address_for_payment failed/
       );
     });
@@ -80,7 +91,12 @@ describe('ATXPAccount', () => {
 
       const paymentMaker = account.paymentMakers['base'];
 
-      await expect(paymentMaker.getSourceAddress()).rejects.toThrow(
+      await expect(paymentMaker.getSourceAddress({
+        amount: new BigNumber('10'),
+        currency: 'USDC',
+        receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
+        memo: 'test payment'
+      })).rejects.toThrow(
         /did not return sourceAddress/
       );
     });
@@ -101,7 +117,12 @@ describe('ATXPAccount', () => {
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
       const paymentMaker = account.paymentMakers['base'];
-      await paymentMaker.getSourceAddress();
+      await paymentMaker.getSourceAddress({
+        amount: new BigNumber('10'),
+        currency: 'USDC',
+        receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
+        memo: 'test payment'
+      });
 
       const authHeader = mockFetch.mock.calls[0][1].headers['Authorization'];
       expect(authHeader).toMatch(/^Basic /);
@@ -128,8 +149,14 @@ describe('ATXPAccount', () => {
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
       const paymentMaker = account.paymentMakers['base'];
-      const address1 = await paymentMaker.getSourceAddress();
-      const address2 = await paymentMaker.getSourceAddress();
+      const params = {
+        amount: new BigNumber('10'),
+        currency: 'USDC' as const,
+        receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
+        memo: 'test payment'
+      };
+      const address1 = await paymentMaker.getSourceAddress(params);
+      const address2 = await paymentMaker.getSourceAddress(params);
 
       expect(address1).toBe(address2);
       expect(address1).toBe(sourceAddress);

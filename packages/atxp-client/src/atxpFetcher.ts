@@ -1,6 +1,6 @@
 import { BigNumber } from 'bignumber.js';
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Network } from '@atxp/common';
+import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Network, Currency } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch } from '@atxp/common';
@@ -130,7 +130,11 @@ export class ATXPFetcher {
   protected async resolveAtxpBaseDestination(
     network: string,
     paymentInfoUrl: string,
-    paymentRequestId: string
+    paymentRequestId: string,
+    amount: BigNumber,
+    currency: Currency,
+    receiver: string,
+    memo: string
   ): Promise<{ destinationAddress: string; network: Network } | null> {
     // Check if this is an atxp_base network that needs resolution
     if (network !== 'atxp_base' && network !== 'atxp_base_sepolia') {
@@ -150,7 +154,12 @@ export class ATXPFetcher {
     // Get the buyer address (source address) from the payment maker
     let buyerAddress: string;
     try {
-      buyerAddress = await paymentMaker.getSourceAddress();
+      buyerAddress = await paymentMaker.getSourceAddress({
+        amount,
+        currency,
+        receiver,
+        memo
+      });
     } catch (error) {
       this.logger.warn(`ATXP: failed to get source address from payment maker for ${realNetwork}: ${(error as Error).message}`);
       return null;
@@ -219,11 +228,22 @@ export class ATXPFetcher {
 
     // Try each destination in order
     for (const dest of paymentRequestData.destinations) {
+      // Convert amount to BigNumber since it comes as a string from JSON
+      const amount = new BigNumber(dest.amount);
+
       // Resolve atxp_base destinations to real base network destinations
       let destinationAddress = dest.address;
       let destinationNetwork = dest.network;
 
-      const resolved = await this.resolveAtxpBaseDestination(dest.network, dest.address, paymentRequestId);
+      const resolved = await this.resolveAtxpBaseDestination(
+        dest.network,
+        dest.address,
+        paymentRequestId,
+        amount,
+        dest.currency,
+        dest.address,
+        paymentRequestData.iss
+      );
       if (resolved) {
         destinationAddress = resolved.destinationAddress;
         destinationNetwork = resolved.network;
@@ -234,9 +254,6 @@ export class ATXPFetcher {
         this.logger.debug(`ATXP: payment network '${destinationNetwork}' not available, trying next destination`);
         continue;
       }
-
-      // Convert amount to BigNumber since it comes as a string from JSON
-      const amount = new BigNumber(dest.amount);
 
       const prospectivePayment : ProspectivePayment = {
         accountId: this.accountId,
@@ -334,16 +351,6 @@ export class ATXPFetcher {
       throw new Error(`destination not provided`);
     }
 
-    // Resolve atxp_base destinations to real base network destinations
-    let destinationAddress = destination;
-    let destinationNetwork = requestedNetwork;
-
-    const resolved = await this.resolveAtxpBaseDestination(requestedNetwork, destination, paymentRequestId);
-    if (resolved) {
-      destinationAddress = resolved.destinationAddress;
-      destinationNetwork = resolved.network;
-    }
-
     let amount = new BigNumber(0);
     if (!paymentRequestData.amount) {
       throw new Error(`amount not provided`);
@@ -360,6 +367,24 @@ export class ATXPFetcher {
     const currency = paymentRequestData.currency;
     if (!currency) {
       throw new Error(`Currency not provided`);
+    }
+
+    // Resolve atxp_base destinations to real base network destinations
+    let destinationAddress = destination;
+    let destinationNetwork = requestedNetwork;
+
+    const resolved = await this.resolveAtxpBaseDestination(
+      requestedNetwork,
+      destination,
+      paymentRequestId,
+      amount,
+      currency,
+      destination,
+      paymentRequestData.iss
+    );
+    if (resolved) {
+      destinationAddress = resolved.destinationAddress;
+      destinationNetwork = resolved.network;
     }
 
     const paymentMaker = this.paymentMakers.get(destinationNetwork);

@@ -32,7 +32,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     this.logger = logger ?? new ConsoleLogger();
   }
 
-  getSourceAddress(): string {
+  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
     return this.source.publicKey.toBase58();
   }
 
