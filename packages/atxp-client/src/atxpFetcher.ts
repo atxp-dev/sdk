@@ -150,7 +150,7 @@ export class ATXPFetcher {
     // Get the buyer address (source address) from the payment maker
     let buyerAddress: string;
     try {
-      buyerAddress = paymentMaker.getSourceAddress();
+      buyerAddress = await paymentMaker.getSourceAddress();
     } catch (error) {
       this.logger.warn(`ATXP: failed to get source address from payment maker for ${realNetwork}: ${(error as Error).message}`);
       return null;
