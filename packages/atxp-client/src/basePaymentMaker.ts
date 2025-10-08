@@ -120,7 +120,7 @@ export class BasePaymentMaker implements PaymentMaker {
     return jwt;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, _memo: string, _paymentRequestId?: string): Promise<string> {
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
     }

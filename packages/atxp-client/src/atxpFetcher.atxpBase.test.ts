@@ -347,7 +347,8 @@ describe('atxpFetcher atxp_base resolution', () => {
         expect.objectContaining({ _isBigNumber: true }),
         'USDC',
         destinationAddress,
-        expect.any(String)
+        expect.any(String),
+        paymentRequestId
       );
     });
 
@@ -417,7 +418,8 @@ describe('atxpFetcher atxp_base resolution', () => {
         expect.objectContaining({ _isBigNumber: true }),
         'USDC',
         solanaDestination,
-        expect.any(String)
+        expect.any(String),
+        paymentRequestId
       );
     });
   });
@@ -482,7 +484,8 @@ describe('atxpFetcher atxp_base resolution', () => {
         expect.objectContaining({ _isBigNumber: true }),
         'USDC',
         destinationAddress,
-        expect.any(String)
+        expect.any(String),
+        paymentRequestId
       );
     });
   });
