@@ -434,13 +434,6 @@ describe('Developer Token in Registration Metadata', () => {
     expect(metadata.redirect_uris).toBeDefined();
   });
 
-  it.skip('should pass developer token to actual registration request', async () => {
-    // This test requires mocking the oauth4webapi module which is complex
-    // The actual token inclusion is tested in the metadata tests above
-    // In production, the registerClient method will use getRegistrationMetadata
-    // which we've already verified includes the developer token
-  });
-
   it('should consistently include developer token across multiple registrations', async () => {
     const atxpDeveloperToken = 'atxp_dev_consistent_token';
 
