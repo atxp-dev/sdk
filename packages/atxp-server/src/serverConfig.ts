@@ -33,11 +33,16 @@ export function buildServerConfig(args: ATXPArgs): ATXPConfig {
     allowHttp: process.env.NODE_ENV === 'development',
   };
   const withDefaults = { ...envDefaults, ...args };
+
+  // Read developer token from environment
+  const atxpDeveloperToken = process.env.ATXP_DEVELOPER_TOKEN;
+
   const oAuthDb = withDefaults.oAuthDb ?? new MemoryOAuthDb()
   const oAuthClient = withDefaults.oAuthClient ?? new OAuthResourceClient({
     db: oAuthDb,
     allowInsecureRequests: withDefaults.allowHttp,
     clientName: withDefaults.payeeName,
+    atxpDeveloperToken: atxpDeveloperToken,
   });
   const logger = withDefaults.logger ?? new ConsoleLogger();
   const paymentServer = withDefaults.paymentServer ?? new ATXPPaymentServer(withDefaults.server, logger)
