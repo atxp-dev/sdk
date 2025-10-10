@@ -14,6 +14,15 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
 
 // Validate required environment variables
 function validateEnvironment() {
+  // Check for developer token (required)
+  if (!process.env.ATXP_DEVELOPER_TOKEN) {
+    console.error('❌ Missing required environment variable: ATXP_DEVELOPER_TOKEN');
+    console.error('   Please obtain your developer token from https://accounts.atxp.ai/');
+    console.error('   and add it to your .env file:');
+    console.error('   ATXP_DEVELOPER_TOKEN=atxp_dev_...');
+    process.exit(1);
+  }
+
   // Support either ATXP connection string OR static funding destination
   const hasAtxpConnection = process.env.ATXP_CONNECTION_STRING;
   const hasStaticFunding = process.env.FUNDING_DESTINATION && process.env.FUNDING_NETWORK;
@@ -105,6 +114,7 @@ async function main() {
     paymentDestination,
     payeeName: 'ATXP Server Example',
     allowHttp: process.env.NODE_ENV === 'development',
+    atxpDeveloperToken: process.env.ATXP_DEVELOPER_TOKEN!,
   });
   
   // Use the router as middleware - Express v5 compatibility
