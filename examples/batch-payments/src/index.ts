@@ -11,14 +11,6 @@ import { atxpExpress, requirePayment, atxpAccountId, ATXPPaymentDestination } fr
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3011;
 
 async function main() {
-  // Validate required environment variables
-  if (!process.env.ATXP_DEVELOPER_TOKEN) {
-    console.error('❌ Missing required environment variable: ATXP_DEVELOPER_TOKEN');
-    console.error('   Please obtain your developer token from https://accounts.atxp.ai/');
-    console.error('   and add it to your .env file:');
-    console.error('   ATXP_DEVELOPER_TOKEN=atxp_dev_...');
-    process.exit(1);
-  }
   const server = new McpServer({
     name: 'batch-payments-example',
     version: '1.0.0',
@@ -65,8 +57,7 @@ async function main() {
     paymentDestination,
     payeeName: 'Batch Payments Example',
     allowHttp: process.env.NODE_ENV === 'development',
-    minimumPayment: BigNumber(0.05),
-    atxpDeveloperToken: process.env.ATXP_DEVELOPER_TOKEN!,
+    minimumPayment: BigNumber(0.05)
   });
 
   app.use(atxpRouter as any);

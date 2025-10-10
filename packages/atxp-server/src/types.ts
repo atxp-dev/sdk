@@ -48,8 +48,6 @@ export type ATXPConfig = {
   oAuthClient: OAuthResourceClient;
   paymentServer: PaymentServer;
   minimumPayment?: BigNumber;
-  // Developer token for OAuth Dynamic Client Registration verification
-  atxpDeveloperToken: string;
 }
 
 

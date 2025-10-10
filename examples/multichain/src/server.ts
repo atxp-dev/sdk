@@ -49,15 +49,6 @@ const getServer = () => {
   return server;
 }
 
-// Validate required environment variables
-if (!process.env.ATXP_DEVELOPER_TOKEN) {
-  console.error('❌ Missing required environment variable: ATXP_DEVELOPER_TOKEN');
-  console.error('   Please obtain your developer token from https://accounts.atxp.ai/developer');
-  console.error('   and add it to your .env file:');
-  console.error('   ATXP_DEVELOPER_TOKEN=atxp_dev_...');
-  process.exit(1);
-}
-
 const app = express();
 app.use(express.json());
 
@@ -76,8 +67,7 @@ const atxpRouter = atxpExpress({
   mountPath: '/',
   payeeName: 'Multichain Example Server',
   allowHttp: true,
-  logger: new ConsoleLogger({level: LogLevel.DEBUG}),
-  atxpDeveloperToken: process.env.ATXP_DEVELOPER_TOKEN!,
+  logger: new ConsoleLogger({level: LogLevel.DEBUG})
 });
 
 app.use(atxpRouter as any);
