@@ -67,6 +67,7 @@ export function config(args: Partial<ATXPConfig> = {}): ATXPConfig {
     oAuthClient,
     paymentServer: args.paymentServer ?? paymentServer(),
     logger: args.logger ?? mockLogger,
+    atxpDeveloperToken: args.atxpDeveloperToken ?? 'atxp_dev_test123456789',
     ...args
   };
 

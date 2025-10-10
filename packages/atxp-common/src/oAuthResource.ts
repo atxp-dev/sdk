@@ -12,6 +12,7 @@ export interface OAuthResourceClientConfig {
   allowInsecureRequests?: boolean;
   clientName?: string;
   logger?: Logger;
+  atxpDeveloperToken?: string;
 }
 
 export class OAuthResourceClient {
@@ -29,6 +30,7 @@ export class OAuthResourceClient {
   // safe, or a confidential client, which can.
   protected isPublic: boolean;
   protected logger: Logger;
+  protected atxpDeveloperToken?: string;
   // In-memory lock to prevent concurrent client registrations
   private registrationLocks = new Map<string, Promise<ClientCredentials>>();
 
@@ -40,7 +42,8 @@ export class OAuthResourceClient {
     strict = false,
     allowInsecureRequests = process.env.NODE_ENV === 'development',
     clientName = 'Token Introspection Client',
-    logger = new ConsoleLogger()
+    logger = new ConsoleLogger(),
+    atxpDeveloperToken
   }: OAuthResourceClientConfig) {
     // Default values above are appropriate for a global client used directly. Subclasses should override these,
     // because things like the callbackUrl will actually be important for them
@@ -52,6 +55,7 @@ export class OAuthResourceClient {
     this.allowInsecureRequests = allowInsecureRequests;
     this.clientName = clientName;
     this.logger = logger;
+    this.atxpDeveloperToken = atxpDeveloperToken;
   }
 
   static trimToPath = (url: string): string => {
@@ -239,15 +243,20 @@ export class OAuthResourceClient {
 
   protected getRegistrationMetadata = async (): Promise<Partial<oauth.OmitSymbolProperties<oauth.Client>>> => {
     // Create client metadata for registration
-    const clientMetadata = {
+    // Using Record<string, any> to allow custom fields like atxp_developer_token
+    const clientMetadata: Record<string, any> = {
       redirect_uris: [this.callbackUrl],
       // We shouldn't actually need any response_types for this client either, but
       // the OAuth spec requires us to provide a response_type
       response_types: ['code'],
-      grant_types: ['authorization_code', 'client_credentials'], 
+      grant_types: ['authorization_code', 'client_credentials'],
       token_endpoint_auth_method: 'client_secret_basic',
       client_name: this.clientName,
-    }; 
+    };
+    // Add developer token if provided (for developer verification)
+    if (this.atxpDeveloperToken) {
+      clientMetadata.atxp_developer_token = this.atxpDeveloperToken;
+    }
     return clientMetadata;
   }
 
@@ -259,7 +268,7 @@ export class OAuthResourceClient {
     }
 
     const clientMetadata = await this.getRegistrationMetadata();
-    
+
     let registeredClient: oauth.Client;
     try {
       // Make the registration request
