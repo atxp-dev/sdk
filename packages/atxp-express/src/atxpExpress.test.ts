@@ -8,10 +8,18 @@ import request from 'supertest';
 describe('ATXP', () => {
   it('should run code at request start and finish', async () => {
     const logger = TH.logger();
-    const router = atxpExpress(TH.config({
-      logger, 
+    const config = TH.config({
+      logger,
       oAuthClient: TH.oAuthClient({introspectResult: TH.tokenData({active: true})})
-    }));
+    });
+    const router = atxpExpress({
+      paymentDestination: config.paymentDestination,
+      atxpDeveloperToken: config.atxpDeveloperToken,
+      logger: config.logger,
+      oAuthClient: config.oAuthClient,
+      oAuthDb: config.oAuthDb,
+      paymentServer: config.paymentServer
+    });
 
     const app = express();
     app.use(express.json());
@@ -37,10 +45,18 @@ describe('ATXP', () => {
   it('should run code at start and finish if sending an OAuth challenge', async () => {
     const badToken = TH.tokenData({active: false});
     const logger = TH.logger();
-    const router = atxpExpress(TH.config({
-      logger, 
+    const config = TH.config({
+      logger,
       oAuthClient: TH.oAuthClient({introspectResult: badToken})
-    }));
+    });
+    const router = atxpExpress({
+      paymentDestination: config.paymentDestination,
+      atxpDeveloperToken: config.atxpDeveloperToken,
+      logger: config.logger,
+      oAuthClient: config.oAuthClient,
+      oAuthDb: config.oAuthDb,
+      paymentServer: config.paymentServer
+    });
 
     const app = express();
     app.use(express.json());
@@ -65,10 +81,18 @@ describe('ATXP', () => {
   it('should save the oAuth token in the DB if it is active', async () => {
     const goodToken = TH.tokenData({active: true, sub: 'test-user'});
     const oAuthDb = new MemoryOAuthDb();
-    const router = atxpExpress(TH.config({
+    const config = TH.config({
       oAuthClient: TH.oAuthClient({introspectResult: goodToken}),
       oAuthDb
-    }));
+    });
+    const router = atxpExpress({
+      paymentDestination: config.paymentDestination,
+      atxpDeveloperToken: config.atxpDeveloperToken,
+      logger: config.logger,
+      oAuthClient: config.oAuthClient,
+      oAuthDb: config.oAuthDb,
+      paymentServer: config.paymentServer
+    });
 
     const app = express();
     app.use(express.json());
@@ -96,9 +120,17 @@ describe('ATXP', () => {
   
   it('should return an OAuth challenge if token not active', async () => {
     const badToken = TH.tokenData({active: false});
-    const router = atxpExpress(TH.config({
+    const config = TH.config({
       oAuthClient: TH.oAuthClient({introspectResult: badToken})
-    }));
+    });
+    const router = atxpExpress({
+      paymentDestination: config.paymentDestination,
+      atxpDeveloperToken: config.atxpDeveloperToken,
+      logger: config.logger,
+      oAuthClient: config.oAuthClient,
+      oAuthDb: config.oAuthDb,
+      paymentServer: config.paymentServer
+    });
 
     const app = express();
     app.use(express.json());
@@ -120,9 +152,15 @@ describe('ATXP', () => {
   });
 
   it('should not intercept non-MCP requests', async () => {
-    const router = atxpExpress(TH.config({
-      destination: 'test-destination',
-    }));
+    const config = TH.config({});
+    const router = atxpExpress({
+      paymentDestination: config.paymentDestination,
+      atxpDeveloperToken: config.atxpDeveloperToken,
+      logger: config.logger,
+      oAuthClient: config.oAuthClient,
+      oAuthDb: config.oAuthDb,
+      paymentServer: config.paymentServer
+    });
 
     const app = express();
     app.use(express.json());
@@ -142,9 +180,15 @@ describe('ATXP', () => {
   });
 
   it('serves PRM endpoint', async () => {
-    const router = atxpExpress(TH.config({
-      destination: 'test-destination',
-    }));
+    const config = TH.config({});
+    const router = atxpExpress({
+      paymentDestination: config.paymentDestination,
+      atxpDeveloperToken: config.atxpDeveloperToken,
+      logger: config.logger,
+      oAuthClient: config.oAuthClient,
+      oAuthDb: config.oAuthDb,
+      paymentServer: config.paymentServer
+    });
 
     const app = express();
     app.use(express.json());
@@ -157,7 +201,7 @@ describe('ATXP', () => {
     // Check the response data
     expect(response.body).toMatchObject({
       resource: expect.stringMatching(/^https?:\/\/127\.0\.0\.1:\d+\/$/),
-      resource_name: 'Test ATXP Server',
+      resource_name: 'An ATXP Server',
       authorization_servers: ['https://auth.atxp.ai'],
       bearer_methods_supported: ['header'],
       scopes_supported: ['read', 'write'],

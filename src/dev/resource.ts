@@ -47,6 +47,15 @@ app.use(express.json());
 
 const logger = new ConsoleLogger({level: LogLevel.DEBUG});
 
+// Validate required environment variables
+if (!process.env.ATXP_DEVELOPER_TOKEN) {
+  console.error('❌ Missing required environment variable: ATXP_DEVELOPER_TOKEN');
+  console.error('   Please obtain your developer token from https://accounts.atxp.ai/developer');
+  console.error('   and add it to your .env file:');
+  console.error('   ATXP_DEVELOPER_TOKEN=atxp_dev_...');
+  process.exit(1);
+}
+
 const destinationAddress = process.env.ATXP_DESTINATION!;
 //const destination = new ChainPaymentDestination(destinationAddress, 'base');
 const destination = new ATXPPaymentDestination(destinationAddress, { logger });
@@ -58,7 +67,8 @@ app.use(atxpExpress({
   payeeName: 'ATXP Client Example Resource Server',
   minimumPayment: BigNumber(0.05),
   allowHttp: true,
-  logger
+  logger,
+  atxpDeveloperToken: process.env.ATXP_DEVELOPER_TOKEN,
 }));
 
 

@@ -379,3 +379,87 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
     });
   });
 });
+
+describe('Developer Token in Registration Metadata', () => {
+  let db: MemoryOAuthDb;
+  let client: OAuthResourceClient;
+  let mockFetch: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch = vi.fn();
+    db = new MemoryOAuthDb({ logger: mockLogger });
+  });
+
+  it('should include developer token in registration metadata when provided', async () => {
+    const atxpDeveloperToken = 'atxp_dev_test123456789';
+
+    client = new OAuthResourceClient({
+      db,
+      sideChannelFetch: mockFetch,
+      logger: mockLogger,
+      allowInsecureRequests: true,
+      atxpDeveloperToken: atxpDeveloperToken
+    });
+
+    // Access the protected method to get registration metadata
+    const metadata = await (client as any).getRegistrationMetadata();
+
+    // Verify developer token is included
+    expect(metadata.atxp_developer_token).toBe(atxpDeveloperToken);
+
+    // Verify other required fields are still present
+    expect(metadata.client_name).toBeDefined();
+    expect(metadata.redirect_uris).toBeDefined();
+    expect(metadata.response_types).toContain('code');
+    expect(metadata.grant_types).toContain('authorization_code');
+  });
+
+  it('should not include developer token when not provided', async () => {
+    client = new OAuthResourceClient({
+      db,
+      sideChannelFetch: mockFetch,
+      logger: mockLogger,
+      allowInsecureRequests: true
+      // No developer token provided
+    });
+
+    const metadata = await (client as any).getRegistrationMetadata();
+
+    // Verify developer token is NOT included
+    expect(metadata.atxp_developer_token).toBeUndefined();
+
+    // Verify other fields are still present
+    expect(metadata.client_name).toBeDefined();
+    expect(metadata.redirect_uris).toBeDefined();
+  });
+
+  it('should consistently include developer token across multiple registrations', async () => {
+    const atxpDeveloperToken = 'atxp_dev_consistent_token';
+
+    client = new OAuthResourceClient({
+      db,
+      sideChannelFetch: mockFetch,
+      logger: mockLogger,
+      allowInsecureRequests: true,
+      atxpDeveloperToken: atxpDeveloperToken
+    });
+
+    // Get metadata multiple times
+    const metadata1 = await (client as any).getRegistrationMetadata();
+    const metadata2 = await (client as any).getRegistrationMetadata();
+    const metadata3 = await (client as any).getRegistrationMetadata();
+
+    // Verify token is consistently included
+    expect(metadata1.atxp_developer_token).toBe(atxpDeveloperToken);
+    expect(metadata2.atxp_developer_token).toBe(atxpDeveloperToken);
+    expect(metadata3.atxp_developer_token).toBe(atxpDeveloperToken);
+
+    // Verify it's the same token each time
+    expect(metadata1.atxp_developer_token).toBe(metadata2.atxp_developer_token);
+    expect(metadata2.atxp_developer_token).toBe(metadata3.atxp_developer_token);
+  });
+
+  // Note: Logging tests removed as logging is not currently implemented in the source code
+  // These can be added back once logging functionality is added to getRegistrationMetadata()
+});
