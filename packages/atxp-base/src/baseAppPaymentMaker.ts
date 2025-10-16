@@ -82,38 +82,40 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return this.smartWallet.account.address;
   }
 
-  async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
+  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string}): Promise<string> {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
-    
+
     const message = constructEIP1271Message({
       walletAddress: this.smartWallet.account.address,
       timestamp,
       codeChallenge,
-      paymentRequestId
+      paymentRequestId,
+      ...(accountId ? { accountId } : {}),
     });
-    
+
     // Sign the message - this will return an ABI-encoded signature from the smart wallet
     const signature = await this.smartWallet.account.signMessage({
       message: message
     });
-    
+
     const authData = createEIP1271AuthData({
       walletAddress: this.smartWallet.account.address,
       message,
       signature,
       timestamp,
       codeChallenge,
-      paymentRequestId
+      paymentRequestId,
+      ...(accountId ? { accountId } : {}),
     });
-    
+
     const jwtToken = createEIP1271JWT(authData);
-    
+
     this.logger.info(`codeChallenge: ${codeChallenge}`);
     this.logger.info(`paymentRequestId: ${paymentRequestId}`);
     this.logger.info(`walletAddress: ${this.smartWallet.account.address}`);
     this.logger.info(`Generated EIP-1271 JWT: ${jwtToken}`);
-    
+
     return jwtToken;
   }
 

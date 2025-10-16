@@ -277,7 +277,7 @@ export class ATXPFetcher {
         await this.onPayment({ payment: prospectivePayment });
 
         // Submit payment to the server
-        const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
+        const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: '', accountId: this.accountId});
         const response = await this.sideChannelFetch(paymentRequestUrl.toString(), {
           method: 'PUT',
           headers: {
@@ -423,7 +423,7 @@ export class ATXPFetcher {
       throw paymentError;
     }
 
-    const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: ''});
+    const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: '', accountId: this.accountId});
 
     // Make a fetch call to the authorization URL with the payment ID
     // redirect=false is a hack
@@ -490,7 +490,7 @@ export class ATXPFetcher {
       throw new Error(`Payment maker is missing generateJWT method. Available payment makers: [${availableNetworks}]. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.`);
     }
 
-    const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge});
+    const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId: this.accountId});
 
     // Make a fetch call to the authorization URL with the payment ID
     // redirect=false is a hack

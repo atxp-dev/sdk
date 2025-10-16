@@ -36,7 +36,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     return this.source.publicKey.toBase58();
   }
 
-  generateJWT = async({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> => {
+  generateJWT = async({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string}): Promise<string> => {
     // Solana/Web3.js secretKey is 64 bytes:
     // first 32 bytes are the private scalar, last 32 are the public key.
     // JWK expects only the 32-byte private scalar for 'd'
@@ -50,7 +50,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     if (!(privateKey instanceof CryptoKey)) {
       throw new Error('Expected CryptoKey from importJWK');
     }
-    return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '');
+    return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '', accountId);
   }
 
   makePayment = async (amount: BigNumber, currency: Currency, receiver: string, memo: string, _paymentRequestId?: string): Promise<string> => {

@@ -42,6 +42,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   async generateJWT(payload: {
     paymentRequestId: string;
     codeChallenge: string;
+    accountId?: string;
   }): Promise<string> {
     this.logger.info(`codeChallenge: ${payload.codeChallenge}`);
     this.logger.info(`paymentRequestId: ${payload.paymentRequestId}`);
@@ -49,26 +50,27 @@ export class MainWalletPaymentMaker implements PaymentMaker {
 
     // Generate EIP-1271 auth data for main wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
-    
+
     const message = constructEIP1271Message({
       walletAddress: this.walletAddress,
       timestamp,
       codeChallenge: payload.codeChallenge,
-      paymentRequestId: payload.paymentRequestId
+      paymentRequestId: payload.paymentRequestId,
+      ...(payload.accountId ? { accountId: payload.accountId } : {}),
     });
 
     // Sign with the main wallet
     // Coinbase Wallet requires hex-encoded messages, while other wallets may accept plain strings
     let messageToSign: string;
-    
+
     // Check if this is Coinbase Wallet by looking for provider properties
     const providerWithCoinbase = this.provider as MainWalletProvider & {
       isCoinbaseWallet?: boolean;
       isCoinbaseBrowser?: boolean;
     };
-    const isCoinbaseWallet = providerWithCoinbase.isCoinbaseWallet || 
+    const isCoinbaseWallet = providerWithCoinbase.isCoinbaseWallet ||
                             providerWithCoinbase.isCoinbaseBrowser;
-    
+
     if (isCoinbaseWallet) {
       // Coinbase Wallet requires hex-encoded messages
       messageToSign = toHex(message);
@@ -78,7 +80,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       messageToSign = message;
       this.logger.info('Using plain string message for wallet');
     }
-    
+
     const signature = await this.provider.request({
       method: 'personal_sign',
       params: [messageToSign, this.walletAddress]
@@ -90,13 +92,14 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       signature,
       timestamp,
       codeChallenge: payload.codeChallenge,
-      paymentRequestId: payload.paymentRequestId
+      paymentRequestId: payload.paymentRequestId,
+      ...(payload.accountId ? { accountId: payload.accountId } : {}),
     });
 
     const jwtToken = createEIP1271JWT(authData);
-    
+
     this.logger.info(`Generated EIP-1271 JWT: ${jwtToken}`);
-    
+
     return jwtToken;
   }
 
