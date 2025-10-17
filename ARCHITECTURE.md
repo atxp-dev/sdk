@@ -328,17 +328,14 @@ export class ATXPDestinationMapper implements DestinationMapper {
     sourceAddresses: Array<{network: Network, address: string}>
   ): Promise<PaymentDestination[]> {
 
-    const paymentInfoUrl = destination.address;
-
-    // Check if address looks like ATXP accounts URL
-    if (!paymentInfoUrl.includes('accounts.atxp.ai/a/')) {
-      // Not an ATXP URL, return unchanged
+    // Check if this is an ATXP network destination
+    if (destination.network !== 'atxp') {
+      // Not an ATXP destination, return unchanged
       return [destination];
     }
 
-    // Parse account ID from URL and construct payment_info endpoint
-    // URL format: https://accounts.atxp.ai/a/${accountId}
-    const accountId = paymentInfoUrl.split('/a/')[1];
+    // For ATXP network, the address IS the account ID
+    const accountId = destination.address;
     const paymentInfoEndpoint = `https://accounts.atxp.ai/payment_info/${accountId}`;
 
     // Build buyerAddresses object from sourceAddresses array
@@ -574,7 +571,7 @@ const config = atxpExpress({
   destinations: [
     {
       network: 'atxp',
-      address: `https://accounts.atxp.ai/a/${accountId}`
+      address: accountId  // Just the account ID, e.g., 'acct_123'
     }
   ],
   // ...
@@ -586,7 +583,7 @@ const config = atxpExpress({
 - Do NOT use connection string
 - `destinations` array with plain objects (no ServerAccount interface)
 - Currency at root level of config
-- Use `https://accounts.atxp.ai/a/${accountId}` URL format
+- Address field contains just the account ID (not full URL)
 - Use `atxp` network name (NOT `atxp_base`)
 
 ---
@@ -649,7 +646,7 @@ const config = atxpExpress({
   destinations: [
     {
       network: 'atxp',
-      address: `https://accounts.atxp.ai/a/${process.env.ATXP_ACCOUNT_ID}`
+      address: process.env.ATXP_ACCOUNT_ID  // Just the account ID, e.g., 'acct_123'
     }
   ],
   // ...
@@ -894,7 +891,7 @@ The following items are explicitly OUT of scope for this refactor:
 - Simple `destinations` array with plain objects (no ServerAccount interface needed)
 - Currency at root level of config
 - Static configuration only
-- Use `https://accounts.atxp.ai/a/${accountId}` URL format
+- Address field contains just the account ID (not full URL)
 
 ### Success Criteria
 - Server never needs to call account service

@@ -29,11 +29,14 @@ export interface DestinationMapper {
 }
 
 /**
- * ATXPDestinationMapper resolves ATXP account URLs to concrete payment destinations.
+ * ATXPDestinationMapper resolves ATXP account IDs to concrete payment destinations.
  *
- * This mapper calls the ATXP accounts service to resolve ATXP URLs like
- * https://accounts.atxp.ai/a/{accountId} into concrete destinations (e.g., Stripe
- * base address, or cross-chain base + solana addresses).
+ * This mapper calls the ATXP accounts service to resolve destinations with network='atxp'
+ * and address={accountId} into concrete destinations (e.g., Stripe base address,
+ * or cross-chain base + solana addresses).
+ *
+ * For ATXP destinations, the address field contains just the account ID (e.g., 'acct_123'),
+ * not a full URL. The mapper constructs the payment_info endpoint URL internally.
  *
  * The accounts service is an implementation detail - the DestinationMapper interface
  * itself is generic and doesn't know about accounts service.
@@ -49,24 +52,14 @@ export class ATXPDestinationMapper implements DestinationMapper {
     sourceAddresses: Array<{network: Network, address: string}>
   ): Promise<PaymentDestination[]> {
 
-    const paymentInfoUrl = destination.address;
-
-    // Check if address looks like ATXP accounts URL
-    // CRITICAL: Do NOT check for specific networks - defer to accounts service
-    if (!paymentInfoUrl.includes('accounts.atxp.ai/a/')) {
-      // Not an ATXP URL, return unchanged
+    // Check if this is an ATXP network destination
+    if (destination.network !== 'atxp') {
+      // Not an ATXP destination, return unchanged
       return [destination];
     }
 
-    // Parse account ID from URL and construct payment_info endpoint
-    // URL format: https://accounts.atxp.ai/a/${accountId}
-    const accountIdMatch = paymentInfoUrl.match(/\/a\/([^/]+)/);
-    if (!accountIdMatch) {
-      this.logger.warn(`Invalid ATXP URL format: ${paymentInfoUrl}`);
-      return [destination];
-    }
-
-    const accountId = accountIdMatch[1];
+    // For ATXP network, the address IS the account ID
+    const accountId = destination.address;
     const paymentInfoEndpoint = `https://accounts.atxp.ai/payment_info/${accountId}`;
 
     // Build buyerAddresses object from sourceAddresses array
