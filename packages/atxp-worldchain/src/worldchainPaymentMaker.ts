@@ -186,7 +186,7 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     return this.smartWallet.account.address;
   }
 
-  async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
+  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string}): Promise<string> {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
 
@@ -194,7 +194,8 @@ export class WorldchainPaymentMaker implements PaymentMaker {
       walletAddress: this.smartWallet.account.address,
       timestamp,
       codeChallenge,
-      paymentRequestId
+      paymentRequestId,
+      ...(accountId ? { accountId } : {}),
     });
 
     // Sign the message - this will return an ABI-encoded signature from the smart wallet
@@ -208,7 +209,8 @@ export class WorldchainPaymentMaker implements PaymentMaker {
       signature,
       timestamp,
       codeChallenge,
-      paymentRequestId
+      paymentRequestId,
+      ...(accountId ? { accountId } : {}),
     });
 
     return createEIP1271JWT(authData);

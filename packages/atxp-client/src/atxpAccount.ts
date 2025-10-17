@@ -90,7 +90,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     return json.txHash;
   }
 
-  async generateJWT(params: { paymentRequestId: string; codeChallenge: string }): Promise<string> {
+  async generateJWT(params: { paymentRequestId: string; codeChallenge: string; accountId?: string }): Promise<string> {
     const response = await this.fetchFn(`${this.origin}/sign`, {
       method: 'POST',
       headers: {
@@ -100,6 +100,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
       body: JSON.stringify({
         paymentRequestId: params.paymentRequestId,
         codeChallenge: params.codeChallenge,
+        ...(params.accountId ? { accountId: params.accountId } : {}),
       }),
     });
     if (!response.ok) {
@@ -132,9 +133,9 @@ export class ATXPAccount implements Account {
     this.fetchFn = fetchFn;
 
     if (accountId) {
-      this.accountId = `atxp:${accountId}`;
+      this.accountId = `atxp_${accountId}`;
     } else {
-      this.accountId = `atxp:${crypto.randomUUID()}`;
+      this.accountId = `atxp_${crypto.randomUUID()}`;
     }
     this.paymentMakers = {
       [network]: new ATXPHttpPaymentMaker(origin, token, fetchFn),

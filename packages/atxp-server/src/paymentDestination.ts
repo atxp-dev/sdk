@@ -9,6 +9,7 @@ export type FundingAmount = {
 export type PaymentAddress = {
   destination: string;
   network: Network;
+  accountId?: string;
 }
 
 export interface PaymentDestination {

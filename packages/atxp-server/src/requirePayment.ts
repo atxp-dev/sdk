@@ -48,6 +48,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
       network: addr.network,
       currency: config.currency,
       address: addr.destination,
+      accountId: addr.accountId,
       amount: paymentConfig.price // Each destination gets the requested amount for charge
     })),
     source: user,
@@ -76,6 +77,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
       network: addr.network,
       currency: config.currency,
       address: addr.destination,
+      accountId: addr.accountId,
       amount: paymentAmount // Use minimumPayment or requested amount
     }))
   };

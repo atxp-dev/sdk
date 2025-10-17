@@ -83,7 +83,7 @@ export class BasePaymentMaker implements PaymentMaker {
     return this.signingClient.account!.address;
   }
 
-  async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
+  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string}): Promise<string> {
     const headerObj = { alg: 'ES256K' };
 
     const payloadObj = {
@@ -94,6 +94,7 @@ export class BasePaymentMaker implements PaymentMaker {
       exp: Math.floor(Date.now() / 1000) + 60 * 60,
       ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
       ...(paymentRequestId ? { payment_request_id: paymentRequestId } : {}),
+      ...(accountId ? { account_id: accountId } : {}),
     } as Record<string, unknown>;
 
     const header = toBase64Url(JSON.stringify(headerObj));

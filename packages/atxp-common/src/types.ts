@@ -26,6 +26,7 @@ export type PaymentRequestDestination = {
   network: Network;
   currency: Currency;
   address: string;
+  accountId?: string;
   amount: BigNumber;
 }
 
@@ -48,6 +49,7 @@ export type PaymentRequestData = {
 export type CustomJWTPayload = {
   code_challenge?: string;
   payment_request_id?: string;
+  account_id?: string;
 }
 
 export type ClientCredentials = {

@@ -56,10 +56,12 @@ export class MainWalletPaymentMaker implements PaymentMaker {
 
   async generateJWT({
     paymentRequestId,
-    codeChallenge
+    codeChallenge,
+    accountId
   }: {
     paymentRequestId: string;
     codeChallenge: string;
+    accountId?: string;
   }): Promise<string> {
     const timestamp = Math.floor(Date.now() / 1000);
 
@@ -77,7 +79,8 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       exp: timestamp + 3600, // 1 hour expiration
       payment_request_id: paymentRequestId,
       code_challenge: codeChallenge,
-      chain_id: this.chainId
+      chain_id: this.chainId,
+      ...(accountId ? { account_id: accountId } : {}),
     };
 
     // Encode header and payload to base64url

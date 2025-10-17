@@ -78,6 +78,6 @@ export class PaymentNetworkError extends Error {
 
 export interface PaymentMaker {
   makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string) => Promise<string>;
-  generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;
+  generateJWT: (params: {paymentRequestId: string, codeChallenge: string, accountId?: string}) => Promise<string>;
   getSourceAddress: (params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}) => string | Promise<string>;
 }
