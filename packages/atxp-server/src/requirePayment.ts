@@ -1,22 +1,6 @@
-import { RequirePaymentConfig, paymentRequiredError, Currency } from "@atxp/common";
+import { RequirePaymentConfig, paymentRequiredError } from "@atxp/common";
 import { getATXPConfig, atxpAccountId } from "./atxpContext.js";
-import { PaymentAddress, FundingAmount } from "./paymentDestination.js";
 import { ATXPConfig } from "./types.js";
-import BigNumber from "bignumber.js";
-
-/**
- * Get payment destinations for a user, with caching to avoid repeated HTTP calls.
- * This is an internal helper function used by requirePayment.
- */
-async function getPaymentDestinations(
-  config: ATXPConfig,
-  user: string,
-  amount: BigNumber,
-  currency: Currency
-): Promise<PaymentAddress[]> {
-  const fundingAmount: FundingAmount = { amount, currency };
-  return await config.paymentDestination.destinations(fundingAmount);
-}
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
   const config = getATXPConfig();
@@ -34,22 +18,17 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     ? config.minimumPayment
     : paymentConfig.price;
 
-  // Get payment destinations (with caching)
-  const paymentAddresses = await getPaymentDestinations(
-    config,
-    user,
-    paymentAmount,
-    config.currency
-  );
+  // Use configured destinations directly (no dynamic lookup)
+  const paymentAddresses = config.destinations.map(dest => ({
+    network: dest.network,
+    currency: config.currency,
+    address: dest.address,
+    amount: paymentConfig.price // Each destination gets the requested amount for charge
+  }));
 
   // Always use multi-destination format
   const charge = {
-    destinations: paymentAddresses.map(addr => ({
-      network: addr.network,
-      currency: config.currency,
-      address: addr.destination,
-      amount: paymentConfig.price // Each destination gets the requested amount for charge
-    })),
+    destinations: paymentAddresses,
     source: user,
     payeeName: config.payeeName,
   };
@@ -72,10 +51,10 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   const paymentRequest = {
     source: charge.source,
     payeeName: charge.payeeName,
-    destinations: paymentAddresses.map(addr => ({
-      network: addr.network,
+    destinations: config.destinations.map(dest => ({
+      network: dest.network,
       currency: config.currency,
-      address: addr.destination,
+      address: dest.address,
       amount: paymentAmount // Use minimumPayment or requested amount
     }))
   };

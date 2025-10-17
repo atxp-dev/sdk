@@ -1,6 +1,6 @@
-import type { PaymentMaker, Hex } from './types.js';
+import type { PaymentMaker, Hex, PaymentDestination, PaymentObject } from './types.js';
 import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from './types.js';
-import { Logger, Currency } from '@atxp/common';
+import { Logger, Currency, Network } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
@@ -79,8 +79,11 @@ export class BasePaymentMaker implements PaymentMaker {
     this.logger = logger ?? new ConsoleLogger();
   }
 
-  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
-    return this.signingClient.account!.address;
+  async getSourceAddresses(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<Array<{network: Network, address: string}>> {
+    return [{
+      network: 'base' as Network,
+      address: this.signingClient.account!.address
+    }];
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
@@ -120,12 +123,19 @@ export class BasePaymentMaker implements PaymentMaker {
     return jwt;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, _memo: string, _paymentRequestId?: string): Promise<string> {
-    if (currency.toUpperCase() !== 'USDC') {
-      throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
+  async makePayment(destinations: PaymentDestination[], memo: string, _paymentRequestId?: string): Promise<PaymentObject | null> {
+    // Find a compatible destination (base network)
+    const dest = destinations.find(d => d.network === 'base');
+    if (!dest) {
+      this.logger.debug('BasePaymentMaker: no base network destination found');
+      return null;
     }
 
-    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base from ${this.signingClient.account!.address}`);
+    if (dest.currency.toUpperCase() !== 'USDC') {
+      throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + dest.currency);
+    }
+
+    this.logger.info(`Making payment of ${dest.amount} ${dest.currency} to ${dest.address} on Base from ${this.signingClient.account!.address}`);
 
     try {
       // Check balance before attempting payment
@@ -138,18 +148,18 @@ export class BasePaymentMaker implements PaymentMaker {
 
       const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** USDC_DECIMALS);
 
-      if (balance.lt(amount)) {
-        this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
-        throw new InsufficientFundsErrorClass(currency, amount, balance, 'base');
+      if (balance.lt(dest.amount)) {
+        this.logger.warn(`Insufficient ${dest.currency} balance for payment. Required: ${dest.amount}, Available: ${balance}`);
+        throw new InsufficientFundsErrorClass(dest.currency, dest.amount, balance, 'base');
       }
 
       // Convert amount to USDC units (6 decimals) as BigInt
-      const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
+      const amountInUSDCUnits = BigInt(dest.amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
 
       const data = encodeFunctionData({
         abi: ERC20_ABI,
         functionName: "transfer",
-        args: [receiver as Address, amountInUSDCUnits],
+        args: [dest.address as Address, amountInUSDCUnits],
       });
       const hash = await this.signingClient.sendTransaction({
         chain: base,
@@ -173,7 +183,13 @@ export class BasePaymentMaker implements PaymentMaker {
 
       this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
 
-      return hash;
+      return {
+        network: 'base' as Network,
+        address: dest.address,
+        amount: dest.amount,
+        currency: dest.currency,
+        transactionId: hash
+      };
     } catch (error) {
       if (error instanceof InsufficientFundsErrorClass || error instanceof PaymentNetworkErrorClass) {
         throw error;

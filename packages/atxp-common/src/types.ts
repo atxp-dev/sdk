@@ -20,7 +20,7 @@ export type UrlString = `http://${string}` | `https://${string}`;
 export type AuthorizationServerUrl = UrlString;
 
 export type Currency = 'USDC';
-export type Network = 'solana' | 'base' | 'world' | 'base_sepolia' | 'world_sepolia' | 'atxp_base' | 'atxp_base_sepolia';
+export type Network = 'solana' | 'base' | 'world' | 'base_sepolia' | 'world_sepolia' | 'atxp';
 
 export type PaymentRequestDestination = {
   network: Network;

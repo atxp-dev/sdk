@@ -1,9 +1,11 @@
 import {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
   WORLD_CHAIN_MAINNET,
-  type PaymentMaker
+  type PaymentMaker,
+  type PaymentDestination,
+  type PaymentObject
 } from '@atxp/client';
-import { Logger, Currency, ConsoleLogger } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, Network } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
@@ -182,8 +184,11 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     this.confirmationDelays = finalDelays;
   }
 
-  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
-    return this.smartWallet.account.address;
+  async getSourceAddresses(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<Array<{network: Network, address: string}>> {
+    return [{
+      network: 'world' as Network,
+      address: this.smartWallet.account.address
+    }];
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
@@ -214,22 +219,29 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     return createEIP1271JWT(authData);
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
-    if (currency !== 'USDC') {
-      throw new Error('Only usdc currency is supported; received ' + currency);
+  async makePayment(destinations: PaymentDestination[], memo: string, _paymentRequestId?: string): Promise<PaymentObject | null> {
+    // Find a compatible destination (world network)
+    const dest = destinations.find(d => d.network === 'world');
+    if (!dest) {
+      this.logger.debug('WorldchainPaymentMaker: no world network destination found');
+      return null;
+    }
+
+    if (dest.currency !== 'USDC') {
+      throw new Error('Only usdc currency is supported; received ' + dest.currency);
     }
 
     // Use World Chain Mainnet configuration
     const usdcAddress = USDC_CONTRACT_ADDRESS_WORLD_MAINNET;
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
-    const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
+    const amountInUSDCUnits = BigInt(dest.amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
     const spendCalls = await prepareSpendCallData({ permission: this.spendPermission, amount: amountInUSDCUnits });
 
     // Add a second call to transfer USDC from the smart wallet to the receiver
     let transferCallData = encodeFunctionData({
       abi: ERC20_ABI,
       functionName: "transfer",
-      args: [receiver as Address, amountInUSDCUnits],
+      args: [dest.address as Address, amountInUSDCUnits],
     });
 
     // Append memo to transfer call data if present
@@ -286,6 +298,12 @@ export class WorldchainPaymentMaker implements PaymentMaker {
 
     // Return the actual transaction hash, not the user operation hash
     // The payment verification system needs the on-chain transaction hash
-    return txHash;
+    return {
+      network: 'world' as Network,
+      address: dest.address,
+      amount: dest.amount,
+      currency: dest.currency,
+      transactionId: txHash
+    };
   }
 }

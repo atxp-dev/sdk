@@ -11,7 +11,7 @@ export type AccountIdString = `${AccountPrefix}${string}`;
 
 export type Account = {
   accountId: string;
-  paymentMakers: {[key: string]: PaymentMaker};
+  paymentMakers: PaymentMaker[];
 }
 
 export type ProspectivePayment = {
@@ -76,8 +76,36 @@ export class PaymentNetworkError extends Error {
   }
 }
 
+export type PaymentDestination = {
+  network: Network;
+  address: string;
+  amount: BigNumber;
+  currency: Currency;
+  paymentRequestId?: string;
+  accountId?: string;
+}
+
+export type PaymentObject = {
+  network: Network;
+  address: string;
+  amount: BigNumber;
+  currency: Currency;
+  transactionId: string;
+}
+
 export interface PaymentMaker {
-  makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string) => Promise<string>;
+  makePayment: (
+    destinations: PaymentDestination[],
+    memo: string,
+    paymentRequestId?: string
+  ) => Promise<PaymentObject | null>;
+
   generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;
-  getSourceAddress: (params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}) => string | Promise<string>;
+
+  getSourceAddresses: (params: {
+    amount: BigNumber,
+    currency: Currency,
+    receiver: string,
+    memo: string
+  }) => Promise<Array<{network: Network, address: string}>>;
 }

@@ -56,7 +56,7 @@ export function config(args: Partial<ATXPConfig> = {}): ATXPConfig {
   } as any;
 
   const config: ATXPConfig = {
-    paymentDestination: args.paymentDestination ?? new ChainPaymentDestination(DESTINATION, 'base'),
+    destinations: args.destinations ?? [{network: 'base', address: DESTINATION}],
     mountPath: args.mountPath ?? '/',
     currency: args.currency ?? 'USDC',
     server: args.server ?? DEFAULT_AUTHORIZATION_SERVER,

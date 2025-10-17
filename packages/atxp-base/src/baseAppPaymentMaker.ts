@@ -1,7 +1,8 @@
-import { getBaseUSDCAddress, type PaymentMaker } from '@atxp/client';
+import { getBaseUSDCAddress, type PaymentMaker, type PaymentDestination, type PaymentObject } from '@atxp/client';
 import { base } from 'viem/chains';
-import { Logger, Currency, ConsoleLogger } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, Network } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
+import BigNumber from 'bignumber.js';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
 import { prepareSpendCallData } from './spendPermissionShim.js';
@@ -78,26 +79,29 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     this.usdcAddress = getBaseUSDCAddress(chainId);
   }
 
-  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
-    return this.smartWallet.account.address;
+  async getSourceAddresses(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<Array<{network: Network, address: string}>> {
+    return [{
+      network: 'base' as Network,
+      address: this.smartWallet.account.address
+    }];
   }
 
   async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
-    
+
     const message = constructEIP1271Message({
       walletAddress: this.smartWallet.account.address,
       timestamp,
       codeChallenge,
       paymentRequestId
     });
-    
+
     // Sign the message - this will return an ABI-encoded signature from the smart wallet
     const signature = await this.smartWallet.account.signMessage({
       message: message
     });
-    
+
     const authData = createEIP1271AuthData({
       walletAddress: this.smartWallet.account.address,
       message,
@@ -106,33 +110,40 @@ export class BaseAppPaymentMaker implements PaymentMaker {
       codeChallenge,
       paymentRequestId
     });
-    
+
     const jwtToken = createEIP1271JWT(authData);
-    
+
     this.logger.info(`codeChallenge: ${codeChallenge}`);
     this.logger.info(`paymentRequestId: ${paymentRequestId}`);
     this.logger.info(`walletAddress: ${this.smartWallet.account.address}`);
     this.logger.info(`Generated EIP-1271 JWT: ${jwtToken}`);
-    
+
     return jwtToken;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
-    if (currency !== 'USDC') {
-      throw new Error('Only usdc currency is supported; received ' + currency);
+  async makePayment(destinations: PaymentDestination[], memo: string, _paymentRequestId?: string): Promise<PaymentObject | null> {
+    // Find a compatible destination (base network)
+    const dest = destinations.find(d => d.network === 'base');
+    if (!dest) {
+      this.logger.debug('BaseAppPaymentMaker: no base network destination found');
+      return null;
     }
 
-    this.logger.info(`Making spendPermission payment of ${amount} ${currency} to ${receiver} on Base with memo: ${memo}`);
+    if (dest.currency !== 'USDC') {
+      throw new Error('Only usdc currency is supported; received ' + dest.currency);
+    }
+
+    this.logger.info(`Making spendPermission payment of ${dest.amount} ${dest.currency} to ${dest.address} on Base with memo: ${memo}`);
 
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
-    const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
+    const amountInUSDCUnits = BigInt(dest.amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
     const spendCalls = await prepareSpendCallData({ permission: this.spendPermission, amount: amountInUSDCUnits });
-    
+
     // Add a second call to transfer USDC from the smart wallet to the receiver
     let transferCallData = encodeFunctionData({
       abi: ERC20_ABI,
       functionName: "transfer",
-      args: [receiver as Address, amountInUSDCUnits],
+      args: [dest.address as Address, amountInUSDCUnits],
     });
     
     // Append memo to transfer call data if present
@@ -182,14 +193,20 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     }
     
     this.logger.info(`Spend permission executed successfully. UserOp: ${receipt.userOpHash}, TxHash: ${txHash}`);
-    
+
     // Wait for additional confirmations to ensure the transaction is well-propagated
     // This helps avoid the "Transaction receipt could not be found" error
     await waitForTransactionConfirmations(this.smartWallet, txHash, 2, this.logger);
-    
+
     // Return the actual transaction hash, not the user operation hash
     // The payment verification system needs the on-chain transaction hash
-    return txHash;
+    return {
+      network: 'base' as Network,
+      address: dest.address,
+      amount: dest.amount,
+      currency: dest.currency,
+      transactionId: txHash
+    };
   }
 
   /**
