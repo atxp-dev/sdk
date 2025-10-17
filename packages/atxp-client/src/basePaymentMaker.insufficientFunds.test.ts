@@ -86,15 +86,15 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     mockSigningClient.readContract.mockResolvedValue(balanceInWei);
 
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver')
+      paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}])
     ).rejects.toThrow(InsufficientFundsError);
 
     // Verify the error details
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver');
+      await paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}]);
     } catch (error) {
       expect(error).toBeInstanceOf(InsufficientFundsError);
-      
+
       if (error instanceof InsufficientFundsError) {
         expect(error.currency).toBe('USDC');
         expect(error.required.toString()).toBe('10');
@@ -129,13 +129,15 @@ describe('BasePaymentMaker insufficient funds handling', () => {
       blockNumber: BigInt(12345),
     });
 
-    const result = await paymentMaker.makePayment(
-      new BigNumber('10'), 
-      'USDC', 
-      '0xreceiver'
-    );
+    const result = await paymentMaker.makePayment([{
+      network: 'base',
+      address: '0xreceiver',
+      amount: new BigNumber('10'),
+      currency: 'USDC',
+      paymentRequestId: 'test'
+    }]);
 
-    expect(result).toBe('0xtransactionhash');
+    expect(result.transactionId).toBe('0xtransactionhash');
     expect(mockSigningClient.readContract).toHaveBeenCalled();
     expect(mockSigningClient.sendTransaction).toHaveBeenCalled();
     expect(mockSigningClient.waitForTransactionReceipt).toHaveBeenCalled();
@@ -143,14 +145,14 @@ describe('BasePaymentMaker insufficient funds handling', () => {
 
   it('should throw PaymentNetworkError for unsupported currency', async () => {
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'ETH' as any, '0xreceiver')
+      paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('10'), currency: 'ETH' as any, paymentRequestId: 'test'}])
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'ETH' as any, '0xreceiver');
+      await paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('10'), currency: 'ETH' as any, paymentRequestId: 'test'}]);
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
-      
+
       if (error instanceof PaymentNetworkError) {
         expect(error.message).toContain('Only USDC currency is supported');
       }
@@ -173,14 +175,14 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     });
 
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver')
+      paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}])
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver');
+      await paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}]);
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
-      
+
       if (error instanceof PaymentNetworkError) {
         expect(error.message).toContain('Transaction reverted');
         expect(error.originalError?.message).toContain('Transaction reverted on chain');
@@ -194,14 +196,14 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     mockSigningClient.readContract.mockRejectedValue(unexpectedError);
 
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver')
+      paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}])
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver');
+      await paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}]);
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
-      
+
       if (error instanceof PaymentNetworkError) {
         expect(error.message).toContain('Payment failed on Base network');
         expect(error.message).toContain('RPC connection failed');
@@ -216,11 +218,11 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     mockSigningClient.readContract.mockResolvedValue(balanceInWei);
 
     await expect(
-      paymentMaker.makePayment(new BigNumber('0.000001'), 'USDC', '0xreceiver')
+      paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('0.000001'), currency: 'USDC', paymentRequestId: 'test'}])
     ).rejects.toThrow(InsufficientFundsError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('0.000001'), 'USDC', '0xreceiver');
+      await paymentMaker.makePayment([{network: 'base', address: '0xreceiver', amount: new BigNumber('0.000001'), currency: 'USDC', paymentRequestId: 'test'}]);
     } catch (error) {
       if (error instanceof InsufficientFundsError) {
         expect(error.available?.toString()).toBe('0');
@@ -241,13 +243,15 @@ describe('BasePaymentMaker insufficient funds handling', () => {
       blockNumber: BigInt(12345),
     });
 
-    const result = await paymentMaker.makePayment(
-      new BigNumber('10'),
-      'USDC',
-      '0xreceiver'
-    );
+    const result = await paymentMaker.makePayment([{
+      network: 'base',
+      address: '0xreceiver',
+      amount: new BigNumber('10'),
+      currency: 'USDC',
+      paymentRequestId: 'test'
+    }]);
 
-    expect(result).toBe('0xtransactionhash');
+    expect(result.transactionId).toBe('0xtransactionhash');
     expect(mockSigningClient.sendTransaction).toHaveBeenCalled();
   });
 });

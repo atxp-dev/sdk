@@ -10,14 +10,14 @@ describe('buildServerConfig', () => {
 
       expect(() => {
         buildServerConfig({
-          paymentDestination,
+          destinations: [paymentDestination],
           minimumPayment: BigNumber(1.01) // $1.01, should throw
         });
       }).toThrow('minimumPayment cannot exceed $1.00');
 
       expect(() => {
         buildServerConfig({
-          paymentDestination,
+          destinations: [paymentDestination],
           minimumPayment: BigNumber(5) // $5.00, should throw
         });
       }).toThrow('minimumPayment cannot exceed $1.00');
@@ -28,7 +28,7 @@ describe('buildServerConfig', () => {
 
       expect(() => {
         buildServerConfig({
-          paymentDestination,
+          destinations: [paymentDestination],
           minimumPayment: BigNumber(1) // $1.00, should be allowed
         });
       }).not.toThrow();
@@ -39,14 +39,14 @@ describe('buildServerConfig', () => {
 
       expect(() => {
         buildServerConfig({
-          paymentDestination,
+          destinations: [paymentDestination],
           minimumPayment: BigNumber(0.05) // $0.05, should be allowed
         });
       }).not.toThrow();
 
       expect(() => {
         buildServerConfig({
-          paymentDestination,
+          destinations: [paymentDestination],
           minimumPayment: BigNumber(0.99) // $0.99, should be allowed
         });
       }).not.toThrow();
@@ -57,7 +57,7 @@ describe('buildServerConfig', () => {
 
       expect(() => {
         buildServerConfig({
-          paymentDestination
+          destinations: [paymentDestination]
           // No minimumPayment provided
         });
       }).not.toThrow();

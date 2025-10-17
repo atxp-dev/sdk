@@ -123,7 +123,7 @@ export class BasePaymentMaker implements PaymentMaker {
     return jwt;
   }
 
-  async makePayment(destinations: PaymentDestination[], memo: string, _paymentRequestId?: string): Promise<PaymentObject | null> {
+  async makePayment(destinations: PaymentDestination[], _memo: string, _paymentRequestId?: string): Promise<PaymentObject | null> {
     // Find a compatible destination (base network)
     const dest = destinations.find(d => d.network === 'base');
     if (!dest) {

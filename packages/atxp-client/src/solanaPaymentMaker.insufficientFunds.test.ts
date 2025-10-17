@@ -90,15 +90,15 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     vi.mocked(getAccount).mockResolvedValue(mockTokenAccount as any);
 
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo')
+      paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo')
     ).rejects.toThrow(InsufficientFundsError);
 
     // Verify the error details
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo');
+      await paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo');
     } catch (error) {
       expect(error).toBeInstanceOf(InsufficientFundsError);
-      
+
       if (error instanceof InsufficientFundsError) {
         expect(error.currency).toBe('USDC');
         expect(error.required.toString()).toBe('10');
@@ -130,14 +130,15 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     vi.mocked(createTransfer).mockResolvedValue(mockTransaction as any);
     vi.mocked(sendAndConfirmTransaction).mockResolvedValue('TransactionSignature123');
 
-    const result = await paymentMaker.makePayment(
-      new BigNumber('10'), 
-      'USDC', 
-      'ReceiverPublicKey',
-      'dummy memo'
-    );
+    const result = await paymentMaker.makePayment([{
+      network: 'solana',
+      address: 'ReceiverPublicKey',
+      amount: new BigNumber('10'),
+      currency: 'USDC',
+      paymentRequestId: 'test'
+    }], 'dummy memo');
 
-    expect(result).toBe('TransactionSignature123');
+    expect(result.transactionId).toBe('TransactionSignature123');
     expect(getAssociatedTokenAddress).toHaveBeenCalled();
     expect(getAccount).toHaveBeenCalled();
     expect(createTransfer).toHaveBeenCalled();
@@ -157,9 +158,9 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
       }
     });
 
-    const result = await paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo');
+    const result = await paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo');
 
-    expect(result).toBe('TransactionSignature123');
+    expect(result.transactionId).toBe('TransactionSignature123');
     expect(getAssociatedTokenAddress).toHaveBeenCalled();
     expect(sendAndConfirmTransaction).toHaveBeenCalled();
   });
@@ -170,14 +171,14 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     vi.mocked(getAssociatedTokenAddress).mockRejectedValue(unexpectedError);
 
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo')
+      paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo')
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo');
+      await paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo');
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
-      
+
       if (error instanceof PaymentNetworkError) {
         expect(error.message).toContain('Payment failed on Solana network');
         expect(error.message).toContain('Network connection timeout');
@@ -205,14 +206,14 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     vi.mocked(sendAndConfirmTransaction).mockRejectedValue(transactionError);
 
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo')
+      paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo')
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo');
+      await paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo');
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
-      
+
       if (error instanceof PaymentNetworkError) {
         expect(error.originalError).toBe(transactionError);
       }
@@ -228,11 +229,11 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     vi.mocked(getAccount).mockResolvedValue(mockTokenAccount as any);
 
     await expect(
-      paymentMaker.makePayment(new BigNumber('0.000001'), 'USDC', 'ReceiverPublicKey', 'dummy memo')
+      paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('0.000001'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo')
     ).rejects.toThrow(InsufficientFundsError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('0.000001'), 'USDC', 'ReceiverPublicKey', 'dummy memo');
+      await paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('0.000001'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo');
     } catch (error) {
       if (error instanceof InsufficientFundsError) {
         expect(error.available?.toString()).toBe('0');
@@ -256,14 +257,15 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     vi.mocked(createTransfer).mockResolvedValue(mockTransaction as any);
     vi.mocked(sendAndConfirmTransaction).mockResolvedValue('TransactionSignature123');
 
-    const result = await paymentMaker.makePayment(
-      new BigNumber('5.5'),
-      'USDC',
-      'ReceiverPublicKey',
-      'dummy memo'
-    );
+    const result = await paymentMaker.makePayment([{
+      network: 'solana',
+      address: 'ReceiverPublicKey',
+      amount: new BigNumber('5.5'),
+      currency: 'USDC',
+      paymentRequestId: 'test'
+    }], 'dummy memo');
 
-    expect(result).toBe('TransactionSignature123');
+    expect(result.transactionId).toBe('TransactionSignature123');
     expect(sendAndConfirmTransaction).toHaveBeenCalled();
   });
 
@@ -275,11 +277,11 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     vi.mocked(getAccount).mockRejectedValue(accountError);
 
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo')
+      paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo')
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo');
+      await paymentMaker.makePayment([{network: 'solana', address: 'ReceiverPublicKey', amount: new BigNumber('10'), currency: 'USDC', paymentRequestId: 'test'}], 'dummy memo');
     } catch (error) {
       if (error instanceof PaymentNetworkError) {
         expect(error.originalError).toBe(accountError);

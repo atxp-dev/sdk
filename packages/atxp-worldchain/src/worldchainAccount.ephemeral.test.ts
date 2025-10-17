@@ -97,7 +97,8 @@ describe('WorldchainAccount', () => {
       expect(account).toBeDefined();
       expect(account.accountId).toBe(TEST_SMART_WALLET_ADDRESS);
       expect(account.paymentMakers).toBeDefined();
-      expect(account.paymentMakers.world).toBeDefined();
+      expect(account.paymentMakers).toHaveLength(1);
+      expect(account.paymentMakers[0]).toBeDefined();
 
       // Verify mocks were called
       expect(mocks.toEphemeralSmartWallet).toHaveBeenCalled();
@@ -449,15 +450,26 @@ describe('WorldchainAccount', () => {
 
       // Replace the payment maker with a test version that has short delays
       const testPaymentMaker = createTestWorldchainPaymentMaker(permission, ephemeralWallet);
-      account.paymentMakers.world = testPaymentMaker;
+      account.paymentMakers[0] = testPaymentMaker;
 
       // Make a payment
-      const paymentMaker = account.paymentMakers.world;
-      const amount = new BigNumber(1.5); // 1.5 USDC
-      const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
+      const paymentMaker = account.paymentMakers[0];
+      const destinations = [{
+        network: 'world' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1.5), // 1.5 USDC
+        currency: 'USDC' as const
+      }];
+      const result = await paymentMaker.makePayment(destinations, 'test payment');
 
       // Verify payment was made
-      expect(txHash).toBe('0xtxhash');
+      expect(result).toEqual({
+        network: 'world',
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1.5),
+        currency: 'USDC',
+        transactionId: '0xtxhash'
+      });
       expect(prepareSpendCallData).toHaveBeenCalledWith({ permission, amount: 1500000n }); // 1.5 USDC in smallest units
       expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
         account: ephemeralWallet.account,

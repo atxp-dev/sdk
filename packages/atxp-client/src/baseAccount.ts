@@ -6,7 +6,7 @@ import { base } from 'viem/chains';
 
 export class BaseAccount implements Account {
   accountId: string;
-  paymentMakers: { [key: string]: PaymentMaker };
+  paymentMakers: PaymentMaker[];
   private walletClient: WalletClient;
   private account: PrivateKeyAccount;
 
@@ -26,9 +26,9 @@ export class BaseAccount implements Account {
       chain: base,
       transport: http(baseRPCUrl),
     });
-    this.paymentMakers = {
-      'base': new BasePaymentMaker(baseRPCUrl, this.walletClient),
-    }
+    this.paymentMakers = [
+      new BasePaymentMaker(baseRPCUrl, this.walletClient),
+    ];
   }
 
   /**

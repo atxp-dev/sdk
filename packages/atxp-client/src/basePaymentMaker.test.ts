@@ -69,8 +69,8 @@ describe('basePaymentMaker.generateJWT', () => {
   });
 });
 
-describe('basePaymentMaker.getSourceAddress', () => {
-  it('should return the wallet client address', () => {
+describe('basePaymentMaker.getSourceAddresses', () => {
+  it('should return the wallet client address', async () => {
     const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
     const walletClient = createWalletClient({
@@ -80,13 +80,15 @@ describe('basePaymentMaker.getSourceAddress', () => {
     });
     const paymentMaker = new BasePaymentMaker('https://example.com', walletClient);
 
-    const sourceAddress = paymentMaker.getSourceAddress();
+    const result = await paymentMaker.getSourceAddresses();
 
-    expect(sourceAddress).toBe(account.address);
-    expect(sourceAddress).toMatch(/^0x[a-fA-F0-9]{40}$/); // Valid Ethereum address format
+    expect(result).toHaveLength(1);
+    expect(result[0].network).toBe('base');
+    expect(result[0].address).toBe(account.address);
+    expect(result[0].address).toMatch(/^0x[a-fA-F0-9]{40}$/); // Valid Ethereum address format
   });
 
-  it('should return consistent address across multiple calls', () => {
+  it('should return consistent address across multiple calls', async () => {
     const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
     const walletClient = createWalletClient({
@@ -96,10 +98,10 @@ describe('basePaymentMaker.getSourceAddress', () => {
     });
     const paymentMaker = new BasePaymentMaker('https://example.com', walletClient);
 
-    const address1 = paymentMaker.getSourceAddress();
-    const address2 = paymentMaker.getSourceAddress();
+    const result1 = await paymentMaker.getSourceAddresses();
+    const result2 = await paymentMaker.getSourceAddresses();
 
-    expect(address1).toBe(address2);
+    expect(result1[0].address).toBe(result2[0].address);
   });
 });
 

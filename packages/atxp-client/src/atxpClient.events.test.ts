@@ -24,12 +24,19 @@ describe('atxpClient events', () => {
 
     const onAuthorize = vi.fn();
     const paymentMaker = {
-      makePayment: vi.fn(),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'testPaymentId'
+      }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -63,12 +70,19 @@ describe('atxpClient events', () => {
 
     const onAuthorizeFailure = vi.fn();
     const paymentMaker = {
-      makePayment: vi.fn(),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'testPaymentId'
+      }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     
     // The client initialization or callTool will throw an error due to OAuth failure
@@ -106,12 +120,19 @@ describe('atxpClient events', () => {
 
     const onPayment = vi.fn();
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('test-payment-result-id'),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'test-payment-result-id'
+      }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -151,11 +172,12 @@ describe('atxpClient events', () => {
     const onPaymentFailure = vi.fn();
     const paymentMaker = {
       makePayment: vi.fn().mockImplementation(() => Promise.reject(new Error('Payment failed'))),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -164,9 +186,14 @@ describe('atxpClient events', () => {
       fetchFn: f.fetchHandler
     });
 
-    // The payment will fail and throw an error
-    await expect(client.callTool({ name: 'pay', arguments: {} })).rejects.toThrow('Payment failed');
-    
+    // The payment will fail and return an error response
+    const res = await client.callTool({ name: 'pay', arguments: {} });
+
+    // Verify the response is an error
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain('Payment via ATXP is required');
+    expect(res.content[0].text).toContain('test-payment-id');
+
     // Verify the callbacks were called
     expect(paymentMaker.makePayment).toHaveBeenCalledTimes(1);
     expect(onPaymentFailure).toHaveBeenCalledTimes(1);

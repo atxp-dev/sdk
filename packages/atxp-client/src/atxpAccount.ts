@@ -33,7 +33,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     this.fetchFn = fetchFn;
   }
 
-  async getSourceAddress(params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<string> {
+  async getSourceAddresses(params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<Array<{network: Network, address: string}>> {
     // Call the /address_for_payment endpoint to get the source address for this account
     const response = await this.fetchFn(`${this.origin}/address_for_payment`, {
       method: 'POST',
@@ -54,14 +54,21 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
       throw new Error(`ATXPAccount: /address_for_payment failed: ${response.status} ${response.statusText} ${text}`);
     }
 
-    const json = await response.json() as { sourceAddress?: string; sourceNetwork?: string };
-    if (!json?.sourceAddress) {
-      throw new Error('ATXPAccount: /address_for_payment did not return sourceAddress');
+    const json = await response.json() as { sourceAddress?: string; sourceNetwork?: Network };
+    if (!json?.sourceAddress || !json?.sourceNetwork) {
+      throw new Error('ATXPAccount: /address_for_payment did not return sourceAddress or sourceNetwork');
     }
-    return json.sourceAddress;
+    return [{ network: json.sourceNetwork, address: json.sourceAddress }];
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string): Promise<string> {
+  async makePayment(destinations: import('./types.js').PaymentDestination[], memo: string, paymentRequestId?: string): Promise<import('./types.js').PaymentObject | null> {
+    // For now, only support single destination
+    if (destinations.length !== 1) {
+      throw new Error('ATXPHttpPaymentMaker: Only single destination is currently supported');
+    }
+
+    const destination = destinations[0];
+
     // Make a regular payment via the /pay endpoint
     const response = await this.fetchFn(`${this.origin}/pay`, {
       method: 'POST',
@@ -70,9 +77,9 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: amount.toString(),
-        currency,
-        receiver,
+        amount: destination.amount.toString(),
+        currency: destination.currency,
+        receiver: destination.address,
         memo,
         ...(paymentRequestId && { paymentRequestId })
       }),
@@ -87,7 +94,14 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     if (!json?.txHash) {
       throw new Error('ATXPAccount: /pay did not return txHash');
     }
-    return json.txHash;
+
+    return {
+      network: destination.network,
+      address: destination.address,
+      amount: destination.amount,
+      currency: destination.currency,
+      transactionId: json.txHash
+    };
   }
 
   async generateJWT(params: { paymentRequestId: string; codeChallenge: string }): Promise<string> {
@@ -116,7 +130,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 
 export class ATXPAccount implements Account {
   accountId: string;
-  paymentMakers: { [key: string]: PaymentMaker };
+  paymentMakers: PaymentMaker[];
   origin: string;
   token: string;
   fetchFn: FetchLike;
@@ -124,7 +138,6 @@ export class ATXPAccount implements Account {
   constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: Network }) {
     const { origin, token, accountId } = parseConnectionString(connectionString);
     const fetchFn = opts?.fetchFn ?? fetch;
-    const network = opts?.network ?? 'base';
 
     // Store for use in X402 payment creation
     this.origin = origin;
@@ -136,9 +149,9 @@ export class ATXPAccount implements Account {
     } else {
       this.accountId = `atxp:${crypto.randomUUID()}`;
     }
-    this.paymentMakers = {
-      [network]: new ATXPHttpPaymentMaker(origin, token, fetchFn),
-    };
+    this.paymentMakers = [
+      new ATXPHttpPaymentMaker(origin, token, fetchFn),
+    ];
   }
 
   async getSigner(): Promise<LocalAccount> {

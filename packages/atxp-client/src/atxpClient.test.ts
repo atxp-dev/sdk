@@ -23,12 +23,19 @@ describe('atxpClient', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn(),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'testPaymentId'
+      }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -59,16 +66,23 @@ describe('atxpClient', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('test-payment-result-id'),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'test-payment-result-id'
+      }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
-      account, 
+      account,
       fetchFn: f.fetchHandler
     });
 
@@ -108,12 +122,19 @@ describe('atxpClient', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('test-payment-result-id'),
-      generateJWT: vi.fn().mockResolvedValue('testJWT')
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'test-payment-result-id'
+      }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',

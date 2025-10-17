@@ -180,7 +180,7 @@ export class ATXPFetcher {
     destinations: PaymentDestination[],
     sourceAddresses: Array<{network: Network, address: string}>
   ): Promise<PaymentDestination[]> {
-    let mappedDestinations: PaymentDestination[] = [];
+    const mappedDestinations: PaymentDestination[] = [];
 
     for (const destination of destinations) {
       // Apply all mappers to this destination
@@ -212,6 +212,8 @@ export class ATXPFetcher {
     memo: string,
     paymentRequestId: string
   ): Promise<PaymentObject | null> {
+    let lastError: Error | null = null;
+
     for (const maker of this.paymentMakers) {
       try {
         const result = await maker.makePayment(destinations, memo, paymentRequestId);
@@ -221,9 +223,16 @@ export class ATXPFetcher {
           return result;
         }
       } catch (error) {
-        this.logger.warn(`Payment maker failed: ${(error as Error).message}`);
+        lastError = error as Error;
+        this.logger.warn(`Payment maker failed: ${lastError.message}`);
         // Continue with next maker
       }
+    }
+
+    // If we had at least one error, throw it (so onPaymentFailure gets called)
+    // Otherwise return null (no maker could handle this payment)
+    if (lastError) {
+      throw lastError;
     }
 
     return null;
@@ -486,7 +495,7 @@ export class ATXPFetcher {
         payment: prospectivePayment,
         error: paymentError as Error
       });
-      throw paymentError;
+      return false;
     }
   }
 

@@ -60,7 +60,7 @@ export class ATXPDestinationMapper implements DestinationMapper {
 
     // Parse account ID from URL and construct payment_info endpoint
     // URL format: https://accounts.atxp.ai/a/${accountId}
-    const accountIdMatch = paymentInfoUrl.match(/\/a\/([^\/]+)/);
+    const accountIdMatch = paymentInfoUrl.match(/\/a\/([^/]+)/);
     if (!accountIdMatch) {
       this.logger.warn(`Invalid ATXP URL format: ${paymentInfoUrl}`);
       return [destination];
