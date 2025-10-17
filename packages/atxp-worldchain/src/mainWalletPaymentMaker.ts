@@ -50,8 +50,8 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     this.customRpcUrl = customRpcUrl;
   }
 
-  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
-    return this.walletAddress;
+  async getSourceAddresses(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<Array<{network: import('@atxp/common').Network, address: string}>> {
+    return [{ network: 'world', address: this.walletAddress }];
   }
 
   async generateJWT({
@@ -105,13 +105,24 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   }
 
   async makePayment(
-    amount: BigNumber,
-    currency: Currency,
-    receiver: string,
-    memo: string
-  ): Promise<string> {
+    destinations: import('@atxp/client').PaymentDestination[],
+    memo: string,
+    _paymentRequestId?: string
+  ): Promise<import('@atxp/client').PaymentObject | null> {
+    // For now, only support single destination
+    if (destinations.length !== 1) {
+      throw new Error('MainWalletPaymentMaker: Only single destination is currently supported');
+    }
+
+    const destination = destinations[0];
+    const { amount, currency, address: receiver, network } = destination;
+
     if (currency !== 'USDC') {
       throw new Error('Only USDC currency is supported; received ' + currency);
+    }
+
+    if (network !== 'world') {
+      throw new Error('Only world network is supported');
     }
 
     // Use World Chain Mainnet configuration
@@ -196,6 +207,12 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       await new Promise(resolve => setTimeout(resolve, 30000));
     }
 
-    return txHash;
+    return {
+      network,
+      address: receiver,
+      amount,
+      currency,
+      transactionId: txHash
+    };
   }
 }

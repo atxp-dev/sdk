@@ -6,16 +6,24 @@ import { mockResourceServer, mockAuthorizationServer } from './clientTestHelpers
 import { ATXPFetcher } from './atxpFetcher.js';
 import { OAuthDb, FetchLike, DEFAULT_AUTHORIZATION_SERVER } from '@atxp/common';
 import { PaymentMaker } from './types.js';
+import BigNumber from 'bignumber.js';
 
 function mockPaymentMakers(solanaPaymentMaker?: PaymentMaker) {
   solanaPaymentMaker = solanaPaymentMaker ?? {
-    makePayment: vi.fn().mockResolvedValue('testPaymentId'),
-    generateJWT: vi.fn().mockResolvedValue('testJWT')
+    makePayment: vi.fn().mockResolvedValue({
+      network: 'solana',
+      address: 'receiver',
+      amount: new BigNumber(0.01),
+      currency: 'USDC',
+      transactionId: 'testPaymentId'
+    }),
+    generateJWT: vi.fn().mockResolvedValue('testJWT'),
+    getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
   };
-  return {'solana': solanaPaymentMaker };
+  return [solanaPaymentMaker];
 }
 
-function atxpFetcher(fetchFn: FetchLike, paymentMakers?: {[key: string]: PaymentMaker}, db?: OAuthDb) {
+function atxpFetcher(fetchFn: FetchLike, paymentMakers?: PaymentMaker[], db?: OAuthDb) {
   return new ATXPFetcher({
     accountId: "bdj",
     db: db ?? new MemoryOAuthDb(),
@@ -41,10 +49,17 @@ describe('atxpFetcher.fetch oauth', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
-      generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'testPaymentId'
+      }),
+      generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params)),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
     };
-    const fetcher = atxpFetcher(f.fetchHandler, {'solana': paymentMaker});
+    const fetcher = atxpFetcher(f.fetchHandler, [paymentMaker]);
     await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
 
     // Ensure we call the authorize endpoint
@@ -61,13 +76,13 @@ describe('atxpFetcher.fetch oauth', () => {
     expect(jwtToken.codeChallenge.length).toBeGreaterThan(10);
   });
 
-  it('should throw an error if multiple payment makers are available (we dont know how to handle this yet)', async () => {
+  it('should use the first payment maker when multiple payment makers are available', async () => {
     const f = fetchMock.createInstance();
     mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER)
       .postOnce('https://example.com/mcp', 401)
       .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
-      // Respond to /authorize call 
+      // Respond to /authorize call
       .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
         const state = new URL(req.args[0] as any).searchParams.get('state');
         return {
@@ -77,18 +92,23 @@ describe('atxpFetcher.fetch oauth', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
-      generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'testPaymentId'
+      }),
+      generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params)),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
     };
-    const fetcher = atxpFetcher(f.fetchHandler, {'solana': paymentMaker, 'ethereum': paymentMaker});
-    let threw = false;
-    try{
-      await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-    } catch (e: any) {
-      threw = true;
-      expect(e.message).to.include('multiple payment makers');
-    }
-    expect(threw).toBe(true);
+    const fetcher = atxpFetcher(f.fetchHandler, [paymentMaker, paymentMaker]);
+
+    // Should succeed by using the first payment maker
+    const res = await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    expect(res.status).toBe(200);
+    const resJson = await res.json();
+    expect(resJson.content[0].text).toBe('hello world');
   });
 
   it('should auth using the local token if one is available', async () => {
@@ -113,7 +133,19 @@ describe('atxpFetcher.fetch oauth', () => {
     const originalFromDb = await db.getAccessToken('bdj', 'https://example.com/mcp');
     expect(originalFromDb).toBeNull();
 
-    const fetcher = atxpFetcher(f.fetchHandler, {}, db);
+    // Provide a mock payment maker even though we won't use it (using token exchange instead)
+    const mockMaker = {
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'testPaymentId'
+      }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddresses: vi.fn().mockResolvedValue([{network: 'solana', address: 'source'}])
+    };
+    const fetcher = atxpFetcher(f.fetchHandler, [mockMaker], db);
     const res = await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
     expect(res.status).toBe(200);
     const resJson = await res.json();
@@ -136,13 +168,18 @@ describe('atxpFetcher.fetch oauth', () => {
     expect(fromDb!.resourceUrl).toBe('https://example.com/mcp');
   });
 
-  it('should bubble up OAuthAuthenticationRequiredError on OAuth challenge with no paymentMakers or local token', async () => {
-    const f = fetchMock.createInstance().postOnce('https://example.com/mcp', 401);
-    mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER);
-    mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER);
+  it('should throw error when trying to create ATXPFetcher with no payment makers', async () => {
+    const f = fetchMock.createInstance();
 
-    const fetcher = atxpFetcher(f.fetchHandler, {});
-    await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow(OAuthAuthenticationRequiredError);
+    // ATXPFetcher now requires at least one payment maker in constructor
+    expect(() => {
+      new ATXPFetcher({
+        accountId: "bdj",
+        db: new MemoryOAuthDb(),
+        paymentMakers: [],
+        fetchFn: f.fetchHandler
+      });
+    }).toThrow('At least one payment maker is required');
   });
 
   it('should throw if authorization server response is not successful', async () => {
@@ -187,11 +224,17 @@ describe('atxpFetcher.fetch oauth', () => {
 
     // Mock a payment maker that doesn't have generateJWT method
     const brokenPaymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId')
+      makePayment: vi.fn().mockResolvedValue({
+        network: 'solana',
+        address: 'receiver',
+        amount: new BigNumber(0.01),
+        currency: 'USDC',
+        transactionId: 'testPaymentId'
+      })
       // Missing generateJWT method
     } as unknown as PaymentMaker;
 
-    const fetcher = atxpFetcher(f.fetchHandler, { 'broken': brokenPaymentMaker });
-    await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow('Payment maker is missing generateJWT method. Available payment makers: [broken]. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.');
+    const fetcher = atxpFetcher(f.fetchHandler, [brokenPaymentMaker]);
+    await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow('Payment maker is missing generateJWT method. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.');
   });
 });

@@ -101,10 +101,16 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5); // 1.5 USDC
 
-    const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
+    const result = await paymentMaker.makePayment([{
+      network: 'base',
+      address: TEST_RECEIVER_ADDRESS,
+      amount,
+      currency: 'USDC',
+      paymentRequestId: 'test'
+    }], 'test payment');
     
     // Verify the transaction hash
-    expect(txHash).toBe('0xtxhash');
+    expect(result.transactionId).toBe('0xtxhash');
     
     // Verify sendUserOperation was called with correct parameters
     expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
@@ -137,7 +143,13 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const amount = new BigNumber(1.5);
     
     await expect(
-      paymentMaker.makePayment(amount, 'ETH' as any, TEST_RECEIVER_ADDRESS, 'test payment')
+      paymentMaker.makePayment([{
+        network: 'base',
+        address: TEST_RECEIVER_ADDRESS,
+        amount,
+        currency: 'ETH' as any,
+        paymentRequestId: 'test'
+      }], 'test payment')
     ).rejects.toThrow('Only usdc currency is supported');
   });
 
@@ -150,7 +162,13 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const amount = new BigNumber(1.5);
     
     await expect(
-      paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment')
+      paymentMaker.makePayment([{
+        network: 'base',
+        address: TEST_RECEIVER_ADDRESS,
+        amount,
+        currency: 'USDC',
+        paymentRequestId: 'test'
+      }], 'test payment')
     ).rejects.toThrow('User operation failed');
   });
 
@@ -163,7 +181,13 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const amount = new BigNumber(1.5);
     
     await expect(
-      paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment')
+      paymentMaker.makePayment([{
+        network: 'base',
+        address: TEST_RECEIVER_ADDRESS,
+        amount,
+        currency: 'USDC',
+        paymentRequestId: 'test'
+      }], 'test payment')
     ).rejects.toThrow('User operation was executed but no transaction hash was returned');
   });
 });

@@ -2,7 +2,7 @@ import { ConsoleLogger, OAuthResourceClient, DEFAULT_AUTHORIZATION_SERVER, Memor
 import { ATXPConfig } from "./types.js";
 import { ATXPPaymentServer } from "./paymentServer.js";
 
-type RequiredATXPConfigFields = 'paymentDestination';
+type RequiredATXPConfigFields = 'destinations';
 type RequiredATXPConfig = Pick<ATXPConfig, RequiredATXPConfigFields>;
 type OptionalATXPConfig = Omit<ATXPConfig, RequiredATXPConfigFields>;
 export type ATXPArgs = RequiredATXPConfig & Partial<OptionalATXPConfig>;
@@ -18,8 +18,17 @@ export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConf
 };
 
 export function buildServerConfig(args: ATXPArgs): ATXPConfig {
-  if(!args.paymentDestination) {
-    throw new Error('paymentDestination is required');
+  if(!args.destinations || args.destinations.length === 0) {
+    throw new Error('destinations array is required and must not be empty');
+  }
+
+  for (const dest of args.destinations) {
+    if (!dest.network || typeof dest.network !== 'string') {
+      throw new Error('Each destination must have a network field');
+    }
+    if (!dest.address || typeof dest.address !== 'string') {
+      throw new Error('Each destination must have an address field');
+    }
   }
 
   // Validate minimumPayment if provided

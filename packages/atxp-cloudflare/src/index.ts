@@ -15,7 +15,5 @@ export type {
 export {
   type ATXPArgs,
   DEFAULT_CONFIG,
-  buildServerConfig,
-  ChainPaymentDestination,
-  ATXPPaymentDestination
+  buildServerConfig
 } from '@atxp/server';

@@ -18,6 +18,12 @@ export {
   atxpFetch
 } from './atxpFetcher.js';
 
+// Destination mapper
+export {
+  type DestinationMapper,
+  ATXPDestinationMapper
+} from './destinationMapper.js';
+
 // Payment makers for different networks
 export {
   ValidateTransferError,
@@ -70,7 +76,9 @@ export {
   type FetchWrapper,
   InsufficientFundsError,
   PaymentNetworkError,
-  type PaymentMaker
+  type PaymentMaker,
+  type PaymentDestination,
+  type PaymentObject
 } from './types.js';
 
 export {

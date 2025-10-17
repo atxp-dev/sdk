@@ -1,11 +1,11 @@
-import type { PaymentMaker } from './types.js';
+import type { PaymentMaker, PaymentDestination, PaymentObject } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { Keypair, Connection, PublicKey, ComputeBudgetProgram, sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTransfer, ValidateTransferError as _ValidateTransferError } from "@solana/pay";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import bs58 from "bs58";
 import BigNumber from "bignumber.js";
-import { generateJWT, Currency } from '@atxp/common';
+import { generateJWT, Currency, Network } from '@atxp/common';
 import { importJWK } from 'jose';
 import { Logger } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
@@ -32,8 +32,11 @@ export class SolanaPaymentMaker implements PaymentMaker {
     this.logger = logger ?? new ConsoleLogger();
   }
 
-  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
-    return this.source.publicKey.toBase58();
+  async getSourceAddresses(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<Array<{network: Network, address: string}>> {
+    return [{
+      network: 'solana' as Network,
+      address: this.source.publicKey.toBase58()
+    }];
   }
 
   generateJWT = async({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> => {
@@ -53,14 +56,21 @@ export class SolanaPaymentMaker implements PaymentMaker {
     return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '');
   }
 
-  makePayment = async (amount: BigNumber, currency: Currency, receiver: string, memo: string, _paymentRequestId?: string): Promise<string> => {
-    if (currency.toUpperCase() !== 'USDC') {
-      throw new PaymentNetworkError('Only USDC currency is supported; received ' + currency);
+  makePayment = async (destinations: PaymentDestination[], memo: string, _paymentRequestId?: string): Promise<PaymentObject | null> => {
+    // Find a compatible destination (solana network)
+    const dest = destinations.find(d => d.network === 'solana');
+    if (!dest) {
+      this.logger.debug('SolanaPaymentMaker: no solana network destination found');
+      return null;
     }
 
-    const receiverKey = new PublicKey(receiver);
+    if (dest.currency.toUpperCase() !== 'USDC') {
+      throw new PaymentNetworkError('Only USDC currency is supported; received ' + dest.currency);
+    }
 
-    this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Solana from ${this.source.publicKey.toBase58()}`);
+    const receiverKey = new PublicKey(dest.address);
+
+    this.logger.info(`Making payment of ${dest.amount} ${dest.currency} to ${dest.address} on Solana from ${this.source.publicKey.toBase58()}`);
 
     try {
       // Check balance before attempting payment
@@ -72,9 +82,9 @@ export class SolanaPaymentMaker implements PaymentMaker {
       const tokenAccount = await getAccount(this.connection, tokenAccountAddress);
       const balance = new BigNumber(tokenAccount.amount.toString()).dividedBy(10 ** 6); // USDC has 6 decimals
 
-      if (balance.lt(amount)) {
-        this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
-        throw new InsufficientFundsError(currency, amount, balance, 'solana');
+      if (balance.lt(dest.amount)) {
+        this.logger.warn(`Insufficient ${dest.currency} balance for payment. Required: ${dest.amount}, Available: ${balance}`);
+        throw new InsufficientFundsError(dest.currency, dest.amount, balance, 'solana');
       }
 
       // Increase compute units to handle both memo and token transfer
@@ -91,7 +101,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
         this.connection,
         this.source.publicKey,
         {
-          amount: amount,
+          amount: dest.amount,
           recipient: receiverKey,
           splToken: USDC_MINT,
           memo,
@@ -106,7 +116,14 @@ export class SolanaPaymentMaker implements PaymentMaker {
         transaction,
         [this.source],
       );
-      return transactionHash;
+
+      return {
+        network: 'solana' as Network,
+        address: dest.address,
+        amount: dest.amount,
+        currency: dest.currency,
+        transactionId: transactionHash
+      };
     } catch (error) {
       if (error instanceof InsufficientFundsError || error instanceof PaymentNetworkError) {
         throw error;

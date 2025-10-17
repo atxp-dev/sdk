@@ -19,15 +19,15 @@ describe('ATXPAccount', () => {
       const connectionString = 'https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123';
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
-      const result = await paymentMaker.getSourceAddress({
+      const paymentMaker = account.paymentMakers[0];
+      const result = await paymentMaker.getSourceAddresses({
         amount: new BigNumber('10'),
         currency: 'USDC',
         receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
         memo: 'test payment'
       });
 
-      expect(result).toBe(sourceAddress);
+      expect(result[0].address).toBe(sourceAddress);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://accounts.atxp.ai/address_for_payment',
         expect.objectContaining({
@@ -63,9 +63,9 @@ describe('ATXPAccount', () => {
       const connectionString = 'https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123';
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
+      const paymentMaker = account.paymentMakers[0];
 
-      await expect(paymentMaker.getSourceAddress({
+      await expect(paymentMaker.getSourceAddresses({
         amount: new BigNumber('10'),
         currency: 'USDC',
         receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
@@ -89,9 +89,9 @@ describe('ATXPAccount', () => {
       const connectionString = 'https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123';
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
+      const paymentMaker = account.paymentMakers[0];
 
-      await expect(paymentMaker.getSourceAddress({
+      await expect(paymentMaker.getSourceAddresses({
         amount: new BigNumber('10'),
         currency: 'USDC',
         receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
@@ -116,8 +116,8 @@ describe('ATXPAccount', () => {
       const connectionString = `https://accounts.atxp.ai?connection_token=${token}&account_id=acc_123`;
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
-      await paymentMaker.getSourceAddress({
+      const paymentMaker = account.paymentMakers[0];
+      await paymentMaker.getSourceAddresses({
         amount: new BigNumber('10'),
         currency: 'USDC',
         receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
@@ -148,18 +148,18 @@ describe('ATXPAccount', () => {
       const connectionString = 'https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123';
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
+      const paymentMaker = account.paymentMakers[0];
       const params = {
         amount: new BigNumber('10'),
         currency: 'USDC' as const,
         receiver: '0xabcdef0123456789abcdef0123456789abcdef01',
         memo: 'test payment'
       };
-      const address1 = await paymentMaker.getSourceAddress(params);
-      const address2 = await paymentMaker.getSourceAddress(params);
+      const result1 = await paymentMaker.getSourceAddresses(params);
+      const result2 = await paymentMaker.getSourceAddresses(params);
 
-      expect(address1).toBe(address2);
-      expect(address1).toBe(sourceAddress);
+      expect(result1[0].address).toBe(result2[0].address);
+      expect(result1[0].address).toBe(sourceAddress);
     });
   });
 });

@@ -107,8 +107,7 @@ export class ATXPPaymentDestination implements PaymentDestination {
         case 'world':
         case 'world_sepolia':
         case 'solana':
-        case 'atxp_base':
-        case 'atxp_base_sepolia':
+        case 'atxp':
           network = networkFromItem
           break;
         default:

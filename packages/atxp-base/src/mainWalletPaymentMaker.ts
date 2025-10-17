@@ -35,8 +35,8 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     this.usdcAddress = getBaseUSDCAddress(chainId);
   }
 
-  getSourceAddress(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): string {
-    return this.walletAddress;
+  async getSourceAddresses(_params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}): Promise<Array<{network: import('@atxp/common').Network, address: string}>> {
+    return [{ network: 'base', address: this.walletAddress }];
   }
 
   async generateJWT(payload: {
@@ -101,16 +101,27 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   }
 
   async makePayment(
-    amount: BigNumber,
-    currency: Currency,
-    receiver: string,
-    _reason: string
-  ): Promise<string> {
+    destinations: import('@atxp/client').PaymentDestination[],
+    memo: string,
+    _paymentRequestId?: string
+  ): Promise<import('@atxp/client').PaymentObject | null> {
+    // For now, only support single destination
+    if (destinations.length !== 1) {
+      throw new Error('MainWalletPaymentMaker: Only single destination is currently supported');
+    }
+
+    const destination = destinations[0];
+    const { amount, currency, address: receiver, network } = destination;
+
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported');
     }
 
-    this.logger.info(`Making direct payment of ${amount} ${currency} to ${receiver} on Base`);
+    if (network !== 'base') {
+      throw new Error('Only base network is supported');
+    }
+
+    this.logger.info(`Making direct payment of ${amount} ${currency} to ${receiver} on Base with memo: ${memo}`);
 
     // Convert amount to USDC units (6 decimals)
     const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
@@ -142,12 +153,18 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     });
 
     this.logger.info(`Transaction submitted. TxHash: ${txHash}`);
-    
+
     // Wait for confirmations
     const CONFIRMATIONS = 2;
-    await this.waitForTransactionConfirmations(txHash, CONFIRMATIONS);
-    
-    return txHash;
+    await this.waitForTransactionConfirmations(txHash as string, CONFIRMATIONS);
+
+    return {
+      network,
+      address: receiver,
+      amount,
+      currency,
+      transactionId: txHash as string
+    };
   }
 
   private async waitForTransactionConfirmations(txHash: string, confirmations: number): Promise<void> {

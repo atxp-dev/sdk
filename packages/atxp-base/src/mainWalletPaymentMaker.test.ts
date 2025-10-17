@@ -185,7 +185,7 @@ describe('MainWalletPaymentMaker', () => {
         status: '0x1',
         blockNumber: '0x100'
       };
-      
+
       // Mock transaction submission
       provider.request.mockImplementation(async ({ method }) => {
         if (method === 'eth_sendTransaction') return txHash;
@@ -194,10 +194,15 @@ describe('MainWalletPaymentMaker', () => {
         throw new Error(`Unexpected method: ${method}`);
       });
 
+      const destinations = [{
+        network: 'base' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1.5),
+        currency: 'USDC' as const
+      }];
+
       const result = await paymentMaker.makePayment(
-        new BigNumber(1.5),
-        'USDC',
-        TEST_RECEIVER_ADDRESS,
+        destinations,
         'Test payment'
       );
 
@@ -219,15 +224,26 @@ describe('MainWalletPaymentMaker', () => {
         }]
       });
 
-      expect(result).toBe(txHash);
+      expect(result).toEqual({
+        network: 'base',
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1.5),
+        currency: 'USDC',
+        transactionId: txHash
+      });
     });
 
     it('should throw error for non-USDC currency', async () => {
+      const destinations = [{
+        network: 'base' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1),
+        currency: 'ETH' as any
+      }];
+
       await expect(
         paymentMaker.makePayment(
-          new BigNumber(1),
-          'ETH' as any,
-          TEST_RECEIVER_ADDRESS,
+          destinations,
           'Test payment'
         )
       ).rejects.toThrow('Only usdc currency is supported');
@@ -239,18 +255,23 @@ describe('MainWalletPaymentMaker', () => {
         status: '0x0', // Failed transaction
         blockNumber: '0x100'
       };
-      
+
       provider.request.mockImplementation(async ({ method }) => {
         if (method === 'eth_sendTransaction') return txHash;
         if (method === 'eth_getTransactionReceipt') return receipt;
         throw new Error(`Unexpected method: ${method}`);
       });
 
+      const destinations = [{
+        network: 'base' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1),
+        currency: 'USDC' as const
+      }];
+
       await expect(
         paymentMaker.makePayment(
-          new BigNumber(1),
-          'USDC',
-          TEST_RECEIVER_ADDRESS,
+          destinations,
           'Test payment'
         )
       ).rejects.toThrow(`Transaction failed. TxHash: ${txHash}`);
@@ -262,7 +283,7 @@ describe('MainWalletPaymentMaker', () => {
         status: '0x1',
         blockNumber: '0x100'
       };
-      
+
       provider.request.mockImplementation(async ({ method }) => {
         if (method === 'eth_sendTransaction') return txHash;
         if (method === 'eth_getTransactionReceipt') return receipt;
@@ -270,10 +291,15 @@ describe('MainWalletPaymentMaker', () => {
         throw new Error(`Unexpected method: ${method}`);
       });
 
+      const destinations = [{
+        network: 'base' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(0.123456),
+        currency: 'USDC' as const
+      }];
+
       await paymentMaker.makePayment(
-        new BigNumber(0.123456),
-        'USDC',
-        TEST_RECEIVER_ADDRESS,
+        destinations,
         'Test payment'
       );
 
@@ -291,7 +317,7 @@ describe('MainWalletPaymentMaker', () => {
         status: '0x1',
         blockNumber: '0x100' // Block 256
       };
-      
+
       let blockNumberCalls = 0;
       provider.request.mockImplementation(async ({ method }) => {
         if (method === 'eth_sendTransaction') return txHash;
@@ -304,10 +330,15 @@ describe('MainWalletPaymentMaker', () => {
         throw new Error(`Unexpected method: ${method}`);
       });
 
+      const destinations = [{
+        network: 'base' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1),
+        currency: 'USDC' as const
+      }];
+
       await paymentMaker.makePayment(
-        new BigNumber(1),
-        'USDC',
-        TEST_RECEIVER_ADDRESS,
+        destinations,
         'Test payment'
       );
 
@@ -324,7 +355,7 @@ describe('MainWalletPaymentMaker', () => {
         status: '0x1',
         blockNumber: '0x100'
       };
-      
+
       const callOrder: string[] = [];
       provider.request.mockImplementation(async ({ method }) => {
         callOrder.push(method);
@@ -334,10 +365,15 @@ describe('MainWalletPaymentMaker', () => {
         throw new Error(`Unexpected method: ${method}`);
       });
 
+      const destinations = [{
+        network: 'base' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1),
+        currency: 'USDC' as const
+      }];
+
       await paymentMaker.makePayment(
-        new BigNumber(1),
-        'USDC',
-        TEST_RECEIVER_ADDRESS,
+        destinations,
         'Test payment'
       );
 
@@ -354,19 +390,24 @@ describe('MainWalletPaymentMaker', () => {
 
     it('should handle receipt polling timeout', async () => {
       const txHash = '0xtxhash';
-      
+
       provider.request.mockImplementation(async ({ method }) => {
         if (method === 'eth_sendTransaction') return txHash;
         if (method === 'eth_getTransactionReceipt') return null; // Transaction not mined yet
         throw new Error(`Unexpected method: ${method}`);
       });
 
+      const destinations = [{
+        network: 'base' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1),
+        currency: 'USDC' as const
+      }];
+
       // This should eventually timeout (in real implementation)
       // For now, it will keep polling - we should add a timeout mechanism
       const promise = paymentMaker.makePayment(
-        new BigNumber(1),
-        'USDC',
-        TEST_RECEIVER_ADDRESS,
+        destinations,
         'Test payment'
       );
 
@@ -382,17 +423,28 @@ describe('MainWalletPaymentMaker', () => {
       }, 100);
 
       const result = await promise;
-      expect(result).toBe(txHash);
+      expect(result).toEqual({
+        network: 'base',
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1),
+        currency: 'USDC',
+        transactionId: txHash
+      });
     });
 
     it('should handle transaction submission errors', async () => {
       provider.request.mockRejectedValueOnce(new Error('insufficient funds'));
 
+      const destinations = [{
+        network: 'base' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1),
+        currency: 'USDC' as const
+      }];
+
       await expect(
         paymentMaker.makePayment(
-          new BigNumber(1),
-          'USDC',
-          TEST_RECEIVER_ADDRESS,
+          destinations,
           'Test payment'
         )
       ).rejects.toThrow('insufficient funds');
@@ -410,7 +462,7 @@ describe('MainWalletPaymentMaker', () => {
         status: '0x1',
         blockNumber: '0x100'
       };
-      
+
       provider.request.mockImplementation(async ({ method }) => {
         if (method === 'eth_sendTransaction') return txHash;
         if (method === 'eth_getTransactionReceipt') return receipt;
@@ -418,10 +470,15 @@ describe('MainWalletPaymentMaker', () => {
         throw new Error(`Unexpected method: ${method}`);
       });
 
+      const destinations = [{
+        network: 'base' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: new BigNumber(1000000), // 1 million USDC
+        currency: 'USDC' as const
+      }];
+
       await paymentMaker.makePayment(
-        new BigNumber(1000000), // 1 million USDC
-        'USDC',
-        TEST_RECEIVER_ADDRESS,
+        destinations,
         'Test payment'
       );
 
@@ -448,7 +505,7 @@ describe('MainWalletPaymentMaker', () => {
 
     it('should handle invalid addresses', async () => {
       const invalidAddress = '0xinvalid';
-      
+
       provider.request.mockImplementation(async ({ method, params }) => {
         if (method === 'eth_sendTransaction' && params?.[0]?.to === USDC_CONTRACT_ADDRESS_BASE) {
           throw new Error('invalid address');
@@ -456,11 +513,16 @@ describe('MainWalletPaymentMaker', () => {
         throw new Error(`Unexpected method: ${method}`);
       });
 
+      const destinations = [{
+        network: 'base' as const,
+        address: invalidAddress,
+        amount: new BigNumber(1),
+        currency: 'USDC' as const
+      }];
+
       await expect(
         paymentMaker.makePayment(
-          new BigNumber(1),
-          'USDC',
-          invalidAddress,
+          destinations,
           'Test payment'
         )
       ).rejects.toThrow();

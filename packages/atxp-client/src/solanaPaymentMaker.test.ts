@@ -58,37 +58,39 @@ describe('solanaPaymentMaker.generateJWT', () => {
   });
 });
 
-describe('solanaPaymentMaker.getSourceAddress', () => {
-  it('should return the Solana public key as base58', () => {
+describe('solanaPaymentMaker.getSourceAddresses', () => {
+  it('should return the Solana public key as base58', async () => {
     const keypair = Keypair.generate();
     const paymentMaker = new SolanaPaymentMaker('https://example.com', bs58.encode(keypair.secretKey));
 
-    const sourceAddress = paymentMaker.getSourceAddress();
+    const result = await paymentMaker.getSourceAddresses();
 
-    expect(sourceAddress).toBe(keypair.publicKey.toBase58());
+    expect(result).toHaveLength(1);
+    expect(result[0].network).toBe('solana');
+    expect(result[0].address).toBe(keypair.publicKey.toBase58());
   });
 
-  it('should return a valid base58 encoded address', () => {
+  it('should return a valid base58 encoded address', async () => {
     const keypair = Keypair.generate();
     const paymentMaker = new SolanaPaymentMaker('https://example.com', bs58.encode(keypair.secretKey));
 
-    const sourceAddress = paymentMaker.getSourceAddress();
+    const result = await paymentMaker.getSourceAddresses();
 
     // Should be a valid base58 string (typically 32-44 characters for Solana addresses)
-    expect(sourceAddress).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
+    expect(result[0].address).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
 
     // Should be decodable as base58
-    expect(() => bs58.decode(sourceAddress)).not.toThrow();
+    expect(() => bs58.decode(result[0].address)).not.toThrow();
   });
 
-  it('should return consistent address across multiple calls', () => {
+  it('should return consistent address across multiple calls', async () => {
     const keypair = Keypair.generate();
     const paymentMaker = new SolanaPaymentMaker('https://example.com', bs58.encode(keypair.secretKey));
 
-    const address1 = paymentMaker.getSourceAddress();
-    const address2 = paymentMaker.getSourceAddress();
+    const result1 = await paymentMaker.getSourceAddresses();
+    const result2 = await paymentMaker.getSourceAddresses();
 
-    expect(address1).toBe(address2);
+    expect(result1[0].address).toBe(result2[0].address);
   });
 });
 

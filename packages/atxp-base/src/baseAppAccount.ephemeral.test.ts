@@ -97,7 +97,7 @@ describe('BaseAppAccount', () => {
       expect(account).toBeDefined();
       expect(account.accountId).toBe(TEST_SMART_WALLET_ADDRESS);
       expect(account.paymentMakers).toBeDefined();
-      expect(account.paymentMakers.base).toBeDefined();
+      expect(account.paymentMakers[0]).toBeDefined();
 
       // Verify mocks were called
       expect(mocks.toEphemeralSmartWallet).toHaveBeenCalled();
@@ -459,9 +459,10 @@ describe('BaseAppAccount', () => {
       });
 
       // Make a payment
-      const paymentMaker = account.paymentMakers.base;
+      const paymentMaker = account.paymentMakers[0];
       const amount = new BigNumber(1.5); // 1.5 USDC
-      const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
+      const result = await paymentMaker.makePayment([{network: 'base', address: TEST_RECEIVER_ADDRESS, amount, currency: 'USDC', paymentRequestId: 'test'}], 'test payment');
+      const txHash = result.transactionId;
 
       // Verify payment was made
       expect(txHash).toBe('0xtxhash');
