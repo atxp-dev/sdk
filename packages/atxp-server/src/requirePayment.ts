@@ -1,21 +1,64 @@
-import { RequirePaymentConfig, paymentRequiredError, Currency } from "@atxp/common";
+import { RequirePaymentConfig, paymentRequiredError, Currency, Network } from "@atxp/common";
 import { getATXPConfig, atxpAccountId } from "./atxpContext.js";
-import { PaymentAddress, FundingAmount } from "./paymentDestination.js";
 import { ATXPConfig } from "./types.js";
+import { ATXPAccount, BaseAccount, SolanaAccount } from "@atxp/client";
+import { BaseAppAccount } from "@atxp/base";
+import { WorldchainAccount } from "@atxp/worldchain";
 import BigNumber from "bignumber.js";
 
+type PaymentAddress = {
+  destination: string;
+  network: Network;
+  accountId: string | null;
+};
+
 /**
- * Get payment destinations for a user, with caching to avoid repeated HTTP calls.
+ * Get payment destination information from an Account.
  * This is an internal helper function used by requirePayment.
  */
-async function getPaymentDestinations(
-  config: ATXPConfig,
-  user: string,
-  amount: BigNumber,
-  currency: Currency
-): Promise<PaymentAddress[]> {
-  const fundingAmount: FundingAmount = { amount, currency };
-  return await config.paymentDestination.destinations(fundingAmount);
+function getPaymentDestination(
+  destination: ATXPConfig['destination']
+): PaymentAddress {
+  // Validate accountId is non-empty
+  if (!destination.accountId || destination.accountId.trim() === '') {
+    throw new Error('Account accountId cannot be empty');
+  }
+
+  let destinationAddress: string;
+  let destinationNetwork: Network;
+  let destinationAccountId: string | null;
+
+  if (destination instanceof ATXPAccount) {
+    destinationAddress = destination.accountId;
+    destinationNetwork = 'atxp_base';
+    destinationAccountId = destination.accountId;  // ATXP account
+  } else if (destination instanceof BaseAccount) {
+    destinationAddress = destination.accountId;
+    destinationNetwork = 'base';
+    destinationAccountId = destination.accountId;  // Changed from null
+  } else if (destination instanceof SolanaAccount) {
+    destinationAddress = destination.accountId;
+    destinationNetwork = 'solana';
+    destinationAccountId = destination.accountId;  // Changed from null
+  } else if (destination instanceof BaseAppAccount) {
+    destinationAddress = destination.accountId;
+    destinationNetwork = 'base';
+    destinationAccountId = destination.accountId;  // Changed from null
+  } else if (destination instanceof WorldchainAccount) {
+    destinationAddress = destination.accountId;
+    destinationNetwork = 'world';
+    destinationAccountId = destination.accountId;  // Changed from null
+  } else {
+    // Exhaustiveness check - throw error for unknown account types
+    // This will fail at runtime if a new Account type is added without updating this function
+    throw new Error(`Unsupported account type. accountId: ${destination.accountId}. Please update getPaymentDestination() to handle this account type.`);
+  }
+
+  return {
+    destination: destinationAddress,
+    network: destinationNetwork,
+    accountId: destinationAccountId
+  };
 }
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
@@ -34,24 +77,19 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     ? config.minimumPayment
     : paymentConfig.price;
 
-  // Get payment destinations (with caching)
-  const paymentAddresses = await getPaymentDestinations(
-    config,
-    user,
-    paymentAmount,
-    config.currency
-  );
+  // Get payment destination from the Account
+  const paymentAddress = getPaymentDestination(config.destination);
 
   // Always use multi-destination format
   const charge = {
-    destinations: paymentAddresses.map(addr => ({
-      network: addr.network,
+    destinations: [{
+      network: paymentAddress.network,
       currency: config.currency,
-      address: addr.destination,
-      amount: paymentConfig.price // Each destination gets the requested amount for charge
-    })),
+      address: paymentAddress.destination,
+      amount: paymentConfig.price // Destination gets the requested amount for charge
+    }],
     source: user,
-    destinationAccountId: paymentAddresses[0]?.accountId || null,
+    destinationAccountId: paymentAddress.accountId,
     payeeName: config.payeeName,
   };
 
@@ -74,12 +112,12 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     source: charge.source,
     destinationAccountId: charge.destinationAccountId,
     payeeName: charge.payeeName,
-    destinations: paymentAddresses.map(addr => ({
-      network: addr.network,
+    destinations: [{
+      network: paymentAddress.network,
       currency: config.currency,
-      address: addr.destination,
+      address: paymentAddress.destination,
       amount: paymentAmount // Use minimumPayment or requested amount
-    }))
+    }]
   };
 
   const paymentId = await config.paymentServer.createPaymentRequest(paymentRequest);

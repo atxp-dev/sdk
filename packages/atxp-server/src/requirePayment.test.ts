@@ -27,7 +27,7 @@ describe('requirePayment', () => {
           amount: BigNumber(0.01)
         }],
         source: 'test-user',
-        destinationAccountId: null,
+        destinationAccountId: TH.DESTINATION,
         payeeName: config.payeeName,
       });
     });
@@ -61,7 +61,7 @@ describe('requirePayment', () => {
             amount: BigNumber(0.01)
           }],
           source: 'test-user',
-          destinationAccountId: null,
+          destinationAccountId: TH.DESTINATION,
           payeeName: config.payeeName,
         });
       }
@@ -151,7 +151,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // charge uses requested amount
             }],
             source: 'test-user',
-            destinationAccountId: null,
+            destinationAccountId: TH.DESTINATION,
             payeeName: config.payeeName,
           });
 
@@ -164,7 +164,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.05) // Uses minimumPayment override
             }],
             source: 'test-user',
-            destinationAccountId: null,
+            destinationAccountId: TH.DESTINATION,
             payeeName: config.payeeName,
           });
         }
@@ -192,7 +192,7 @@ describe('requirePayment', () => {
             amount: BigNumber(0.01) // charge ALWAYS uses the requested amount, not minimumPayment
           }],
           source: 'test-user',
-          destinationAccountId: null,
+          destinationAccountId: TH.DESTINATION,
           payeeName: config.payeeName,
         });
       });
@@ -222,7 +222,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // charge uses requested amount
             }],
             source: 'test-user',
-            destinationAccountId: null,
+            destinationAccountId: TH.DESTINATION,
             payeeName: config.payeeName,
           });
 
@@ -235,7 +235,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // Uses requested amount
             }],
             source: 'test-user',
-            destinationAccountId: null,
+            destinationAccountId: TH.DESTINATION,
             payeeName: config.payeeName,
           });
         }
@@ -268,7 +268,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.10) // Uses requested amount
             }],
             source: 'test-user',
-            destinationAccountId: null,
+            destinationAccountId: TH.DESTINATION,
             payeeName: config.payeeName,
           });
 
@@ -281,7 +281,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.10) // Uses requested amount, not minimumPayment
             }],
             source: 'test-user',
-            destinationAccountId: null,
+            destinationAccountId: TH.DESTINATION,
             payeeName: config.payeeName,
           });
         }
@@ -312,7 +312,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // Uses requested amount for charge
             }],
             source: 'test-user',
-            destinationAccountId: null,
+            destinationAccountId: TH.DESTINATION,
             payeeName: config.payeeName,
           });
 
@@ -325,7 +325,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.05) // Uses minimumPayment since it's higher
             }],
             source: 'test-user',
-            destinationAccountId: null,
+            destinationAccountId: TH.DESTINATION,
             payeeName: config.payeeName,
           });
         }

@@ -1,18 +1,24 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { buildATXPConfig } from '../buildATXPConfig.js';
 import './setup.js';
-import { ATXPArgs, ChainPaymentDestination } from '@atxp/server';
+import { ATXPArgs } from '@atxp/server';
+import { Account } from '@atxp/client';
 
 // Mock the buildServerConfig function
 vi.mock('@atxp/server', () => ({
   buildServerConfig: vi.fn((args) => ({
     mockConfig: true,
     ...args
-  })),
-  ChainPaymentDestination: vi.fn().mockImplementation((address: string, network: string) => ({
-    destination: vi.fn().mockResolvedValue({ destination: address, network })
   }))
 }));
+
+// Helper to create a mock Account for testing
+function mockAccount(accountId: string): Account {
+  return {
+    accountId,
+    paymentMakers: {}
+  };
+}
 
 describe('buildATXPConfig', () => {
   beforeEach(() => {
@@ -21,7 +27,7 @@ describe('buildATXPConfig', () => {
 
   it('should call buildServerConfig with provided args', () => {
     const args : ATXPArgs = {
-      paymentDestination: new ChainPaymentDestination('0x1234567890123456789012345678901234567890', 'base'),
+      destination: mockAccount('0x1234567890123456789012345678901234567890'),
       payeeName: 'Test Server',
       allowHttp: true
     };
@@ -40,7 +46,7 @@ describe('buildATXPConfig', () => {
     globalThis.fetch = mockFetch;
 
     const args = {
-      paymentDestination: new ChainPaymentDestination('0x1234567890123456789012345678901234567890', 'base')
+      destination: mockAccount('0x1234567890123456789012345678901234567890')
     };
 
     buildATXPConfig(args);
@@ -58,7 +64,7 @@ describe('buildATXPConfig', () => {
     (globalThis as any).fetch = undefined;
 
     const args = {
-      paymentDestination: new ChainPaymentDestination('0x1234567890123456789012345678901234567890', 'base')
+      destination: mockAccount('0x1234567890123456789012345678901234567890')
     };
 
     expect(() => buildATXPConfig(args)).not.toThrow();

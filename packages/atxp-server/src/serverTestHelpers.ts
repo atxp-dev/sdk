@@ -6,7 +6,7 @@ import { JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
 import { OAuthResourceClient, TokenData, Logger, Currency, Network, MemoryOAuthDb, DEFAULT_AUTHORIZATION_SERVER } from '@atxp/common';
 import { vi } from 'vitest';
 import { Charge, ATXPConfig, TokenCheck, TokenCheckPass, TokenCheckFail, TokenProblem, McpMethod, McpName, PaymentServer } from './types.js';
-import { ChainPaymentDestination } from './paymentDestination.js';
+import { Account, BaseAccount } from '@atxp/client';
 // Note: buildServerConfig is not exported from serverTestHelpers to avoid circular dependencies
 // It should be imported from the main index when needed
 import { BigNumber } from 'bignumber.js';
@@ -14,6 +14,24 @@ import * as oauth from 'oauth4webapi';
 
 export const DESTINATION = 'testDestination';
 export const SOURCE = 'testSource';
+
+// Mock BaseAccount for testing that properly handles instanceof checks
+class MockBaseAccount extends BaseAccount {
+  constructor(accountId: string) {
+    // Skip parent constructor by using a workaround
+    // This allows us to create test instances without real private keys
+    const instance = Object.create(BaseAccount.prototype);
+    instance.accountId = accountId;
+    instance.paymentMakers = {};
+    return instance as BaseAccount;
+  }
+}
+
+// Helper to create a mock Account for testing
+// Now creates a MockBaseAccount to properly handle instanceof checks in requirePayment
+export function mockAccount(accountId: string): Account {
+  return new MockBaseAccount(accountId);
+}
 
 export function charge({
     amount = BigNumber(0.01),
@@ -55,8 +73,11 @@ export function config(args: Partial<ATXPConfig> = {}): ATXPConfig {
     extractAccessToken: vi.fn().mockReturnValue('test-token')
   } as any;
 
+  // Create a mock Account for testing
+  const mockDestination = args.destination ?? mockAccount(DESTINATION);
+
   const config: ATXPConfig = {
-    paymentDestination: args.paymentDestination ?? new ChainPaymentDestination(DESTINATION, 'base'),
+    destination: mockDestination,
     mountPath: args.mountPath ?? '/',
     currency: args.currency ?? 'USDC',
     server: args.server ?? DEFAULT_AUTHORIZATION_SERVER,

@@ -6,7 +6,8 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { atxpExpress, requirePayment, atxpAccountId, ATXPPaymentDestination } from '@atxp/express';
+import { atxpExpress, requirePayment, atxpAccountId } from '@atxp/express';
+import { ATXPAccount } from '@atxp/client';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3011;
 
@@ -51,10 +52,10 @@ async function main() {
   const app = express();
   app.use(express.json());
 
-  const paymentDestination = new ATXPPaymentDestination(process.env.ATXP_CONNECTION_STRING!);
+  const destination = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
 
   const atxpRouter = atxpExpress({
-    paymentDestination,
+    destination,
     payeeName: 'Batch Payments Example',
     allowHttp: process.env.NODE_ENV === 'development',
     minimumPayment: BigNumber(0.05)

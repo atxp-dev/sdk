@@ -8,9 +8,19 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
 import { atxpExpress, requirePayment } from '@atxp/express';
 import { Network } from '@atxp/common';
-import { ChainPaymentDestination, ATXPPaymentDestination } from '@atxp/server';
+import { ATXPAccount, Account } from '@atxp/client';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
+
+// Helper function to create a simple account for receiving payments
+function createStaticAccount(address: string, network: Network): Account {
+  // For server-side use (receiving payments), we just need an Account
+  // with an accountId - we don't need payment makers
+  return {
+    accountId: address,
+    paymentMakers: {}
+  };
+}
 
 // Validate required environment variables
 function validateEnvironment() {
@@ -97,12 +107,12 @@ async function main() {
   
   // Create ATXP router and use it as middleware
   // Use either ATXP connection string for dynamic resolution or static funding destination
-  const paymentDestination = process.env.ATXP_CONNECTION_STRING
-    ? new ATXPPaymentDestination(process.env.ATXP_CONNECTION_STRING)
-    : new ChainPaymentDestination(process.env.FUNDING_DESTINATION!, process.env.FUNDING_NETWORK! as Network);
+  const destination = process.env.ATXP_CONNECTION_STRING
+    ? new ATXPAccount(process.env.ATXP_CONNECTION_STRING)
+    : createStaticAccount(process.env.FUNDING_DESTINATION!, process.env.FUNDING_NETWORK! as Network);
 
   const atxpRouter = atxpExpress({
-    paymentDestination,
+    destination,
     payeeName: 'ATXP Server Example',
     allowHttp: process.env.NODE_ENV === 'development',
   });
