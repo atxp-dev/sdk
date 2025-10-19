@@ -83,7 +83,7 @@ export class ATXPPaymentDestination implements PaymentDestination {
       throw new Error(`ATXPPaymentDestination: /addresses failed: ${response.status} ${response.statusText} ${text}`);
     }
 
-    const json = await response.json() as Array<{ address?: string; network?: string; currency?: string }>;
+    const json = await response.json() as Array<{ address?: string; network?: string; currency?: string; accountId?: string }>;
     if (!Array.isArray(json) || json.length === 0) {
       this.logger.error('/addresses did not return any addresses');
       throw new Error('ATXPPaymentDestination: /addresses did not return any addresses');
@@ -119,7 +119,8 @@ export class ATXPPaymentDestination implements PaymentDestination {
 
       addresses.push({
         destination: item.address,
-        network
+        network,
+        ...(item.accountId ? { accountId: item.accountId } : {})
       });
     }
 

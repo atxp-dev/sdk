@@ -133,9 +133,9 @@ export class ATXPAccount implements Account {
     this.fetchFn = fetchFn;
 
     if (accountId) {
-      this.accountId = `atxp_${accountId}`;
+      this.accountId = accountId; // Use as supplied (already has atxp_acct_ prefix from connection string)
     } else {
-      this.accountId = `atxp_${crypto.randomUUID()}`;
+      this.accountId = `atxp_${crypto.randomUUID()}`; // Keep prefix for generated IDs
     }
     this.paymentMakers = {
       [network]: new ATXPHttpPaymentMaker(origin, token, fetchFn),

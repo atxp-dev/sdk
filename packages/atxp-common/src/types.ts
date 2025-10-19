@@ -26,7 +26,6 @@ export type PaymentRequestDestination = {
   network: Network;
   currency: Currency;
   address: string;
-  accountId?: string;
   amount: BigNumber;
 }
 
@@ -40,6 +39,8 @@ export type PaymentRequestData = {
   destination?: string;
   // Common fields
   source: string;
+  sourceAccountId?: string | null;
+  destinationAccountId?: string | null;
   resource: URL;
   resourceName: string;
   payeeName?: string | null;
