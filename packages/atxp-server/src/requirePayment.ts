@@ -1,4 +1,4 @@
-import { RequirePaymentConfig, paymentRequiredError } from "@atxp/common";
+import { RequirePaymentConfig, paymentRequiredError, extractNetworkFromAccountId } from "@atxp/common";
 import { getATXPConfig, atxpAccountId } from "./atxpContext.js";
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
@@ -18,7 +18,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     : paymentConfig.price;
 
   // Get network and address from destination Account
-  const destinationNetwork = config.destination.network();
+  const destinationNetwork = extractNetworkFromAccountId(config.destination.accountId);
   const destinationAccountId = config.destination.accountId;
   const destinationAddress = config.destination.accountId; // Address IS accountId
 

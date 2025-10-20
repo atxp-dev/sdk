@@ -1,5 +1,5 @@
 import type { Account, PaymentMaker } from './types.js';
-import type { Network, AccountId } from '@atxp/common';
+import type { AccountId } from '@atxp/common';
 import { SolanaPaymentMaker } from './solanaPaymentMaker.js';
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -22,9 +22,5 @@ export class SolanaAccount implements Account {
     this.paymentMakers = {
       'solana': new SolanaPaymentMaker(solanaEndpoint, sourceSecretKey),
     }
-  }
-
-  network(): Network {
-    return 'solana';
   }
 }

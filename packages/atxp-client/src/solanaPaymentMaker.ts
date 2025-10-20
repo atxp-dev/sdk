@@ -5,7 +5,7 @@ import { createTransfer, ValidateTransferError as _ValidateTransferError } from 
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import bs58 from "bs58";
 import BigNumber from "bignumber.js";
-import { generateJWT, Currency } from '@atxp/common';
+import { generateJWT, Currency, AccountId } from '@atxp/common';
 import { importJWK } from 'jose';
 import { Logger } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
@@ -50,7 +50,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     if (!(privateKey instanceof CryptoKey)) {
       throw new Error('Expected CryptoKey from importJWK');
     }
-    return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '', accountId || undefined);
+    return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '', accountId as AccountId | undefined);
   }
 
   makePayment = async (amount: BigNumber, currency: Currency, receiver: string, memo: string, _paymentRequestId?: string): Promise<string> => {

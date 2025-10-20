@@ -42,8 +42,8 @@ export type PaymentRequestData = {
   destination?: string;
   // Common fields
   source: string;
-  sourceAccountId?: string | null;
-  destinationAccountId?: string | null;
+  sourceAccountId?: AccountId | null;
+  destinationAccountId?: AccountId | null;
   resource: URL;
   resourceName: string;
   payeeName?: string | null;
@@ -53,7 +53,7 @@ export type PaymentRequestData = {
 export type CustomJWTPayload = {
   code_challenge?: string;
   payment_request_id?: string;
-  account_id?: string;
+  account_id?: AccountId;
 }
 
 export type ClientCredentials = {
@@ -113,7 +113,6 @@ export interface PaymentMaker {
 export type Account = {
   accountId: AccountId;
   paymentMakers: {[key: string]: PaymentMaker};
-  network(): Network;
 }
 
 /**

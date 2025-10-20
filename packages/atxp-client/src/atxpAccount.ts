@@ -151,8 +151,4 @@ export class ATXPAccount implements Account {
       this.fetchFn
     );
   }
-
-  network(): Network {
-    return 'atxp';
-  }
 }

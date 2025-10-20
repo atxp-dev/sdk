@@ -1,4 +1,4 @@
-import type { CustomJWTPayload } from "./types.js";
+import type { CustomJWTPayload, AccountId } from "./types.js";
 import { SignJWT } from 'jose';
 
 // TODO: revisit this
@@ -19,7 +19,7 @@ export const generateJWT = async (
   privateKey: CryptoKey | Uint8Array,
   paymentRequestId: string,
   codeChallenge: string,
-  accountId?: string
+  accountId?: AccountId
 ): Promise<string> => {
   const payload: CustomJWTPayload = {
     code_challenge: codeChallenge,
