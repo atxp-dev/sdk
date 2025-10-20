@@ -90,7 +90,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     return json.txHash;
   }
 
-  async generateJWT(params: { paymentRequestId: string; codeChallenge: string; accountId?: string }): Promise<string> {
+  async generateJWT(params: { paymentRequestId: string; codeChallenge: string; accountId?: string | null }): Promise<string> {
     const response = await this.fetchFn(`${this.origin}/sign`, {
       method: 'POST',
       headers: {

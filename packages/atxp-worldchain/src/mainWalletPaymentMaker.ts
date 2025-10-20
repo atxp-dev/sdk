@@ -60,7 +60,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   }: {
     paymentRequestId: string;
     codeChallenge: string;
-    accountId?: string;
+    accountId?: string | null;
   }): Promise<string> {
     const timestamp = Math.floor(Date.now() / 1000);
 

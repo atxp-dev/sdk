@@ -82,7 +82,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return this.smartWallet.account.address;
   }
 
-  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string}): Promise<string> {
+  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string | null}): Promise<string> {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
 

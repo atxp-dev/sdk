@@ -41,7 +41,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   async generateJWT(payload: {
     paymentRequestId: string;
     codeChallenge: string;
-    accountId?: string;
+    accountId?: string | null;
   }): Promise<string> {
     this.logger.info(`codeChallenge: ${payload.codeChallenge}`);
     this.logger.info(`paymentRequestId: ${payload.paymentRequestId}`);

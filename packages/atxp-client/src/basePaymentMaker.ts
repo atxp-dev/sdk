@@ -83,7 +83,7 @@ export class BasePaymentMaker implements PaymentMaker {
     return this.signingClient.account!.address;
   }
 
-  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string}): Promise<string> {
+  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string | null}): Promise<string> {
     const headerObj = { alg: 'ES256K' };
 
     const payloadObj = {
