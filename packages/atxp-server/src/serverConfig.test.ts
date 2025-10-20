@@ -6,7 +6,7 @@ import type { Account } from '@atxp/common';
 // Helper to create a mock Account for testing
 function mockAccount(accountId: string): Account {
   return {
-    accountId,
+    accountId: `base:${accountId}` as any,
     paymentMakers: {},
     network: () => 'base'
   };
