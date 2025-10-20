@@ -1,12 +1,12 @@
 import type { Account, PaymentMaker, Hex } from './types.js';
-import type { Network } from '@atxp/common';
+import type { Network, AccountId } from '@atxp/common';
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
 import { base } from 'viem/chains';
 
 export class BaseAccount implements Account {
-  accountId: string;
+  accountId: AccountId;
   paymentMakers: { [key: string]: PaymentMaker };
   private walletClient: WalletClient;
   private account: PrivateKeyAccount;
@@ -21,7 +21,8 @@ export class BaseAccount implements Account {
 
     this.account = privateKeyToAccount(sourceSecretKey as Hex);
 
-    this.accountId = this.account.address;
+    // Format accountId as network:address
+    this.accountId = `base:${this.account.address}` as AccountId;
     this.walletClient = createWalletClient({
       account: this.account,
       chain: base,

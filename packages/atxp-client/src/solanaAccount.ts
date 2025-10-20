@@ -1,11 +1,11 @@
 import type { Account, PaymentMaker } from './types.js';
-import type { Network } from '@atxp/common';
+import type { Network, AccountId } from '@atxp/common';
 import { SolanaPaymentMaker } from './solanaPaymentMaker.js';
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 
 export class SolanaAccount implements Account {
-  accountId: string;
+  accountId: AccountId;
   paymentMakers: { [key: string]: PaymentMaker };
 
   constructor(solanaEndpoint: string, sourceSecretKey: string) {
@@ -17,7 +17,8 @@ export class SolanaAccount implements Account {
     }
     const source = Keypair.fromSecretKey(bs58.decode(sourceSecretKey));
 
-    this.accountId = source.publicKey.toBase58();
+    // Format accountId as network:address
+    this.accountId = `solana:${source.publicKey.toBase58()}` as AccountId;
     this.paymentMakers = {
       'solana': new SolanaPaymentMaker(solanaEndpoint, sourceSecretKey),
     }

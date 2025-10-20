@@ -35,6 +35,7 @@ export {
   type AuthorizationServerUrl,
   type Currency,
   type Network,
+  type AccountId,
   type PaymentRequestDestination,
   type PaymentRequestData,
   type CustomJWTPayload,
@@ -47,7 +48,9 @@ export {
   type FetchLike,
   type RequirePaymentConfig,
   type PaymentMaker,
-  type Account
+  type Account,
+  extractAddressFromAccountId,
+  extractNetworkFromAccountId
 } from './types.js';
 
 // Utility functions

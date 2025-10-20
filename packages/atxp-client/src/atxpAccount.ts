@@ -1,5 +1,5 @@
 import type { Account, PaymentMaker } from './types.js';
-import type { FetchLike, Network, Currency } from '@atxp/common'
+import type { FetchLike, Network, Currency, AccountId } from '@atxp/common'
 import { crypto } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { LocalAccount } from 'viem';
@@ -116,7 +116,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 }
 
 export class ATXPAccount implements Account {
-  accountId: string;
+  accountId: AccountId;
   paymentMakers: { [key: string]: PaymentMaker };
   origin: string;
   token: string;
@@ -132,10 +132,12 @@ export class ATXPAccount implements Account {
     this.token = token;
     this.fetchFn = fetchFn;
 
+    // Format accountId as network:address
+    // Connection string provides just the atxp_acct_xxx part (no prefix for UI)
     if (accountId) {
-      this.accountId = accountId; // Use as supplied (already has atxp_acct_ prefix from connection string)
+      this.accountId = `atxp:${accountId}` as AccountId;
     } else {
-      this.accountId = `atxp_${crypto.randomUUID()}`; // Keep prefix for generated IDs
+      this.accountId = `atxp:atxp_${crypto.randomUUID()}` as AccountId;
     }
     this.paymentMakers = {
       [network]: new ATXPHttpPaymentMaker(origin, token, fetchFn),

@@ -22,6 +22,9 @@ export type AuthorizationServerUrl = UrlString;
 export type Currency = 'USDC';
 export type Network = 'solana' | 'base' | 'world' | 'base_sepolia' | 'world_sepolia' | 'atxp';
 
+// Globally unique account identifier format: network:address
+export type AccountId = `${Network}:${string}`;
+
 export type PaymentRequestDestination = {
   network: Network;
   currency: Currency;
@@ -108,7 +111,33 @@ export interface PaymentMaker {
 }
 
 export type Account = {
-  accountId: string;
+  accountId: AccountId;
   paymentMakers: {[key: string]: PaymentMaker};
   network(): Network;
+}
+
+/**
+ * Extract the address portion from a fully-qualified accountId
+ * @param accountId - Format: network:address
+ * @returns The address portion
+ */
+export function extractAddressFromAccountId(accountId: AccountId): string {
+  const parts = accountId.split(':');
+  if (parts.length !== 2) {
+    throw new Error(`Invalid accountId format: ${accountId}. Expected format: network:address`);
+  }
+  return parts[1];
+}
+
+/**
+ * Extract the network portion from a fully-qualified accountId
+ * @param accountId - Format: network:address
+ * @returns The network portion
+ */
+export function extractNetworkFromAccountId(accountId: AccountId): Network {
+  const parts = accountId.split(':');
+  if (parts.length !== 2) {
+    throw new Error(`Invalid accountId format: ${accountId}. Expected format: network:address`);
+  }
+  return parts[0] as Network;
 }
