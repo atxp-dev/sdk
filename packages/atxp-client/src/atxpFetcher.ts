@@ -1,6 +1,6 @@
 import { BigNumber } from 'bignumber.js';
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Network, Currency } from '@atxp/common';
+import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Network, Currency, AccountId } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch } from '@atxp/common';
@@ -37,7 +37,7 @@ export class ATXPFetcher {
   protected paymentMakers: Map<string, PaymentMaker>;
   protected sideChannelFetch: FetchLike;
   protected db: OAuthDb;
-  protected accountId: string;
+  protected accountId: AccountId;
   protected allowedAuthorizationServers: AuthorizationServerUrl[];
   protected approvePayment: (payment: ProspectivePayment) => Promise<boolean>;
   protected logger: Logger;
@@ -46,7 +46,7 @@ export class ATXPFetcher {
   protected onPayment: (args: { payment: ProspectivePayment }) => Promise<void>;
   protected onPaymentFailure: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
   constructor(config: {
-    accountId: string;
+    accountId: AccountId;
     db: OAuthDb;
     paymentMakers: {[key: string]: PaymentMaker};
     fetchFn?: FetchLike;

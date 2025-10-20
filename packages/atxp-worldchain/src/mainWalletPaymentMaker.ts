@@ -4,7 +4,7 @@ import {
   getWorldChainMainnetWithRPC,
   type Hex
 } from '@atxp/client';
-import { Logger, Currency, ConsoleLogger, PaymentMaker } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { createWalletClient, createPublicClient, custom, encodeFunctionData, http } from 'viem';
 
@@ -60,7 +60,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   }: {
     paymentRequestId: string;
     codeChallenge: string;
-    accountId?: string | null;
+    accountId?: AccountId | null;
   }): Promise<string> {
     const timestamp = Math.floor(Date.now() / 1000);
 

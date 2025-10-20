@@ -1,6 +1,6 @@
 import { getBaseUSDCAddress } from '@atxp/client';
 import { base } from 'viem/chains';
-import { Logger, Currency, ConsoleLogger, PaymentMaker } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
@@ -82,7 +82,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return this.smartWallet.account.address;
   }
 
-  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string | null}): Promise<string> {
+  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: AccountId | null}): Promise<string> {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
 

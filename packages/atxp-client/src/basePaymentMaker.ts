@@ -1,6 +1,6 @@
 import type { PaymentMaker, Hex } from './types.js';
 import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from './types.js';
-import { Logger, Currency } from '@atxp/common';
+import { Logger, Currency, AccountId } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
@@ -83,7 +83,7 @@ export class BasePaymentMaker implements PaymentMaker {
     return this.signingClient.account!.address;
   }
 
-  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: string | null}): Promise<string> {
+  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: AccountId | null}): Promise<string> {
     const headerObj = { alg: 'ES256K' };
 
     const payloadObj = {

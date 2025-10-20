@@ -2,7 +2,7 @@ import { encodeFunctionData, toHex } from 'viem';
 import { getBaseUSDCAddress, type Hex } from '@atxp/client';
 import { base } from 'viem/chains';
 import BigNumber from 'bignumber.js';
-import { ConsoleLogger, Logger, Currency, PaymentMaker } from '@atxp/common';
+import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId } from '@atxp/common';
 import {
   createEIP1271JWT,
   createEIP1271AuthData,
@@ -41,7 +41,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   async generateJWT(payload: {
     paymentRequestId: string;
     codeChallenge: string;
-    accountId?: string | null;
+    accountId?: AccountId | null;
   }): Promise<string> {
     this.logger.info(`codeChallenge: ${payload.codeChallenge}`);
     this.logger.info(`paymentRequestId: ${payload.paymentRequestId}`);

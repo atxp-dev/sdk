@@ -106,7 +106,7 @@ export type RequirePaymentConfig = {
 
 export interface PaymentMaker {
   makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string) => Promise<string>;
-  generateJWT: (params: {paymentRequestId: string, codeChallenge: string, accountId?: string | null}) => Promise<string>;
+  generateJWT: (params: {paymentRequestId: string, codeChallenge: string, accountId?: AccountId | null}) => Promise<string>;
   getSourceAddress: (params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}) => string | Promise<string>;
 }
 
