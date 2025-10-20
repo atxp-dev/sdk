@@ -61,8 +61,8 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         cache,
       });
 
-      // Should have main wallet address as account ID
-      expect(account.accountId).toBe(TEST_WALLET_ADDRESS);
+      // Should have main wallet address as account ID (qualified with network)
+      expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
       
       // Should have main wallet payment maker
       expect(account.paymentMakers['base']).toBeInstanceOf(MainWalletPaymentMaker);
@@ -104,7 +104,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         cache,
       });
 
-      expect(account.accountId).toBe(TEST_WALLET_ADDRESS);
+      expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
       expect(account.paymentMakers['base']).toBeInstanceOf(MainWalletPaymentMaker);
     });
 

@@ -95,7 +95,7 @@ describe('WorldchainAccount', () => {
 
       // Verify account creation
       expect(account).toBeDefined();
-      expect(account.accountId).toBe(TEST_SMART_WALLET_ADDRESS);
+      expect(account.accountId).toBe(`world:${TEST_SMART_WALLET_ADDRESS}`);
       expect(account.paymentMakers).toBeDefined();
       expect(account.paymentMakers.world).toBeDefined();
 
@@ -159,7 +159,7 @@ describe('WorldchainAccount', () => {
 
       // Verify account was loaded from storage
       expect(account).toBeDefined();
-      expect(account.accountId).toBe(TEST_SMART_WALLET_ADDRESS);
+      expect(account.accountId).toBe(`world:${TEST_SMART_WALLET_ADDRESS}`);
 
       // Verify smart wallet was NOT deployed (reusing existing)
       expect(bundlerClient.sendUserOperation).not.toHaveBeenCalled();
