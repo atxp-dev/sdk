@@ -105,12 +105,12 @@ async function main() {
     const address = process.env.FUNDING_DESTINATION!;
 
     // Create appropriate account type based on network
-    if (network === 'base' || network === 'atxp_base') {
+    if (network === 'base') {
       destination = new BaseAccount(address);
     } else if (network === 'solana') {
       destination = new SolanaAccount(address);
     } else {
-      throw new Error(`Unsupported network: ${network}. Please use 'base', 'atxp_base', or 'solana'.`);
+      throw new Error(`Unsupported network: ${network}. Please use 'base' or 'solana'.`);
     }
   }
 

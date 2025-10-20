@@ -12,7 +12,7 @@ import BigNumber from "bignumber.js";
  */
 function getNetworkForAccount(destination: Account): Network {
   if (destination instanceof ATXPAccount) {
-    return 'atxp_base';
+    return 'atxp';
   } else if (destination instanceof BaseAccount) {
     return 'base';
   } else if (destination instanceof SolanaAccount) {
