@@ -1,6 +1,5 @@
 import { RequirePaymentConfig, paymentRequiredError } from "@atxp/common";
 import { getATXPConfig, atxpAccountId } from "./atxpContext.js";
-import BigNumber from "bignumber.js";
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
   const config = getATXPConfig();
