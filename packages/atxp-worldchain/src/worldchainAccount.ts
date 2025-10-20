@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker } from '@atxp/client';
+import type { Account, PaymentMaker, Network } from '@atxp/common';
 import {
   getWorldChainUSDCAddress,
   WORLD_CHAIN_MAINNET
@@ -185,5 +185,9 @@ export class WorldchainAccount implements Account {
     }
 
     cache.delete(this.toCacheKey(userWalletAddress));
+  }
+
+  network(): Network {
+    return 'world';
   }
 }

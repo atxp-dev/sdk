@@ -3,10 +3,9 @@
 import { Readable } from 'stream';
 import { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'http';
 import { JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
-import { OAuthResourceClient, TokenData, Logger, Currency, Network, MemoryOAuthDb, DEFAULT_AUTHORIZATION_SERVER } from '@atxp/common';
+import { OAuthResourceClient, TokenData, Logger, Currency, Network, MemoryOAuthDb, DEFAULT_AUTHORIZATION_SERVER, Account } from '@atxp/common';
 import { vi } from 'vitest';
 import { Charge, ATXPConfig, TokenCheck, TokenCheckPass, TokenCheckFail, TokenProblem, McpMethod, McpName, PaymentServer } from './types.js';
-import { Account, BaseAccount } from '@atxp/client';
 // Note: buildServerConfig is not exported from serverTestHelpers to avoid circular dependencies
 // It should be imported from the main index when needed
 import { BigNumber } from 'bignumber.js';
@@ -16,14 +15,12 @@ export const DESTINATION = 'testDestination';
 export const SOURCE = 'testSource';
 
 // Helper to create a mock Account for testing
-// Creates a BaseAccount instance that will be recognized by instanceof checks
 export function mockAccount(accountId: string): Account {
-  // Create a BaseAccount instance using Object.create to bypass constructor
-  // This allows us to create test instances without real private keys
-  const instance = Object.create(BaseAccount.prototype);
-  instance.accountId = accountId;
-  instance.paymentMakers = {};
-  return instance as BaseAccount;
+  return {
+    accountId,
+    paymentMakers: {},
+    network: () => 'base'
+  };
 }
 
 export function charge({

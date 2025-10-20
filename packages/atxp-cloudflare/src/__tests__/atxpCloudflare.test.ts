@@ -30,13 +30,14 @@ import {
 } from '@atxp/server';
 import { buildATXPConfig } from '../buildATXPConfig.js';
 import { ATXPCloudflareOptions } from '../types.js';
-import { Account } from '@atxp/client';
+import { Account } from '@atxp/common';
 
 // Helper to create a mock Account for testing
 function mockAccount(accountId: string): Account {
   return {
     accountId,
-    paymentMakers: {}
+    paymentMakers: {},
+    network: () => 'base'
   };
 }
 

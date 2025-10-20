@@ -1,9 +1,8 @@
-import { PaymentMaker } from '@atxp/client';
 import { encodeFunctionData, toHex } from 'viem';
 import { getBaseUSDCAddress, type Hex } from '@atxp/client';
 import { base } from 'viem/chains';
 import BigNumber from 'bignumber.js';
-import { ConsoleLogger, Logger, Currency } from '@atxp/common';
+import { ConsoleLogger, Logger, Currency, PaymentMaker } from '@atxp/common';
 import {
   createEIP1271JWT,
   createEIP1271AuthData,

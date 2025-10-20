@@ -45,7 +45,9 @@ export {
   type OAuthDb,
   type TokenData,
   type FetchLike,
-  type RequirePaymentConfig
+  type RequirePaymentConfig,
+  type PaymentMaker,
+  type Account
 } from './types.js';
 
 // Utility functions

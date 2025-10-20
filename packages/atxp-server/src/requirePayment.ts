@@ -1,30 +1,6 @@
-import { RequirePaymentConfig, paymentRequiredError, Currency, Network } from "@atxp/common";
+import { RequirePaymentConfig, paymentRequiredError } from "@atxp/common";
 import { getATXPConfig, atxpAccountId } from "./atxpContext.js";
-import { ATXPConfig } from "./types.js";
-import { ATXPAccount, BaseAccount, SolanaAccount, Account } from "@atxp/client";
-import { BaseAppAccount } from "@atxp/base";
-import { WorldchainAccount } from "@atxp/worldchain";
 import BigNumber from "bignumber.js";
-
-/**
- * Get the network for an Account.
- * This is an internal helper function used by requirePayment.
- */
-function getNetworkForAccount(destination: Account): Network {
-  if (destination instanceof ATXPAccount) {
-    return 'atxp';
-  } else if (destination instanceof BaseAccount) {
-    return 'base';
-  } else if (destination instanceof SolanaAccount) {
-    return 'solana';
-  } else if (destination instanceof BaseAppAccount) {
-    return 'base';
-  } else if (destination instanceof WorldchainAccount) {
-    return 'world';
-  } else {
-    throw new Error(`Unsupported account type. accountId: ${destination.accountId}`);
-  }
-}
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
   const config = getATXPConfig();
@@ -43,7 +19,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     : paymentConfig.price;
 
   // Get network and address from destination Account
-  const destinationNetwork = getNetworkForAccount(config.destination);
+  const destinationNetwork = config.destination.network();
   const destinationAccountId = config.destination.accountId;
   const destinationAddress = config.destination.accountId; // Address IS accountId
 

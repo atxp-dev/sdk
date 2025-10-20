@@ -1,4 +1,5 @@
 import type { Account, PaymentMaker, Hex } from './types.js';
+import type { Network } from '@atxp/common';
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
@@ -38,5 +39,9 @@ export class BaseAccount implements Account {
   getSigner(): LocalAccount {
     // Return the viem account directly - it implements LocalAccount interface
     return this.account;
+  }
+
+  network(): Network {
+    return 'base';
   }
 }

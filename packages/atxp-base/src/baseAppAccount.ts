@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker } from '@atxp/client';
+import type { Account, PaymentMaker, Network } from '@atxp/common';
 import { getBaseUSDCAddress } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
@@ -182,5 +182,9 @@ export class BaseAppAccount implements Account {
     }
 
     cache.delete(this.toCacheKey(userWalletAddress));
+  }
+
+  network(): Network {
+    return 'base';
   }
 }

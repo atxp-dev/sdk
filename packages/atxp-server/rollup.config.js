@@ -25,7 +25,7 @@ const serverTestHelpersConfigs = [
     },
     external: (id) => {
       const externals = [
-        '@atxp/common', '@atxp/server', '@atxp/client', '@atxp/base', '@atxp/worldchain',
+        '@atxp/common', '@atxp/server',
         'vitest', 'bignumber.js', 'oauth4webapi',
         'fs', 'path', 'crypto', 'http', 'https', 'url', 'stream', 'util', 'events', 'buffer', 'process', 'os',
         'node:fs', 'node:path', 'node:crypto', 'node:http', 'node:https', 'node:url', 'node:stream',
@@ -63,7 +63,7 @@ const serverTestHelpersConfigs = [
     },
     external: (id) => {
       const externals = [
-        '@atxp/common', '@atxp/server', '@atxp/client', '@atxp/base', '@atxp/worldchain',
+        '@atxp/common', '@atxp/server',
         'vitest', 'bignumber.js', 'oauth4webapi',
         'fs', 'path', 'crypto', 'http', 'https', 'url', 'stream', 'util', 'events', 'buffer', 'process', 'os',
         'node:fs', 'node:path', 'node:crypto', 'node:http', 'node:https', 'node:url', 'node:stream',

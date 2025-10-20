@@ -1,6 +1,6 @@
-import { getBaseUSDCAddress, type PaymentMaker } from '@atxp/client';
+import { getBaseUSDCAddress } from '@atxp/client';
 import { base } from 'viem/chains';
-import { Logger, Currency, ConsoleLogger } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';

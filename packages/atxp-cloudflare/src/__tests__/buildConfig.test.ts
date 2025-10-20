@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { buildATXPConfig } from '../buildATXPConfig.js';
 import './setup.js';
 import { ATXPArgs } from '@atxp/server';
-import { Account } from '@atxp/client';
+import { Account } from '@atxp/common';
 
 // Mock the buildServerConfig function
 vi.mock('@atxp/server', () => ({
@@ -16,7 +16,8 @@ vi.mock('@atxp/server', () => ({
 function mockAccount(accountId: string): Account {
   return {
     accountId,
-    paymentMakers: {}
+    paymentMakers: {},
+    network: () => 'base'
   };
 }
 

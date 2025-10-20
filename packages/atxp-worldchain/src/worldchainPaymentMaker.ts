@@ -1,9 +1,8 @@
 import {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
-  WORLD_CHAIN_MAINNET,
-  type PaymentMaker
+  WORLD_CHAIN_MAINNET
 } from '@atxp/client';
-import { Logger, Currency, ConsoleLogger } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';

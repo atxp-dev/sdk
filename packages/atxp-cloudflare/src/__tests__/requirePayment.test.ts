@@ -3,7 +3,7 @@ import { requirePayment } from '../requirePayment.js';
 import { BigNumber } from 'bignumber.js';
 import './setup.js';
 import type { ATXPConfig, TokenCheck } from '@atxp/server';
-import { Account } from '@atxp/client';
+import { Account } from '@atxp/common';
 
 // Mock external dependencies
 vi.mock('@atxp/server', async (importOriginal) => {
@@ -26,7 +26,8 @@ import {
 function mockAccount(accountId: string): Account {
   return {
     accountId,
-    paymentMakers: {}
+    paymentMakers: {},
+    network: () => 'base'
   };
 }
 

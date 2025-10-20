@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { buildServerConfig } from './serverConfig.js';
 import { BigNumber } from 'bignumber.js';
-import { Account } from '@atxp/client';
+import type { Account } from '@atxp/common';
 
 // Helper to create a mock Account for testing
 function mockAccount(accountId: string): Account {
   return {
     accountId,
-    paymentMakers: {}
+    paymentMakers: {},
+    network: () => 'base'
   };
 }
 

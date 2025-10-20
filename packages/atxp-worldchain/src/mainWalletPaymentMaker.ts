@@ -2,10 +2,9 @@ import {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
   WORLD_CHAIN_MAINNET,
   getWorldChainMainnetWithRPC,
-  type PaymentMaker,
   type Hex
 } from '@atxp/client';
-import { Logger, Currency, ConsoleLogger } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { createWalletClient, createPublicClient, custom, encodeFunctionData, http } from 'viem';
 
