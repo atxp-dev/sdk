@@ -15,22 +15,15 @@ import * as oauth from 'oauth4webapi';
 export const DESTINATION = 'testDestination';
 export const SOURCE = 'testSource';
 
-// Mock BaseAccount for testing that properly handles instanceof checks
-class MockBaseAccount extends BaseAccount {
-  constructor(accountId: string) {
-    // Skip parent constructor by using a workaround
-    // This allows us to create test instances without real private keys
-    const instance = Object.create(BaseAccount.prototype);
-    instance.accountId = accountId;
-    instance.paymentMakers = {};
-    return instance as BaseAccount;
-  }
-}
-
 // Helper to create a mock Account for testing
-// Now creates a MockBaseAccount to properly handle instanceof checks in requirePayment
+// Creates a BaseAccount instance that will be recognized by instanceof checks
 export function mockAccount(accountId: string): Account {
-  return new MockBaseAccount(accountId);
+  // Create a BaseAccount instance using Object.create to bypass constructor
+  // This allows us to create test instances without real private keys
+  const instance = Object.create(BaseAccount.prototype);
+  instance.accountId = accountId;
+  instance.paymentMakers = {};
+  return instance as BaseAccount;
 }
 
 export function charge({
