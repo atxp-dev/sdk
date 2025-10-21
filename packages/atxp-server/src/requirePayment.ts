@@ -52,6 +52,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   // For createPaymentRequest, use the minimumPayment if configured
   const paymentRequest = {
     source: charge.source,
+    sourceAccountId: user,
     destinationAccountId: charge.destinationAccountId,
     payeeName: charge.payeeName,
     destinations: [{
@@ -62,6 +63,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     }]
   };
 
+  config.logger.debug(`Creating payment request with sourceAccountId: ${user}, destinationAccountId: ${charge.destinationAccountId}`);
   const paymentId = await config.paymentServer.createPaymentRequest(paymentRequest);
   config.logger.info(`Created payment request ${paymentId}`);
   throw paymentRequiredError(config.server, paymentId, paymentAmount);
