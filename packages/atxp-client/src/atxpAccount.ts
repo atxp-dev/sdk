@@ -1,9 +1,11 @@
 import type { Account, PaymentMaker } from './types.js';
 import type { FetchLike, Network, Currency, AccountId } from '@atxp/common'
+import type { DestinationMapper } from './destinationMapper.js';
 import { crypto } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { LocalAccount } from 'viem';
 import { ATXPLocalAccount } from './atxpLocalAccount.js';
+import { ATXPDestinationMapper } from './atxpDestinationMapper.js';
 
 function toBasicAuth(token: string): string {
   // Basic auth is base64("username:password"), password is blank
@@ -118,14 +120,19 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 export class ATXPAccount implements Account {
   accountId: AccountId;
   paymentMakers: { [key: string]: PaymentMaker };
+  destinationMappers: DestinationMapper[];
   origin: string;
   token: string;
   fetchFn: FetchLike;
 
-  constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: Network }) {
+  constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: Network; accountsServiceUrl?: string }) {
     const { origin, token, accountId } = parseConnectionString(connectionString);
     const fetchFn = opts?.fetchFn ?? fetch;
     const network = opts?.network ?? 'base';
+
+    // Use the accounts service URL from options, or default to the origin
+    // For staging/prod, the accounts service is the same as the origin
+    const accountsServiceUrl = opts?.accountsServiceUrl ?? origin;
 
     // Store for use in X402 payment creation
     this.origin = origin;
@@ -142,6 +149,11 @@ export class ATXPAccount implements Account {
     this.paymentMakers = {
       [network]: new ATXPHttpPaymentMaker(origin, token, fetchFn),
     };
+
+    // Initialize destination mappers - add ATXP mapper to handle account ID resolution
+    this.destinationMappers = [
+      new ATXPDestinationMapper(accountsServiceUrl, fetchFn)
+    ];
   }
 
   async getSigner(): Promise<LocalAccount> {

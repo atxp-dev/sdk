@@ -113,6 +113,7 @@ export interface PaymentMaker {
 export type Account = {
   accountId: AccountId;
   paymentMakers: {[key: string]: PaymentMaker};
+  destinationMappers?: any[]; // Using any[] to avoid circular dependency with atxp-client
 }
 
 /**
