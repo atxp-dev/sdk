@@ -197,7 +197,7 @@ export class ATXPFetcher {
           },
           body: JSON.stringify({
             transactionId: paymentId,
-            network: destinationNetwork,
+            chain: destinationNetwork,
             currency: dest.currency
           })
         });
@@ -339,7 +339,7 @@ export class ATXPFetcher {
       },
       body: JSON.stringify({
         transactionId: paymentId,
-        network: destinationNetwork,
+        chain: destinationNetwork,
         currency: currency
       })
     });
