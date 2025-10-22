@@ -67,7 +67,7 @@ export class ATXPDestinationMapper implements DestinationMapper {
     // Strip any network prefix if present (e.g., atxp:atxp_acct_xxx -> atxp_acct_xxx)
     const unqualifiedId = accountId.includes(':') ? accountId.split(':')[1] : accountId;
 
-    const url = `${this.accountsServiceUrl}/a/${unqualifiedId}/addresses`;
+    const url = `${this.accountsServiceUrl}/account/${unqualifiedId}/sources`;
     logger?.debug(`ATXPDestinationMapper: Fetching addresses from ${url}`);
 
     try {
