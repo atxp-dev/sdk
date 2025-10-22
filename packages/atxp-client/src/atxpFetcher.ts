@@ -140,7 +140,13 @@ export class ATXPFetcher {
     }
 
     // Apply destination mappers to transform destinations
-    let mappedDestinations: Destination[] = paymentRequestData.destinations;
+    // Convert PaymentRequestDestination[] to Destination[] for mapper compatibility
+    let mappedDestinations: Destination[] = paymentRequestData.destinations.map(dest => ({
+      network: dest.network,
+      currency: dest.currency,
+      address: dest.address,
+      amount: dest.amount.toString()
+    }));
     for (const mapper of this.destinationMappers) {
       try {
         mappedDestinations = await mapper.mapDestinations(mappedDestinations, this.logger);
@@ -170,8 +176,8 @@ export class ATXPFetcher {
         accountId: this.accountId,
         resourceUrl: paymentRequestData.resource?.toString() ?? '',
         resourceName: paymentRequestData.resourceName ?? '',
-        network: destinationNetwork,
-        currency: dest.currency,
+        network: destinationNetwork as Network,
+        currency: dest.currency as Currency,
         amount: amount,
         iss: paymentRequestData.iss ?? '',
       };
@@ -183,7 +189,7 @@ export class ATXPFetcher {
 
       let paymentId: string;
       try {
-        paymentId = await paymentMaker.makePayment(amount, dest.currency, destinationAddress, paymentRequestData.iss, paymentRequestId);
+        paymentId = await paymentMaker.makePayment(amount, dest.currency as Currency, destinationAddress, paymentRequestData.iss, paymentRequestId);
         this.logger.info(`ATXP: made payment of ${amount.toString()} ${dest.currency} on ${destinationNetwork}: ${paymentId}`);
         await this.onPayment({ payment: prospectivePayment });
 

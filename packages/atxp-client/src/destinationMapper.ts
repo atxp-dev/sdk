@@ -3,6 +3,7 @@ import { Logger } from '@atxp/common';
 /**
  * Represents a payment destination that can be mapped/transformed
  */
+// TODO: Update Destination to use proper types once we are done refactoring
 export interface Destination {
   network: string;
   currency: string;
