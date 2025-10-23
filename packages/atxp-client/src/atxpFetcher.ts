@@ -147,21 +147,14 @@ export class ATXPFetcher {
         this.logger.debug(`ATXP: destination maker for network '${option.network}' not available, trying next destination`);
         continue;
       }
-      mappedDestinations = await destinationMaker.makeDestinations(option, this.logger);
+      mappedDestinations.push(...(await destinationMaker.makeDestinations(option, this.logger)));
     }
 
     // Try each destination in order
     for (const dest of mappedDestinations) {
-      // Convert amount to BigNumber since it comes as a string from JSON
-      const amount = new BigNumber(dest.amount);
-
-      // Use destination directly without any resolution
-      const destinationAddress = dest.address;
-      const destinationChain = dest.chain;
-
-      const paymentMaker = this.paymentMakers.get(destinationChain);
+      const paymentMaker = this.paymentMakers.get(dest.chain);
       if (!paymentMaker) {
-        this.logger.debug(`ATXP: payment chain '${destinationChain}' not available, trying next destination`);
+        this.logger.debug(`ATXP: payment maker for chain '${dest.chain}' not available, trying next destination`);
         continue;
       }
 
@@ -169,21 +162,21 @@ export class ATXPFetcher {
         accountId: this.accountId,
         resourceUrl: paymentRequestData.resource?.toString() ?? '',
         resourceName: paymentRequestData.resourceName ?? '',
-        chain: destinationChain,
+        chain: dest.chain,
         currency: dest.currency,
-        amount: amount,
+        amount: dest.amount,
         iss: paymentRequestData.iss ?? '',
       };
 
       if (!await this.approvePayment(prospectivePayment)){
-        this.logger.info(`ATXP: payment request denied by callback function for destination on ${destinationChain}`);
+        this.logger.info(`ATXP: payment request denied by callback function for destination on ${dest.chain}`);
         continue;
       }
 
       let paymentId: string;
       try {
-        paymentId = await paymentMaker.makePayment(amount, dest.currency as Currency, destinationAddress, paymentRequestData.iss, paymentRequestId);
-        this.logger.info(`ATXP: made payment of ${amount.toString()} ${dest.currency} on ${destinationChain}: ${paymentId}`);
+        paymentId = await paymentMaker.makePayment(dest.amount, dest.currency, dest.address, paymentRequestData.iss, paymentRequestId);
+        this.logger.info(`ATXP: made payment of ${dest.amount.toString()} ${dest.currency} on ${dest.chain}: ${paymentId}`);
         await this.onPayment({ payment: prospectivePayment });
 
         // Submit payment to the server
@@ -196,7 +189,7 @@ export class ATXPFetcher {
           },
           body: JSON.stringify({
             transactionId: paymentId,
-            chain: destinationChain,
+            chain: dest.chain,
             currency: dest.currency
           })
         });
@@ -212,10 +205,8 @@ export class ATXPFetcher {
         return true;
       } catch (error: unknown) {
         const typedError = error as Error;
-        this.logger.warn(`ATXP: payment failed on ${destinationChain}: ${typedError.message}`);
+        this.logger.warn(`ATXP: payment failed on ${dest.chain}: ${typedError.message}`);
         await this.onPaymentFailure({ payment: prospectivePayment, error: typedError });
-        // Try next destination
-        continue;
       }
     }
 
