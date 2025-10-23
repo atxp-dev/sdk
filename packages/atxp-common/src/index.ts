@@ -49,6 +49,8 @@ export {
   type RequirePaymentConfig,
   type PaymentMaker,
   type Account,
+  type Source,
+  type Chain,
   extractAddressFromAccountId,
   extractNetworkFromAccountId
 } from './types.js';

@@ -21,9 +21,15 @@ export type AuthorizationServerUrl = UrlString;
 
 export type Currency = 'USDC';
 export type Network = 'solana' | 'base' | 'world' | 'base_sepolia' | 'world_sepolia' | 'atxp';
+export type Chain = 'solana' | 'base' | 'world' | 'base_sepolia' | 'world_sepolia';
 
 // Globally unique account identifier format: network:address
 export type AccountId = `${Network}:${string}`;
+
+export type Source = {
+  address: string;
+  chain: Chain;
+}
 
 export type PaymentRequestDestination = {
   network: Network;

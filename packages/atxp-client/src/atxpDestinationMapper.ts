@@ -1,10 +1,8 @@
 import { FetchLike, Logger } from '@atxp/common';
 import { DestinationMapper, Destination } from './destinationMapper.js';
+import { Source } from '@atxp/common';
 
-interface AccountAddress {
-  address: string;
-  network: string;
-}
+
 
 /**
  * Destination mapper for ATXP network destinations.
@@ -30,24 +28,24 @@ export class ATXPDestinationMapper implements DestinationMapper {
         try {
           // The address field contains the account ID (e.g., atxp_acct_xxx)
           const accountId = dest.address;
-          const addresses = await this.getAccountAddresses(accountId, logger);
+          const sources = await this.getAccountSources(accountId, logger);
 
           // Create new destinations for each blockchain address
-          for (const addr of addresses) {
+          for (const src of sources) {
             const mappedDest: Destination = {
-              network: addr.network,
+              chain: src.chain,
               currency: dest.currency,
-              address: addr.address,
+              address: src.address,
               amount: dest.amount
             };
             mappedDestinations.push(mappedDest);
-            logger?.debug(`ATXPDestinationMapper: Mapped to ${addr.network}:${addr.address}`);
+            logger?.debug(`ATXPDestinationMapper: Mapped to ${src.chain}:${src.chain}`);
           }
 
-          if (addresses.length === 0) {
+          if (sources.length === 0) {
             logger?.warn(`ATXPDestinationMapper: No addresses found for account ${accountId}`);
           } else {
-            logger?.debug(`ATXPDestinationMapper: Found ${addresses.length} addresses for account ${accountId}`);
+            logger?.debug(`ATXPDestinationMapper: Found ${sources.length} sources for account ${accountId}`);
           }
         } catch (error) {
           logger?.error(`ATXPDestinationMapper: Failed to map ATXP destination: ${error}`);
@@ -63,7 +61,7 @@ export class ATXPDestinationMapper implements DestinationMapper {
     return mappedDestinations;
   }
 
-  private async getAccountAddresses(accountId: string, logger?: Logger): Promise<AccountAddress[]> {
+  private async getAccountSources(accountId: string, logger?: Logger): Promise<Source[]> {
     // Strip any network prefix if present (e.g., atxp:atxp_acct_xxx -> atxp_acct_xxx)
     const unqualifiedId = accountId.includes(':') ? accountId.split(':')[1] : accountId;
 
@@ -83,7 +81,7 @@ export class ATXPDestinationMapper implements DestinationMapper {
         throw new Error(`Failed to fetch addresses: ${response.status} ${response.statusText} - ${text}`);
       }
 
-      const data = await response.json() as AccountAddress[];
+      const data = await response.json() as Source[];
       logger?.debug(`ATXPDestinationMapper: Received ${data.length} addresses from API`);
       return data || [];
     } catch (error) {
