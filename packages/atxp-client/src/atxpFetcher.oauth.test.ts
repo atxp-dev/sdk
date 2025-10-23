@@ -114,7 +114,7 @@ describe('atxpFetcher.fetch oauth', () => {
     const originalFromDb = await db.getAccessToken('bdj', 'https://example.com/mcp');
     expect(originalFromDb).toBeNull();
 
-    const fetcher = atxpFetcher(f.fetchHandler, {}, db);
+    const fetcher = atxpFetcher(f.fetchHandler, new Map(), db);
     const res = await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
     expect(res.status).toBe(200);
     const resJson = await res.json();
@@ -142,7 +142,7 @@ describe('atxpFetcher.fetch oauth', () => {
     mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER);
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER);
 
-    const fetcher = atxpFetcher(f.fetchHandler, {});
+    const fetcher = atxpFetcher(f.fetchHandler, new Map());
     await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow(OAuthAuthenticationRequiredError);
   });
 
@@ -192,7 +192,7 @@ describe('atxpFetcher.fetch oauth', () => {
       // Missing generateJWT method
     } as unknown as PaymentMaker;
 
-    const fetcher = atxpFetcher(f.fetchHandler, { 'broken': brokenPaymentMaker });
+    const fetcher = atxpFetcher(f.fetchHandler, new Map([['broken' as any, brokenPaymentMaker]]));
     await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow('Payment maker is missing generateJWT method. Available payment makers: [broken]. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.');
   });
 });

@@ -164,7 +164,7 @@ describe('atxpFetcher.fetch payment', () => {
       .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER, {'foo': BigNumber(0.01)});
 
-    const fetcher = atxpFetcher(f.fetchHandler, {});
+    const fetcher = atxpFetcher(f.fetchHandler, new Map());
     const res = await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
 
     const resJson = await res.json();
@@ -185,7 +185,7 @@ describe('atxpFetcher.fetch payment', () => {
       .getOnce(`${DEFAULT_AUTHORIZATION_SERVER}/payment-request/foo`, 404);
     let threw = false;
 
-    const fetcher = atxpFetcher(f.fetchHandler, {});
+    const fetcher = atxpFetcher(f.fetchHandler, new Map());
     try {
       await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
     } catch (e: any) {
@@ -233,7 +233,7 @@ describe('atxpFetcher.fetch payment', () => {
       makePayment: vi.fn().mockResolvedValue('testPaymentId'),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
-    const fetcher = atxpFetcher(f.fetchHandler, {'solana': paymentMaker}, undefined, undefined, async () => false);
+    const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]), undefined, undefined, async () => false);
     const res = await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
 
     expect(res.status).toBe(200);

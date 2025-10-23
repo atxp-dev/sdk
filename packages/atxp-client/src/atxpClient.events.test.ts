@@ -175,7 +175,7 @@ describe('atxpClient events', () => {
         accountId: account.accountId,
         amount: new BigNumber(0.01),
         currency: expect.any(String),
-        network: expect.any(String)
+        chain: expect.any(String)
       }),
       error: expect.any(Error)
     });
