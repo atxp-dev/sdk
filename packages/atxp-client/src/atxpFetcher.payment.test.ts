@@ -11,7 +11,7 @@ import BigNumber from 'bignumber.js';
 
 function mockPaymentMakers(solanaPaymentMaker?: PaymentMaker) {
   solanaPaymentMaker = solanaPaymentMaker ?? {
-    makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+    makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
     generateJWT: vi.fn().mockResolvedValue('testJWT')
   };
   return new Map([['solana' as any, solanaPaymentMaker]]);
@@ -47,7 +47,7 @@ describe('atxpFetcher.fetch payment', () => {
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER, {'foo': BigNumber(0.01)});
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
@@ -75,7 +75,7 @@ describe('atxpFetcher.fetch payment', () => {
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER, {'foo': BigNumber(0.01)});
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
@@ -103,7 +103,7 @@ describe('atxpFetcher.fetch payment', () => {
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER, {'foo': BigNumber(0.01)});
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
@@ -121,7 +121,7 @@ describe('atxpFetcher.fetch payment', () => {
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER);
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
@@ -140,7 +140,7 @@ describe('atxpFetcher.fetch payment', () => {
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER, {'foo': BigNumber(0.01)});
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
@@ -206,7 +206,7 @@ describe('atxpFetcher.fetch payment', () => {
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER, {'foo': BigNumber(0.01)});
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const fetcher = atxpFetcher(f.fetchHandler, {'solana': paymentMaker}, undefined, ['https://not-atxp.com']);
@@ -230,7 +230,7 @@ describe('atxpFetcher.fetch payment', () => {
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER, {'foo': BigNumber(0.01)});
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]), undefined, undefined, async () => false);
@@ -255,7 +255,7 @@ describe('atxpFetcher.fetch payment', () => {
     let threw = false;
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
@@ -281,7 +281,7 @@ describe('atxpFetcher.fetch payment', () => {
     let threw = false;
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));

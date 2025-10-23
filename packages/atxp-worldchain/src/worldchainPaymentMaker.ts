@@ -2,7 +2,7 @@ import {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
   WORLD_CHAIN_MAINNET
 } from '@atxp/client';
-import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifiers } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
@@ -215,7 +215,7 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     return createEIP1271JWT(authData);
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<PaymentIdentifiers> {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
@@ -285,8 +285,11 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     // This helps avoid the "Transaction receipt could not be found" error
     await waitForTransactionConfirmations(this.smartWallet, txHash, 2, this.logger, this.confirmationDelays);
 
-    // Return the actual transaction hash, not the user operation hash
-    // The payment verification system needs the on-chain transaction hash
-    return txHash;
+    // For bundled EVM transactions (ERC-4337), transactionId is the on-chain txHash (for backwards compatibility)
+    // and transactionSubId is the userOpHash (identifies the specific user operation within the bundle)
+    return {
+      transactionId: txHash,
+      transactionSubId: receipt.userOpHash
+    };
   }
 }

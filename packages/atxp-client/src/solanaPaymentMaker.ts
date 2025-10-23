@@ -5,7 +5,7 @@ import { createTransfer, ValidateTransferError as _ValidateTransferError } from 
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import bs58 from "bs58";
 import BigNumber from "bignumber.js";
-import { generateJWT, Currency, AccountId } from '@atxp/common';
+import { generateJWT, Currency, AccountId, PaymentIdentifiers } from '@atxp/common';
 import { importJWK } from 'jose';
 import { Logger } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
@@ -53,7 +53,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '', accountId as AccountId | undefined);
   }
 
-  makePayment = async (amount: BigNumber, currency: Currency, receiver: string, memo: string, _paymentRequestId?: string): Promise<string> => {
+  makePayment = async (amount: BigNumber, currency: Currency, receiver: string, memo: string, _paymentRequestId?: string): Promise<PaymentIdentifiers> => {
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkError('Only USDC currency is supported; received ' + currency);
     }
@@ -76,6 +76,12 @@ export class SolanaPaymentMaker implements PaymentMaker {
         this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
         throw new InsufficientFundsError(currency, amount, balance, 'solana');
       }
+
+      // Get the destination token account address (this will be the transactionId)
+      const destinationTokenAccount = await getAssociatedTokenAddress(
+        USDC_MINT,
+        receiverKey
+      );
 
       // Increase compute units to handle both memo and token transfer
       // Memo uses ~6000 CUs, token transfer needs ~6500 CUs
@@ -101,12 +107,18 @@ export class SolanaPaymentMaker implements PaymentMaker {
       transaction.add(modifyComputeUnits);
       transaction.add(addPriorityFee);
 
-      const transactionHash = await sendAndConfirmTransaction(
+      const transactionSignature = await sendAndConfirmTransaction(
         this.connection,
         transaction,
         [this.source],
       );
-      return transactionHash;
+
+      // Return transaction signature as transactionId (for backwards compatibility with main branch)
+      // and token account address as transactionSubId (identifies the specific transfer within the transaction)
+      return {
+        transactionId: transactionSignature,
+        transactionSubId: destinationTokenAccount.toBase58()
+      };
     } catch (error) {
       if (error instanceof InsufficientFundsError || error instanceof PaymentNetworkError) {
         throw error;

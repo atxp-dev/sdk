@@ -109,10 +109,10 @@ describe('WorldchainPaymentMaker.makePayment', () => {
 
     // Make payment
     const amount = new BigNumber(5.25); // 5.25 USDC
-    const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test memo');
+    const result = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test memo');
 
     // Verify result
-    expect(txHash).toBe('0xtxhash');
+    expect(result.transactionId).toBe('0xtxhash');
 
     // Verify prepareSpendCallData was called correctly
     expect(prepareSpendCallData).toHaveBeenCalledWith({
@@ -175,7 +175,7 @@ describe('WorldchainPaymentMaker.makePayment', () => {
     const paymentMaker = createTestWorldchainPaymentMaker(permission, smartWallet);
 
     // Make zero amount payment
-    const txHash = await paymentMaker.makePayment(
+    const result = await paymentMaker.makePayment(
       new BigNumber(0),
       'USDC',
       TEST_RECEIVER_ADDRESS,
@@ -183,7 +183,7 @@ describe('WorldchainPaymentMaker.makePayment', () => {
     );
 
     // Verify result
-    expect(txHash).toBe('0xtxhash');
+    expect(result.transactionId).toBe('0xtxhash');
 
     // Verify prepareSpendCallData was called with zero amount
     expect(prepareSpendCallData).toHaveBeenCalledWith({

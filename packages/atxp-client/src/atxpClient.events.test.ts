@@ -106,7 +106,7 @@ describe('atxpClient events', () => {
 
     const onPayment = vi.fn();
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('test-payment-result-id'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'test-payment-result-id' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {

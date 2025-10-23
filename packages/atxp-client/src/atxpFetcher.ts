@@ -1,6 +1,6 @@
 import { BigNumber } from 'bignumber.js';
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Currency, AccountId, Chain, Network, DestinationMaker } from '@atxp/common';
+import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Currency, AccountId, Chain, Network, DestinationMaker, PaymentIdentifiers } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
@@ -173,10 +173,10 @@ export class ATXPFetcher {
         continue;
       }
 
-      let paymentId: string;
+      let paymentIdentifiers: PaymentIdentifiers;
       try {
-        paymentId = await paymentMaker.makePayment(dest.amount, dest.currency, dest.address, paymentRequestData.iss, paymentRequestId);
-        this.logger.info(`ATXP: made payment of ${dest.amount.toString()} ${dest.currency} on ${dest.chain}: ${paymentId}`);
+        paymentIdentifiers = await paymentMaker.makePayment(dest.amount, dest.currency, dest.address, paymentRequestData.iss, paymentRequestId);
+        this.logger.info(`ATXP: made payment of ${dest.amount.toString()} ${dest.currency} on ${dest.chain}: ${paymentIdentifiers.transactionId}`);
         await this.onPayment({ payment: prospectivePayment });
 
         // Submit payment to the server
@@ -188,7 +188,8 @@ export class ATXPFetcher {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            transactionId: paymentId,
+            transactionId: paymentIdentifiers.transactionId,
+            ...(paymentIdentifiers.transactionSubId ? { transactionSubId: paymentIdentifiers.transactionSubId } : {}),
             chain: dest.chain,
             currency: dest.currency
           })
@@ -296,10 +297,10 @@ export class ATXPFetcher {
       return false;
     }
 
-    let paymentId: string;
+    let paymentIdentifiers: import('@atxp/common').PaymentIdentifiers;
     try {
-      paymentId = await paymentMaker.makePayment(amount, currency, destinationAddress, paymentRequestData.iss, paymentRequestId);
-      this.logger.info(`ATXP: made payment of ${amount} ${currency} on ${destinationNetwork}: ${paymentId}`);
+      paymentIdentifiers = await paymentMaker.makePayment(amount, currency, destinationAddress, paymentRequestData.iss, paymentRequestId);
+      this.logger.info(`ATXP: made payment of ${amount} ${currency} on ${destinationNetwork}: ${paymentIdentifiers.transactionId}`);
 
       // Call onPayment callback after successful payment
       await this.onPayment({ payment: prospectivePayment });
@@ -318,7 +319,7 @@ export class ATXPFetcher {
     // redirect=false is a hack
     // The OAuth spec calls for the authorization url to return with a redirect, but fetch
     // on mobile will automatically follow the redirect (it doesn't support the redirect=manual option)
-    // We want the redirect URL so we can extract the code from it, not the contents of the 
+    // We want the redirect URL so we can extract the code from it, not the contents of the
     // redirect URL (which might not even exist for agentic ATXP clients)
     //   So ATXP servers are set up to instead return a 200 with the redirect URL in the body
     // if we pass redirect=false.
@@ -330,7 +331,8 @@ export class ATXPFetcher {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        transactionId: paymentId,
+        transactionId: paymentIdentifiers.transactionId,
+        ...(paymentIdentifiers.transactionSubId ? { transactionSubId: paymentIdentifiers.transactionSubId } : {}),
         chain: destinationNetwork,
         currency: currency
       })

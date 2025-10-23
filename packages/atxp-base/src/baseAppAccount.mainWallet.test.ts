@@ -218,14 +218,14 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       expect(paymentMaker).toBeDefined();
 
       // Make a payment
-      const txHash = await paymentMaker.makePayment(
+      const result = await paymentMaker.makePayment(
         new BigNumber(1.5),
         'USDC',
         '0x1234567890123456789012345678901234567890',
         'Test payment'
       );
 
-      expect(txHash).toBe('0xtxhash');
+      expect(result.transactionId).toBe('0xtxhash');
       
       // Verify eth_sendTransaction was called (it's the 2nd call after wallet_connect)
       expect(provider.request).toHaveBeenCalledWith({

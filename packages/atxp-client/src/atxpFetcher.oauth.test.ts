@@ -9,7 +9,7 @@ import { PaymentMaker } from './types.js';
 
 function mockPaymentMakers(solanaPaymentMaker?: PaymentMaker) {
   solanaPaymentMaker = solanaPaymentMaker ?? {
-    makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+    makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
     generateJWT: vi.fn().mockResolvedValue('testJWT')
   };
   return new Map([['solana' as any, solanaPaymentMaker]]);
@@ -32,7 +32,7 @@ describe('atxpFetcher.fetch oauth', () => {
       .postOnce('https://example.com/mcp', 401)
       .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
-      // Respond to /authorize call 
+      // Respond to /authorize call
       .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
         const state = new URL(req.args[0] as any).searchParams.get('state');
         return {
@@ -42,7 +42,7 @@ describe('atxpFetcher.fetch oauth', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
@@ -68,7 +68,7 @@ describe('atxpFetcher.fetch oauth', () => {
       .postOnce('https://example.com/mcp', 401)
       .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
-      // Respond to /authorize call 
+      // Respond to /authorize call
       .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
         const state = new URL(req.args[0] as any).searchParams.get('state');
         return {
@@ -78,7 +78,7 @@ describe('atxpFetcher.fetch oauth', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
     };
     const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker], ['ethereum' as any, paymentMaker]]));
@@ -188,7 +188,7 @@ describe('atxpFetcher.fetch oauth', () => {
 
     // Mock a payment maker that doesn't have generateJWT method
     const brokenPaymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId')
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' })
       // Missing generateJWT method
     } as unknown as PaymentMaker;
 

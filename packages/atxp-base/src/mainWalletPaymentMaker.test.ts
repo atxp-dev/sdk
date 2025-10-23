@@ -219,7 +219,7 @@ describe('MainWalletPaymentMaker', () => {
         }]
       });
 
-      expect(result).toBe(txHash);
+      expect(result.transactionId).toBe(txHash);
     });
 
     it('should throw error for non-USDC currency', async () => {
@@ -382,7 +382,7 @@ describe('MainWalletPaymentMaker', () => {
       }, 100);
 
       const result = await promise;
-      expect(result).toBe(txHash);
+      expect(result.transactionId).toBe(txHash);
     });
 
     it('should handle transaction submission errors', async () => {

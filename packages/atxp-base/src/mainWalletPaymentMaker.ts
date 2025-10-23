@@ -2,7 +2,7 @@ import { encodeFunctionData, toHex } from 'viem';
 import { getBaseUSDCAddress, type Hex } from '@atxp/client';
 import { base } from 'viem/chains';
 import BigNumber from 'bignumber.js';
-import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId } from '@atxp/common';
+import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId, PaymentIdentifiers } from '@atxp/common';
 import {
   createEIP1271JWT,
   createEIP1271AuthData,
@@ -107,7 +107,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     currency: Currency,
     receiver: string,
     _reason: string
-  ): Promise<string> {
+  ): Promise<PaymentIdentifiers> {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported');
     }
@@ -144,12 +144,15 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     });
 
     this.logger.info(`Transaction submitted. TxHash: ${txHash}`);
-    
+
     // Wait for confirmations
     const CONFIRMATIONS = 2;
     await this.waitForTransactionConfirmations(txHash, CONFIRMATIONS);
-    
-    return txHash;
+
+    // For non-bundled EVM transactions, only transactionId is needed
+    return {
+      transactionId: txHash
+    };
   }
 
   private async waitForTransactionConfirmations(txHash: string, confirmations: number): Promise<void> {

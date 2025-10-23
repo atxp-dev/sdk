@@ -4,7 +4,7 @@ import {
   getWorldChainMainnetWithRPC,
   type Hex
 } from '@atxp/client';
-import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifiers } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { createWalletClient, createPublicClient, custom, encodeFunctionData, http } from 'viem';
 
@@ -111,7 +111,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     currency: Currency,
     receiver: string,
     memo: string
-  ): Promise<string> {
+  ): Promise<PaymentIdentifiers> {
     if (currency !== 'USDC') {
       throw new Error('Only USDC currency is supported; received ' + currency);
     }
@@ -198,6 +198,9 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       await new Promise(resolve => setTimeout(resolve, 30000));
     }
 
-    return txHash;
+    // For non-bundled EVM transactions, only transactionId is needed
+    return {
+      transactionId: txHash
+    };
   }
 }
