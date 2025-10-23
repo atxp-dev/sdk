@@ -3,13 +3,33 @@ import { BigNumber } from "bignumber.js";
 
 // https://github.com/modelcontextprotocol/typescript-sdk/blob/c6ac083b1b37b222b5bfba5563822daa5d03372e/src/types.ts
 // ctrl+f "method: z.literal(""
-export type McpMethod = 'notifications/cancelled' | 'initialize' | 'ping' | 'notifications/progress' | 
-  'resources/list' | 'resources/templates/list' | 'resources/read' | 'notifications/resources/list_changed' | 
-  'resources/subscribe' | 'resources/unsubscribe' | 'notifications/resources/updated' | 
-  'prompts/list' | 'prompts/get' | 'notifications/prompts/list_changed' | 'tools/list' | 
-  'tools/call' | 'notifications/tools/list_changed' | 'logging/setLevel' | 'notifications/message' |
-  'sampling/createMessage' | 'elicitation/create' | 'completion/complete' | 'roots/list' | 
-  'notifications/roots/list_changed';
+export enum McpMethodEnum {
+  NotificationsCancelled = 'notifications/cancelled',
+  Initialize = 'initialize',
+  Ping = 'ping',
+  NotificationsProgress = 'notifications/progress',
+  ResourcesList = 'resources/list',
+  ResourcesTemplatesList = 'resources/templates/list',
+  ResourcesRead = 'resources/read',
+  NotificationsResourcesListChanged = 'notifications/resources/list_changed',
+  ResourcesSubscribe = 'resources/subscribe',
+  ResourcesUnsubscribe = 'resources/unsubscribe',
+  NotificationsResourcesUpdated = 'notifications/resources/updated',
+  PromptsList = 'prompts/list',
+  PromptsGet = 'prompts/get',
+  NotificationsPromptsListChanged = 'notifications/prompts/list_changed',
+  ToolsList = 'tools/list',
+  ToolsCall = 'tools/call',
+  NotificationsToolsListChanged = 'notifications/tools/list_changed',
+  LoggingSetLevel = 'logging/setLevel',
+  NotificationsMessage = 'notifications/message',
+  SamplingCreateMessage = 'sampling/createMessage',
+  ElicitationCreate = 'elicitation/create',
+  CompletionComplete = 'completion/complete',
+  RootsList = 'roots/list',
+  NotificationsRootsListChanged = 'notifications/roots/list_changed'
+}
+export type McpMethod = `${McpMethodEnum}`;
 
 export type McpName = string;
 export type McpNamePattern = McpName | '*';

@@ -77,13 +77,9 @@ export {
   ATXPLocalAccount
 } from './atxpLocalAccount.js';
 
-// Destination mappers
+// Destination makers
 export {
-  type DestinationMapper,
-  type Destination,
-  IdentityDestinationMapper
-} from './destinationMapper.js';
+  ATXPDestinationMaker,
+  PassthroughDestinationMaker,
+} from './destinationMakers/index.js';
 
-export {
-  ATXPDestinationMapper
-} from './atxpDestinationMapper.js';

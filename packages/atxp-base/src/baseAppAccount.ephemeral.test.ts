@@ -459,7 +459,7 @@ describe('BaseAppAccount', () => {
       });
 
       // Make a payment
-      const paymentMaker = account.paymentMakers.base;
+      const paymentMaker = account.paymentMakers['base'];
       const amount = new BigNumber(1.5); // 1.5 USDC
       const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
 

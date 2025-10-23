@@ -2,6 +2,8 @@ import { BigNumber } from 'bignumber.js';
 
 export const DEFAULT_AUTHORIZATION_SERVER = 'https://auth.atxp.ai';
 
+export const DEFAULT_ATXP_ACCOUNTS_SERVER = 'https://accounts.atxp.ai';
+
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -19,9 +21,36 @@ export type Logger = {
 export type UrlString = `http://${string}` | `https://${string}`;
 export type AuthorizationServerUrl = UrlString;
 
-export type Currency = 'USDC';
-export type Network = 'solana' | 'base' | 'world' | 'base_sepolia' | 'world_sepolia' | 'atxp';
-export type Chain = 'solana' | 'base' | 'world' | 'base_sepolia' | 'world_sepolia';
+// Enums provide runtime access to valid values
+export enum CurrencyEnum {
+  USDC = 'USDC'
+}
+export type Currency = `${CurrencyEnum}`;
+
+export enum NetworkEnum {
+  Solana = 'solana',
+  Base = 'base',
+  World = 'world',
+  BaseSepolia = 'base_sepolia',
+  WorldSepolia = 'world_sepolia',
+  ATXP = 'atxp'
+}
+export type Network = `${NetworkEnum}`;
+
+export enum ChainEnum {
+  Solana = 'solana',
+  Base = 'base',
+  World = 'world',
+  BaseSepolia = 'base_sepolia',
+  WorldSepolia = 'world_sepolia'
+}
+export type Chain = `${ChainEnum}`;
+
+export enum WalletTypeEnum {
+  EOA = 'eoa',
+  Smart = 'smart'
+}
+export type WalletType = `${WalletTypeEnum}`;
 
 // Globally unique account identifier format: network:address
 export type AccountId = `${Network}:${string}`;
@@ -29,10 +58,18 @@ export type AccountId = `${Network}:${string}`;
 export type Source = {
   address: string;
   chain: Chain;
+  walletType: WalletType;
 }
 
-export type PaymentRequestDestination = {
+export type PaymentRequestOption = {
   network: Network;
+  currency: Currency;
+  address: string;
+  amount: BigNumber;
+}
+
+export type Destination = {
+  chain: Chain;
   currency: Currency;
   address: string;
   amount: BigNumber;
@@ -40,7 +77,7 @@ export type PaymentRequestDestination = {
 
 export type PaymentRequestData = {
   // New multi-destination format
-  destinations?: PaymentRequestDestination[];
+  destinations?: PaymentRequestOption[];
   // Legacy single destination fields (for backwards compatibility)
   amount?: BigNumber;
   currency?: Currency;
@@ -55,6 +92,7 @@ export type PaymentRequestData = {
   payeeName?: string | null;
   iss: string;
 }
+
 
 export type CustomJWTPayload = {
   code_challenge?: string;
@@ -116,10 +154,13 @@ export interface PaymentMaker {
   getSourceAddress: (params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}) => string | Promise<string>;
 }
 
+export interface DestinationMaker {
+  makeDestinations: (option: PaymentRequestOption, logger: Logger) => Promise<Destination[]>;
+}
+
 export type Account = {
   accountId: AccountId;
   paymentMakers: {[key: string]: PaymentMaker};
-  destinationMappers?: any[]; // Using any[] to avoid circular dependency with atxp-client
 }
 
 /**

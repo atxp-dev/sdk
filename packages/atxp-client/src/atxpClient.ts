@@ -3,10 +3,12 @@ import { MemoryOAuthDb, ConsoleLogger, DEFAULT_AUTHORIZATION_SERVER } from "@atx
 import { atxpFetch } from "./atxpFetcher.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { createDestinationMakers } from './destinationMakers/index.js';
+import { DEFAULT_ATXP_ACCOUNTS_SERVER } from "@atxp/common";
 
 type RequiredClientConfigFields = 'mcpServer' | 'account';
 type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
-type BuildableClientConfigFields = 'oAuthDb' | 'logger';
+type BuildableClientConfigFields = 'oAuthDb' | 'logger' | 'destinationMakers';
 
 // Detect if we're in a browser environment and bind fetch appropriately
 const getFetch = (): typeof fetch => {
@@ -20,6 +22,7 @@ const getFetch = (): typeof fetch => {
 
 export const DEFAULT_CLIENT_CONFIG: Required<Omit<OptionalClientConfig, BuildableClientConfigFields>> = {
   allowedAuthorizationServers: [DEFAULT_AUTHORIZATION_SERVER],
+  atxpAccountsServer: DEFAULT_ATXP_ACCOUNTS_SERVER,
   approvePayment: async (_p) => true,
   fetchFn: getFetch(),
   oAuthChannelFetch: getFetch(),
@@ -50,7 +53,15 @@ export function buildClientConfig(args: ClientArgs): ClientConfig {
   const withDefaults = { ...envDefaults, ...args };
   const logger = withDefaults.logger ?? new ConsoleLogger();
   const oAuthDb = withDefaults.oAuthDb ?? new MemoryOAuthDb({logger});
-  const built = { oAuthDb, logger};
+  const fetchFn = withDefaults.fetchFn;
+  
+  // Build destination makers if not provided
+  const destinationMakers = withDefaults.destinationMakers ?? createDestinationMakers({
+    atxpAccountsServer: withDefaults.atxpAccountsServer,
+    fetchFn
+  });
+  
+  const built = { oAuthDb, logger, destinationMakers };
   return Object.freeze({ ...withDefaults, ...built });
 };
 

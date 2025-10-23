@@ -1,5 +1,5 @@
 import { BigNumber } from "bignumber.js";
-import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike, Account, PaymentMaker } from "@atxp/common";
+import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike, Account, PaymentMaker, AccountId, Chain, DestinationMaker } from "@atxp/common";
 import { ClientOptions } from "@modelcontextprotocol/sdk/client/index.js";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
 
@@ -10,10 +10,10 @@ type AccountPrefix = Network;
 export type AccountIdString = `${AccountPrefix}${string}`;
 
 export type ProspectivePayment = {
-  accountId: string;
+  accountId: AccountId;
   resourceUrl: string;
   resourceName: string;
-  network: Network;
+  chain: Chain;
   currency: Currency;
   amount: BigNumber;
   iss: string;
@@ -22,6 +22,8 @@ export type ProspectivePayment = {
 export type ClientConfig = {
   mcpServer: string;
   account: Account;
+  atxpAccountsServer: string;
+  destinationMakers: Map<Network, DestinationMaker>;
   allowedAuthorizationServers: AuthorizationServerUrl[];
   approvePayment: (payment: ProspectivePayment) => Promise<boolean>;
   oAuthDb: OAuthDb;

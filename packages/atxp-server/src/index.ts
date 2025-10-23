@@ -1,5 +1,6 @@
 // Core types and interfaces
 export {
+  McpMethodEnum,
   type McpMethod,
   type McpName,
   type McpNamePattern,

@@ -65,7 +65,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
       
       // Should have main wallet payment maker
-      expect(account.paymentMakers['base']).toBeInstanceOf(MainWalletPaymentMaker);
+      expect(account.paymentMakers.base).toBeInstanceOf(MainWalletPaymentMaker);
       
       // Should still connect wallet
       expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
@@ -105,7 +105,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       });
 
       expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
-      expect(account.paymentMakers['base']).toBeInstanceOf(MainWalletPaymentMaker);
+      expect(account.paymentMakers.base).toBeInstanceOf(MainWalletPaymentMaker);
     });
 
     it('should pass the provider to MainWalletPaymentMaker', async () => {
@@ -124,7 +124,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       });
 
       // Get the payment maker and verify it has the right properties
-      const paymentMaker = account.paymentMakers['base'] as MainWalletPaymentMaker;
+      const paymentMaker = account.paymentMakers.base as MainWalletPaymentMaker;
       expect(paymentMaker).toBeInstanceOf(MainWalletPaymentMaker);
       
       // Test that the payment maker can use the provider
@@ -175,7 +175,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
       // Should be in ephemeral wallet mode with smart wallet address as accountId
       expect(account).toBeDefined();
-      expect(account.paymentMakers['base']).toBeDefined();
+      expect(account.paymentMakers.base).toBeDefined();
       // In ephemeral mode, we expect the account ID to be different from wallet address
       expect(account.accountId).not.toBe(TEST_WALLET_ADDRESS);
     });
