@@ -128,7 +128,7 @@ describe('atxpClient events', () => {
         accountId: account.accountId,
         amount: BigNumber(0.01),
         currency: 'USDC',
-        network: 'solana'
+        chain: 'solana'
       })
     });
   });

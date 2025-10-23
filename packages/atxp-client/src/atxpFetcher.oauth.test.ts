@@ -12,14 +12,15 @@ function mockPaymentMakers(solanaPaymentMaker?: PaymentMaker) {
     makePayment: vi.fn().mockResolvedValue('testPaymentId'),
     generateJWT: vi.fn().mockResolvedValue('testJWT')
   };
-  return {'solana': solanaPaymentMaker };
+  return new Map([['solana' as any, solanaPaymentMaker]]);
 }
 
-function atxpFetcher(fetchFn: FetchLike, paymentMakers?: {[key: string]: PaymentMaker}, db?: OAuthDb) {
+function atxpFetcher(fetchFn: FetchLike, paymentMakers?: Map<any, PaymentMaker>, db?: OAuthDb) {
   return new ATXPFetcher({
     accountId: "bdj",
     db: db ?? new MemoryOAuthDb(),
     paymentMakers: paymentMakers ?? mockPaymentMakers(),
+    destinationMakers: new Map(),
     fetchFn
   });
 }
@@ -44,7 +45,7 @@ describe('atxpFetcher.fetch oauth', () => {
       makePayment: vi.fn().mockResolvedValue('testPaymentId'),
       generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
     };
-    const fetcher = atxpFetcher(f.fetchHandler, {'solana': paymentMaker});
+    const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
     await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
 
     // Ensure we call the authorize endpoint
@@ -80,7 +81,7 @@ describe('atxpFetcher.fetch oauth', () => {
       makePayment: vi.fn().mockResolvedValue('testPaymentId'),
       generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
     };
-    const fetcher = atxpFetcher(f.fetchHandler, {'solana': paymentMaker, 'ethereum': paymentMaker});
+    const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker], ['ethereum' as any, paymentMaker]]));
     let threw = false;
     try{
       await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });

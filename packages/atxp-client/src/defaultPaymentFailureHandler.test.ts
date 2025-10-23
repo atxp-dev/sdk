@@ -41,7 +41,8 @@ describe('Default Payment Failure Handler', () => {
     const fetcher = new ATXPFetcher({
       accountId: 'test-account',
       db: {} as any,
-      paymentMakers: {},
+      paymentMakers: new Map(),
+      destinationMakers: new Map(),
       logger: mockLogger,
     });
 
@@ -53,7 +54,7 @@ describe('Default Payment Failure Handler', () => {
     accountId: 'test-account-123',
     resourceUrl: 'https://example.com/resource',
     resourceName: 'test-resource',
-    network: 'solana',
+    chain: 'solana',
     currency: 'USDC',
     amount: new BigNumber('10'),
     iss: 'test-issuer',
@@ -63,7 +64,7 @@ describe('Default Payment Failure Handler', () => {
   describe('InsufficientFundsError handling', () => {
     it('should log comprehensive insufficient funds information', async () => {
       const payment = createTestPayment({
-        network: 'solana',
+        chain: 'solana',
         currency: 'USDC',
         amount: new BigNumber('25.5'),
         accountId: 'user-wallet-123',
@@ -87,7 +88,7 @@ describe('Default Payment Failure Handler', () => {
 
     it('should handle insufficient funds error without available balance', async () => {
       const payment = createTestPayment({
-        network: 'base',
+        chain: 'base',
         currency: 'USDC',
         amount: new BigNumber('100'),
         accountId: 'enterprise-account',
@@ -113,7 +114,7 @@ describe('Default Payment Failure Handler', () => {
 
     it('should handle different currencies and amounts', async () => {
       const payment = createTestPayment({
-        network: 'ethereum' as any,
+        chain: 'ethereum' as any,
         currency: 'ETH' as any,
         amount: new BigNumber('2.5'),
         accountId: 'trader-123',
@@ -150,7 +151,7 @@ describe('Default Payment Failure Handler', () => {
   describe('PaymentNetworkError handling', () => {
     it('should log network error with payment details', async () => {
       const payment = createTestPayment({
-        network: 'base',
+        chain: 'base',
         currency: 'USDC',
         accountId: 'mobile-user-456',
       });
@@ -166,7 +167,7 @@ describe('Default Payment Failure Handler', () => {
 
     it('should handle network error with different networks', async () => {
       const payment = createTestPayment({
-        network: 'polygon' as any,
+        chain: 'polygon' as any,
       });
 
       const error = new PaymentNetworkError('Transaction reverted');
@@ -257,7 +258,7 @@ describe('Default Payment Failure Handler', () => {
     it('should be parseable by log aggregation tools', async () => {
       const payment = createTestPayment({
         accountId: 'user-123',
-        network: 'base',
+        chain: 'base',
       });
       const error = new PaymentNetworkError('Connection timeout');
 
