@@ -1,6 +1,6 @@
 import { BigNumber } from 'bignumber.js';
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Currency, AccountId, Chain, Network, DestinationMaker, PaymentIdentifiers } from '@atxp/common';
+import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, AccountId, Chain, Network, DestinationMaker, PaymentIdentifiers } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
@@ -140,7 +140,7 @@ export class ATXPFetcher {
 
     // Apply destination mappers to transform destinations
     // Convert PaymentRequestDestination[] to Destination[] for mapper compatibility
-    let mappedDestinations: Destination[] = [];
+    const mappedDestinations: Destination[] = [];
     for (const option of paymentRequestData.destinations) {
       const destinationMaker = this.destinationMakers.get(option.network);
       if (!destinationMaker) {
