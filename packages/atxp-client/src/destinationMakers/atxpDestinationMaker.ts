@@ -37,16 +37,15 @@ export class ATXPDestinationMaker implements DestinationMaker {
           amount: option.amount
         };
         mappedDestinations.push(mappedDest);
-        logger.debug(`ATXPDestinationMapper: Mapped to ${src.chain}:${src.chain}`);
       }
 
       if (sources.length === 0) {
-        logger.warn(`ATXPDestinationMapper: No sources found for account ${accountId}`);
+        logger.warn(`ATXPDestinationMaker: No sources found for account ${accountId}`);
       } else {
-        logger.debug(`ATXPDestinationMapper: Found ${sources.length} sources for account ${accountId}`);
+        logger.debug(`ATXPDestinationMaker: Found ${sources.length} sources for account ${accountId}`);
       }
     } catch (error) {
-      logger.error(`ATXPDestinationMapper: Failed to make ATXP destinations: ${error}`);
+      logger.error(`ATXPDestinationMaker: Failed to make ATXP destinations: ${error}`);
       throw error;
     }
 
@@ -58,7 +57,7 @@ export class ATXPDestinationMaker implements DestinationMaker {
     const unqualifiedId = accountId.includes(':') ? accountId.split(':')[1] : accountId;
 
     const url = `${this.accountsServiceUrl}/account/${unqualifiedId}/sources`;
-    logger?.debug(`ATXPDestinationMapper: Fetching addresses from ${url}`);
+    logger?.debug(`ATXPDestinationMaker: Fetching addresses from ${url}`);
 
     try {
       const response = await this.fetchFn(url, {
@@ -74,10 +73,9 @@ export class ATXPDestinationMaker implements DestinationMaker {
       }
 
       const data = await response.json() as Source[];
-      logger?.debug(`ATXPDestinationMapper: Received ${data.length} addresses from API`);
       return data || [];
     } catch (error) {
-      logger?.error(`ATXPDestinationMapper: Error fetching addresses: ${error}`);
+      logger?.error(`ATXPDestinationMaker: Error fetching addresses: ${error}`);
       throw error;
     }
   }
