@@ -30,7 +30,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
       address: destinationAddress,
       amount: paymentConfig.price // Destination gets the requested amount for charge
     }],
-    source: user,
+    sourceAccountId: user,
     destinationAccountId: destinationAccountId,
     payeeName: config.payeeName,
   };
@@ -51,10 +51,10 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
 
   // For createPaymentRequest, use the minimumPayment if configured
   const paymentRequest = {
-    source: charge.source,
+    source: user,
     sourceAccountId: user,
-    destinationAccountId: charge.destinationAccountId,
-    payeeName: charge.payeeName,
+    destinationAccountId: destinationAccountId,
+    payeeName: config.payeeName,
     destinations: [{
       network: destinationNetwork,
       currency: config.currency,
