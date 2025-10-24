@@ -1,5 +1,6 @@
 // Core types and interfaces
 export {
+  McpMethodEnum,
   type McpMethod,
   type McpName,
   type McpNamePattern,
@@ -53,15 +54,6 @@ export {
 
 // Payment functionality
 export { requirePayment } from './requirePayment.js';
-
-// Payment destination types and implementations
-export {
-  type FundingAmount,
-  type PaymentAddress,
-  type PaymentDestination,
-  ChainPaymentDestination,
-  ATXPPaymentDestination
-} from './paymentDestination.js';
 
 // Test utilities are available via separate export ./serverTestHelpers
 

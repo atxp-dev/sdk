@@ -29,13 +29,22 @@ export { Servers } from './servers.js';
 // Core types
 export {
   DEFAULT_AUTHORIZATION_SERVER,
+  DEFAULT_ATXP_ACCOUNTS_SERVER,
   LogLevel,
   type Logger,
   type UrlString,
   type AuthorizationServerUrl,
+  CurrencyEnum,
   type Currency,
+  NetworkEnum,
   type Network,
-  type PaymentRequestDestination,
+  ChainEnum,
+  type Chain,
+  WalletTypeEnum,
+  type WalletType,
+  type AccountId,
+  type PaymentRequestOption,
+  type Destination,
   type PaymentRequestData,
   type CustomJWTPayload,
   type ClientCredentials,
@@ -45,7 +54,14 @@ export {
   type OAuthDb,
   type TokenData,
   type FetchLike,
-  type RequirePaymentConfig
+  type RequirePaymentConfig,
+  type PaymentIdentifiers,
+  type PaymentMaker,
+  type DestinationMaker,
+  type Account,
+  type Source,
+  extractAddressFromAccountId,
+  extractNetworkFromAccountId
 } from './types.js';
 
 // Utility functions

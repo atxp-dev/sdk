@@ -130,12 +130,12 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     });
 
     const result = await paymentMaker.makePayment(
-      new BigNumber('10'), 
-      'USDC', 
+      new BigNumber('10'),
+      'USDC',
       '0xreceiver'
     );
 
-    expect(result).toBe('0xtransactionhash');
+    expect(result.transactionId).toBe('0xtransactionhash');
     expect(mockSigningClient.readContract).toHaveBeenCalled();
     expect(mockSigningClient.sendTransaction).toHaveBeenCalled();
     expect(mockSigningClient.waitForTransactionReceipt).toHaveBeenCalled();
@@ -247,7 +247,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
       '0xreceiver'
     );
 
-    expect(result).toBe('0xtransactionhash');
+    expect(result.transactionId).toBe('0xtransactionhash');
     expect(mockSigningClient.sendTransaction).toHaveBeenCalled();
   });
 });

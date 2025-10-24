@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker } from '@atxp/client';
+import type { Account, PaymentMaker, AccountId } from '@atxp/common';
 import { getBaseUSDCAddress } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
@@ -15,7 +15,7 @@ const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
 
 export class BaseAppAccount implements Account {
-  accountId: string;
+  accountId: AccountId;
   paymentMakers: { [key: string]: PaymentMaker };
 
   private static toCacheKey(userWalletAddress: string): string {
@@ -148,7 +148,8 @@ export class BaseAppAccount implements Account {
       if (!spendPermission) {
         throw new Error('Spend permission is required for ephemeral wallet mode');
       }
-      this.accountId = ephemeralSmartWallet.address;
+      // Format accountId as network:address
+      this.accountId = `base:${ephemeralSmartWallet.address}` as AccountId;
       this.paymentMakers = {
         'base': new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId),
       };
@@ -157,7 +158,8 @@ export class BaseAppAccount implements Account {
       if (!mainWalletAddress || !provider) {
         throw new Error('Main wallet address and provider are required for main wallet mode');
       }
-      this.accountId = mainWalletAddress;
+      // Format accountId as network:address
+      this.accountId = `base:${mainWalletAddress}` as AccountId;
       this.paymentMakers = {
         'base': new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId),
       };

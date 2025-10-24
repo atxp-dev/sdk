@@ -1,4 +1,4 @@
-import { TokenData } from "@atxp/common";
+import { TokenData, AccountId } from "@atxp/common";
 import { ATXPConfig, TokenCheck } from "./types.js";
 import { AsyncLocalStorage } from "async_hooks";
 
@@ -21,9 +21,9 @@ export function getATXPResource(): URL | null {
 }
 
 // Helper function to get the current request's user
-export function atxpAccountId(): string | null {
+export function atxpAccountId(): AccountId | null {
   const context = contextStorage.getStore();
-  return context?.tokenData?.sub ?? null;
+  return context?.tokenData?.sub as AccountId | null ?? null;
 }
 
 // Helper function to run code within a user context

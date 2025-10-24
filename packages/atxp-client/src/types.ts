@@ -1,5 +1,5 @@
 import { BigNumber } from "bignumber.js";
-import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike } from "@atxp/common";
+import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike, Account, PaymentMaker, AccountId, Chain, DestinationMaker } from "@atxp/common";
 import { ClientOptions } from "@modelcontextprotocol/sdk/client/index.js";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
 
@@ -9,16 +9,11 @@ export type Hex = `0x${string}`;
 type AccountPrefix = Network;
 export type AccountIdString = `${AccountPrefix}${string}`;
 
-export type Account = {
-  accountId: string;
-  paymentMakers: {[key: string]: PaymentMaker};
-}
-
 export type ProspectivePayment = {
-  accountId: string;
+  accountId: AccountId;
   resourceUrl: string;
   resourceName: string;
-  network: Network;
+  chain: Chain;
   currency: Currency;
   amount: BigNumber;
   iss: string;
@@ -27,6 +22,8 @@ export type ProspectivePayment = {
 export type ClientConfig = {
   mcpServer: string;
   account: Account;
+  atxpAccountsServer: string;
+  destinationMakers: Map<Network, DestinationMaker>;
   allowedAuthorizationServers: AuthorizationServerUrl[];
   approvePayment: (payment: ProspectivePayment) => Promise<boolean>;
   oAuthDb: OAuthDb;
@@ -76,8 +73,5 @@ export class PaymentNetworkError extends Error {
   }
 }
 
-export interface PaymentMaker {
-  makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string) => Promise<string>;
-  generateJWT: (params: {paymentRequestId: string, codeChallenge: string}) => Promise<string>;
-  getSourceAddress: (params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}) => string | Promise<string>;
-}
+// Re-export Account and PaymentMaker for backwards compatibility
+export type { Account, PaymentMaker };

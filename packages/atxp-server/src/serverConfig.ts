@@ -2,7 +2,7 @@ import { ConsoleLogger, OAuthResourceClient, DEFAULT_AUTHORIZATION_SERVER, Memor
 import { ATXPConfig } from "./types.js";
 import { ATXPPaymentServer } from "./paymentServer.js";
 
-type RequiredATXPConfigFields = 'paymentDestination';
+type RequiredATXPConfigFields = 'destination';
 type RequiredATXPConfig = Pick<ATXPConfig, RequiredATXPConfigFields>;
 type OptionalATXPConfig = Omit<ATXPConfig, RequiredATXPConfigFields>;
 export type ATXPArgs = RequiredATXPConfig & Partial<OptionalATXPConfig>;
@@ -18,8 +18,8 @@ export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConf
 };
 
 export function buildServerConfig(args: ATXPArgs): ATXPConfig {
-  if(!args.paymentDestination) {
-    throw new Error('paymentDestination is required');
+  if(!args.destination) {
+    throw new Error('destination is required');
   }
 
   // Validate minimumPayment if provided

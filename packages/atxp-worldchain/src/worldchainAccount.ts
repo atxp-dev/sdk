@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker } from '@atxp/client';
+import type { Account, PaymentMaker, AccountId } from '@atxp/common';
 import {
   getWorldChainUSDCAddress,
   WORLD_CHAIN_MAINNET
@@ -17,7 +17,7 @@ const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
 
 export class WorldchainAccount implements Account {
-  accountId: string;
+  accountId: AccountId;
   paymentMakers: { [key: string]: PaymentMaker };
 
   private static toCacheKey(userWalletAddress: string): string {
@@ -153,7 +153,8 @@ export class WorldchainAccount implements Account {
       if (!spendPermission) {
         throw new Error('Spend permission is required for ephemeral wallet mode');
       }
-      this.accountId = ephemeralSmartWallet.address;
+      // Format accountId as network:address
+      this.accountId = `world:${ephemeralSmartWallet.address}` as AccountId;
       this.paymentMakers = {
         'world': new WorldchainPaymentMaker(spendPermission, ephemeralSmartWallet, {
           logger,
@@ -166,7 +167,8 @@ export class WorldchainAccount implements Account {
       if (!mainWalletAddress || !provider) {
         throw new Error('Main wallet address and provider are required for main wallet mode');
       }
-      this.accountId = mainWalletAddress;
+      // Format accountId as network:address
+      this.accountId = `world:${mainWalletAddress}` as AccountId;
       this.paymentMakers = {
         'world': new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId, customRpcUrl),
       };

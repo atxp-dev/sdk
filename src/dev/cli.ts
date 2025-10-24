@@ -35,6 +35,7 @@ async function main() {
   console.log('\nUsage:');
   console.log('Via npm: npm run cli [url] [toolName] [arg1=value1] [arg2=value2]');
   console.log('\nExample: npm run cli http://localhost:3009 secure-data message=hello\n');
+  console.log('\nExample: npm run cli https://search.mcp.atxp.ai search_search query=KingEngland\n');
   console.log('--------------------------------');
   
   const { url, toolName, namedArgs } = parseArgs();

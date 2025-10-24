@@ -95,7 +95,7 @@ describe('BaseAppAccount', () => {
 
       // Verify account creation
       expect(account).toBeDefined();
-      expect(account.accountId).toBe(TEST_SMART_WALLET_ADDRESS);
+      expect(account.accountId).toBe(`base:${TEST_SMART_WALLET_ADDRESS}`);
       expect(account.paymentMakers).toBeDefined();
       expect(account.paymentMakers.base).toBeDefined();
 
@@ -159,7 +159,7 @@ describe('BaseAppAccount', () => {
 
       // Verify account was loaded from storage
       expect(account).toBeDefined();
-      expect(account.accountId).toBe(TEST_SMART_WALLET_ADDRESS);
+      expect(account.accountId).toBe(`base:${TEST_SMART_WALLET_ADDRESS}`);
 
       // Verify smart wallet was NOT deployed (reusing existing)
       expect(bundlerClient.sendUserOperation).not.toHaveBeenCalled();
@@ -459,12 +459,12 @@ describe('BaseAppAccount', () => {
       });
 
       // Make a payment
-      const paymentMaker = account.paymentMakers.base;
+      const paymentMaker = account.paymentMakers['base'];
       const amount = new BigNumber(1.5); // 1.5 USDC
-      const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
+      const result = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
 
       // Verify payment was made
-      expect(txHash).toBe('0xtxhash');
+      expect(result.transactionId).toBe('0xtxhash');
       expect(prepareSpendCallData).toHaveBeenCalledWith({ permission, amount: 1500000n }); // 1.5 USDC in smallest units
       expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
         account: ephemeralWallet.account,

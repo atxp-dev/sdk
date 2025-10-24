@@ -1,6 +1,6 @@
 import type { PaymentMaker, Hex } from './types.js';
 import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from './types.js';
-import { Logger, Currency } from '@atxp/common';
+import { Logger, Currency, AccountId, PaymentIdentifiers } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
@@ -83,7 +83,7 @@ export class BasePaymentMaker implements PaymentMaker {
     return this.signingClient.account!.address;
   }
 
-  async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
+  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: AccountId | null}): Promise<string> {
     const headerObj = { alg: 'ES256K' };
 
     const payloadObj = {
@@ -94,6 +94,7 @@ export class BasePaymentMaker implements PaymentMaker {
       exp: Math.floor(Date.now() / 1000) + 60 * 60,
       ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
       ...(paymentRequestId ? { payment_request_id: paymentRequestId } : {}),
+      ...(accountId ? { account_id: accountId } : {}),
     } as Record<string, unknown>;
 
     const header = toBase64Url(JSON.stringify(headerObj));
@@ -120,7 +121,7 @@ export class BasePaymentMaker implements PaymentMaker {
     return jwt;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, _memo: string, _paymentRequestId?: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, _memo: string, _paymentRequestId?: string): Promise<PaymentIdentifiers> {
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
     }
@@ -173,7 +174,10 @@ export class BasePaymentMaker implements PaymentMaker {
 
       this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
 
-      return hash;
+      // For non-bundled EVM transactions, only transactionId is needed
+      return {
+        transactionId: hash
+      };
     } catch (error) {
       if (error instanceof InsufficientFundsErrorClass || error instanceof PaymentNetworkErrorClass) {
         throw error;

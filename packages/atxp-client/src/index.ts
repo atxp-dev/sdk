@@ -76,3 +76,10 @@ export {
 export {
   ATXPLocalAccount
 } from './atxpLocalAccount.js';
+
+// Destination makers
+export {
+  ATXPDestinationMaker,
+  PassthroughDestinationMaker,
+} from './destinationMakers/index.js';
+

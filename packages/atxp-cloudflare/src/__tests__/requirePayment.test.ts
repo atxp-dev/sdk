@@ -3,6 +3,7 @@ import { requirePayment } from '../requirePayment.js';
 import { BigNumber } from 'bignumber.js';
 import './setup.js';
 import type { ATXPConfig, TokenCheck } from '@atxp/server';
+import { Account } from '@atxp/common';
 
 // Mock external dependencies
 vi.mock('@atxp/server', async (importOriginal) => {
@@ -11,19 +12,24 @@ vi.mock('@atxp/server', async (importOriginal) => {
     ...actual,
     requirePayment: vi.fn(),
     withATXPContext: vi.fn(),
-    buildServerConfig: vi.fn(),
-    ChainPaymentDestination: vi.fn().mockImplementation((address: string, network: string) => ({
-      destination: vi.fn().mockResolvedValue({ destination: address, network })
-    }))
+    buildServerConfig: vi.fn()
   };
 });
 
 import {
   requirePayment as mockRequirePaymentSDK,
   withATXPContext as mockWithATXPContext,
-  buildServerConfig as mockBuildServerConfig,
-  ChainPaymentDestination,
+  buildServerConfig as mockBuildServerConfig
 } from '@atxp/server';
+
+// Helper to create a mock Account for testing
+function mockAccount(accountId: string): Account {
+  return {
+    accountId,
+    paymentMakers: {},
+    network: () => 'base'
+  };
+}
 
 describe('requirePayment', () => {
   beforeEach(() => {
@@ -40,7 +46,7 @@ describe('requirePayment', () => {
   it('should require payment with config args', async () => {
     const configOpts = {
       payeeName: 'Test Payee',
-      paymentDestination: new ChainPaymentDestination('0x1234', 'base')
+      destination: mockAccount('0x1234')
     };
 
     const mcpProps = {
@@ -71,7 +77,7 @@ describe('requirePayment', () => {
   it('should handle null token check', async () => {
     const configOpts = {
       payeeName: 'Test Payee',
-      paymentDestination: new ChainPaymentDestination('0x1234', 'base')
+      destination: mockAccount('0x1234')
     };
 
     const mcpProps = {

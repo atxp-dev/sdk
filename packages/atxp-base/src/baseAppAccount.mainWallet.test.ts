@@ -61,11 +61,11 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         cache,
       });
 
-      // Should have main wallet address as account ID
-      expect(account.accountId).toBe(TEST_WALLET_ADDRESS);
+      // Should have main wallet address as account ID (qualified with network)
+      expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
       
       // Should have main wallet payment maker
-      expect(account.paymentMakers['base']).toBeInstanceOf(MainWalletPaymentMaker);
+      expect(account.paymentMakers.base).toBeInstanceOf(MainWalletPaymentMaker);
       
       // Should still connect wallet
       expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
@@ -104,8 +104,8 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         cache,
       });
 
-      expect(account.accountId).toBe(TEST_WALLET_ADDRESS);
-      expect(account.paymentMakers['base']).toBeInstanceOf(MainWalletPaymentMaker);
+      expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
+      expect(account.paymentMakers.base).toBeInstanceOf(MainWalletPaymentMaker);
     });
 
     it('should pass the provider to MainWalletPaymentMaker', async () => {
@@ -124,7 +124,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       });
 
       // Get the payment maker and verify it has the right properties
-      const paymentMaker = account.paymentMakers['base'] as MainWalletPaymentMaker;
+      const paymentMaker = account.paymentMakers.base as MainWalletPaymentMaker;
       expect(paymentMaker).toBeInstanceOf(MainWalletPaymentMaker);
       
       // Test that the payment maker can use the provider
@@ -175,7 +175,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
       // Should be in ephemeral wallet mode with smart wallet address as accountId
       expect(account).toBeDefined();
-      expect(account.paymentMakers['base']).toBeDefined();
+      expect(account.paymentMakers.base).toBeDefined();
       // In ephemeral mode, we expect the account ID to be different from wallet address
       expect(account.accountId).not.toBe(TEST_WALLET_ADDRESS);
     });
@@ -218,14 +218,14 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       expect(paymentMaker).toBeDefined();
 
       // Make a payment
-      const txHash = await paymentMaker.makePayment(
+      const result = await paymentMaker.makePayment(
         new BigNumber(1.5),
         'USDC',
         '0x1234567890123456789012345678901234567890',
         'Test payment'
       );
 
-      expect(txHash).toBe('0xtxhash');
+      expect(result.transactionId).toBe('0xtxhash');
       
       // Verify eth_sendTransaction was called (it's the 2nd call after wallet_connect)
       expect(provider.request).toHaveBeenCalledWith({

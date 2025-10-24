@@ -5,8 +5,9 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { atxpExpress, atxpAccountId, requirePayment, ATXPPaymentDestination } from '@atxp/express';
+import { atxpExpress, atxpAccountId, requirePayment } from '@atxp/express';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
+import { ATXPAccount } from '@atxp/client';
 import 'dotenv/config';
 
 const PORT = 3009;
@@ -47,16 +48,15 @@ app.use(express.json());
 
 const logger = new ConsoleLogger({level: LogLevel.DEBUG});
 
-const destinationAddress = process.env.ATXP_DESTINATION!;
-//const destination = new ChainPaymentDestination(destinationAddress, 'base');
-const destination = new ATXPPaymentDestination(destinationAddress, { logger });
+const destinationConnectionString = process.env.ATXP_DESTINATION!;
+const destination = new ATXPAccount(destinationConnectionString);
 
-console.log('Starting MCP server with destination', destinationAddress);
+console.log('Starting MCP server with destination', destinationConnectionString);
 app.use(atxpExpress({
-  paymentDestination: destination,
-  //server: 'http://localhost:3010',
+  destination: destination,
+  server: 'http://localhost:3010',
   payeeName: 'ATXP Client Example Resource Server',
-  minimumPayment: BigNumber(0.05),
+  minimumPayment: BigNumber(0.01),
   allowHttp: true,
   logger
 }));

@@ -125,19 +125,22 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
       add: vi.fn(),
     };
 
-    vi.mocked(getAssociatedTokenAddress).mockResolvedValue('TokenAccount123' as any);
+    const mockTokenAccountAddress = {
+      toBase58: () => 'TokenAccount123',
+    };
+    vi.mocked(getAssociatedTokenAddress).mockResolvedValue(mockTokenAccountAddress as any);
     vi.mocked(getAccount).mockResolvedValue(mockTokenAccount as any);
     vi.mocked(createTransfer).mockResolvedValue(mockTransaction as any);
     vi.mocked(sendAndConfirmTransaction).mockResolvedValue('TransactionSignature123');
 
     const result = await paymentMaker.makePayment(
-      new BigNumber('10'), 
-      'USDC', 
+      new BigNumber('10'),
+      'USDC',
       'ReceiverPublicKey',
       'dummy memo'
     );
 
-    expect(result).toBe('TransactionSignature123');
+    expect(result.transactionId).toBe('TransactionSignature123');
     expect(getAssociatedTokenAddress).toHaveBeenCalled();
     expect(getAccount).toHaveBeenCalled();
     expect(createTransfer).toHaveBeenCalled();
@@ -146,7 +149,10 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
 
   it('should successfully process USDC payments', async () => {
     // Mock sufficient balance for USDC
-    vi.mocked(getAssociatedTokenAddress).mockResolvedValue('AssociatedTokenAddress' as any);
+    const mockTokenAccountAddress = {
+      toBase58: () => 'AssociatedTokenAddress',
+    };
+    vi.mocked(getAssociatedTokenAddress).mockResolvedValue(mockTokenAccountAddress as any);
     vi.mocked(sendAndConfirmTransaction).mockResolvedValue('TransactionSignature123');
     mockConnection.getTokenAccountBalance.mockResolvedValue({
       value: {
@@ -159,7 +165,7 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
 
     const result = await paymentMaker.makePayment(new BigNumber('10'), 'USDC', 'ReceiverPublicKey', 'dummy memo');
 
-    expect(result).toBe('TransactionSignature123');
+    expect(result.transactionId).toBe('TransactionSignature123');
     expect(getAssociatedTokenAddress).toHaveBeenCalled();
     expect(sendAndConfirmTransaction).toHaveBeenCalled();
   });
@@ -251,7 +257,10 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
       add: vi.fn(),
     };
 
-    vi.mocked(getAssociatedTokenAddress).mockResolvedValue('TokenAccount123' as any);
+    const mockTokenAccountAddress = {
+      toBase58: () => 'TokenAccount123',
+    };
+    vi.mocked(getAssociatedTokenAddress).mockResolvedValue(mockTokenAccountAddress as any);
     vi.mocked(getAccount).mockResolvedValue(mockTokenAccount as any);
     vi.mocked(createTransfer).mockResolvedValue(mockTransaction as any);
     vi.mocked(sendAndConfirmTransaction).mockResolvedValue('TransactionSignature123');
@@ -263,7 +272,7 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
       'dummy memo'
     );
 
-    expect(result).toBe('TransactionSignature123');
+    expect(result.transactionId).toBe('TransactionSignature123');
     expect(sendAndConfirmTransaction).toHaveBeenCalled();
   });
 

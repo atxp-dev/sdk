@@ -8,7 +8,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
 import { atxpExpress, requirePayment } from '@atxp/express';
 import { Network } from '@atxp/common';
-import { ChainPaymentDestination, ATXPPaymentDestination } from '@atxp/server';
+import { ATXPAccount, Account, BaseAccount, SolanaAccount } from '@atxp/client';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
 
@@ -97,12 +97,25 @@ async function main() {
   
   // Create ATXP router and use it as middleware
   // Use either ATXP connection string for dynamic resolution or static funding destination
-  const paymentDestination = process.env.ATXP_CONNECTION_STRING
-    ? new ATXPPaymentDestination(process.env.ATXP_CONNECTION_STRING)
-    : new ChainPaymentDestination(process.env.FUNDING_DESTINATION!, process.env.FUNDING_NETWORK! as Network);
+  let destination: Account;
+  if (process.env.ATXP_CONNECTION_STRING) {
+    destination = new ATXPAccount(process.env.ATXP_CONNECTION_STRING);
+  } else {
+    const network = process.env.FUNDING_NETWORK! as Network;
+    const address = process.env.FUNDING_DESTINATION!;
+
+    // Create appropriate account type based on network
+    if (network === 'base') {
+      destination = new BaseAccount(address);
+    } else if (network === 'solana') {
+      destination = new SolanaAccount(address);
+    } else {
+      throw new Error(`Unsupported network: ${network}. Please use 'base' or 'solana'.`);
+    }
+  }
 
   const atxpRouter = atxpExpress({
-    paymentDestination,
+    destination,
     payeeName: 'ATXP Server Example',
     allowHttp: process.env.NODE_ENV === 'development',
   });

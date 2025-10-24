@@ -1,6 +1,6 @@
-import { getBaseUSDCAddress, type PaymentMaker } from '@atxp/client';
+import { getBaseUSDCAddress } from '@atxp/client';
 import { base } from 'viem/chains';
-import { Logger, Currency, ConsoleLogger } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifiers } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
@@ -82,42 +82,44 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return this.smartWallet.account.address;
   }
 
-  async generateJWT({paymentRequestId, codeChallenge}: {paymentRequestId: string, codeChallenge: string}): Promise<string> {
+  async generateJWT({paymentRequestId, codeChallenge, accountId}: {paymentRequestId: string, codeChallenge: string, accountId?: AccountId | null}): Promise<string> {
     // Generate EIP-1271 auth data for smart wallet authentication
     const timestamp = Math.floor(Date.now() / 1000);
-    
+
     const message = constructEIP1271Message({
       walletAddress: this.smartWallet.account.address,
       timestamp,
       codeChallenge,
-      paymentRequestId
+      paymentRequestId,
+      ...(accountId ? { accountId } : {}),
     });
-    
+
     // Sign the message - this will return an ABI-encoded signature from the smart wallet
     const signature = await this.smartWallet.account.signMessage({
       message: message
     });
-    
+
     const authData = createEIP1271AuthData({
       walletAddress: this.smartWallet.account.address,
       message,
       signature,
       timestamp,
       codeChallenge,
-      paymentRequestId
+      paymentRequestId,
+      ...(accountId ? { accountId } : {}),
     });
-    
+
     const jwtToken = createEIP1271JWT(authData);
-    
+
     this.logger.info(`codeChallenge: ${codeChallenge}`);
     this.logger.info(`paymentRequestId: ${paymentRequestId}`);
     this.logger.info(`walletAddress: ${this.smartWallet.account.address}`);
     this.logger.info(`Generated EIP-1271 JWT: ${jwtToken}`);
-    
+
     return jwtToken;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<PaymentIdentifiers> {
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
@@ -127,14 +129,14 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     // Convert amount to USDC units (6 decimals) as BigInt for spendPermission
     const amountInUSDCUnits = BigInt(amount.multipliedBy(10 ** USDC_DECIMALS).toFixed(0));
     const spendCalls = await prepareSpendCallData({ permission: this.spendPermission, amount: amountInUSDCUnits });
-    
+
     // Add a second call to transfer USDC from the smart wallet to the receiver
     let transferCallData = encodeFunctionData({
       abi: ERC20_ABI,
       functionName: "transfer",
       args: [receiver as Address, amountInUSDCUnits],
     });
-    
+
     // Append memo to transfer call data if present
     // This works because the EVM ignores extra calldata beyond what a function expects.
     // The ERC20 transfer() function only reads the first 68 bytes (4-byte selector + 32-byte address + 32-byte amount).
@@ -146,19 +148,19 @@ export class BaseAppPaymentMaker implements PaymentMaker {
       transferCallData = (transferCallData + memoHex) as Hex;
       this.logger.info(`Added memo "${memo.trim()}" to transfer call`);
     }
-    
+
     const transferCall = {
       to: this.usdcAddress as Hex,
       data: transferCallData,
       value: '0x0' as Hex
     };
-    
+
     // Combine spend permission calls with the transfer call
     const allCalls = [...spendCalls, transferCall];
-    
+
     this.logger.info(`Executing ${allCalls.length} calls (${spendCalls.length} spend permission + 1 transfer)`);
-    const hash = await this.smartWallet.client.sendUserOperation({ 
-      account: this.smartWallet.account, 
+    const hash = await this.smartWallet.client.sendUserOperation({
+      account: this.smartWallet.account,
       calls: allCalls.map(call => {
         return {
           to: call.to as Hex,
@@ -167,29 +169,32 @@ export class BaseAppPaymentMaker implements PaymentMaker {
         }
       }),
       maxPriorityFeePerGas: parseEther('0.000000001')
-    }) 
-     
+    })
+
     const receipt = await this.smartWallet.client.waitForUserOperationReceipt({ hash })
     if (!receipt) {
       throw new Error('User operation failed');
     }
-    
+
     // The receipt contains the actual transaction hash that was mined on chain
     const txHash = receipt.receipt.transactionHash;
-    
+
     if (!txHash) {
       throw new Error('User operation was executed but no transaction hash was returned. This should not happen.');
     }
-    
+
     this.logger.info(`Spend permission executed successfully. UserOp: ${receipt.userOpHash}, TxHash: ${txHash}`);
-    
+
     // Wait for additional confirmations to ensure the transaction is well-propagated
     // This helps avoid the "Transaction receipt could not be found" error
     await waitForTransactionConfirmations(this.smartWallet, txHash, 2, this.logger);
-    
-    // Return the actual transaction hash, not the user operation hash
-    // The payment verification system needs the on-chain transaction hash
-    return txHash;
+
+    // For bundled EVM transactions (ERC-4337), transactionId is the on-chain txHash (for backwards compatibility)
+    // and transactionSubId is the userOpHash (identifies the specific user operation within the bundle)
+    return {
+      transactionId: txHash,
+      transactionSubId: receipt.userOpHash
+    };
   }
 
   /**

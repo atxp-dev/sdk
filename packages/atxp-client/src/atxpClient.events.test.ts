@@ -106,7 +106,7 @@ describe('atxpClient events', () => {
 
     const onPayment = vi.fn();
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('test-payment-result-id'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'test-payment-result-id' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
@@ -128,7 +128,7 @@ describe('atxpClient events', () => {
         accountId: account.accountId,
         amount: BigNumber(0.01),
         currency: 'USDC',
-        network: 'solana'
+        chain: 'solana'
       })
     });
   });
@@ -175,7 +175,7 @@ describe('atxpClient events', () => {
         accountId: account.accountId,
         amount: new BigNumber(0.01),
         currency: expect.any(String),
-        network: expect.any(String)
+        chain: expect.any(String)
       }),
       error: expect.any(Error)
     });

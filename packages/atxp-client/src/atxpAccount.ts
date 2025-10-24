@@ -1,5 +1,5 @@
 import type { Account, PaymentMaker } from './types.js';
-import type { FetchLike, Network, Currency } from '@atxp/common'
+import type { FetchLike, Currency, AccountId, PaymentIdentifiers } from '@atxp/common'
 import { crypto } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { LocalAccount } from 'viem';
@@ -61,7 +61,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     return json.sourceAddress;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string): Promise<string> {
+  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string): Promise<PaymentIdentifiers> {
     // Make a regular payment via the /pay endpoint
     const response = await this.fetchFn(`${this.origin}/pay`, {
       method: 'POST',
@@ -83,14 +83,19 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
       throw new Error(`ATXPAccount: /pay failed: ${response.status} ${response.statusText} ${text}`);
     }
 
-    const json = await response.json() as { txHash?: string };
+    const json = await response.json() as { txHash?: string; transactionSubId?: string };
     if (!json?.txHash) {
       throw new Error('ATXPAccount: /pay did not return txHash');
     }
-    return json.txHash;
+    // Return txHash as transactionId (for backwards compatibility)
+    // and optionally include transactionSubId if the server provides it
+    return {
+      transactionId: json.txHash,
+      ...(json.transactionSubId ? { transactionSubId: json.transactionSubId } : {})
+    };
   }
 
-  async generateJWT(params: { paymentRequestId: string; codeChallenge: string }): Promise<string> {
+  async generateJWT(params: { paymentRequestId: string; codeChallenge: string; accountId?: AccountId | null }): Promise<string> {
     const response = await this.fetchFn(`${this.origin}/sign`, {
       method: 'POST',
       headers: {
@@ -100,6 +105,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
       body: JSON.stringify({
         paymentRequestId: params.paymentRequestId,
         codeChallenge: params.codeChallenge,
+        ...(params.accountId ? { accountId: params.accountId } : {}),
       }),
     });
     if (!response.ok) {
@@ -115,31 +121,33 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 }
 
 export class ATXPAccount implements Account {
-  accountId: string;
+  accountId: AccountId;
   paymentMakers: { [key: string]: PaymentMaker };
   origin: string;
   token: string;
   fetchFn: FetchLike;
 
-  constructor(connectionString: string, opts?: { fetchFn?: FetchLike; network?: Network }) {
+  constructor(connectionString: string, opts?: { fetchFn?: FetchLike; }) {
     const { origin, token, accountId } = parseConnectionString(connectionString);
     const fetchFn = opts?.fetchFn ?? fetch;
-    const network = opts?.network ?? 'base';
 
     // Store for use in X402 payment creation
     this.origin = origin;
     this.token = token;
     this.fetchFn = fetchFn;
 
+    // Format accountId as network:address
+    // Connection string provides just the atxp_acct_xxx part (no prefix for UI)
     if (accountId) {
-      this.accountId = `atxp:${accountId}`;
+      this.accountId = `atxp:${accountId}` as AccountId;
     } else {
-      this.accountId = `atxp:${crypto.randomUUID()}`;
+      this.accountId = `atxp:atxp_${crypto.randomUUID()}` as AccountId;
     }
     this.paymentMakers = {
-      [network]: new ATXPHttpPaymentMaker(origin, token, fetchFn),
+      'base': new ATXPHttpPaymentMaker(origin, token, fetchFn),
     };
   }
+
 
   async getSigner(): Promise<LocalAccount> {
     return ATXPLocalAccount.create(

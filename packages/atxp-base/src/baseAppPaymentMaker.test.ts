@@ -101,10 +101,10 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5); // 1.5 USDC
 
-    const txHash = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
-    
+    const result = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
+
     // Verify the transaction hash
-    expect(txHash).toBe('0xtxhash');
+    expect(result.transactionId).toBe('0xtxhash');
     
     // Verify sendUserOperation was called with correct parameters
     expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({

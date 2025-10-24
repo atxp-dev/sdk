@@ -2,10 +2,9 @@ import {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
   WORLD_CHAIN_MAINNET,
   getWorldChainMainnetWithRPC,
-  type PaymentMaker,
   type Hex
 } from '@atxp/client';
-import { Logger, Currency, ConsoleLogger } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifiers } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { createWalletClient, createPublicClient, custom, encodeFunctionData, http } from 'viem';
 
@@ -56,10 +55,12 @@ export class MainWalletPaymentMaker implements PaymentMaker {
 
   async generateJWT({
     paymentRequestId,
-    codeChallenge
+    codeChallenge,
+    accountId
   }: {
     paymentRequestId: string;
     codeChallenge: string;
+    accountId?: AccountId | null;
   }): Promise<string> {
     const timestamp = Math.floor(Date.now() / 1000);
 
@@ -77,7 +78,8 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       exp: timestamp + 3600, // 1 hour expiration
       payment_request_id: paymentRequestId,
       code_challenge: codeChallenge,
-      chain_id: this.chainId
+      chain_id: this.chainId,
+      ...(accountId ? { account_id: accountId } : {}),
     };
 
     // Encode header and payload to base64url
@@ -109,7 +111,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     currency: Currency,
     receiver: string,
     memo: string
-  ): Promise<string> {
+  ): Promise<PaymentIdentifiers> {
     if (currency !== 'USDC') {
       throw new Error('Only USDC currency is supported; received ' + currency);
     }
@@ -196,6 +198,9 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       await new Promise(resolve => setTimeout(resolve, 30000));
     }
 
-    return txHash;
+    // For non-bundled EVM transactions, only transactionId is needed
+    return {
+      transactionId: txHash
+    };
   }
 }

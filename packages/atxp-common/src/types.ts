@@ -2,6 +2,8 @@ import { BigNumber } from 'bignumber.js';
 
 export const DEFAULT_AUTHORIZATION_SERVER = 'https://auth.atxp.ai';
 
+export const DEFAULT_ATXP_ACCOUNTS_SERVER = 'https://accounts.atxp.ai';
+
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -19,11 +21,55 @@ export type Logger = {
 export type UrlString = `http://${string}` | `https://${string}`;
 export type AuthorizationServerUrl = UrlString;
 
-export type Currency = 'USDC';
-export type Network = 'solana' | 'base' | 'world' | 'base_sepolia' | 'world_sepolia' | 'atxp_base' | 'atxp_base_sepolia';
+// Enums provide runtime access to valid values
+export enum CurrencyEnum {
+  USDC = 'USDC'
+}
+export type Currency = `${CurrencyEnum}`;
 
-export type PaymentRequestDestination = {
+export enum NetworkEnum {
+  Solana = 'solana',
+  Base = 'base',
+  World = 'world',
+  BaseSepolia = 'base_sepolia',
+  WorldSepolia = 'world_sepolia',
+  ATXP = 'atxp'
+}
+export type Network = `${NetworkEnum}`;
+
+export enum ChainEnum {
+  Solana = 'solana',
+  Base = 'base',
+  World = 'world',
+  BaseSepolia = 'base_sepolia',
+  WorldSepolia = 'world_sepolia'
+}
+export type Chain = `${ChainEnum}`;
+
+export enum WalletTypeEnum {
+  EOA = 'eoa',
+  Smart = 'smart'
+}
+export type WalletType = `${WalletTypeEnum}`;
+
+// Globally unique account identifier format: network:address
+export type AccountId = `${Network}:${string}`;
+
+export type Source = {
+  address: string;
+  chain: Chain;
+  walletType: WalletType;
+}
+
+export type PaymentRequestOption = {
   network: Network;
+  currency: Currency;
+  address: string;
+  amount: BigNumber;
+}
+
+export type Destination = {
+  chain: Chain;
   currency: Currency;
   address: string;
   amount: BigNumber;
@@ -31,7 +77,7 @@ export type PaymentRequestDestination = {
 
 export type PaymentRequestData = {
   // New multi-destination format
-  destinations?: PaymentRequestDestination[];
+  destinations?: PaymentRequestOption[];
   // Legacy single destination fields (for backwards compatibility)
   amount?: BigNumber;
   currency?: Currency;
@@ -39,15 +85,19 @@ export type PaymentRequestData = {
   destination?: string;
   // Common fields
   source: string;
+  sourceAccountId?: AccountId | null;
+  destinationAccountId?: AccountId | null;
   resource: URL;
   resourceName: string;
   payeeName?: string | null;
   iss: string;
 }
 
+
 export type CustomJWTPayload = {
   code_challenge?: string;
   payment_request_id?: string;
+  account_id?: AccountId;
 }
 
 export type ClientCredentials = {
@@ -96,4 +146,50 @@ export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Respo
 export type RequirePaymentConfig = {
   price: BigNumber;
   getExistingPaymentId?: () => Promise<string | null>;
+}
+
+export type PaymentIdentifiers = {
+  transactionId: string;
+  transactionSubId?: string;
+};
+
+export interface PaymentMaker {
+  makePayment: (amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string) => Promise<PaymentIdentifiers>;
+  generateJWT: (params: {paymentRequestId: string, codeChallenge: string, accountId?: AccountId | null}) => Promise<string>;
+  getSourceAddress: (params: {amount: BigNumber, currency: Currency, receiver: string, memo: string}) => string | Promise<string>;
+}
+
+export interface DestinationMaker {
+  makeDestinations: (option: PaymentRequestOption, logger: Logger) => Promise<Destination[]>;
+}
+
+export type Account = {
+  accountId: AccountId;
+  paymentMakers: {[key: string]: PaymentMaker};
+}
+
+/**
+ * Extract the address portion from a fully-qualified accountId
+ * @param accountId - Format: network:address
+ * @returns The address portion
+ */
+export function extractAddressFromAccountId(accountId: AccountId): string {
+  const parts = accountId.split(':');
+  if (parts.length !== 2) {
+    throw new Error(`Invalid accountId format: ${accountId}. Expected format: network:address`);
+  }
+  return parts[1];
+}
+
+/**
+ * Extract the network portion from a fully-qualified accountId
+ * @param accountId - Format: network:address
+ * @returns The network portion
+ */
+export function extractNetworkFromAccountId(accountId: AccountId): Network {
+  const parts = accountId.split(':');
+  if (parts.length !== 2) {
+    throw new Error(`Invalid accountId format: ${accountId}. Expected format: network:address`);
+  }
+  return parts[0] as Network;
 }

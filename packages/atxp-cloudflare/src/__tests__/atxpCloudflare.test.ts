@@ -10,10 +10,7 @@ vi.mock('@atxp/server', () => ({
   parseMcpRequestsWebApi: vi.fn(),
   sendOAuthChallengeWebApi: vi.fn(),
   sendOAuthMetadataWebApi: vi.fn(),
-  sendProtectedResourceMetadataWebApi: vi.fn(),
-  ChainPaymentDestination: vi.fn().mockImplementation((address: string, network: string) => ({
-    destination: vi.fn().mockResolvedValue({ destination: address, network })
-  }))
+  sendProtectedResourceMetadataWebApi: vi.fn()
 }));
 
 vi.mock('../buildATXPConfig.js', () => ({
@@ -29,11 +26,20 @@ import {
   parseMcpRequestsWebApi,
   sendOAuthChallengeWebApi,
   sendOAuthMetadataWebApi,
-  sendProtectedResourceMetadataWebApi,
-  ChainPaymentDestination,
+  sendProtectedResourceMetadataWebApi
 } from '@atxp/server';
 import { buildATXPConfig } from '../buildATXPConfig.js';
 import { ATXPCloudflareOptions } from '../types.js';
+import { Account } from '@atxp/common';
+
+// Helper to create a mock Account for testing
+function mockAccount(accountId: string): Account {
+  return {
+    accountId,
+    paymentMakers: {},
+    network: () => 'base'
+  };
+}
 
 // Mock MCP Agent
 const mockMcpAgent : ATXPCloudflareOptions['mcpAgent'] = {
@@ -55,7 +61,7 @@ describe('atxpCloudflare', () => {
 
   const mockOptions : ATXPCloudflareOptions = {
     mcpAgent: mockMcpAgent,
-    paymentDestination: new ChainPaymentDestination('0x1234567890123456789012345678901234567890', 'base'),
+    destination: mockAccount('0x1234567890123456789012345678901234567890'),
     payeeName: 'Test Server'
   };
 

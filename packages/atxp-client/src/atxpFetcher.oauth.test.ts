@@ -9,17 +9,18 @@ import { PaymentMaker } from './types.js';
 
 function mockPaymentMakers(solanaPaymentMaker?: PaymentMaker) {
   solanaPaymentMaker = solanaPaymentMaker ?? {
-    makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+    makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
     generateJWT: vi.fn().mockResolvedValue('testJWT')
   };
-  return {'solana': solanaPaymentMaker };
+  return new Map([['solana' as any, solanaPaymentMaker]]);
 }
 
-function atxpFetcher(fetchFn: FetchLike, paymentMakers?: {[key: string]: PaymentMaker}, db?: OAuthDb) {
+function atxpFetcher(fetchFn: FetchLike, paymentMakers?: Map<any, PaymentMaker>, db?: OAuthDb) {
   return new ATXPFetcher({
     accountId: "bdj",
     db: db ?? new MemoryOAuthDb(),
     paymentMakers: paymentMakers ?? mockPaymentMakers(),
+    destinationMakers: new Map(),
     fetchFn
   });
 }
@@ -31,7 +32,7 @@ describe('atxpFetcher.fetch oauth', () => {
       .postOnce('https://example.com/mcp', 401)
       .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
-      // Respond to /authorize call 
+      // Respond to /authorize call
       .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
         const state = new URL(req.args[0] as any).searchParams.get('state');
         return {
@@ -41,10 +42,10 @@ describe('atxpFetcher.fetch oauth', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
     };
-    const fetcher = atxpFetcher(f.fetchHandler, {'solana': paymentMaker});
+    const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
     await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
 
     // Ensure we call the authorize endpoint
@@ -67,7 +68,7 @@ describe('atxpFetcher.fetch oauth', () => {
       .postOnce('https://example.com/mcp', 401)
       .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
-      // Respond to /authorize call 
+      // Respond to /authorize call
       .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
         const state = new URL(req.args[0] as any).searchParams.get('state');
         return {
@@ -77,10 +78,10 @@ describe('atxpFetcher.fetch oauth', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId'),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
       generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
     };
-    const fetcher = atxpFetcher(f.fetchHandler, {'solana': paymentMaker, 'ethereum': paymentMaker});
+    const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker], ['ethereum' as any, paymentMaker]]));
     let threw = false;
     try{
       await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
@@ -113,7 +114,7 @@ describe('atxpFetcher.fetch oauth', () => {
     const originalFromDb = await db.getAccessToken('bdj', 'https://example.com/mcp');
     expect(originalFromDb).toBeNull();
 
-    const fetcher = atxpFetcher(f.fetchHandler, {}, db);
+    const fetcher = atxpFetcher(f.fetchHandler, new Map(), db);
     const res = await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
     expect(res.status).toBe(200);
     const resJson = await res.json();
@@ -141,7 +142,7 @@ describe('atxpFetcher.fetch oauth', () => {
     mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER);
     mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER);
 
-    const fetcher = atxpFetcher(f.fetchHandler, {});
+    const fetcher = atxpFetcher(f.fetchHandler, new Map());
     await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow(OAuthAuthenticationRequiredError);
   });
 
@@ -187,11 +188,11 @@ describe('atxpFetcher.fetch oauth', () => {
 
     // Mock a payment maker that doesn't have generateJWT method
     const brokenPaymentMaker = {
-      makePayment: vi.fn().mockResolvedValue('testPaymentId')
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' })
       // Missing generateJWT method
     } as unknown as PaymentMaker;
 
-    const fetcher = atxpFetcher(f.fetchHandler, { 'broken': brokenPaymentMaker });
+    const fetcher = atxpFetcher(f.fetchHandler, new Map([['broken' as any, brokenPaymentMaker]]));
     await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow('Payment maker is missing generateJWT method. Available payment makers: [broken]. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.');
   });
 });
