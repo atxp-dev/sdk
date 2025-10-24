@@ -2,7 +2,7 @@ import { encodeFunctionData, toHex } from 'viem';
 import { getBaseUSDCAddress, type Hex } from '@atxp/client';
 import { base } from 'viem/chains';
 import BigNumber from 'bignumber.js';
-import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId, PaymentIdentifiers } from '@atxp/common';
+import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId, PaymentIdentifier, Destination, Chain } from '@atxp/common';
 import {
   createEIP1271JWT,
   createEIP1271AuthData,
@@ -103,11 +103,24 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   }
 
   async makePayment(
-    amount: BigNumber,
-    currency: Currency,
-    receiver: string,
-    _reason: string
-  ): Promise<PaymentIdentifiers> {
+    destinations: Destination[],
+    _memo: string,
+    _paymentRequestId?: string
+  ): Promise<PaymentIdentifiers | null> {
+    // Filter to base chain destinations
+    const baseDestinations = destinations.filter(d => d.chain === 'base');
+
+    if (baseDestinations.length === 0) {
+      this.logger.debug('MainWalletPaymentMaker: No base destinations found, cannot handle payment');
+      return null; // Cannot handle these destinations
+    }
+
+    // Pick first base destination
+    const dest = baseDestinations[0];
+    const amount = dest.amount;
+    const currency = dest.currency;
+    const receiver = dest.address;
+
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported');
     }
@@ -149,9 +162,11 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     const CONFIRMATIONS = 2;
     await this.waitForTransactionConfirmations(txHash, CONFIRMATIONS);
 
-    // For non-bundled EVM transactions, only transactionId is needed
+    // Return payment result with chain and currency
     return {
-      transactionId: txHash
+      transactionId: txHash,
+      chain: 'base',
+      currency: 'USDC'
     };
   }
 

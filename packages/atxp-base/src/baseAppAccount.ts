@@ -16,7 +16,7 @@ const DEFAULT_PERIOD_IN_DAYS = 7;
 
 export class BaseAppAccount implements Account {
   accountId: AccountId;
-  paymentMakers: { [key: string]: PaymentMaker };
+  paymentMakers: PaymentMaker[];
 
   private static toCacheKey(userWalletAddress: string): string {
     return `atxp-base-permission-${userWalletAddress}`;
@@ -150,9 +150,9 @@ export class BaseAppAccount implements Account {
       }
       // Format accountId as network:address
       this.accountId = `base:${ephemeralSmartWallet.address}` as AccountId;
-      this.paymentMakers = {
-        'base': new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId),
-      };
+      this.paymentMakers = [
+        new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId)
+      ];
     } else {
       // Main wallet mode
       if (!mainWalletAddress || !provider) {
@@ -160,9 +160,9 @@ export class BaseAppAccount implements Account {
       }
       // Format accountId as network:address
       this.accountId = `base:${mainWalletAddress}` as AccountId;
-      this.paymentMakers = {
-        'base': new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId),
-      };
+      this.paymentMakers = [
+        new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId)
+      ];
     }
   }
 

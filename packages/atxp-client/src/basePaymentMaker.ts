@@ -1,6 +1,6 @@
 import type { PaymentMaker, Hex } from './types.js';
 import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from './types.js';
-import { Logger, Currency, AccountId, PaymentIdentifiers } from '@atxp/common';
+import { Logger, Currency, AccountId, PaymentIdentifier, Destination, Chain } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
@@ -121,7 +121,21 @@ export class BasePaymentMaker implements PaymentMaker {
     return jwt;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, _memo: string, _paymentRequestId?: string): Promise<PaymentIdentifiers> {
+  async makePayment(destinations: Destination[], _memo: string, _paymentRequestId?: string): Promise<PaymentIdentifiers | null> {
+    // Filter to base chain destinations
+    const baseDestinations = destinations.filter(d => d.chain === 'base');
+
+    if (baseDestinations.length === 0) {
+      this.logger.debug('BasePaymentMaker: No base destinations found, cannot handle payment');
+      return null; // Cannot handle these destinations
+    }
+
+    // Pick first base destination
+    const dest = baseDestinations[0];
+    const amount = dest.amount;
+    const currency = dest.currency;
+    const receiver = dest.address;
+
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
     }
@@ -174,9 +188,11 @@ export class BasePaymentMaker implements PaymentMaker {
 
       this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
 
-      // For non-bundled EVM transactions, only transactionId is needed
+      // Return payment result with chain and currency
       return {
-        transactionId: hash
+        transactionId: hash,
+        chain: 'base',
+        currency: 'USDC'
       };
     } catch (error) {
       if (error instanceof InsufficientFundsErrorClass || error instanceof PaymentNetworkErrorClass) {

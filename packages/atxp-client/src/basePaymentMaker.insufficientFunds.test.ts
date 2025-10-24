@@ -53,7 +53,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
-    
+
     // Create a mock signing client
     mockSigningClient = {
       account: {
@@ -71,7 +71,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
       },
       extend: vi.fn(() => mockSigningClient),
     } as any;
-    
+
     paymentMaker = new BasePaymentMaker(
       'https://fake-rpc.com',
       walletClient,
@@ -85,16 +85,23 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     const balanceInWei = BigInt(5 * 1_000_000); // 5 USDC with 6 decimals
     mockSigningClient.readContract.mockResolvedValue(balanceInWei);
 
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'USDC' as const,
+      address: '0xreceiver',
+      amount: new BigNumber('10')
+    }];
+
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver')
+      paymentMaker.makePayment(destinations, '')
     ).rejects.toThrow(InsufficientFundsError);
 
     // Verify the error details
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver');
+      await paymentMaker.makePayment(destinations, '');
     } catch (error) {
       expect(error).toBeInstanceOf(InsufficientFundsError);
-      
+
       if (error instanceof InsufficientFundsError) {
         expect(error.currency).toBe('USDC');
         expect(error.required.toString()).toBe('10');
@@ -121,7 +128,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     // Mock balance check to return sufficient balance (15 USDC when 10 is required)
     const balanceInWei = BigInt(15 * 1_000_000); // 15 USDC with 6 decimals
     mockSigningClient.readContract.mockResolvedValue(balanceInWei);
-    
+
     // Mock successful transaction
     mockSigningClient.sendTransaction.mockResolvedValue('0xtransactionhash');
     mockSigningClient.waitForTransactionReceipt.mockResolvedValue({
@@ -129,28 +136,40 @@ describe('BasePaymentMaker insufficient funds handling', () => {
       blockNumber: BigInt(12345),
     });
 
-    const result = await paymentMaker.makePayment(
-      new BigNumber('10'),
-      'USDC',
-      '0xreceiver'
-    );
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'USDC' as const,
+      address: '0xreceiver',
+      amount: new BigNumber('10')
+    }];
 
-    expect(result.transactionId).toBe('0xtransactionhash');
+    const result = await paymentMaker.makePayment(destinations, '');
+
+    expect(result).not.toBeNull();
+    expect(result!.transactionId).toBe('0xtransactionhash');
+    expect(result!.chain).toBe('base');
     expect(mockSigningClient.readContract).toHaveBeenCalled();
     expect(mockSigningClient.sendTransaction).toHaveBeenCalled();
     expect(mockSigningClient.waitForTransactionReceipt).toHaveBeenCalled();
   });
 
   it('should throw PaymentNetworkError for unsupported currency', async () => {
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'ETH' as any,
+      address: '0xreceiver',
+      amount: new BigNumber('10')
+    }];
+
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'ETH' as any, '0xreceiver')
+      paymentMaker.makePayment(destinations, '')
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'ETH' as any, '0xreceiver');
+      await paymentMaker.makePayment(destinations, '');
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
-      
+
       if (error instanceof PaymentNetworkError) {
         expect(error.message).toContain('Only USDC currency is supported');
       }
@@ -164,7 +183,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     // Mock sufficient balance
     const balanceInWei = BigInt(15 * 1_000_000);
     mockSigningClient.readContract.mockResolvedValue(balanceInWei);
-    
+
     // Mock successful transaction but reverted receipt
     mockSigningClient.sendTransaction.mockResolvedValue('0xtransactionhash');
     mockSigningClient.waitForTransactionReceipt.mockResolvedValue({
@@ -172,15 +191,22 @@ describe('BasePaymentMaker insufficient funds handling', () => {
       blockNumber: BigInt(12345),
     });
 
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'USDC' as const,
+      address: '0xreceiver',
+      amount: new BigNumber('10')
+    }];
+
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver')
+      paymentMaker.makePayment(destinations, '')
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver');
+      await paymentMaker.makePayment(destinations, '');
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
-      
+
       if (error instanceof PaymentNetworkError) {
         expect(error.message).toContain('Transaction reverted');
         expect(error.originalError?.message).toContain('Transaction reverted on chain');
@@ -193,15 +219,22 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     const unexpectedError = new Error('RPC connection failed');
     mockSigningClient.readContract.mockRejectedValue(unexpectedError);
 
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'USDC' as const,
+      address: '0xreceiver',
+      amount: new BigNumber('10')
+    }];
+
     await expect(
-      paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver')
+      paymentMaker.makePayment(destinations, '')
     ).rejects.toThrow(PaymentNetworkError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('10'), 'USDC', '0xreceiver');
+      await paymentMaker.makePayment(destinations, '');
     } catch (error) {
       expect(error).toBeInstanceOf(PaymentNetworkError);
-      
+
       if (error instanceof PaymentNetworkError) {
         expect(error.message).toContain('Payment failed on Base network');
         expect(error.message).toContain('RPC connection failed');
@@ -215,12 +248,19 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     const balanceInWei = BigInt(0);
     mockSigningClient.readContract.mockResolvedValue(balanceInWei);
 
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'USDC' as const,
+      address: '0xreceiver',
+      amount: new BigNumber('0.000001')
+    }];
+
     await expect(
-      paymentMaker.makePayment(new BigNumber('0.000001'), 'USDC', '0xreceiver')
+      paymentMaker.makePayment(destinations, '')
     ).rejects.toThrow(InsufficientFundsError);
 
     try {
-      await paymentMaker.makePayment(new BigNumber('0.000001'), 'USDC', '0xreceiver');
+      await paymentMaker.makePayment(destinations, '');
     } catch (error) {
       if (error instanceof InsufficientFundsError) {
         expect(error.available?.toString()).toBe('0');
@@ -233,7 +273,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     // Mock exact balance (10 USDC when 10 is required)
     const balanceInWei = BigInt(10 * 1_000_000);
     mockSigningClient.readContract.mockResolvedValue(balanceInWei);
-    
+
     // Mock successful transaction
     mockSigningClient.sendTransaction.mockResolvedValue('0xtransactionhash');
     mockSigningClient.waitForTransactionReceipt.mockResolvedValue({
@@ -241,13 +281,35 @@ describe('BasePaymentMaker insufficient funds handling', () => {
       blockNumber: BigInt(12345),
     });
 
-    const result = await paymentMaker.makePayment(
-      new BigNumber('10'),
-      'USDC',
-      '0xreceiver'
-    );
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'USDC' as const,
+      address: '0xreceiver',
+      amount: new BigNumber('10')
+    }];
 
-    expect(result.transactionId).toBe('0xtransactionhash');
+    const result = await paymentMaker.makePayment(destinations, '');
+
+    expect(result).not.toBeNull();
+    expect(result!.transactionId).toBe('0xtransactionhash');
     expect(mockSigningClient.sendTransaction).toHaveBeenCalled();
+  });
+
+  it('should return null when no base destinations provided', async () => {
+    const destinations = [{
+      chain: 'solana' as const,
+      currency: 'USDC' as const,
+      address: 'SolanaAddress123',
+      amount: new BigNumber('10')
+    }];
+
+    const result = await paymentMaker.makePayment(destinations, '');
+
+    // Should return null since this payment maker only handles base
+    expect(result).toBeNull();
+
+    // Should not check balance or attempt transaction
+    expect(mockSigningClient.readContract).not.toHaveBeenCalled();
+    expect(mockSigningClient.sendTransaction).not.toHaveBeenCalled();
   });
 });

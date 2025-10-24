@@ -13,7 +13,6 @@ export type ProspectivePayment = {
   accountId: AccountId;
   resourceUrl: string;
   resourceName: string;
-  chain: Chain;
   currency: Currency;
   amount: BigNumber;
   iss: string;
