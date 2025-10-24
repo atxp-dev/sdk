@@ -9,8 +9,7 @@ describe('buildConfig', () => {
       mcpServer: 'https://example.com/mcp',
       account: {
         accountId: 'bdj',
-        paymentMakers: {},
-        network: () => 'base'
+        paymentMakers: []
       }
     });
     expect(config.oAuthChannelFetch).toBe(fetchFn);

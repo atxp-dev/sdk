@@ -4,6 +4,7 @@ import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js'
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import { BigNumber } from 'bignumber.js';
 
 /**
  * Creates an ATXP fetch wrapper that handles OAuth authentication and payments.
@@ -262,6 +263,16 @@ export class ATXPFetcher {
       throw new Error(`ATXP: GET ${paymentRequestUrl} failed: ${prRequest.status} ${prRequest.statusText}`);
     }
     const paymentRequest = await prRequest.json() as PaymentRequestData;
+
+    // Parse amount strings to BigNumber objects
+    if (paymentRequest.destinations) {
+      for (const dest of paymentRequest.destinations) {
+        if (typeof dest.amount === 'string' || typeof dest.amount === 'number') {
+          dest.amount = new BigNumber(dest.amount);
+        }
+      }
+    }
+
     return paymentRequest;
   }
 

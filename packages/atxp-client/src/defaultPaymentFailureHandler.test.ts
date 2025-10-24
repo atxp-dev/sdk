@@ -234,12 +234,12 @@ describe('Default Payment Failure Handler', () => {
 
     it('should format messages for text-only logs', async () => {
       const payment = createTestPayment();
-      const error = new InsufficientFundsError('USDC', new BigNumber('100'), new BigNumber('50'));
+      const error = new InsufficientFundsError('USDC', new BigNumber('100'), new BigNumber('50'), 'solana');
 
       await defaultHandler({ payment, error });
 
       const logCalls = mockLogger.info.mock.calls.map((call: any[]) => call[0]);
-      
+
       expect(logCalls).toEqual([
         'PAYMENT FAILED: Insufficient USDC funds on solana',
         'Required: 100 USDC',
