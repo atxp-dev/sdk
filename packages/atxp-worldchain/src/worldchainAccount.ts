@@ -18,7 +18,7 @@ const DEFAULT_PERIOD_IN_DAYS = 7;
 
 export class WorldchainAccount implements Account {
   accountId: AccountId;
-  paymentMakers: { [key: string]: PaymentMaker };
+  paymentMakers: PaymentMaker[];
 
   private static toCacheKey(userWalletAddress: string): string {
     return `atxp-world-permission-${userWalletAddress}`;
@@ -155,13 +155,13 @@ export class WorldchainAccount implements Account {
       }
       // Format accountId as network:address
       this.accountId = `world:${ephemeralSmartWallet.address}` as AccountId;
-      this.paymentMakers = {
-        'world': new WorldchainPaymentMaker(spendPermission, ephemeralSmartWallet, {
+      this.paymentMakers = [
+        new WorldchainPaymentMaker(spendPermission, ephemeralSmartWallet, {
           logger,
           chainId,
           customRpcUrl
-        }),
-      };
+        })
+      ];
     } else {
       // Main wallet mode
       if (!mainWalletAddress || !provider) {
@@ -169,9 +169,9 @@ export class WorldchainAccount implements Account {
       }
       // Format accountId as network:address
       this.accountId = `world:${mainWalletAddress}` as AccountId;
-      this.paymentMakers = {
-        'world': new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId, customRpcUrl),
-      };
+      this.paymentMakers = [
+        new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId, customRpcUrl)
+      ];
     }
   }
 

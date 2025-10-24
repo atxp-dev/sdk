@@ -1,6 +1,6 @@
 import { getBaseUSDCAddress } from '@atxp/client';
 import { base } from 'viem/chains';
-import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifier, Destination, Chain } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
@@ -119,7 +119,7 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return jwtToken;
   }
 
-  async makePayment(destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifiers | null> {
+  async makePayment(destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> {
     // Filter to base chain destinations
     const baseDestinations = destinations.filter(d => d.chain === 'base');
 
@@ -212,8 +212,4 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     };
   }
 
-  /**
-   * Dynamically import the appropriate spend-permission module based on environment.
-   * Uses browser or node version as appropriate since prepareSpendCallData exists in both.
-   */
 }

@@ -1,6 +1,5 @@
-import { BigNumber } from 'bignumber.js';
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, AccountId, Chain, Network, DestinationMaker, PaymentIdentifiers } from '@atxp/common';
+import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, AccountId, Network, DestinationMaker } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';

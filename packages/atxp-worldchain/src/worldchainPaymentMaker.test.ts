@@ -109,10 +109,17 @@ describe('WorldchainPaymentMaker.makePayment', () => {
 
     // Make payment
     const amount = new BigNumber(5.25); // 5.25 USDC
-    const result = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test memo');
+    const destinations = [{
+      chain: 'world' as const,
+      currency: 'USDC' as const,
+      address: TEST_RECEIVER_ADDRESS,
+      amount
+    }];
+    const result = await paymentMaker.makePayment(destinations, 'test memo');
 
     // Verify result
-    expect(result.transactionId).toBe('0xtxhash');
+    expect(result).toBeDefined();
+    expect(result!.transactionId).toBe('0xtxhash');
 
     // Verify prepareSpendCallData was called correctly
     expect(prepareSpendCallData).toHaveBeenCalledWith({
@@ -153,12 +160,13 @@ describe('WorldchainPaymentMaker.makePayment', () => {
     const paymentMaker = createTestWorldchainPaymentMaker(permission, smartWallet);
 
     // Make payment - should throw
-    await expect(paymentMaker.makePayment(
-      new BigNumber(1),
-      'USDC',
-      TEST_RECEIVER_ADDRESS,
-      'test memo'
-    )).rejects.toThrow('User operation failed');
+    const destinations = [{
+      chain: 'world' as const,
+      currency: 'USDC' as const,
+      address: TEST_RECEIVER_ADDRESS,
+      amount: new BigNumber(1)
+    }];
+    await expect(paymentMaker.makePayment(destinations, 'test memo')).rejects.toThrow('User operation failed');
   });
 
   it('should handle zero amount payments', async () => {
@@ -175,15 +183,17 @@ describe('WorldchainPaymentMaker.makePayment', () => {
     const paymentMaker = createTestWorldchainPaymentMaker(permission, smartWallet);
 
     // Make zero amount payment
-    const result = await paymentMaker.makePayment(
-      new BigNumber(0),
-      'USDC',
-      TEST_RECEIVER_ADDRESS,
-      'zero amount memo'
-    );
+    const destinations = [{
+      chain: 'world' as const,
+      currency: 'USDC' as const,
+      address: TEST_RECEIVER_ADDRESS,
+      amount: new BigNumber(0)
+    }];
+    const result = await paymentMaker.makePayment(destinations, 'zero amount memo');
 
     // Verify result
-    expect(result.transactionId).toBe('0xtxhash');
+    expect(result).toBeDefined();
+    expect(result!.transactionId).toBe('0xtxhash');
 
     // Verify prepareSpendCallData was called with zero amount
     expect(prepareSpendCallData).toHaveBeenCalledWith({
@@ -216,12 +226,13 @@ describe('WorldchainPaymentMaker.makePayment', () => {
     for (const testCase of testCases) {
       vi.clearAllMocks();
 
-      await paymentMaker.makePayment(
-        testCase.input,
-        'USDC',
-        TEST_RECEIVER_ADDRESS,
-        'fractional test'
-      );
+      const destinations = [{
+        chain: 'world' as const,
+        currency: 'USDC' as const,
+        address: TEST_RECEIVER_ADDRESS,
+        amount: testCase.input
+      }];
+      await paymentMaker.makePayment(destinations, 'fractional test');
 
       expect(prepareSpendCallData).toHaveBeenCalledWith({
         permission,

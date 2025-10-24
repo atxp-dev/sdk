@@ -19,7 +19,7 @@ describe('ATXPAccount', () => {
       const connectionString = 'https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123';
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
+      const paymentMaker = account.paymentMakers[0];
       const result = await paymentMaker.getSourceAddress({
         amount: new BigNumber('10'),
         currency: 'USDC',
@@ -63,7 +63,7 @@ describe('ATXPAccount', () => {
       const connectionString = 'https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123';
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
+      const paymentMaker = account.paymentMakers[0];
 
       await expect(paymentMaker.getSourceAddress({
         amount: new BigNumber('10'),
@@ -89,7 +89,7 @@ describe('ATXPAccount', () => {
       const connectionString = 'https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123';
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
+      const paymentMaker = account.paymentMakers[0];
 
       await expect(paymentMaker.getSourceAddress({
         amount: new BigNumber('10'),
@@ -116,7 +116,7 @@ describe('ATXPAccount', () => {
       const connectionString = `https://accounts.atxp.ai?connection_token=${token}&account_id=acc_123`;
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
+      const paymentMaker = account.paymentMakers[0];
       await paymentMaker.getSourceAddress({
         amount: new BigNumber('10'),
         currency: 'USDC',
@@ -148,7 +148,7 @@ describe('ATXPAccount', () => {
       const connectionString = 'https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123';
       const account = new ATXPAccount(connectionString, { fetchFn: mockFetch, network: 'base' });
 
-      const paymentMaker = account.paymentMakers['base'];
+      const paymentMaker = account.paymentMakers[0];
       const params = {
         amount: new BigNumber('10'),
         currency: 'USDC' as const,

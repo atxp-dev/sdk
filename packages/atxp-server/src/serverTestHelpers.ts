@@ -18,7 +18,7 @@ export const SOURCE = 'testSource';
 export function mockAccount(accountId: string): Account {
   return {
     accountId: `base:${accountId}` as any, // Format as base:address for tests
-    paymentMakers: {},
+    paymentMakers: [],
   };
 }
 

@@ -2,7 +2,7 @@ import {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
   WORLD_CHAIN_MAINNET
 } from '@atxp/client';
-import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifiers } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
@@ -215,7 +215,20 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     return createEIP1271JWT(authData);
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<PaymentIdentifiers> {
+  async makePayment(destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> {
+    // Filter to world/base chain destinations
+    const worldDestinations = destinations.filter(d => d.chain === 'world' || d.chain === 'base');
+
+    if (worldDestinations.length === 0) {
+      this.logger.debug('WorldchainPaymentMaker: No world/base destinations found, cannot handle payment');
+      return null;
+    }
+
+    // For now, handle only the first destination
+    // TODO: Support multiple destinations in a single transaction
+    const dest = worldDestinations[0];
+    const { amount, currency, address: receiver } = dest;
+
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
@@ -289,7 +302,9 @@ export class WorldchainPaymentMaker implements PaymentMaker {
     // and transactionSubId is the userOpHash (identifies the specific user operation within the bundle)
     return {
       transactionId: txHash,
-      transactionSubId: receipt.userOpHash
+      transactionSubId: receipt.userOpHash,
+      chain: dest.chain,
+      currency: dest.currency
     };
   }
 }

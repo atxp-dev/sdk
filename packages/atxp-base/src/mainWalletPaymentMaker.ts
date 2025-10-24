@@ -2,7 +2,7 @@ import { encodeFunctionData, toHex } from 'viem';
 import { getBaseUSDCAddress, type Hex } from '@atxp/client';
 import { base } from 'viem/chains';
 import BigNumber from 'bignumber.js';
-import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId, PaymentIdentifier, Destination, Chain } from '@atxp/common';
+import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import {
   createEIP1271JWT,
   createEIP1271AuthData,
@@ -106,7 +106,7 @@ export class MainWalletPaymentMaker implements PaymentMaker {
     destinations: Destination[],
     _memo: string,
     _paymentRequestId?: string
-  ): Promise<PaymentIdentifiers | null> {
+  ): Promise<PaymentIdentifier | null> {
     // Filter to base chain destinations
     const baseDestinations = destinations.filter(d => d.chain === 'base');
 

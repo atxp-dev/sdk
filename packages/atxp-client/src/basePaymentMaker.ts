@@ -1,6 +1,6 @@
 import type { PaymentMaker, Hex } from './types.js';
 import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from './types.js';
-import { Logger, Currency, AccountId, PaymentIdentifier, Destination, Chain } from '@atxp/common';
+import { Logger, Currency, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
   Address,
@@ -121,7 +121,7 @@ export class BasePaymentMaker implements PaymentMaker {
     return jwt;
   }
 
-  async makePayment(destinations: Destination[], _memo: string, _paymentRequestId?: string): Promise<PaymentIdentifiers | null> {
+  async makePayment(destinations: Destination[], _memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> {
     // Filter to base chain destinations
     const baseDestinations = destinations.filter(d => d.chain === 'base');
 

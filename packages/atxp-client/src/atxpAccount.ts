@@ -61,7 +61,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     return json.sourceAddress;
   }
 
-  async makePayment(destinations: Destination[], memo: string, paymentRequestId?: string): Promise<PaymentIdentifiers | null> {
+  async makePayment(destinations: Destination[], memo: string, paymentRequestId?: string): Promise<PaymentIdentifier | null> {
     // Make a payment via the /pay endpoint with multiple destinations
     const response = await this.fetchFn(`${this.origin}/pay`, {
       method: 'POST',

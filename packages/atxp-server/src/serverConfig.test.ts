@@ -7,7 +7,7 @@ import type { Account } from '@atxp/common';
 function mockAccount(accountId: string): Account {
   return {
     accountId: `base:${accountId}` as any,
-    paymentMakers: {},
+    paymentMakers: [],
   };
 }
 

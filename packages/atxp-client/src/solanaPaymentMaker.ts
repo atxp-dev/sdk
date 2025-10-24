@@ -5,7 +5,7 @@ import { createTransfer, ValidateTransferError as _ValidateTransferError } from 
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import bs58 from "bs58";
 import BigNumber from "bignumber.js";
-import { generateJWT, Currency, AccountId, PaymentIdentifier, Destination, Chain } from '@atxp/common';
+import { generateJWT, Currency, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import { importJWK } from 'jose';
 import { Logger } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
@@ -53,7 +53,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '', accountId as AccountId | undefined);
   }
 
-  makePayment = async (destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifiers | null> => {
+  makePayment = async (destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> => {
     // Filter to solana chain destinations
     const solanaDestinations = destinations.filter(d => d.chain === 'solana');
 

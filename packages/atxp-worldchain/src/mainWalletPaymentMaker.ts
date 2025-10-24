@@ -4,7 +4,7 @@ import {
   getWorldChainMainnetWithRPC,
   type Hex
 } from '@atxp/client';
-import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifiers } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { createWalletClient, createPublicClient, custom, encodeFunctionData, http } from 'viem';
 
@@ -107,11 +107,23 @@ export class MainWalletPaymentMaker implements PaymentMaker {
   }
 
   async makePayment(
-    amount: BigNumber,
-    currency: Currency,
-    receiver: string,
-    memo: string
-  ): Promise<PaymentIdentifiers> {
+    destinations: Destination[],
+    memo: string,
+    _paymentRequestId?: string
+  ): Promise<PaymentIdentifier | null> {
+    // Filter to world/base chain destinations
+    const worldDestinations = destinations.filter(d => d.chain === 'world' || d.chain === 'base');
+
+    if (worldDestinations.length === 0) {
+      this.logger.debug('MainWalletPaymentMaker: No world/base destinations found, cannot handle payment');
+      return null;
+    }
+
+    // For now, handle only the first destination
+    // TODO: Support multiple destinations in a single transaction
+    const dest = worldDestinations[0];
+    const { amount, currency, address: receiver } = dest;
+
     if (currency !== 'USDC') {
       throw new Error('Only USDC currency is supported; received ' + currency);
     }
@@ -198,9 +210,11 @@ export class MainWalletPaymentMaker implements PaymentMaker {
       await new Promise(resolve => setTimeout(resolve, 30000));
     }
 
-    // For non-bundled EVM transactions, only transactionId is needed
+    // Return payment identifier with all required fields
     return {
-      transactionId: txHash
+      transactionId: txHash,
+      chain: dest.chain,
+      currency: dest.currency
     };
   }
 }
