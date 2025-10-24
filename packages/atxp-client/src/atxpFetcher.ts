@@ -156,6 +156,13 @@ export class ATXPFetcher {
       return false;
     }
 
+    // Validate amounts are not negative
+    for (const dest of mappedDestinations) {
+      if (dest.amount.isLessThan(0)) {
+        throw new Error(`ATXP: payment amount cannot be negative: ${dest.amount.toString()} ${dest.currency}`);
+      }
+    }
+
     // Create prospective payment for approval (using first destination for display)
     const firstDest = mappedDestinations[0];
     const prospectivePayment: ProspectivePayment = {
@@ -174,6 +181,9 @@ export class ATXPFetcher {
     }
 
     // Try each payment maker in order
+    let lastPaymentError: Error | null = null;
+    let paymentAttempted = false;
+
     for (const paymentMaker of this.paymentMakers) {
       try {
         // Pass all destinations to payment maker - it will filter and pick the one it can handle
@@ -183,6 +193,8 @@ export class ATXPFetcher {
           this.logger.debug(`ATXP: payment maker cannot handle these destinations, trying next`);
           continue; // Try next payment maker
         }
+
+        paymentAttempted = true;
 
         // Payment was successful
         this.logger.info(`ATXP: made payment of ${firstDest.amount.toString()} ${firstDest.currency} on ${result.chain}: ${result.transactionId}`);
@@ -216,10 +228,17 @@ export class ATXPFetcher {
         return true;
       } catch (error: unknown) {
         const typedError = error as Error;
+        paymentAttempted = true;
+        lastPaymentError = typedError;
         this.logger.warn(`ATXP: payment maker failed: ${typedError.message}`);
         await this.onPaymentFailure({ payment: prospectivePayment, error: typedError });
         // Continue to next payment maker
       }
+    }
+
+    // If payment was attempted but all failed, rethrow the last error
+    if (paymentAttempted && lastPaymentError) {
+      throw lastPaymentError;
     }
 
     this.logger.info(`ATXP: no payment maker could handle these destinations`);
