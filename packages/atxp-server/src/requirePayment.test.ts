@@ -27,6 +27,7 @@ describe('requirePayment', () => {
           amount: BigNumber(0.01)
         }],
         source: 'test-user',
+        sourceAccountId: 'test-user',
         destinationAccountId: `base:${TH.DESTINATION}`,
         payeeName: config.payeeName,
       });
@@ -152,6 +153,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // charge uses requested amount
             }],
             source: 'test-user',
+            sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
           });
@@ -194,6 +196,7 @@ describe('requirePayment', () => {
             amount: BigNumber(0.01) // charge ALWAYS uses the requested amount, not minimumPayment
           }],
           source: 'test-user',
+          sourceAccountId: 'test-user',
           destinationAccountId: `base:${TH.DESTINATION}`,
           payeeName: config.payeeName,
         });
@@ -224,6 +227,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // charge uses requested amount
             }],
             source: 'test-user',
+            sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
           });
@@ -271,6 +275,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.10) // Uses requested amount
             }],
             source: 'test-user',
+            sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
           });
@@ -316,6 +321,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // Uses requested amount for charge
             }],
             source: 'test-user',
+            sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
           });

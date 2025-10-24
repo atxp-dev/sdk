@@ -24,6 +24,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
 
   // Always use multi-destination format
   const charge = {
+    source: user,
     destinations: [{
       network: destinationNetwork,
       currency: config.currency,
