@@ -1,4 +1,4 @@
-import { FetchLike, Logger } from '@atxp/common';
+import { FetchLike, Logger, Chain } from '@atxp/common';
 import { Source, Destination, PaymentRequestOption, DestinationMaker } from '@atxp/common';
 
 /**
@@ -107,7 +107,7 @@ export class ATXPDestinationMaker implements DestinationMaker {
 
       // Convert the response to a Destination
       const destination: Destination = {
-        chain: data.network as any, // Will be 'base' or other supported chain
+        chain: data.network as Chain, // Will be 'base' or other supported chain
         currency: option.currency,
         address: data.address,
         amount: option.amount

@@ -72,7 +72,7 @@ export class ATXPPaymentServer implements PaymentServer {
       blockNumber?: number;
       timestamp?: number;
     }
-  ): Promise<{valid: boolean; error?: string; details?: any}> => {
+  ): Promise<{valid: boolean; error?: string; details?: Record<string, unknown>}> => {
     // Strip network prefix if present
     const unqualifiedId = accountId.includes(':') ? accountId.split(':')[1] : accountId;
 
@@ -86,7 +86,7 @@ export class ATXPPaymentServer implements PaymentServer {
       valid: boolean;
       error?: string;
       message?: string;
-      details?: any;
+      details?: Record<string, unknown>;
     };
 
     if (response.status === 200) {

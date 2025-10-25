@@ -63,7 +63,7 @@ export type PaymentServer = {
       blockNumber?: number;
       timestamp?: number;
     }
-  ) => Promise<{valid: boolean; error?: string; details?: any}>;
+  ) => Promise<{valid: boolean; error?: string; details?: Record<string, unknown>}>;
 }
 
 export type ATXPConfig = {
