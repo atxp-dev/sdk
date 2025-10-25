@@ -50,6 +50,20 @@ export type ChargeResponse = {
 export type PaymentServer = {
   charge: (args: Charge) => Promise<ChargeResponse>;
   createPaymentRequest: (args: Charge) => Promise<string>;
+  validateTransaction?: (
+    accountId: string,
+    paymentRequestId: string,
+    transaction: {
+      transactionHash: string;
+      fromAddress: string;
+      toAddress: string;
+      amount: string;
+      network: string;
+      tokenAddress?: string;
+      blockNumber?: number;
+      timestamp?: number;
+    }
+  ) => Promise<{valid: boolean; error?: string; details?: any}>;
 }
 
 export type ATXPConfig = {
