@@ -1,5 +1,5 @@
 import { BigNumber } from "bignumber.js";
-import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike, Account, PaymentMaker, AccountId, Chain, DestinationMaker } from "@atxp/common";
+import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike, Account, PaymentMaker, AccountId, DestinationMaker } from "@atxp/common";
 import { ClientOptions } from "@modelcontextprotocol/sdk/client/index.js";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
 
@@ -13,7 +13,6 @@ export type ProspectivePayment = {
   accountId: AccountId;
   resourceUrl: string;
   resourceName: string;
-  chain: Chain;
   currency: Currency;
   amount: BigNumber;
   iss: string;

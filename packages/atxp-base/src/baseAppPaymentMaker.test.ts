@@ -101,10 +101,19 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5); // 1.5 USDC
 
-    const result = await paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment');
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'USDC' as const,
+      address: TEST_RECEIVER_ADDRESS,
+      amount
+    }];
 
-    // Verify the transaction hash
-    expect(result.transactionId).toBe('0xtxhash');
+    const result = await paymentMaker.makePayment(destinations, 'test payment');
+
+    // Verify the transaction hash and chain
+    expect(result).not.toBeNull();
+    expect(result!.transactionId).toBe('0xtxhash');
+    expect(result!.chain).toBe('base');
     
     // Verify sendUserOperation was called with correct parameters
     expect(bundlerClient.sendUserOperation).toHaveBeenCalledWith({
@@ -132,12 +141,19 @@ describe('baseAppPaymentMaker.makePayment', () => {
   it('should throw error for non-USDC currency', async () => {
     const permission = mockSpendPermission();
     const smartWallet = mockEphemeralSmartWallet();
-    
+
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5);
-    
+
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'ETH' as any,
+      address: TEST_RECEIVER_ADDRESS,
+      amount
+    }];
+
     await expect(
-      paymentMaker.makePayment(amount, 'ETH' as any, TEST_RECEIVER_ADDRESS, 'test payment')
+      paymentMaker.makePayment(destinations, 'test payment')
     ).rejects.toThrow('Only usdc currency is supported');
   });
 
@@ -145,12 +161,19 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const permission = mockSpendPermission();
     const bundlerClient = mockFailedBundlerClient({ failureType: 'receipt' });
     const smartWallet = mockEphemeralSmartWallet({ client: bundlerClient });
-    
+
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5);
-    
+
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'USDC' as const,
+      address: TEST_RECEIVER_ADDRESS,
+      amount
+    }];
+
     await expect(
-      paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment')
+      paymentMaker.makePayment(destinations, 'test payment')
     ).rejects.toThrow('User operation failed');
   });
 
@@ -158,12 +181,19 @@ describe('baseAppPaymentMaker.makePayment', () => {
     const permission = mockSpendPermission();
     const bundlerClient = mockFailedBundlerClient({ failureType: 'noTxHash' });
     const smartWallet = mockEphemeralSmartWallet({ client: bundlerClient });
-    
+
     const paymentMaker = new BaseAppPaymentMaker(permission, smartWallet);
     const amount = new BigNumber(1.5);
-    
+
+    const destinations = [{
+      chain: 'base' as const,
+      currency: 'USDC' as const,
+      address: TEST_RECEIVER_ADDRESS,
+      amount
+    }];
+
     await expect(
-      paymentMaker.makePayment(amount, 'USDC', TEST_RECEIVER_ADDRESS, 'test payment')
+      paymentMaker.makePayment(destinations, 'test payment')
     ).rejects.toThrow('User operation was executed but no transaction hash was returned');
   });
 });

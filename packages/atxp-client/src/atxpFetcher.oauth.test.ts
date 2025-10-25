@@ -9,13 +9,14 @@ import { PaymentMaker } from './types.js';
 
 function mockPaymentMakers(solanaPaymentMaker?: PaymentMaker) {
   solanaPaymentMaker = solanaPaymentMaker ?? {
-    makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
-    generateJWT: vi.fn().mockResolvedValue('testJWT')
+    makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId', chain: 'solana' }),
+    generateJWT: vi.fn().mockResolvedValue('testJWT'),
+    getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
   };
-  return new Map([['solana' as any, solanaPaymentMaker]]);
+  return [solanaPaymentMaker];
 }
 
-function atxpFetcher(fetchFn: FetchLike, paymentMakers?: Map<any, PaymentMaker>, db?: OAuthDb) {
+function atxpFetcher(fetchFn: FetchLike, paymentMakers?: PaymentMaker[], db?: OAuthDb) {
   return new ATXPFetcher({
     accountId: "bdj",
     db: db ?? new MemoryOAuthDb(),
@@ -42,10 +43,11 @@ describe('atxpFetcher.fetch oauth', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
-      generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId', chain: 'solana' }),
+      generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params)),
+      getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
     };
-    const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker]]));
+    const fetcher = atxpFetcher(f.fetchHandler, [paymentMaker]);
     await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
 
     // Ensure we call the authorize endpoint
@@ -78,10 +80,11 @@ describe('atxpFetcher.fetch oauth', () => {
       });
 
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' }),
-      generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params))
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId', chain: 'solana' }),
+      generateJWT: (params: {paymentIds?: string[], codeChallenge?: string}) => Promise.resolve(JSON.stringify(params)),
+      getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
     };
-    const fetcher = atxpFetcher(f.fetchHandler, new Map([['solana' as any, paymentMaker], ['ethereum' as any, paymentMaker]]));
+    const fetcher = atxpFetcher(f.fetchHandler, [paymentMaker, paymentMaker]); // Two payment makers to trigger error
     let threw = false;
     try{
       await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
@@ -188,11 +191,12 @@ describe('atxpFetcher.fetch oauth', () => {
 
     // Mock a payment maker that doesn't have generateJWT method
     const brokenPaymentMaker = {
-      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId' })
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId', chain: 'base' }),
+      getSourceAddress: vi.fn().mockReturnValue('0xAddress123')
       // Missing generateJWT method
     } as unknown as PaymentMaker;
 
-    const fetcher = atxpFetcher(f.fetchHandler, new Map([['broken' as any, brokenPaymentMaker]]));
-    await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow('Payment maker is missing generateJWT method. Available payment makers: [broken]. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.');
+    const fetcher = atxpFetcher(f.fetchHandler, [brokenPaymentMaker]);
+    await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow('Payment maker is missing generateJWT method');
   });
 });

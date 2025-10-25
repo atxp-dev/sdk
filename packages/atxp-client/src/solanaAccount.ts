@@ -6,7 +6,7 @@ import bs58 from "bs58";
 
 export class SolanaAccount implements Account {
   accountId: AccountId;
-  paymentMakers: { [key: string]: PaymentMaker };
+  paymentMakers: PaymentMaker[];
 
   constructor(solanaEndpoint: string, sourceSecretKey: string) {
     if (!solanaEndpoint) {
@@ -19,8 +19,8 @@ export class SolanaAccount implements Account {
 
     // Format accountId as network:address
     this.accountId = `solana:${source.publicKey.toBase58()}` as AccountId;
-    this.paymentMakers = {
-      'solana': new SolanaPaymentMaker(solanaEndpoint, sourceSecretKey),
-    }
+    this.paymentMakers = [
+      new SolanaPaymentMaker(solanaEndpoint, sourceSecretKey)
+    ];
   }
 }

@@ -1,5 +1,5 @@
 import type { Account, PaymentMaker } from './types.js';
-import type { FetchLike, Currency, AccountId, PaymentIdentifiers } from '@atxp/common'
+import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain } from '@atxp/common'
 import { crypto } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { LocalAccount } from 'viem';
@@ -61,8 +61,8 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
     return json.sourceAddress;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string, paymentRequestId?: string): Promise<PaymentIdentifiers> {
-    // Make a regular payment via the /pay endpoint
+  async makePayment(destinations: Destination[], memo: string, paymentRequestId?: string): Promise<PaymentIdentifier | null> {
+    // Make a payment via the /pay endpoint with multiple destinations
     const response = await this.fetchFn(`${this.origin}/pay`, {
       method: 'POST',
       headers: {
@@ -70,9 +70,12 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: amount.toString(),
-        currency,
-        receiver,
+        destinations: destinations.map(d => ({
+          chain: d.chain,
+          address: d.address,
+          amount: d.amount.toString(),
+          currency: d.currency
+        })),
         memo,
         ...(paymentRequestId && { paymentRequestId })
       }),
@@ -83,15 +86,30 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
       throw new Error(`ATXPAccount: /pay failed: ${response.status} ${response.statusText} ${text}`);
     }
 
-    const json = await response.json() as { txHash?: string; transactionSubId?: string };
-    if (!json?.txHash) {
-      throw new Error('ATXPAccount: /pay did not return txHash');
+    const json = await response.json() as {
+      transactionId?: string;
+      txHash?: string; // Backwards compatibility
+      transactionSubId?: string;
+      chain?: string;
+      currency?: string;
+    };
+
+    const transactionId = json.transactionId;
+    if (!transactionId) {
+      throw new Error('ATXPAccount: /pay did not return transactionId or txHash');
     }
-    // Return txHash as transactionId (for backwards compatibility)
-    // and optionally include transactionSubId if the server provides it
+    if (!json?.chain) {
+      throw new Error('ATXPAccount: /pay did not return chain');
+    }
+    if (!json?.currency) {
+      throw new Error('ATXPAccount: /pay did not return currency');
+    }
+
     return {
-      transactionId: json.txHash,
-      ...(json.transactionSubId ? { transactionSubId: json.transactionSubId } : {})
+      transactionId,
+      ...(json.transactionSubId ? { transactionSubId: json.transactionSubId } : {}),
+      chain: json.chain as Chain,
+      currency: json.currency as Currency
     };
   }
 
@@ -122,7 +140,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 
 export class ATXPAccount implements Account {
   accountId: AccountId;
-  paymentMakers: { [key: string]: PaymentMaker };
+  paymentMakers: PaymentMaker[];
   origin: string;
   token: string;
   fetchFn: FetchLike;
@@ -143,9 +161,9 @@ export class ATXPAccount implements Account {
     } else {
       this.accountId = `atxp:atxp_${crypto.randomUUID()}` as AccountId;
     }
-    this.paymentMakers = {
-      'base': new ATXPHttpPaymentMaker(origin, token, fetchFn),
-    };
+    this.paymentMakers = [
+      new ATXPHttpPaymentMaker(origin, token, fetchFn)
+    ];
   }
 
 

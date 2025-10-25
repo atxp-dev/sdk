@@ -70,7 +70,7 @@ describe('WorldchainAccount - Main Wallet Mode', () => {
       expect(account).toBeDefined();
       expect(account.accountId).toBe(`world:${TEST_WALLET_ADDRESS}`); // Uses main wallet address as account ID (qualified with network)
       expect(account.paymentMakers).toBeDefined();
-      expect(account.paymentMakers.world).toBeDefined();
+      expect(account.paymentMakers[0]).toBeDefined();
 
       // Verify wallet_connect was attempted
       expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
@@ -101,7 +101,7 @@ describe('WorldchainAccount - Main Wallet Mode', () => {
       // Verify account was created with correct payment maker
       expect(account).toBeDefined();
       expect(account.accountId).toBe(`world:${TEST_WALLET_ADDRESS}`);
-      expect(account.paymentMakers.world).toBeDefined();
+      expect(account.paymentMakers[0]).toBeDefined();
     });
 
     it('should handle wallet_connect failure gracefully in main wallet mode', async () => {
@@ -144,7 +144,7 @@ describe('WorldchainAccount - Main Wallet Mode', () => {
       });
 
       // Get the payment maker
-      const paymentMaker = account.paymentMakers.world;
+      const paymentMaker = account.paymentMakers[0];
       expect(paymentMaker).toBeDefined();
 
       // Verify it's the MainWalletPaymentMaker (not the WorldchainPaymentMaker)

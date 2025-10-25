@@ -1,5 +1,5 @@
 import { ProspectivePayment, type FetchWrapper, type ClientArgs, ATXPAccount } from '@atxp/client';
-import { FetchLike, Chain } from '@atxp/common';
+import { FetchLike } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
 import { LocalAccount } from 'viem';
@@ -106,7 +106,6 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         accountId: account.accountId,
         resourceUrl: url,
         resourceName: selectedPaymentRequirements.description || url,
-        chain: selectedPaymentRequirements.network as Chain,
         currency: 'USDC',
         amount: new BigNumber(amountInUsdc),
         iss: selectedPaymentRequirements.payTo
@@ -245,7 +244,6 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
             accountId: account.accountId,
             resourceUrl: url,
             resourceName: firstOption.description || url,
-            chain: (firstOption.network || 'base') as Chain,
             currency: 'USDC',
             amount: new BigNumber(amount),
             iss: firstOption.payTo || ''

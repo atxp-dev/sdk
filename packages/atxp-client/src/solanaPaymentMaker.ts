@@ -5,7 +5,7 @@ import { createTransfer, ValidateTransferError as _ValidateTransferError } from 
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import bs58 from "bs58";
 import BigNumber from "bignumber.js";
-import { generateJWT, Currency, AccountId, PaymentIdentifiers } from '@atxp/common';
+import { generateJWT, Currency, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import { importJWK } from 'jose';
 import { Logger } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
@@ -53,7 +53,21 @@ export class SolanaPaymentMaker implements PaymentMaker {
     return generateJWT(this.source.publicKey.toBase58(), privateKey, paymentRequestId || '', codeChallenge || '', accountId as AccountId | undefined);
   }
 
-  makePayment = async (amount: BigNumber, currency: Currency, receiver: string, memo: string, _paymentRequestId?: string): Promise<PaymentIdentifiers> => {
+  makePayment = async (destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> => {
+    // Filter to solana chain destinations
+    const solanaDestinations = destinations.filter(d => d.chain === 'solana');
+
+    if (solanaDestinations.length === 0) {
+      this.logger.debug('SolanaPaymentMaker: No solana destinations found, cannot handle payment');
+      return null; // Cannot handle these destinations
+    }
+
+    // Pick first solana destination
+    const dest = solanaDestinations[0];
+    const amount = dest.amount;
+    const currency = dest.currency;
+    const receiver = dest.address;
+
     if (currency.toUpperCase() !== 'USDC') {
       throw new PaymentNetworkError('Only USDC currency is supported; received ' + currency);
     }
@@ -113,11 +127,12 @@ export class SolanaPaymentMaker implements PaymentMaker {
         [this.source],
       );
 
-      // Return transaction signature as transactionId (for backwards compatibility with main branch)
-      // and token account address as transactionSubId (identifies the specific transfer within the transaction)
+      // Return transaction signature as transactionId and token account address as transactionSubId
       return {
         transactionId: transactionSignature,
-        transactionSubId: destinationTokenAccount.toBase58()
+        transactionSubId: destinationTokenAccount.toBase58(),
+        chain: 'solana',
+        currency: 'USDC'
       };
     } catch (error) {
       if (error instanceof InsufficientFundsError || error instanceof PaymentNetworkError) {

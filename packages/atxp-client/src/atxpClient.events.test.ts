@@ -29,7 +29,7 @@ describe('atxpClient events', () => {
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -68,7 +68,7 @@ describe('atxpClient events', () => {
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     
     // The client initialization or callTool will throw an error due to OAuth failure
@@ -106,12 +106,12 @@ describe('atxpClient events', () => {
 
     const onPayment = vi.fn();
     const paymentMaker = {
-      makePayment: vi.fn().mockResolvedValue({ transactionId: 'test-payment-result-id' }),
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'test-payment-result-id', chain: 'solana', currency: 'USDC' }),
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -127,8 +127,7 @@ describe('atxpClient events', () => {
       payment: expect.objectContaining({
         accountId: account.accountId,
         amount: BigNumber(0.01),
-        currency: 'USDC',
-        chain: 'solana'
+        currency: 'USDC'
       })
     });
   });
@@ -155,7 +154,7 @@ describe('atxpClient events', () => {
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: {solana: paymentMaker}
+      paymentMakers: [paymentMaker]
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -174,8 +173,7 @@ describe('atxpClient events', () => {
       payment: expect.objectContaining({
         accountId: account.accountId,
         amount: new BigNumber(0.01),
-        currency: expect.any(String),
-        chain: expect.any(String)
+        currency: expect.any(String)
       }),
       error: expect.any(Error)
     });

@@ -41,7 +41,7 @@ describe('Default Payment Failure Handler', () => {
     const fetcher = new ATXPFetcher({
       accountId: 'test-account',
       db: {} as any,
-      paymentMakers: new Map(),
+      paymentMakers: [],
       destinationMakers: new Map(),
       logger: mockLogger,
     });
@@ -54,7 +54,6 @@ describe('Default Payment Failure Handler', () => {
     accountId: 'test-account-123',
     resourceUrl: 'https://example.com/resource',
     resourceName: 'test-resource',
-    chain: 'solana',
     currency: 'USDC',
     amount: new BigNumber('10'),
     iss: 'test-issuer',
@@ -64,7 +63,6 @@ describe('Default Payment Failure Handler', () => {
   describe('InsufficientFundsError handling', () => {
     it('should log comprehensive insufficient funds information', async () => {
       const payment = createTestPayment({
-        chain: 'solana',
         currency: 'USDC',
         amount: new BigNumber('25.5'),
         accountId: 'user-wallet-123',
@@ -88,7 +86,6 @@ describe('Default Payment Failure Handler', () => {
 
     it('should handle insufficient funds error without available balance', async () => {
       const payment = createTestPayment({
-        chain: 'base',
         currency: 'USDC',
         amount: new BigNumber('100'),
         accountId: 'enterprise-account',
@@ -107,14 +104,13 @@ describe('Default Payment Failure Handler', () => {
       expect(mockLogger.info).toHaveBeenCalledWith('PAYMENT FAILED: Insufficient USDC funds on base');
       expect(mockLogger.info).toHaveBeenCalledWith('Required: 100 USDC');
       expect(mockLogger.info).toHaveBeenCalledWith('Account: enterprise-account');
-      
+
       // Should not log available balance
       expect(mockLogger.info).not.toHaveBeenCalledWith(expect.stringContaining('Available:'));
     });
 
     it('should handle different currencies and amounts', async () => {
       const payment = createTestPayment({
-        chain: 'ethereum' as any,
         currency: 'ETH' as any,
         amount: new BigNumber('2.5'),
         accountId: 'trader-123',
@@ -151,7 +147,6 @@ describe('Default Payment Failure Handler', () => {
   describe('PaymentNetworkError handling', () => {
     it('should log network error with payment details', async () => {
       const payment = createTestPayment({
-        chain: 'base',
         currency: 'USDC',
         accountId: 'mobile-user-456',
       });
@@ -161,21 +156,19 @@ describe('Default Payment Failure Handler', () => {
       await defaultHandler({ payment, error });
 
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('PAYMENT FAILED: Network error on base')
+        expect.stringContaining('PAYMENT FAILED: Network error')
       );
     });
 
     it('should handle network error with different networks', async () => {
-      const payment = createTestPayment({
-        chain: 'polygon' as any,
-      });
+      const payment = createTestPayment();
 
       const error = new PaymentNetworkError('Transaction reverted');
 
       await defaultHandler({ payment, error });
 
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('PAYMENT FAILED: Network error on polygon')
+        expect.stringContaining('PAYMENT FAILED: Network error')
       );
     });
 
@@ -241,12 +234,12 @@ describe('Default Payment Failure Handler', () => {
 
     it('should format messages for text-only logs', async () => {
       const payment = createTestPayment();
-      const error = new InsufficientFundsError('USDC', new BigNumber('100'), new BigNumber('50'));
+      const error = new InsufficientFundsError('USDC', new BigNumber('100'), new BigNumber('50'), 'solana');
 
       await defaultHandler({ payment, error });
 
       const logCalls = mockLogger.info.mock.calls.map((call: any[]) => call[0]);
-      
+
       expect(logCalls).toEqual([
         'PAYMENT FAILED: Insufficient USDC funds on solana',
         'Required: 100 USDC',
@@ -258,7 +251,6 @@ describe('Default Payment Failure Handler', () => {
     it('should be parseable by log aggregation tools', async () => {
       const payment = createTestPayment({
         accountId: 'user-123',
-        chain: 'base',
       });
       const error = new PaymentNetworkError('Connection timeout');
 
@@ -266,7 +258,7 @@ describe('Default Payment Failure Handler', () => {
 
       // Verify messages follow structured format
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'PAYMENT FAILED: Network error on base: Payment failed due to network error: Connection timeout'
+        'PAYMENT FAILED: Network error: Payment failed due to network error: Connection timeout'
       );
     });
   });

@@ -55,7 +55,7 @@ export {
   type TokenData,
   type FetchLike,
   type RequirePaymentConfig,
-  type PaymentIdentifiers,
+  type PaymentIdentifier,
   type PaymentMaker,
   type DestinationMaker,
   type Account,

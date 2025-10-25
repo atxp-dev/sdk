@@ -1,6 +1,6 @@
 import { getBaseUSDCAddress } from '@atxp/client';
 import { base } from 'viem/chains';
-import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifiers } from '@atxp/common';
+import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';
 import { SpendPermission } from './types.js';
 import { type EphemeralSmartWallet } from './smartWalletHelpers.js';
@@ -119,7 +119,21 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     return jwtToken;
   }
 
-  async makePayment(amount: BigNumber, currency: Currency, receiver: string, memo: string): Promise<PaymentIdentifiers> {
+  async makePayment(destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> {
+    // Filter to base chain destinations
+    const baseDestinations = destinations.filter(d => d.chain === 'base');
+
+    if (baseDestinations.length === 0) {
+      this.logger.debug('BaseAppPaymentMaker: No base destinations found, cannot handle payment');
+      return null; // Cannot handle these destinations
+    }
+
+    // Pick first base destination
+    const dest = baseDestinations[0];
+    const amount = dest.amount;
+    const currency = dest.currency;
+    const receiver = dest.address;
+
     if (currency !== 'USDC') {
       throw new Error('Only usdc currency is supported; received ' + currency);
     }
@@ -189,16 +203,13 @@ export class BaseAppPaymentMaker implements PaymentMaker {
     // This helps avoid the "Transaction receipt could not be found" error
     await waitForTransactionConfirmations(this.smartWallet, txHash, 2, this.logger);
 
-    // For bundled EVM transactions (ERC-4337), transactionId is the on-chain txHash (for backwards compatibility)
-    // and transactionSubId is the userOpHash (identifies the specific user operation within the bundle)
+    // Return payment result with chain and currency
     return {
       transactionId: txHash,
-      transactionSubId: receipt.userOpHash
+      transactionSubId: receipt.userOpHash,
+      chain: 'base',
+      currency: 'USDC'
     };
   }
 
-  /**
-   * Dynamically import the appropriate spend-permission module based on environment.
-   * Uses browser or node version as appropriate since prepareSpendCallData exists in both.
-   */
 }

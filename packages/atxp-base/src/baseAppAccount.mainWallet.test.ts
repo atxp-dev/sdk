@@ -63,9 +63,10 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
       // Should have main wallet address as account ID (qualified with network)
       expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
-      
-      // Should have main wallet payment maker
-      expect(account.paymentMakers.base).toBeInstanceOf(MainWalletPaymentMaker);
+
+      // Should have main wallet payment maker (first in array)
+      expect(account.paymentMakers).toHaveLength(1);
+      expect(account.paymentMakers[0]).toBeInstanceOf(MainWalletPaymentMaker);
       
       // Should still connect wallet
       expect(provider.request).toHaveBeenCalledWith({ method: 'wallet_connect' });
@@ -105,7 +106,8 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       });
 
       expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
-      expect(account.paymentMakers.base).toBeInstanceOf(MainWalletPaymentMaker);
+      expect(account.paymentMakers).toHaveLength(1);
+      expect(account.paymentMakers[0]).toBeInstanceOf(MainWalletPaymentMaker);
     });
 
     it('should pass the provider to MainWalletPaymentMaker', async () => {
@@ -124,7 +126,8 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       });
 
       // Get the payment maker and verify it has the right properties
-      const paymentMaker = account.paymentMakers.base as MainWalletPaymentMaker;
+      expect(account.paymentMakers).toHaveLength(1);
+      const paymentMaker = account.paymentMakers[0] as MainWalletPaymentMaker;
       expect(paymentMaker).toBeInstanceOf(MainWalletPaymentMaker);
       
       // Test that the payment maker can use the provider
@@ -175,7 +178,8 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
 
       // Should be in ephemeral wallet mode with smart wallet address as accountId
       expect(account).toBeDefined();
-      expect(account.paymentMakers.base).toBeDefined();
+      expect(account.paymentMakers).toHaveLength(1);
+      expect(account.paymentMakers[0]).toBeDefined();
       // In ephemeral mode, we expect the account ID to be different from wallet address
       expect(account.accountId).not.toBe(TEST_WALLET_ADDRESS);
     });
@@ -214,18 +218,22 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         cache,
       });
 
-      const paymentMaker = account.paymentMakers['base'];
+      expect(account.paymentMakers).toHaveLength(1);
+      const paymentMaker = account.paymentMakers[0];
       expect(paymentMaker).toBeDefined();
 
       // Make a payment
-      const result = await paymentMaker.makePayment(
-        new BigNumber(1.5),
-        'USDC',
-        '0x1234567890123456789012345678901234567890',
-        'Test payment'
-      );
+      const destinations = [{
+        chain: 'base' as const,
+        currency: 'USDC' as const,
+        address: '0x1234567890123456789012345678901234567890',
+        amount: new BigNumber(1.5)
+      }];
 
-      expect(result.transactionId).toBe('0xtxhash');
+      const result = await paymentMaker.makePayment(destinations, 'Test payment');
+
+      expect(result).not.toBeNull();
+      expect(result!.transactionId).toBe('0xtxhash');
       
       // Verify eth_sendTransaction was called (it's the 2nd call after wallet_connect)
       expect(provider.request).toHaveBeenCalledWith({
@@ -254,7 +262,8 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         cache,
       });
 
-      const paymentMaker = account.paymentMakers['base'];
+      expect(account.paymentMakers).toHaveLength(1);
+      const paymentMaker = account.paymentMakers[0];
       const jwt = await paymentMaker.generateJWT({
         paymentRequestId: 'test-payment-id',
         codeChallenge: 'test-challenge'
