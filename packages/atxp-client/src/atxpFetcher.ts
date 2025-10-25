@@ -148,7 +148,7 @@ export class ATXPFetcher {
         this.logger.debug(`ATXP: destination maker for network '${option.network}' not available, trying next destination`);
         continue;
       }
-      mappedDestinations.push(...(await destinationMaker.makeDestinations(option, this.logger)));
+      mappedDestinations.push(...(await destinationMaker.makeDestinations(option, this.logger, paymentRequestId)));
     }
 
     if (mappedDestinations.length === 0) {

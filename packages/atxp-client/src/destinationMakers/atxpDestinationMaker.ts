@@ -15,7 +15,7 @@ export class ATXPDestinationMaker implements DestinationMaker {
     this.fetchFn = fetchFn;
   }
 
-  async makeDestinations(option: PaymentRequestOption, logger: Logger): Promise<Destination[]> {
+  async makeDestinations(option: PaymentRequestOption, logger: Logger, paymentRequestId?: string): Promise<Destination[]> {
     const mappedDestinations: Destination[] = [];
 
     if (option.network !== 'atxp') {
@@ -25,6 +25,19 @@ export class ATXPDestinationMaker implements DestinationMaker {
     try {
       // The address field contains the account ID (e.g., atxp_acct_xxx) for atxp options
       const accountId = option.address;
+
+      // If we have a paymentRequestId, use the new destination endpoint
+      // This will create Stripe payment intents for Base network when available
+      if (paymentRequestId) {
+        const destination = await this.getDestination(accountId, paymentRequestId, option, logger);
+        if (destination) {
+          mappedDestinations.push(destination);
+          logger.debug(`ATXPDestinationMaker: Got destination from /destination endpoint for account ${accountId}`);
+          return mappedDestinations;
+        }
+      }
+
+      // Fallback to sources endpoint if no paymentRequestId or destination endpoint fails
       const sources = await this.getAccountSources(accountId, logger);
 
       // Create new destinations for each blockchain address
@@ -50,6 +63,62 @@ export class ATXPDestinationMaker implements DestinationMaker {
     }
 
     return mappedDestinations;
+  }
+
+  private async getDestination(accountId: string, paymentRequestId: string, option: PaymentRequestOption, logger?: Logger): Promise<Destination | null> {
+    // Strip any network prefix if present
+    const unqualifiedId = accountId.includes(':') ? accountId.split(':')[1] : accountId;
+
+    const url = `${this.accountsServiceUrl}/account/${unqualifiedId}/destination/${paymentRequestId}`;
+    logger?.debug(`ATXPDestinationMaker: Fetching destination from ${url}`);
+
+    try {
+      // Determine the network to request based on the chain
+      // For ATXP network, we typically want to use 'base' as the underlying network
+      const requestBody = {
+        network: 'base', // Default to Base network for ATXP destinations
+        currency: option.currency.toString(),
+        amount: option.amount.toString()
+      };
+
+      const response = await this.fetchFn(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        logger?.warn(`ATXPDestinationMaker: Failed to fetch destination: ${response.status} ${response.statusText} - ${text}`);
+        return null;
+      }
+
+      const data = await response.json() as {
+        network: string;
+        address: string;
+        currency: string;
+        paymentMethod: string;
+        paymentRequestId: string;
+        paymentIntentId?: string;
+      };
+
+      // Convert the response to a Destination
+      const destination: Destination = {
+        chain: data.network as any, // Will be 'base' or other supported chain
+        currency: option.currency,
+        address: data.address,
+        amount: option.amount
+      };
+
+      logger?.debug(`ATXPDestinationMaker: Got ${data.paymentMethod} destination for ${data.network}`);
+      return destination;
+    } catch (error) {
+      logger?.error(`ATXPDestinationMaker: Error fetching destination: ${error}`);
+      return null;
+    }
   }
 
   private async getAccountSources(accountId: string, logger?: Logger): Promise<Source[]> {
