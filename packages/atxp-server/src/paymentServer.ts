@@ -42,62 +42,12 @@ export class ATXPPaymentServer implements PaymentServer {
     if (response.status !== 200) {
       this.logger.warn(`POST /payment-request responded with unexpected HTTP status ${response.status}`);
       this.logger.debug(`Response body: ${JSON.stringify(json)}`);
-      throw new Error(`POST /payment-request responded with unexpected HTTP status ${response.status}`);
+      throw new Error(`POST /payment-request responded with unexpected HTTP status ${response.status}`); 
     }
     if(!json.id) {
       throw new Error(`POST /payment-request response did not contain an id`);
     }
-    return json.id;
-  }
-
-  /**
-   * Validates a transaction against a payment request
-   * This is used to verify that a blockchain transaction satisfies a payment intent
-   *
-   * @param accountId - The account ID that created the payment request
-   * @param paymentRequestId - The payment request ID to validate against
-   * @param transaction - The transaction details to validate
-   * @returns Promise<boolean> - True if the transaction is valid
-   */
-  validateTransaction = async(
-    accountId: string,
-    paymentRequestId: string,
-    transaction: {
-      transactionHash: string;
-      fromAddress: string;
-      toAddress: string;
-      amount: string;
-      network: string;
-      tokenAddress?: string;
-      blockNumber?: number;
-      timestamp?: number;
-    }
-  ): Promise<{valid: boolean; error?: string; details?: any}> => {
-    // Strip network prefix if present
-    const unqualifiedId = accountId.includes(':') ? accountId.split(':')[1] : accountId;
-
-    const response = await this.makeRequest(
-      'POST',
-      `/account/${unqualifiedId}/destination/${paymentRequestId}/validate`,
-      transaction
-    );
-
-    const json = await response.json() as {
-      valid: boolean;
-      error?: string;
-      message?: string;
-      details?: any;
-    };
-
-    if (response.status === 200) {
-      return {valid: true, details: json.details};
-    } else if (response.status === 400) {
-      return {valid: false, error: json.error || json.message, details: json.details};
-    } else {
-      this.logger.warn(`Unexpected status ${response.status} from validation endpoint`);
-      this.logger.debug(`Response body: ${JSON.stringify(json)}`);
-      throw new Error(`Validation request failed with status ${response.status}`);
-    }
+    return json.id; 
   }
 
   /**

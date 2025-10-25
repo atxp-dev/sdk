@@ -7,7 +7,7 @@ export class PassthroughDestinationMaker implements DestinationMaker {
     this.network = network;
   }
 
-  async makeDestinations(option: PaymentRequestOption, _logger: Logger, _paymentRequestId?: string): Promise<Destination[]> {
+  async makeDestinations(option: PaymentRequestOption, _logger: Logger): Promise<Destination[]> {
     if (option.network !== this.network) {
       return [];
     }
