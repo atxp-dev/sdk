@@ -15,7 +15,7 @@ export class ATXPDestinationMaker implements DestinationMaker {
     this.fetchFn = fetchFn;
   }
 
-  async makeDestinations(option: PaymentRequestOption, logger: Logger, paymentRequestId?: string): Promise<Destination[]> {
+  async makeDestinations(option: PaymentRequestOption, logger: Logger, paymentRequestId: string): Promise<Destination[]> {
     const mappedDestinations: Destination[] = [];
 
     if (option.network !== 'atxp') {
