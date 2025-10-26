@@ -21,7 +21,7 @@ describe('wrapWithX402', () => {
 
   beforeEach(() => {
     // Create a mock ATXPAccount instance using the proper connection string format
-    mockAccount = new ATXPAccount('https://test.com?connection_token=test-token');
+    mockAccount = new ATXPAccount('https://test.com?connection_token=test-token&account_id=atxp:test-account');
 
     // Override the fetchFn to mock the ensure-currency call
     mockAccount.fetchFn = vi.fn().mockResolvedValue(
