@@ -1,4 +1,5 @@
-import type { Account, PaymentMaker, AccountId } from '@atxp/common';
+import type { Account, PaymentMaker, AccountId, Source } from '@atxp/common';
+import { WalletTypeEnum, ChainEnum } from '@atxp/common';
 import {
   getWorldChainUSDCAddress,
   WORLD_CHAIN_MAINNET
@@ -19,6 +20,9 @@ const DEFAULT_PERIOD_IN_DAYS = 7;
 export class WorldchainAccount implements Account {
   accountId: AccountId;
   paymentMakers: PaymentMaker[];
+  private mainWalletAddress?: string;
+  private ephemeralSmartWallet?: EphemeralSmartWallet;
+  private chainId: number;
 
   private static toCacheKey(userWalletAddress: string): string {
     return `atxp-world-permission-${userWalletAddress}`;
@@ -148,6 +152,7 @@ export class WorldchainAccount implements Account {
     chainId: number = WORLD_CHAIN_MAINNET.id,
     customRpcUrl?: string
   ) {
+    this.chainId = chainId;
     if (ephemeralSmartWallet) {
       // Ephemeral wallet mode
       if (!spendPermission) {
@@ -155,6 +160,7 @@ export class WorldchainAccount implements Account {
       }
       // Format accountId as network:address
       this.accountId = `world:${ephemeralSmartWallet.address}` as AccountId;
+      this.ephemeralSmartWallet = ephemeralSmartWallet;
       this.paymentMakers = [
         new WorldchainPaymentMaker(spendPermission, ephemeralSmartWallet, {
           logger,
@@ -169,10 +175,27 @@ export class WorldchainAccount implements Account {
       }
       // Format accountId as network:address
       this.accountId = `world:${mainWalletAddress}` as AccountId;
+      this.mainWalletAddress = mainWalletAddress;
       this.paymentMakers = [
         new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId, customRpcUrl)
       ];
     }
+  }
+
+  async getSources(): Promise<Source[]> {
+    const address = this.ephemeralSmartWallet?.address || this.mainWalletAddress;
+    if (!address) {
+      return [];
+    }
+
+    // Determine chain based on chainId
+    const chain = this.chainId === 11155420 ? ChainEnum.WorldSepolia : ChainEnum.World;
+
+    return [{
+      address,
+      chain,
+      walletType: this.ephemeralSmartWallet ? WalletTypeEnum.Smart : WalletTypeEnum.EOA
+    }];
   }
 
   static clearAllCachedData(userWalletAddress: string, cache?: ICache<string>): void {

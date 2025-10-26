@@ -29,7 +29,7 @@ export class SolanaAccount implements Account {
   /**
    * Get sources for this account
    */
-  getSources(): Source[] {
+  async getSources(): Promise<Source[]> {
     return [{
       address: this.sourcePublicKey,
       chain: 'solana',

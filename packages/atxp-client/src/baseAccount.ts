@@ -45,7 +45,7 @@ export class BaseAccount implements Account {
   /**
    * Get sources for this account
    */
-  getSources(): Source[] {
+  async getSources(): Promise<Source[]> {
     return [{
       address: this.account.address,
       chain: 'base',
