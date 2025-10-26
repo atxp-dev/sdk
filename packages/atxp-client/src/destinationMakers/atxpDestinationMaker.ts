@@ -1,4 +1,4 @@
-import { FetchLike, Logger, Chain } from '@atxp/common';
+import { FetchLike, Logger, Chain, Source } from '@atxp/common';
 import { Destination, PaymentRequestOption, DestinationMaker } from '@atxp/common';
 
 /**
@@ -15,7 +15,7 @@ export class ATXPDestinationMaker implements DestinationMaker {
     this.fetchFn = fetchFn;
   }
 
-  async makeDestinations(option: PaymentRequestOption, logger: Logger, paymentRequestId: string): Promise<Destination[]> {
+  async makeDestinations(option: PaymentRequestOption, logger: Logger, paymentRequestId: string, sources: Source[]): Promise<Destination[]> {
     if (option.network !== 'atxp') {
       return [];
     }
@@ -25,7 +25,7 @@ export class ATXPDestinationMaker implements DestinationMaker {
       const accountId = option.address;
 
       // Always use the destinations endpoint
-      const destinations = await this.getDestinations(accountId, paymentRequestId, option, logger);
+      const destinations = await this.getDestinations(accountId, paymentRequestId, option, sources, logger);
 
       if (destinations.length === 0) {
         logger.warn(`ATXPDestinationMaker: No destinations found for account ${accountId}`);
@@ -40,7 +40,7 @@ export class ATXPDestinationMaker implements DestinationMaker {
     }
   }
 
-  private async getDestinations(accountId: string, paymentRequestId: string, option: PaymentRequestOption, logger?: Logger): Promise<Destination[]> {
+  private async getDestinations(accountId: string, paymentRequestId: string, option: PaymentRequestOption, sources: Source[], logger?: Logger): Promise<Destination[]> {
     // Strip any network prefix if present
     const unqualifiedId = accountId.includes(':') ? accountId.split(':')[1] : accountId;
 
@@ -51,11 +51,12 @@ export class ATXPDestinationMaker implements DestinationMaker {
       const requestBody = {
         paymentRequestId,
         options: [{
-          network: option.network,
+          network: option.network, 
           currency: option.currency.toString(),
           address: option.address,
           amount: option.amount.toString()
-        }]
+        }],
+        sources: sources
       };
 
       const response = await this.fetchFn(url, {

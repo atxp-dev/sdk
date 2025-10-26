@@ -1,4 +1,4 @@
-import { MemoryOAuthDb } from '@atxp/common';
+import { MemoryOAuthDb, Account } from '@atxp/common';
 import { describe, it, expect, vi } from 'vitest';
 import fetchMock from 'fetch-mock';
 import { mockResourceServer, mockAuthorizationServer } from './clientTestHelpers.js';
@@ -29,10 +29,19 @@ function atxpFetcher(
   const destinationMakers = new Map();
   destinationMakers.set('solana', new PassthroughDestinationMaker('solana'));
 
-  return new ATXPFetcher({
-    accountId: "bdj",
-    db: db ?? new MemoryOAuthDb(),
+  const account: Account = {
+    accountId: "bdj" as any,
     paymentMakers: paymentMakers ?? mockPaymentMakers(),
+    getSources: () => [{
+      address: 'SolAddress123',
+      chain: 'solana' as any,
+      walletType: 'eoa' as any
+    }]
+  };
+
+  return new ATXPFetcher({
+    account,
+    db: db ?? new MemoryOAuthDb(),
     destinationMakers,
     fetchFn,
     allowedAuthorizationServers,

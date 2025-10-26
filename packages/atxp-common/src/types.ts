@@ -162,12 +162,13 @@ export interface PaymentMaker {
 }
 
 export interface DestinationMaker {
-  makeDestinations: (option: PaymentRequestOption, logger: Logger, paymentRequestId: string) => Promise<Destination[]>;
+  makeDestinations: (option: PaymentRequestOption, logger: Logger, paymentRequestId: string, sources: Source[]) => Promise<Destination[]>;
 }
 
 export type Account = {
   accountId: AccountId;
   paymentMakers: PaymentMaker[];
+  getSources: () => Promise<Source[]>;
 }
 
 /**

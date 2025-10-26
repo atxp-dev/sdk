@@ -1,5 +1,5 @@
 import type { Account, PaymentMaker } from './types.js';
-import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain } from '@atxp/common'
+import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain, Source } from '@atxp/common'
 import { crypto } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 import { LocalAccount } from 'viem';
@@ -11,13 +11,16 @@ function toBasicAuth(token: string): string {
   return `Basic ${b64}`;
 }
 
-function parseConnectionString(connectionString: string): { origin: string; token: string; accountId: string | null } {
+function parseConnectionString(connectionString: string): { origin: string; token: string; accountId: string } {
   const url = new URL(connectionString);
   const origin = url.origin;
   const token = url.searchParams.get('connection_token') || '';
   const accountId = url.searchParams.get('account_id');
   if (!token) {
     throw new Error('ATXPAccount: connection string missing connection token');
+  }
+  if (!accountId) {
+    throw new Error('ATXPAccount: connection string missing account id');
   }
   return { origin, token, accountId };
 }
@@ -144,6 +147,7 @@ export class ATXPAccount implements Account {
   origin: string;
   token: string;
   fetchFn: FetchLike;
+  private unqualifiedAccountId: string;
 
   constructor(connectionString: string, opts?: { fetchFn?: FetchLike; }) {
     const { origin, token, accountId } = parseConnectionString(connectionString);
@@ -156,11 +160,8 @@ export class ATXPAccount implements Account {
 
     // Format accountId as network:address
     // Connection string provides just the atxp_acct_xxx part (no prefix for UI)
-    if (accountId) {
-      this.accountId = `atxp:${accountId}` as AccountId;
-    } else {
-      this.accountId = `atxp:atxp_${crypto.randomUUID()}` as AccountId;
-    }
+    this.unqualifiedAccountId = accountId;
+    this.accountId = `atxp:${accountId}` as AccountId;
     this.paymentMakers = [
       new ATXPHttpPaymentMaker(origin, token, fetchFn)
     ];
@@ -173,5 +174,32 @@ export class ATXPAccount implements Account {
       this.token,
       this.fetchFn
     );
+  }
+
+  /**
+   * Get sources for this account by calling the accounts service
+   */
+  async getSources(): Promise<Source[]> {
+    // Use the unqualified account ID (without atxp: prefix) for the API call
+    const response = await this.fetchFn(`${this.origin}/account/${this.unqualifiedAccountId}/sources`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`ATXPAccount: /account/${this.unqualifiedAccountId}/sources failed: ${response.status} ${response.statusText} ${text}`);
+    }
+
+    const json = await response.json() as Source[];
+
+    // The accounts service returns the sources array directly, not wrapped in an object
+    if (!Array.isArray(json)) {
+      throw new Error(`ATXPAccount: /account/${this.unqualifiedAccountId}/sources did not return sources array`);
+    }
+
+    return json;
   }
 }

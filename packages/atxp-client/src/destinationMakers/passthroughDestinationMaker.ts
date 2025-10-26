@@ -1,4 +1,4 @@
-import { Logger } from '@atxp/common';
+import { Logger, Source } from '@atxp/common';
 import { Network, Chain, Destination, PaymentRequestOption, DestinationMaker, ChainEnum } from '@atxp/common';
 
 export class PassthroughDestinationMaker implements DestinationMaker {
@@ -7,7 +7,7 @@ export class PassthroughDestinationMaker implements DestinationMaker {
     this.network = network;
   }
 
-  async makeDestinations(option: PaymentRequestOption, _logger: Logger, _paymentRequestId: string): Promise<Destination[]> {
+  async makeDestinations(option: PaymentRequestOption, _logger: Logger, _paymentRequestId: string, _sources: Source[]): Promise<Destination[]> {
     if (option.network !== this.network) {
       return [];
     }

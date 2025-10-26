@@ -1,5 +1,5 @@
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, AccountId, Network, DestinationMaker } from '@atxp/common';
+import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, AccountId, Network, DestinationMaker, Account, Source } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
@@ -15,9 +15,8 @@ import { BigNumber } from 'bignumber.js';
  */
 export function atxpFetch(config: ClientConfig): FetchLike {
   const fetcher = new ATXPFetcher({
-    accountId: config.account.accountId,
+    account: config.account,
     db: config.oAuthDb,
-    paymentMakers: config.account.paymentMakers,
     destinationMakers: config.destinationMakers,
     fetchFn: config.fetchFn,
     sideChannelFetch: config.oAuthChannelFetch,
@@ -35,11 +34,10 @@ export function atxpFetch(config: ClientConfig): FetchLike {
 
 export class ATXPFetcher {
   protected oauthClient: OAuthClient;
-  protected paymentMakers: PaymentMaker[];
+  protected account: Account;
   protected destinationMakers: Map<Network, DestinationMaker>;
   protected sideChannelFetch: FetchLike;
   protected db: OAuthDb;
-  protected accountId: AccountId;
   protected allowedAuthorizationServers: AuthorizationServerUrl[];
   protected approvePayment: (payment: ProspectivePayment) => Promise<boolean>;
   protected logger: Logger;
@@ -48,9 +46,8 @@ export class ATXPFetcher {
   protected onPayment: (args: { payment: ProspectivePayment }) => Promise<void>;
   protected onPaymentFailure: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
   constructor(config: {
-    accountId: AccountId;
+    account: Account;
     db: OAuthDb;
-    paymentMakers: PaymentMaker[];
     destinationMakers: Map<Network, DestinationMaker>;
     fetchFn?: FetchLike;
     sideChannelFetch?: FetchLike;
@@ -65,9 +62,8 @@ export class ATXPFetcher {
     onPaymentFailure?: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
   }) {
     const {
-      accountId,
+      account,
       db,
-      paymentMakers,
       destinationMakers,
       fetchFn = fetch,
       sideChannelFetch = fetchFn,
@@ -84,12 +80,12 @@ export class ATXPFetcher {
     // Use React Native safe fetch if in React Native environment
     const safeFetchFn = getIsReactNative() ? createReactNativeSafeFetch(fetchFn) : fetchFn;
     const safeSideChannelFetch = getIsReactNative() ? createReactNativeSafeFetch(sideChannelFetch) : sideChannelFetch;
-    
-    // ATXPClient should never actually use the callback url - instead of redirecting the user to 
+
+    // ATXPClient should never actually use the callback url - instead of redirecting the user to
     // an authorization url which redirects back to the callback url, ATXPClient posts the payment
     // directly to the authorization server, then does the token exchange itself
     this.oauthClient = new OAuthClient({
-      userId: accountId,
+      userId: account.accountId,
       db,
       callbackUrl: 'http://localhost:3000/unused-dummy-atxp-callback',
       isPublic: false,
@@ -99,11 +95,10 @@ export class ATXPFetcher {
       allowInsecureRequests,
       logger: logger
     });
-    this.paymentMakers = paymentMakers;
+    this.account = account;
     this.destinationMakers = destinationMakers;
     this.sideChannelFetch = safeSideChannelFetch;
     this.db = db;
-    this.accountId = accountId;
     this.allowedAuthorizationServers = allowedAuthorizationServers;
     this.approvePayment = approvePayment;
     this.logger = logger;
@@ -139,6 +134,9 @@ export class ATXPFetcher {
       return false;
     }
 
+    // Get sources from the account
+    const sources = await this.account.getSources();
+
     // Apply destination mappers to transform destinations
     // Convert PaymentRequestDestination[] to Destination[] for mapper compatibility
     const mappedDestinations: Destination[] = [];
@@ -148,7 +146,7 @@ export class ATXPFetcher {
         this.logger.debug(`ATXP: destination maker for network '${option.network}' not available, trying next destination`);
         continue;
       }
-      mappedDestinations.push(...(await destinationMaker.makeDestinations(option, this.logger, paymentRequestId)));
+      mappedDestinations.push(...(await destinationMaker.makeDestinations(option, this.logger, paymentRequestId, sources)));
     }
 
     if (mappedDestinations.length === 0) {
@@ -166,7 +164,7 @@ export class ATXPFetcher {
     // Create prospective payment for approval (using first destination for display)
     const firstDest = mappedDestinations[0];
     const prospectivePayment: ProspectivePayment = {
-      accountId: this.accountId,
+      accountId: this.account.accountId,
       resourceUrl: paymentRequestData.resource?.toString() ?? '',
       resourceName: paymentRequestData.resourceName ?? '',
       currency: firstDest.currency,
@@ -184,7 +182,7 @@ export class ATXPFetcher {
     let lastPaymentError: Error | null = null;
     let paymentAttempted = false;
 
-    for (const paymentMaker of this.paymentMakers) {
+    for (const paymentMaker of this.account.paymentMakers) {
       try {
         // Pass all destinations to payment maker - it will filter and pick the one it can handle
         const result = await paymentMaker.makePayment(mappedDestinations, paymentRequestData.iss, paymentRequestId);
@@ -202,7 +200,7 @@ export class ATXPFetcher {
         await this.onPayment({ payment: prospectivePayment });
 
         // Submit payment to the server
-        const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: '', accountId: this.accountId});
+        const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: '', accountId: this.account.accountId});
         const response = await this.sideChannelFetch(paymentRequestUrl.toString(), {
           method: 'PUT',
           headers: {
@@ -308,17 +306,17 @@ export class ATXPFetcher {
     }
 
     if (!paymentMaker) {
-      const paymentMakerCount = this.paymentMakers.length;
+      const paymentMakerCount = this.account.paymentMakers.length;
       throw new Error(`Payment maker is null/undefined. Available payment maker count: ${paymentMakerCount}. This usually indicates a payment maker object was not properly instantiated.`);
     }
 
     // TypeScript should prevent this, but add runtime check for edge cases (untyped JS, version mismatches, etc.)
     if (!paymentMaker.generateJWT) {
-      const paymentMakerCount = this.paymentMakers.length;
+      const paymentMakerCount = this.account.paymentMakers.length;
       throw new Error(`Payment maker is missing generateJWT method. Available payment maker count: ${paymentMakerCount}. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.`);
     }
 
-    const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId: this.accountId});
+    const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId: this.account.accountId});
 
     // Make a fetch call to the authorization URL with the payment ID
     // redirect=false is a hack
@@ -366,11 +364,11 @@ export class ATXPFetcher {
 
   protected authToService = async (error: OAuthAuthenticationRequiredError): Promise<void> => {
     // TODO: We need to generalize this - we can't assume that there's a single paymentMaker for the auth flow.
-    if (this.paymentMakers.length > 1) {
+    if (this.account.paymentMakers.length > 1) {
       throw new Error(`ATXP: multiple payment makers found - cannot determine which one to use for auth`);
     }
 
-    const paymentMaker: PaymentMaker | undefined = this.paymentMakers[0];
+    const paymentMaker: PaymentMaker | undefined = this.account.paymentMakers[0];
     if (paymentMaker) {
       // We can do the full OAuth flow - we'll generate a signed JWT and call /authorize on the
       // AS to get a code, then exchange the code for an access token
@@ -391,13 +389,13 @@ export class ATXPFetcher {
         // Call onAuthorize callback after successful authorization
         await this.onAuthorize({ 
           authorizationServer: authorizationUrl.origin as AuthorizationServerUrl, 
-          userId: this.accountId 
+          userId: this.account.accountId 
         });
       } catch (authError) {
         // Call onAuthorizeFailure callback if authorization fails
         await this.onAuthorizeFailure({ 
           authorizationServer: authorizationUrl.origin as AuthorizationServerUrl, 
-          userId: this.accountId,
+          userId: this.account.accountId,
           error: authError as Error
         });
         throw authError;
@@ -407,13 +405,13 @@ export class ATXPFetcher {
       // If we do, we'll use it to auth to the downstream resource
       // (In pass-through scenarios, the atxpServer() middleware stores the incoming
       // token in the DB under the '' resource URL).
-      const existingToken = await this.db.getAccessToken(this.accountId, '');
+      const existingToken = await this.db.getAccessToken(this.account.accountId, '');
       if (!existingToken) {
         this.logger.info(`ATXP: no token found for the current server - we can't exchange a token if we don't have one`);
         throw error;
       }
       const newToken = await this.exchangeToken(existingToken, error.resourceServerUrl);
-      this.db.saveAccessToken(this.accountId, error.resourceServerUrl, newToken);
+      this.db.saveAccessToken(this.account.accountId, error.resourceServerUrl, newToken);
     }
   }
 
