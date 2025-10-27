@@ -1,5 +1,74 @@
-import { FetchLike, Logger } from '@atxp/common';
-import { Source, Destination, PaymentRequestOption, DestinationMaker } from '@atxp/common';
+import { FetchLike, Logger, Chain, Source, Currency, ChainEnum, CurrencyEnum, isEnumValue } from '@atxp/common';
+import { Destination, PaymentRequestOption, DestinationMaker } from '@atxp/common';
+import { BigNumber } from 'bignumber.js';
+
+// Type guard for destination response
+type DestinationResponse = {
+  chain: string;
+  address: string;
+  currency: string;
+  amount: string;
+};
+
+type DestinationsApiResponse = {
+  destinations: DestinationResponse[];
+  paymentRequestId: string;
+};
+
+function isDestinationResponse(obj: any): obj is DestinationResponse {
+  return obj &&
+    typeof obj === 'object' &&
+    typeof obj.chain === 'string' &&
+    typeof obj.address === 'string' &&
+    typeof obj.currency === 'string' &&
+    typeof obj.amount === 'string';
+}
+
+function isDestinationsApiResponse(obj: any): obj is DestinationsApiResponse {
+  return obj &&
+    typeof obj === 'object' &&
+    Array.isArray(obj.destinations) &&
+    typeof obj.paymentRequestId === 'string';
+}
+
+function parseDestinationsResponse(data: unknown): Destination[] {
+  // Validate response structure
+  if (!isDestinationsApiResponse(data)) {
+    throw new Error('Invalid response: expected object with destinations array and paymentRequestId');
+  }
+
+  // Validate and convert each destination
+  return data.destinations.map((dest, index) => {
+    if (!isDestinationResponse(dest)) {
+      throw new Error(`Invalid destination at index ${index}: missing required fields (chain, address, currency, amount)`);
+    }
+    
+    // Validate chain is a valid Chain enum value
+    if (!isEnumValue(ChainEnum, dest.chain)) {
+      const validChains = Object.values(ChainEnum).join(', ');
+      throw new Error(`Invalid destination at index ${index}: chain "${dest.chain}" is not a valid chain. Valid chains are: ${validChains}`);
+    }
+    
+    // Validate currency is a valid Currency enum value
+    if (!isEnumValue(CurrencyEnum, dest.currency)) {
+      const validCurrencies = Object.values(CurrencyEnum).join(', ');
+      throw new Error(`Invalid destination at index ${index}: currency "${dest.currency}" is not a valid currency. Valid currencies are: ${validCurrencies}`);
+    }
+    
+    // Validate amount is a valid number
+    const amount = new BigNumber(dest.amount);
+    if (amount.isNaN()) {
+      throw new Error(`Invalid destination at index ${index}: amount "${dest.amount}" is not a valid number`);
+    }
+    
+    return {
+      chain: dest.chain as Chain,
+      currency: dest.currency as Currency,
+      address: dest.address,
+      amount: amount
+    };
+  });
+}
 
 /**
  * Destination mapper for ATXP network destinations.
@@ -15,9 +84,7 @@ export class ATXPDestinationMaker implements DestinationMaker {
     this.fetchFn = fetchFn;
   }
 
-  async makeDestinations(option: PaymentRequestOption, logger: Logger): Promise<Destination[]> {
-    const mappedDestinations: Destination[] = [];
-
+  async makeDestinations(option: PaymentRequestOption, logger: Logger, paymentRequestId: string, sources: Source[]): Promise<Destination[]> {
     if (option.network !== 'atxp') {
       return [];
     }
@@ -25,59 +92,62 @@ export class ATXPDestinationMaker implements DestinationMaker {
     try {
       // The address field contains the account ID (e.g., atxp_acct_xxx) for atxp options
       const accountId = option.address;
-      const sources = await this.getAccountSources(accountId, logger);
 
-      // Create new destinations for each blockchain address
-      // But don't include smart wallets - we'll only make payments to EOA wallets
-      for (const src of sources.filter(s => s.walletType === 'eoa')) {
-        const mappedDest: Destination = {
-          chain: src.chain,
-          currency: option.currency,
-          address: src.address,
-          amount: option.amount
-        };
-        mappedDestinations.push(mappedDest);
-      }
+      // Always use the destinations endpoint
+      const destinations = await this.getDestinations(accountId, paymentRequestId, option, sources, logger);
 
-      if (sources.length === 0) {
-        logger.warn(`ATXPDestinationMaker: No sources found for account ${accountId}`);
+      if (destinations.length === 0) {
+        logger.warn(`ATXPDestinationMaker: No destinations found for account ${accountId}`);
       } else {
-        logger.debug(`ATXPDestinationMaker: Found ${sources.length} sources for account ${accountId}`);
+        logger.debug(`ATXPDestinationMaker: Got ${destinations.length} destinations for account ${accountId}`);
       }
+
+      return destinations;
     } catch (error) {
       logger.error(`ATXPDestinationMaker: Failed to make ATXP destinations: ${error}`);
       throw error;
     }
-
-    return mappedDestinations;
   }
 
-  private async getAccountSources(accountId: string, logger?: Logger): Promise<Source[]> {
-    // Strip any network prefix if present (e.g., atxp:atxp_acct_xxx -> atxp_acct_xxx)
+  private async getDestinations(accountId: string, paymentRequestId: string, option: PaymentRequestOption, sources: Source[], logger?: Logger): Promise<Destination[]> {
+    // Strip any network prefix if present
     const unqualifiedId = accountId.includes(':') ? accountId.split(':')[1] : accountId;
 
-    const url = `${this.accountsServiceUrl}/account/${unqualifiedId}/sources`;
-    logger?.debug(`ATXPDestinationMaker: Fetching addresses from ${url}`);
+    const url = `${this.accountsServiceUrl}/account/${unqualifiedId}/destinations`;
+    logger?.debug(`ATXPDestinationMaker: Fetching destinations from ${url}`);
 
     try {
+      const requestBody = {
+        paymentRequestId,
+        options: [{
+          network: option.network, 
+          currency: option.currency.toString(),
+          address: option.address,
+          amount: option.amount.toString()
+        }],
+        sources: sources
+      };
+
       const response = await this.fetchFn(url, {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'Accept': 'application/json',
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(`Failed to fetch addresses: ${response.status} ${response.statusText} - ${text}`);
+        throw new Error(`Failed to fetch destinations: ${response.status} ${response.statusText} - ${text}`);
       }
 
-      const data = await response.json() as Source[];
-      return data || [];
+      const data = await response.json();
+      
+      return parseDestinationsResponse(data);
     } catch (error) {
-      logger?.error(`ATXPDestinationMaker: Error fetching addresses: ${error}`);
+      logger?.error(`ATXPDestinationMaker: Error fetching destinations: ${error}`);
       throw error;
     }
   }
 }
-

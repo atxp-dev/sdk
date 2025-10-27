@@ -29,7 +29,8 @@ describe('atxpClient events', () => {
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: [paymentMaker]
+      paymentMakers: [paymentMaker],
+      getSources: vi.fn().mockResolvedValue([])
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -68,7 +69,8 @@ describe('atxpClient events', () => {
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: [paymentMaker]
+      paymentMakers: [paymentMaker],
+      getSources: vi.fn().mockResolvedValue([])
     };
     
     // The client initialization or callTool will throw an error due to OAuth failure
@@ -111,7 +113,8 @@ describe('atxpClient events', () => {
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: [paymentMaker]
+      paymentMakers: [paymentMaker],
+      getSources: vi.fn().mockResolvedValue([])
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -154,7 +157,8 @@ describe('atxpClient events', () => {
     };
     const account = {
       accountId: 'bdj',
-      paymentMakers: [paymentMaker]
+      paymentMakers: [paymentMaker],
+      getSources: vi.fn().mockResolvedValue([])
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',

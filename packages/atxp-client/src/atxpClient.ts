@@ -5,6 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createDestinationMakers } from './destinationMakers/index.js';
 import { DEFAULT_ATXP_ACCOUNTS_SERVER } from "@atxp/common";
+import { ATXPAccount } from './atxpAccount.js';
 
 type RequiredClientConfigFields = 'mcpServer' | 'account';
 type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
@@ -56,8 +57,15 @@ export function buildClientConfig(args: ClientArgs): ClientConfig {
   const fetchFn = withDefaults.fetchFn;
   
   // Build destination makers if not provided
+  let accountsServer = withDefaults.atxpAccountsServer;
+  // QoL hack for unspecified accounts server - if the caller is passing an atxpAccount, then assume the origin for that
+  // is what we should use for the accounts server. In practice, the only option is accounts.atxp.ai,
+  // but this supports staging environment
+  if (args.atxpAccountsServer === undefined && withDefaults.account && withDefaults.account instanceof ATXPAccount) {
+    accountsServer = withDefaults.account.origin;
+  }
   const destinationMakers = withDefaults.destinationMakers ?? createDestinationMakers({
-    atxpAccountsServer: withDefaults.atxpAccountsServer,
+    atxpAccountsServer: accountsServer,
     fetchFn
   });
   

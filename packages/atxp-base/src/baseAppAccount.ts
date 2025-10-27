@@ -1,4 +1,5 @@
-import type { Account, PaymentMaker, AccountId } from '@atxp/common';
+import type { Account, PaymentMaker, AccountId, Source } from '@atxp/common';
+import { WalletTypeEnum, ChainEnum } from '@atxp/common';
 import { getBaseUSDCAddress } from '@atxp/client';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
@@ -17,6 +18,9 @@ const DEFAULT_PERIOD_IN_DAYS = 7;
 export class BaseAppAccount implements Account {
   accountId: AccountId;
   paymentMakers: PaymentMaker[];
+  private mainWalletAddress?: string;
+  private ephemeralSmartWallet?: EphemeralSmartWallet;
+  private chainId: number;
 
   private static toCacheKey(userWalletAddress: string): string {
     return `atxp-base-permission-${userWalletAddress}`;
@@ -143,6 +147,7 @@ export class BaseAppAccount implements Account {
     provider?: MainWalletProvider,
     chainId: number = base.id
   ) {
+    this.chainId = chainId;
     if (ephemeralSmartWallet) {
       // Ephemeral wallet mode
       if (!spendPermission) {
@@ -150,6 +155,7 @@ export class BaseAppAccount implements Account {
       }
       // Format accountId as network:address
       this.accountId = `base:${ephemeralSmartWallet.address}` as AccountId;
+      this.ephemeralSmartWallet = ephemeralSmartWallet;
       this.paymentMakers = [
         new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId)
       ];
@@ -160,10 +166,27 @@ export class BaseAppAccount implements Account {
       }
       // Format accountId as network:address
       this.accountId = `base:${mainWalletAddress}` as AccountId;
+      this.mainWalletAddress = mainWalletAddress;
       this.paymentMakers = [
         new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId)
       ];
     }
+  }
+
+  async getSources(): Promise<Source[]> {
+    const address = this.ephemeralSmartWallet?.address || this.mainWalletAddress;
+    if (!address) {
+      return [];
+    }
+
+    // Determine chain based on chainId
+    const chain = this.chainId === 84532 ? ChainEnum.BaseSepolia : ChainEnum.Base;
+
+    return [{
+      address,
+      chain,
+      walletType: this.ephemeralSmartWallet ? WalletTypeEnum.Smart : WalletTypeEnum.EOA
+    }];
   }
 
   /**
