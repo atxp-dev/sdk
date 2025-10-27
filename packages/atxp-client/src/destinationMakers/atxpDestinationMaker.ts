@@ -1,5 +1,74 @@
-import { FetchLike, Logger, Chain, Source } from '@atxp/common';
+import { FetchLike, Logger, Chain, Source, Currency, ChainEnum, CurrencyEnum, isEnumValue } from '@atxp/common';
 import { Destination, PaymentRequestOption, DestinationMaker } from '@atxp/common';
+import { BigNumber } from 'bignumber.js';
+
+// Type guard for destination response
+type DestinationResponse = {
+  chain: string;
+  address: string;
+  currency: string;
+  amount: string;
+};
+
+type DestinationsApiResponse = {
+  destinations: DestinationResponse[];
+  paymentRequestId: string;
+};
+
+function isDestinationResponse(obj: any): obj is DestinationResponse {
+  return obj &&
+    typeof obj === 'object' &&
+    typeof obj.chain === 'string' &&
+    typeof obj.address === 'string' &&
+    typeof obj.currency === 'string' &&
+    typeof obj.amount === 'string';
+}
+
+function isDestinationsApiResponse(obj: any): obj is DestinationsApiResponse {
+  return obj &&
+    typeof obj === 'object' &&
+    Array.isArray(obj.destinations) &&
+    typeof obj.paymentRequestId === 'string';
+}
+
+function parseDestinationsResponse(data: unknown): Destination[] {
+  // Validate response structure
+  if (!isDestinationsApiResponse(data)) {
+    throw new Error('Invalid response: expected object with destinations array and paymentRequestId');
+  }
+
+  // Validate and convert each destination
+  return data.destinations.map((dest, index) => {
+    if (!isDestinationResponse(dest)) {
+      throw new Error(`Invalid destination at index ${index}: missing required fields (chain, address, currency, amount)`);
+    }
+    
+    // Validate chain is a valid Chain enum value
+    if (!isEnumValue(ChainEnum, dest.chain)) {
+      const validChains = Object.values(ChainEnum).join(', ');
+      throw new Error(`Invalid destination at index ${index}: chain "${dest.chain}" is not a valid chain. Valid chains are: ${validChains}`);
+    }
+    
+    // Validate currency is a valid Currency enum value
+    if (!isEnumValue(CurrencyEnum, dest.currency)) {
+      const validCurrencies = Object.values(CurrencyEnum).join(', ');
+      throw new Error(`Invalid destination at index ${index}: currency "${dest.currency}" is not a valid currency. Valid currencies are: ${validCurrencies}`);
+    }
+    
+    // Validate amount is a valid number
+    const amount = new BigNumber(dest.amount);
+    if (amount.isNaN()) {
+      throw new Error(`Invalid destination at index ${index}: amount "${dest.amount}" is not a valid number`);
+    }
+    
+    return {
+      chain: dest.chain as Chain,
+      currency: dest.currency as Currency,
+      address: dest.address,
+      amount: amount
+    };
+  });
+}
 
 /**
  * Destination mapper for ATXP network destinations.
@@ -73,24 +142,9 @@ export class ATXPDestinationMaker implements DestinationMaker {
         throw new Error(`Failed to fetch destinations: ${response.status} ${response.statusText} - ${text}`);
       }
 
-      const data = await response.json() as {
-        destinations: Array<{
-          network: string;
-          address: string;
-          currency: string;
-          amount: string;
-          paymentMethod?: string;
-        }>;
-        paymentRequestId: string;
-      };
-
-      // Convert the response destinations to Destination objects
-      return data.destinations.map(dest => ({
-        chain: dest.network as Chain,
-        currency: option.currency,
-        address: dest.address,
-        amount: option.amount
-      }));
+      const data = await response.json();
+      
+      return parseDestinationsResponse(data);
     } catch (error) {
       logger?.error(`ATXPDestinationMaker: Error fetching destinations: ${error}`);
       throw error;
