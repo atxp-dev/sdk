@@ -53,7 +53,7 @@ async function main() {
     const mcpClient = await atxpClient({
       mcpServer: url,
       account,
-      allowedAuthorizationServers: ['http://localhost:3010', 'https://auth.atxp.ai', 'https://atxp-accounts-staging.onrender.com/'],
+      allowedAuthorizationServers: ['http://localhost:3010', 'https://auth.atxp.ai', 'https://atpx-auth-staging.onrender.com'],
       allowHttp: true,
       logger: new ConsoleLogger({level: LogLevel.DEBUG})
     });
