@@ -56,6 +56,15 @@ export {
 } from './worldConstants.js';
 
 export {
+  USDC_CONTRACT_ADDRESS_POLYGON_MAINNET,
+  POLYGON_MAINNET,
+  getPolygonMainnetWithRPC,
+  getPolygonByChainId,
+  getPolygonUSDCAddress,
+  type PolygonChain
+} from './polygonConstants.js';
+
+export {
   BaseAccount
 } from './baseAccount.js';
 
