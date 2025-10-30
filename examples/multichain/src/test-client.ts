@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import { atxpClient, BaseAccount, SolanaAccount } from '@atxp/client';
+import { PolygonAccount } from '@atxp/polygon';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -79,6 +80,48 @@ async function testSolanaPayment() {
   }
 }
 
+async function testPolygonAmoyPayment() {
+  console.log('\n=== Testing Polygon Amoy Testnet Payment ===');
+
+  const polygonRpc = process.env.POLYGON_AMOY_RPC || 'https://rpc-amoy.polygon.technology';
+  const polygonPrivateKey = process.env.POLYGON_AMOY_PRIVATE_KEY;
+
+  if (!polygonPrivateKey) {
+    console.log('Skipping Polygon Amoy test - POLYGON_AMOY_PRIVATE_KEY not set');
+    console.log('To test Polygon Amoy:');
+    console.log('1. Get test MATIC from: https://faucets.chain.link/polygon-amoy');
+    console.log('2. Get test USDC on Amoy testnet');
+    console.log('3. Set POLYGON_AMOY_PRIVATE_KEY in .env');
+    return;
+  }
+
+  try {
+    const account = new PolygonAccount(polygonRpc, polygonPrivateKey as `0x${string}`, 80002);
+    console.log('Using Polygon Amoy account:', account.accountId);
+    console.log('Chain ID: 80002 (Polygon Amoy Testnet)');
+    console.log('RPC:', polygonRpc);
+
+    const mcpClient = await atxpClient({
+      mcpServer: 'http://localhost:3009',
+      account,
+      allowedAuthorizationServers: ['http://localhost:3010', 'https://auth.atxp.ai'],
+      allowHttp: true,
+      logger: new ConsoleLogger({level: LogLevel.INFO})
+    });
+
+    console.log('Calling multi-chain-tool with Polygon Amoy account...');
+    const result = await mcpClient.callTool({
+      name: 'multi-chain-tool',
+      arguments: { message: 'Hello from Polygon Amoy testnet!' }
+    });
+
+    console.log('Polygon Amoy payment result:', result);
+    console.log('✅ Polygon Amoy testnet payment successful!');
+  } catch (error) {
+    console.error('Polygon Amoy payment failed:', error);
+  }
+}
+
 async function main() {
   console.log('====================================');
   console.log('   Multichain Payment Test Client   ');
@@ -99,11 +142,20 @@ async function main() {
   // Test Solana payment
   await testSolanaPayment();
 
+  // Small delay between tests
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Test Polygon Amoy payment
+  await testPolygonAmoyPayment();
+
   console.log('\n====================================');
   console.log('        Test Complete!              ');
   console.log('====================================\n');
-  console.log('The same server accepted payments from both Base and Solana chains!');
-  console.log('Check the accounts-mc service logs to see how it handled different chains.\n');
+  console.log('The same server accepted payments from multiple chains:');
+  console.log('- Base (mainnet)');
+  console.log('- Solana (mainnet)');
+  console.log('- Polygon Amoy (testnet)');
+  console.log('\nCheck the accounts-mc service logs to see how it handled different chains.\n');
 }
 
 // Run the test

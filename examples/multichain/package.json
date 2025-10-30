@@ -12,6 +12,7 @@
     "@atxp/client": "file:../../packages/atxp-client",
     "@atxp/common": "file:../../packages/atxp-common",
     "@atxp/express": "file:../../packages/atxp-express",
+    "@atxp/polygon": "file:../../packages/atxp-polygon",
     "@atxp/server": "file:../../packages/atxp-server",
     "@modelcontextprotocol/sdk": "^1.18.1",
     "@solana/web3.js": "^1.98.0",
