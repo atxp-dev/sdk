@@ -54,7 +54,7 @@ const destination = new ATXPAccount(destinationConnectionString);
 console.log('Starting MCP server with destination', destinationConnectionString);
 app.use(atxpExpress({
   destination: destination,
-  server: 'http://localhost:3010',
+  //server: 'http://localhost:3010',
   payeeName: 'ATXP Client Example Resource Server',
   minimumPayment: BigNumber(0.01),
   allowHttp: true,
