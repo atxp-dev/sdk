@@ -28,6 +28,9 @@ export function createDestinationMakers(config: DestinationMakerFactoryConfig): 
       case NetworkEnum.World:
         makers.set(network, new PassthroughDestinationMaker(network));
         break;
+      case NetworkEnum.Polygon:
+        makers.set(network, new PassthroughDestinationMaker(network));
+        break;
       case NetworkEnum.BaseSepolia:
         makers.set(network, new PassthroughDestinationMaker(network));
         break;
