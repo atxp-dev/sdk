@@ -1,0 +1,57 @@
+{
+  "name": "@atxp/polygon",
+  "version": "0.7.4",
+  "description": "ATXP for Polygon",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atxp-dev/sdk.git",
+    "directory": "packages/atxp-polygon"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "test": "vitest run",
+    "prepack": "npm run build && npm run typecheck",
+    "pack:dry": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "@atxp/client": "0.7.4",
+    "@atxp/common": "0.7.4",
+    "bignumber.js": "^9.3.0"
+  },
+  "peerDependencies": {
+    "viem": "^2.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/supertest": "^6.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "eslint": "^9.32.0",
+    "fetch-mock": "^12.5.2",
+    "happy-dom": "^15.11.6",
+    "jsdom": "^25.0.1",
+    "supertest": "^7.1.4",
+    "typescript": "^5.7.3",
+    "viem": "^2.34.0",
+    "vitest": "^3.0.9"
+  }
+}
