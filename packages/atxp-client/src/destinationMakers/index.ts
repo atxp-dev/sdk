@@ -37,6 +37,9 @@ export function createDestinationMakers(config: DestinationMakerFactoryConfig): 
       case NetworkEnum.WorldSepolia:
         makers.set(network, new PassthroughDestinationMaker(network));
         break;
+      case NetworkEnum.PolygonAmoy:
+        makers.set(network, new PassthroughDestinationMaker(network));
+        break;
       case NetworkEnum.ATXP:
         makers.set(network, new ATXPDestinationMaker(atxpAccountsServer, fetchFn));
         break;
