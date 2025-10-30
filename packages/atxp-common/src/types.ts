@@ -31,6 +31,7 @@ export enum NetworkEnum {
   Solana = 'solana',
   Base = 'base',
   World = 'world',
+  Polygon = 'polygon',
   BaseSepolia = 'base_sepolia',
   WorldSepolia = 'world_sepolia',
   ATXP = 'atxp'
@@ -41,6 +42,7 @@ export enum ChainEnum {
   Solana = 'solana',
   Base = 'base',
   World = 'world',
+  Polygon = 'polygon',
   BaseSepolia = 'base_sepolia',
   WorldSepolia = 'world_sepolia'
 }
