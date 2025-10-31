@@ -545,7 +545,7 @@
 
           const statusResult = await window.state.client.callTool({
             name: 'image_get_image_async',
-            arguments: { task_id: taskId }
+            arguments: { taskId: taskId }
           });
 
           console.log('Status result:', statusResult);
