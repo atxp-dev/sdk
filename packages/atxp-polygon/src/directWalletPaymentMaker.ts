@@ -1,12 +1,10 @@
-import { encodeFunctionData, toHex } from 'viem';
+import { encodeFunctionData } from 'viem';
 import { getPolygonUSDCAddress, type Hex } from '@atxp/client';
 import { polygon } from 'viem/chains';
 import BigNumber from 'bignumber.js';
 import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import {
-  createEIP1271JWT,
-  createEIP1271AuthData,
-  constructEIP1271Message
+  createES256KJWT
 } from '@atxp/common';
 
 const USDC_DECIMALS = 6;
@@ -52,57 +50,41 @@ export class DirectWalletPaymentMaker implements PaymentMaker {
     this.logger.info(`paymentRequestId: ${payload.paymentRequestId}`);
     this.logger.info(`walletAddress: ${this.walletAddress}`);
 
-    // Generate EIP-1271 auth data for main wallet authentication
-    const timestamp = Math.floor(Date.now() / 1000);
+    // For ES256K JWT, we need to sign a message with the wallet
+    // The message will be the JWT header + payload (without signature)
+    // This is standard JWT signing, but using personal_sign instead of a private key
 
-    const message = constructEIP1271Message({
+    // Temporary: create a placeholder message for the user to sign
+    // The actual message signed should be the JWT payload, but for now we'll construct it manually
+    const message = JSON.stringify({
       walletAddress: this.walletAddress,
-      timestamp,
       codeChallenge: payload.codeChallenge,
       paymentRequestId: payload.paymentRequestId,
+      timestamp: Math.floor(Date.now() / 1000),
       ...(payload.accountId ? { accountId: payload.accountId } : {}),
     });
 
-    // Sign with the main wallet
-    // Coinbase Wallet requires hex-encoded messages, while other wallets may accept plain strings
-    let messageToSign: string;
+    this.logger.info(`Requesting signature for message: ${message}`);
 
-    // Check if this is Coinbase Wallet by looking for provider properties
-    const providerWithCoinbase = this.provider as MainWalletProvider & {
-      isCoinbaseWallet?: boolean;
-      isCoinbaseBrowser?: boolean;
-    };
-    const isCoinbaseWallet = providerWithCoinbase.isCoinbaseWallet ||
-                            providerWithCoinbase.isCoinbaseBrowser;
-
-    if (isCoinbaseWallet) {
-      // Coinbase Wallet requires hex-encoded messages
-      messageToSign = toHex(message);
-      this.logger.info('Using hex-encoded message for Coinbase Wallet');
-    } else {
-      // Other wallets (MetaMask, etc.) typically accept plain strings
-      messageToSign = message;
-      this.logger.info('Using plain string message for wallet');
-    }
-
+    // Request signature from the wallet using personal_sign
+    // This returns a 65-byte ECDSA signature (130 hex chars + 0x prefix)
     const signature = await this.provider.request({
       method: 'personal_sign',
-      params: [messageToSign, this.walletAddress]
+      params: [message, this.walletAddress]
     });
 
-    const authData = createEIP1271AuthData({
+    this.logger.info(`Received signature: ${signature}`);
+
+    // Create ES256K JWT using the signature
+    const jwtToken = createES256KJWT({
       walletAddress: this.walletAddress,
-      message,
       signature,
-      timestamp,
       codeChallenge: payload.codeChallenge,
       paymentRequestId: payload.paymentRequestId,
-      ...(payload.accountId ? { accountId: payload.accountId } : {}),
+      accountId: payload.accountId,
     });
 
-    const jwtToken = createEIP1271JWT(authData);
-
-    this.logger.info(`Generated EIP-1271 JWT: ${jwtToken}`);
+    this.logger.info(`Generated ES256K JWT: ${jwtToken}`);
 
     return jwtToken;
   }
