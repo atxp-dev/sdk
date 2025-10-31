@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { ATXPPaymentDestination, requirePayment } from '@atxp/server';
+import { requirePayment } from '@atxp/server';
 import type { AuthorizationServerUrl } from '@atxp/common';
 import { atxpExpress } from '@atxp/express';
 import { ATXPAccount } from '@atxp/client';
@@ -61,7 +61,7 @@ console.log('Starting multichain MCP server with destination', destinationConnec
 console.log(`Server will listen on port ${PORT}`);
 
 const atxpRouter = atxpExpress({
-  paymentDestination: new ATXPPaymentDestination(destinationConnectionString),
+  destination: new ATXPAccount(destinationConnectionString),
   resource: `http://localhost:${PORT}`,
   server: (process.env.ATXP_AUTH_SERVER || 'https://auth.atxp.ai') as AuthorizationServerUrl,
   mountPath: '/',
