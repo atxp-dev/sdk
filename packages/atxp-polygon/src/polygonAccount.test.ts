@@ -46,14 +46,12 @@ import {
   setupInitializationMocks,
   setupPaymentMocks,
   mockSpendPermission,
-  mockExpiredSpendPermission,
   mockBundlerClient,
   mockFailedBundlerClient,
   mockProvider,
   mockSpendCalls,
   mockEphemeralSmartWallet,
   getCacheKey,
-  removeTimestamps,
   TestMemoryCache,
   serializeWithBigInt
 } from './testHelpers.js';
