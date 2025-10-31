@@ -11,7 +11,7 @@ import BigNumber from 'bignumber.js';
 import { TEST_WALLET_ADDRESS, TEST_RECEIVER_ADDRESS, mockProvider, mockLogger, type MockEip1193Provider } from './testHelpers.js';
 import { getPolygonUSDCAddress } from '@atxp/client';
 
-const { encodeFunctionData, fromHex } = await import('viem');
+const { encodeFunctionData } = await import('viem');
 
 describe('DirectWalletPaymentMaker', () => {
   let provider: MockEip1193Provider;
