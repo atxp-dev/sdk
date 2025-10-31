@@ -2,31 +2,31 @@ import type { Account, PaymentMaker, Source } from '@atxp/common';
 import type { AccountId } from '@atxp/common';
 import { ChainEnum, WalletTypeEnum } from '@atxp/common';
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
-import { SimplePolygonPaymentMaker } from './simplePolygonPaymentMaker.js';
+import { ServerPaymentMaker } from './serverPaymentMaker.js';
 import { createWalletClient, http, type WalletClient, type Hex } from 'viem';
 import { polygon, polygonAmoy } from 'viem/chains';
 import type { Chain } from 'viem/chains';
 
 /**
- * Simple Polygon account for server-side/CLI usage
+ * Polygon account for server-side/CLI usage
  *
- * This is a simplified version of PolygonAccount that works without browser providers.
+ * This account type works without browser providers and uses direct private key signing.
  * It uses direct wallet signing (similar to BaseAccount) rather than ephemeral wallets
  * and spend permissions.
  *
- * For browser-based applications with wallet providers, use PolygonAccount.initialize() instead.
+ * For browser-based applications with wallet providers, use PolygonBrowserAccount.initialize() instead.
  *
  * @example
  * ```typescript
  * // Server-side usage
- * const account = new SimplePolygonAccount(
+ * const account = new PolygonServerAccount(
  *   'https://polygon-rpc.com',
  *   '0x_your_private_key',
  *   137  // Polygon mainnet
  * );
  * ```
  */
-export class SimplePolygonAccount implements Account {
+export class PolygonServerAccount implements Account {
   accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private walletClient: WalletClient;
@@ -61,7 +61,7 @@ export class SimplePolygonAccount implements Account {
     });
 
     this.paymentMakers = [
-      new SimplePolygonPaymentMaker(polygonRPCUrl, this.walletClient, chainId)
+      new ServerPaymentMaker(polygonRPCUrl, this.walletClient, chainId)
     ];
   }
 

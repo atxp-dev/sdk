@@ -3,7 +3,7 @@
  * Quick verification script to check Polygon wallet setup
  * Run: npx tsx verify-polygon-setup.ts
  */
-import { SimplePolygonAccount } from '@atxp/polygon';
+import { PolygonServerAccount } from '@atxp/polygon';
 import { POLYGON_MAINNET, getPolygonUSDCAddress } from '@atxp/client';
 import dotenv from 'dotenv';
 import { createPublicClient, http, formatUnits } from 'viem';
@@ -41,9 +41,9 @@ async function verifySetup() {
   console.log(`   RPC: ${polygonRpc}`);
 
   // Create account
-  let account: SimplePolygonAccount;
+  let account: PolygonServerAccount;
   try {
-    account = new SimplePolygonAccount(polygonRpc, polygonPrivateKey as `0x${string}`, 137);
+    account = new PolygonServerAccount(polygonRpc, polygonPrivateKey as `0x${string}`, 137);
     console.log(`✅ Polygon account created`);
     console.log(`   Account ID: ${account.accountId}\n`);
   } catch (error) {

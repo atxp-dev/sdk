@@ -59,10 +59,11 @@ const ERC20_ABI = [
 ];
 
 /**
- * Simple Polygon payment maker for server-side/CLI usage
- * Similar to BasePaymentMaker but for Polygon network
+ * Server-side Polygon payment maker for CLI/backend usage
+ * Uses direct private key signing without browser providers.
+ * Similar to BasePaymentMaker but for Polygon network.
  */
-export class SimplePolygonPaymentMaker implements PaymentMaker {
+export class ServerPaymentMaker implements PaymentMaker {
   protected signingClient: ExtendedWalletClient;
   protected logger: Logger;
   protected chainId: number;

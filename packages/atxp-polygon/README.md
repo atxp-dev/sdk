@@ -6,9 +6,14 @@ ATXP for Polygon - Enable seamless payments in Polygon applications with smart w
 
 `@atxp/polygon` provides a complete solution for integrating ATXP (Autonomous Transaction eXecution Protocol) payments into Polygon applications. It handles Polygon-specific wallet interactions, USDC transfers, and smart wallet integration while abstracting away the complexity of blockchain transactions.
 
-The package supports two payment modes:
-- **Ephemeral Wallet Mode**: Uses Coinbase CDP for smart wallet creation with account abstraction (default)
-- **Main Wallet Mode**: Direct wallet integration for users who prefer to sign each transaction
+The package supports three account types:
+
+### Browser-Based Accounts (`PolygonBrowserAccount`)
+- **Smart Wallet Mode** (`SmartWalletPaymentMaker`): Uses Coinbase CDP for ephemeral smart wallets with account abstraction and gasless transactions (default, best UX)
+- **Direct Wallet Mode** (`DirectWalletPaymentMaker`): Direct wallet integration where users sign each transaction
+
+### Server/CLI Accounts (`PolygonServerAccount`)
+- **Server Mode** (`ServerPaymentMaker`): For backend services and CLI tools using private keys directly
 
 ## Support
 
@@ -30,15 +35,17 @@ npm install viem
 
 ## Quick Start
 
-### 1. Initialize a Polygon Account
+### Browser Usage
+
+#### Option 1: Smart Wallet Mode (Recommended - Best UX)
 
 ```typescript
-import { PolygonAccount } from '@atxp/polygon';
+import { PolygonBrowserAccount } from '@atxp/polygon';
 
-const account = await PolygonAccount.initialize({
+const account = await PolygonBrowserAccount.initialize({
   provider: window.ethereum, // or any EIP-1193 provider
   walletAddress: '0x1234...', // User's wallet address
-  useEphemeralWallet: true, // true = ephemeral smart wallet, false = main wallet
+  useEphemeralWallet: true, // Smart wallet with gasless transactions
 
   // Spend permission parameters
   allowance: BigInt('10000000'), // 10 USDC (in 6 decimals)
@@ -49,6 +56,33 @@ const account = await PolygonAccount.initialize({
   customRpcUrl: 'https://polygon-rpc.com', // Custom RPC endpoint
   logger: console // Logger instance
 });
+```
+
+#### Option 2: Direct Wallet Mode
+
+```typescript
+import { PolygonBrowserAccount } from '@atxp/polygon';
+
+const account = await PolygonBrowserAccount.initialize({
+  provider: window.ethereum,
+  walletAddress: '0x1234...',
+  useEphemeralWallet: false, // User signs each transaction
+  allowance: BigInt('10000000'),
+  periodInDays: 30,
+  periodStart: Math.floor(Date.now() / 1000)
+});
+```
+
+### Server/CLI Usage
+
+```typescript
+import { PolygonServerAccount } from '@atxp/polygon';
+
+const account = new PolygonServerAccount(
+  'https://polygon-rpc.com',     // RPC URL
+  '0x_your_private_key',         // Private key
+  137                             // Chain ID (137 = Polygon mainnet)
+);
 ```
 
 ### 2. Set up ATXP Client
@@ -82,21 +116,22 @@ const result = await client.callTool({
 Here's how to integrate ATXP Polygon into a React application:
 
 ```typescript
-import { PolygonAccount } from '@atxp/polygon';
+import { PolygonBrowserAccount } from '@atxp/polygon';
 import { atxpClient } from '@atxp/client';
 import { useCallback, useEffect, useState } from 'react';
 
 export const AtxpProvider = ({ children }) => {
-  const [atxpAccount, setAtxpAccount] = useState<PolygonAccount | null>(null);
+  const [atxpAccount, setAtxpAccount] = useState<PolygonBrowserAccount | null>(null);
   const [client, setClient] = useState(null);
 
   const loadAccount = useCallback(async (walletAddress: string) => {
-    const account = await PolygonAccount.initialize({
+    const account = await PolygonBrowserAccount.initialize({
       provider: window.ethereum,
       walletAddress,
       useEphemeralWallet: true,
       allowance: BigInt('10000000'), // 10 USDC
-      periodInDays: 30
+      periodInDays: 30,
+      periodStart: Math.floor(Date.now() / 1000)
     });
     setAtxpAccount(account);
 
@@ -138,45 +173,67 @@ export const AtxpProvider = ({ children }) => {
 
 ## API Reference
 
-### `PolygonAccount.initialize(options)`
+### `PolygonBrowserAccount.initialize(options)`
 
-Creates and initializes a Polygon account with smart wallet or main wallet support.
+Creates and initializes a browser-based Polygon account with smart wallet or direct wallet support.
 
 #### Parameters
 
 - `provider: Eip1193Provider` - EIP-1193 compatible provider (e.g., window.ethereum)
 - `walletAddress: string` - The user's wallet address
-- `useEphemeralWallet?: boolean` - Whether to use ephemeral smart wallet (default: true)
+- `useEphemeralWallet?: boolean` - Whether to use smart wallet (true) or direct wallet (false). Default: true
 - `allowance: bigint` - Maximum USDC amount that can be spent (in 6 decimals)
 - `periodInDays: number` - Permission validity period in days
 - `periodStart: number` - Permission start time in Unix seconds
 - `customRpcUrl?: string` - Optional custom RPC URL (defaults to public Polygon RPC)
+- `chainId?: number` - Chain ID (137 for mainnet, 80002 for Amoy testnet)
 - `logger?: Logger` - Optional logger for debugging
 
 #### Returns
 
-`Promise<PolygonAccount>` - Initialized Polygon account
+`Promise<PolygonBrowserAccount>` - Initialized browser Polygon account
 
-### `PolygonAccount`
+### `PolygonServerAccount`
 
-The main account class that handles Polygon interactions.
+Server-side/CLI account for backend services.
+
+#### Constructor
+
+```typescript
+new PolygonServerAccount(
+  rpcUrl: string,
+  privateKey: string,
+  chainId: number = 137
+)
+```
+
+#### Key Features
+
+- Direct private key signing (no browser required)
+- ES256K JWT authentication
+- Simple USDC transfers
+- Works in Node.js, CLI tools, and backend services
+
+### `PolygonBrowserAccount`
+
+Browser-based account class that handles Polygon wallet interactions.
 
 #### Key Methods
 
-- `getId(): Promise<AccountId>` - Get the account identifier for authentication
-- `makePayments(payments: PaymentTransaction[]): Promise<PaymentReceipt[]>` - Process multiple payments
+- `getSources(): Promise<Source[]>` - Get wallet addresses and their sources
+- Payment makers handle the actual payment processing
 
 #### Key Features
 
 - **USDC Transfers**: Handles native USDC transfers on Polygon (0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359)
-- **Message Signing**: Signs JWTs using EIP-1271 for smart wallets or standard signing for main wallets
+- **Message Signing**: Signs JWTs using EIP-1271 for smart wallets or standard signing for direct wallets
 - **Smart Wallet Integration**: Uses Coinbase CDP for account abstraction and gasless transactions
 - **Spend Permissions**: Manages recurring payment permissions with ERC-20 approvals
-- **Automatic Deployment**: Deploys smart wallet before first use (ephemeral mode only)
+- **Automatic Deployment**: Deploys smart wallet before first use (smart wallet mode only)
 
-### `PolygonPaymentMaker`
+### `SmartWalletPaymentMaker`
 
-Handles payment processing using ephemeral smart wallets with account abstraction.
+Browser-based payment maker using ephemeral smart wallets with account abstraction.
 
 #### Features
 
@@ -184,10 +241,11 @@ Handles payment processing using ephemeral smart wallets with account abstractio
 - Batched transaction support
 - Automatic memo appending to transfers
 - User operation handling
+- **Best for**: Production browser apps (best UX)
 
-### `MainWalletPaymentMaker`
+### `DirectWalletPaymentMaker`
 
-Alternative payment processor for direct wallet integrations.
+Browser-based payment maker for direct wallet signing.
 
 #### Features
 
@@ -195,6 +253,19 @@ Alternative payment processor for direct wallet integrations.
 - Support for Coinbase Wallet and standard wallets
 - Transaction confirmation tracking
 - Flexible message signing for different wallet providers
+- **Best for**: Users who want full control, compatibility mode
+
+### `ServerPaymentMaker`
+
+Server-side payment maker using direct private key signing.
+
+#### Features
+
+- ES256K JWT generation
+- Direct USDC ERC-20 transfers
+- Balance checking
+- Transaction confirmation
+- **Best for**: Backend services, CLI tools, testing
 
 ### Caching System
 
@@ -226,13 +297,13 @@ The package comes with sensible defaults:
 - **Bundler**: Coinbase CDP Polygon bundler
 - **Paymaster**: Coinbase CDP paymaster (gasless transactions)
 
-### Ephemeral Wallet Mode (Default)
+### Smart Wallet Mode (Browser - Default, Recommended)
 
 ```typescript
-const account = await PolygonAccount.initialize({
+const account = await PolygonBrowserAccount.initialize({
   provider: window.ethereum,
   walletAddress: '0x1234...',
-  useEphemeralWallet: true, // default
+  useEphemeralWallet: true, // default - uses SmartWalletPaymentMaker
   allowance: BigInt('10000000'),
   periodInDays: 30,
   periodStart: Math.floor(Date.now() / 1000)
@@ -248,16 +319,16 @@ const account = await PolygonAccount.initialize({
 
 **Benefits:**
 - Single approval for multiple transactions
-- Gasless transactions (no native MATIC needed)
+- Gasless transactions (no native POL needed)
 - Improved UX with minimal user prompts
 
-### Main Wallet Mode
+### Direct Wallet Mode (Browser)
 
 ```typescript
-const account = await PolygonAccount.initialize({
+const account = await PolygonBrowserAccount.initialize({
   provider: window.ethereum,
   walletAddress: '0x1234...',
-  useEphemeralWallet: false, // direct wallet mode
+  useEphemeralWallet: false, // uses DirectWalletPaymentMaker
   allowance: BigInt('10000000'),
   periodInDays: 30,
   periodStart: Math.floor(Date.now() / 1000)
@@ -268,17 +339,43 @@ const account = await PolygonAccount.initialize({
 1. Each transaction requires user approval in their wallet
 2. JWT signing also requires user approval
 3. Direct USDC transfers from user's wallet
-4. User pays gas fees in MATIC
+4. User pays gas fees in POL
 
 **When to use:**
 - Users want full control over each transaction
 - Development/testing environments
 - Compatibility with wallets that don't support smart contracts
 
-### Custom RPC Endpoint
+### Server/CLI Mode
 
 ```typescript
-const account = await PolygonAccount.initialize({
+import { PolygonServerAccount } from '@atxp/polygon';
+
+const account = new PolygonServerAccount(
+  'https://polygon-rpc.com',     // RPC URL
+  '0x_your_private_key',         // Private key
+  137                             // 137 = Polygon mainnet, 80002 = Amoy testnet
+);
+```
+
+**How it works:**
+1. Direct private key signing (no browser or wallet provider needed)
+2. ES256K JWT authentication
+3. Simple USDC ERC-20 transfers
+4. Account pays gas fees in POL
+
+**When to use:**
+- Backend services and APIs
+- CLI tools and scripts
+- Testing and automation
+- Server-side payment processing
+
+### Custom RPC Endpoint
+
+#### Browser
+
+```typescript
+const account = await PolygonBrowserAccount.initialize({
   provider: window.ethereum,
   walletAddress: '0x1234...',
   customRpcUrl: 'https://your-polygon-rpc.com',
@@ -287,6 +384,16 @@ const account = await PolygonAccount.initialize({
   periodInDays: 30,
   periodStart: Math.floor(Date.now() / 1000)
 });
+```
+
+#### Server/CLI
+
+```typescript
+const account = new PolygonServerAccount(
+  'https://your-polygon-rpc.com',  // Custom RPC
+  '0x_your_private_key',
+  137
+);
 ```
 
 ## Error Handling
@@ -347,14 +454,20 @@ try {
 
 ## Supported Networks
 
-- **Polygon Mainnet** (Chain ID: 137)
+- **Polygon Mainnet** (Chain ID: 137) - Production
+- **Polygon Amoy** (Chain ID: 80002) - Testnet
 
 ## Requirements
 
-- Node.js 16+ or modern browser environment
+### Browser Usage
+- Modern browser environment
 - EIP-1193 compatible wallet provider (e.g., MetaMask, Coinbase Wallet, WalletConnect)
-- USDC balance on Polygon mainnet
-- MATIC balance for gas fees (only in main wallet mode)
+- USDC balance on Polygon
+- POL balance for gas fees (only in direct wallet mode; smart wallet mode is gasless)
+
+### Server/CLI Usage
+- Node.js 16+
+- Private key with USDC and POL balance
 
 ## Technical Details
 
@@ -375,9 +488,9 @@ Instead of native spend permissions (which Polygon doesn't support), this packag
 
 ### Authentication
 
-- **Ephemeral Wallet**: Uses EIP-1271 smart contract signature verification
-- **Main Wallet**: Uses standard Ethereum message signing
-- **Coinbase Wallet**: Special handling for hex-encoded message format
+- **Smart Wallet Mode** (`SmartWalletPaymentMaker`): Uses EIP-1271 smart contract signature verification
+- **Direct Wallet Mode** (`DirectWalletPaymentMaker`): Uses standard Ethereum message signing with special handling for Coinbase Wallet
+- **Server Mode** (`ServerPaymentMaker`): Uses ES256K JWT with direct private key signing
 
 ## Migration Guide
 
@@ -397,9 +510,9 @@ const account = await BaseAppAccount.initialize({
   periodInDays: 30
 });
 
-// After (Polygon)
-import { PolygonAccount } from '@atxp/polygon';
-const account = await PolygonAccount.initialize({
+// After (Polygon - Browser)
+import { PolygonBrowserAccount } from '@atxp/polygon';
+const account = await PolygonBrowserAccount.initialize({
   provider: window.ethereum,
   walletAddress: address,
   useEphemeralWallet: true,
@@ -410,10 +523,35 @@ const account = await PolygonAccount.initialize({
 ```
 
 Key differences:
+- Class name changed: `PolygonAccount` → `PolygonBrowserAccount` (for clarity)
 - No `apiKey` or `appName` required
 - Must provide `provider` (EIP-1193 compatible)
 - Must provide `periodStart` timestamp
 - Uses Polygon mainnet USDC instead of Base USDC
+- Native currency is POL (not MATIC)
+
+### Upgrading from Old Names
+
+If you're using the old class names, update your imports:
+
+```typescript
+// Old names (still work via aliases for backward compatibility)
+import { PolygonAccount, SimplePolygonAccount, PolygonPaymentMaker } from '@atxp/polygon';
+
+// New recommended names
+import {
+  PolygonBrowserAccount,  // was: PolygonAccount
+  PolygonServerAccount,   // was: SimplePolygonAccount
+  SmartWalletPaymentMaker,  // was: PolygonPaymentMaker
+  DirectWalletPaymentMaker, // was: MainWalletPaymentMaker
+  ServerPaymentMaker        // was: SimplePolygonPaymentMaker
+} from '@atxp/polygon';
+```
+
+**Why the name change?**
+- Makes it immediately clear which account type is for browser vs server/CLI usage
+- Payment maker names describe their approach (smart wallet, direct wallet, server)
+- Reduces confusion about when to use each implementation
 
 ## License
 
