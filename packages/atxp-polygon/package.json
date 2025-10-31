@@ -29,6 +29,8 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "test": "vitest run",
+    "test:browser": "npm run build && npm run serve:test",
+    "serve:test": "npx -y http-server -p 8000 -c-1 --cors",
     "prepack": "npm run build && npm run typecheck",
     "pack:dry": "npm pack --dry-run"
   },

@@ -14,34 +14,33 @@ The `manual-test.html` file is a self-contained test page that can be opened in 
 
 ### Setup
 
-**Note:** These tests should be run from your main working directory (with the latest code), not from a git worktree.
+**Important:** These tests must be run from the **top level of the monorepo** (not from within `packages/atxp-polygon`). The test server needs to serve all packages to resolve the import map correctly.
 
 1. Build the package:
 ```bash
+# From the monorepo root
 cd packages/atxp-polygon
 npm run build
+cd ../..
 ```
 
-2. Start the test server:
+2. Start the test server from the monorepo root:
 ```bash
-npm run test:browser
+# From the monorepo root (e.g., atxp-dev-sdk/)
+npx -y http-server -p 8000 -c-1 --cors
 ```
-
-This will build the package and start an HTTP server.
 
 3. Open your browser to:
 ```
-http://localhost:8000/test/browser/manual-test.html
+http://localhost:8000/packages/atxp-polygon/test/browser/manual-test.html
 ```
 
-**Alternative:** Serve manually with any HTTP server:
-```bash
-# Using Python
-python3 -m http.server 8000
+**Note:** The test page uses import maps to load modules. It must be served from the monorepo root so it can access:
+- `/packages/atxp-polygon/dist/` - The built Polygon package
+- `/packages/atxp-client/dist/` - The ATXP client package
+- `/packages/atxp-common/dist/` - Common utilities
 
-# Or using npx
-npx http-server -p 8000
-```
+If you run the server from a subdirectory, the import paths will not resolve correctly.
 
 ### Using the Test Page
 
@@ -150,8 +149,10 @@ For comprehensive end-to-end testing, use the manual HTML test page or React com
 - Make sure you're using a browser that supports wallet extensions
 
 ### "Module not found" errors
-- Make sure you've built the package: `npm run build`
-- Check that you're serving the files with a web server (not opening HTML directly)
+- Make sure you've built the package: `cd packages/atxp-polygon && npm run build`
+- Check that you're serving from the monorepo root (not from a subdirectory)
+- Verify the server is running: `npx -y http-server -p 8000 -c-1 --cors` from the monorepo root
+- Don't open HTML directly - must be served via HTTP server
 
 ### Initialization fails
 - Check that you're on the correct network in your wallet
