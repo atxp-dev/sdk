@@ -276,6 +276,14 @@
         <input type="number" id="periodDays" value="30" min="1">
       </div>
 
+      <div class="config-group" id="apiKeyGroup" style="display: block;">
+        <label for="cdpApiKey">Coinbase CDP API Key (Smart Wallet only):</label>
+        <input type="text" id="cdpApiKey" placeholder="Optional - leave empty to use default">
+        <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">
+          Get your API key from <a href="https://portal.cdp.coinbase.com" target="_blank">Coinbase Developer Platform</a>
+        </p>
+      </div>
+
       <button id="initBtn" onclick="initializeAccount()" disabled>Initialize Account</button>
       <div id="initStatus" class="status" style="display: none;"></div>
     </div>
@@ -359,6 +367,10 @@
       window.state.mode = mode;
       document.getElementById('modeSmartWallet').classList.toggle('selected', mode === 'smart');
       document.getElementById('modeDirectWallet').classList.toggle('selected', mode === 'direct');
+
+      // Show/hide API key field based on mode
+      const apiKeyGroup = document.getElementById('apiKeyGroup');
+      apiKeyGroup.style.display = mode === 'smart' ? 'block' : 'none';
       window.log(`Selected ${mode === 'smart' ? 'Smart Wallet' : 'Direct Wallet'} mode`);
     };
 
@@ -402,12 +414,16 @@
         const allowance = parseFloat(document.getElementById('allowance').value);
         const periodDays = parseInt(document.getElementById('periodDays').value);
         const useEphemeralWallet = window.state.mode === 'smart';
+        const cdpApiKey = document.getElementById('cdpApiKey').value.trim() || undefined;
 
         window.log('Initializing account...');
         window.log(`- Mode: ${useEphemeralWallet ? 'Smart Wallet (gasless)' : 'Direct Wallet'}`);
         window.log(`- Chain ID: ${chainId}`);
         window.log(`- Allowance: ${allowance} USDC`);
         window.log(`- Period: ${periodDays} days`);
+        if (cdpApiKey && useEphemeralWallet) {
+          window.log(`- Using custom CDP API key: ${cdpApiKey.substring(0, 8)}...`);
+        }
 
         window.showStatus('initStatus', 'Initializing...', 'info');
 
@@ -421,6 +437,7 @@
           allowance: allowanceBigInt,
           periodInDays: periodDays,
           chainId,
+          coinbaseCdpApiKey: cdpApiKey,
           logger: {
             info: (msg) => window.log(`[INFO] ${msg}`),
             warn: (msg) => window.log(`[WARN] ${msg}`),
