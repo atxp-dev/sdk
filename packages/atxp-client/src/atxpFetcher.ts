@@ -201,20 +201,18 @@ export class ATXPFetcher {
 
         // Submit payment to the server
         const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: '', accountId: this.account.accountId});
-        const paymentBody = {
-          transactionId: result.transactionId,
-          ...(result.transactionSubId ? { transactionSubId: result.transactionSubId } : {}),
-          chain: result.chain,
-          currency: result.currency
-        };
-        this.logger.info(`ATXP: submitting payment to ${paymentRequestUrl} with body: ${JSON.stringify(paymentBody)}`);
         const response = await this.sideChannelFetch(paymentRequestUrl.toString(), {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${jwt}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(paymentBody)
+          body: JSON.stringify({
+            transactionId: result.transactionId,
+            ...(result.transactionSubId ? { transactionSubId: result.transactionSubId } : {}),
+            chain: result.chain,
+            currency: result.currency
+          })
         });
 
         this.logger.debug(`ATXP: payment was ${response.ok ? 'successfully' : 'not successfully'} PUT to ${paymentRequestUrl} : status ${response.status} ${response.statusText}`);
