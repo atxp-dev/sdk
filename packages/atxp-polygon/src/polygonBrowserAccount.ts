@@ -1,48 +1,53 @@
 import type { Account, PaymentMaker, AccountId, Source } from '@atxp/common';
 import { WalletTypeEnum, ChainEnum } from '@atxp/common';
-import { getPolygonUSDCAddress } from '@atxp/client';
-import { SmartWalletPaymentMaker } from './smartWalletPaymentMaker.js';
 import { DirectWalletPaymentMaker, type MainWalletProvider } from './directWalletPaymentMaker.js';
-import { generatePrivateKey } from 'viem/accounts';
 import { polygon } from 'viem/chains';
-import { Hex } from '@atxp/client';
-import { SpendPermission, Eip1193Provider } from './types.js';
-import { requestSpendPermission } from './spendPermissionShim.js';
-import { ICache, BrowserCache, IntermediaryCache, type Intermediary } from './cache.js';
-import { toEphemeralSmartWallet, type EphemeralSmartWallet } from './smartWalletHelpers.js';
+import { Eip1193Provider } from './types.js';
 import { ConsoleLogger, Logger } from '@atxp/common';
 
-const DEFAULT_ALLOWANCE = 10n;
-const DEFAULT_PERIOD_IN_DAYS = 7;
-
+/**
+ * Polygon browser account implementation using Direct Wallet mode.
+ *
+ * Direct Wallet mode:
+ * - User signs each transaction with their wallet
+ * - User pays gas fees in POL
+ * - No smart wallet or gasless transactions
+ *
+ * Note: Smart Wallet mode is not supported on Polygon because Coinbase CDP
+ * does not provide Paymaster services for Polygon mainnet.
+ */
 export class PolygonBrowserAccount implements Account {
   accountId: AccountId;
   paymentMakers: PaymentMaker[];
-  private mainWalletAddress?: string;
-  private ephemeralSmartWallet?: EphemeralSmartWallet;
+  private walletAddress: string;
   private chainId: number;
-
-  private static toCacheKey(userWalletAddress: string): string {
-    return `atxp-polygon-permission-${userWalletAddress}`;
-  }
 
   static async initialize(config: {
       walletAddress: string,
       provider: Eip1193Provider,
+      logger?: Logger;
+      chainId?: number; // 137 for mainnet, 80002 for Amoy testnet
+      // Deprecated parameters (kept for backward compatibility but ignored):
       useEphemeralWallet?: boolean;
       allowance?: bigint;
       periodInDays?: number;
-      cache?: ICache<string>;
-      logger?: Logger;
-      chainId?: number; // 137 for mainnet
+      cache?: unknown;
+      coinbaseCdpApiKey?: string;
     },
   ): Promise<PolygonBrowserAccount> {
     const logger = config.logger || new ConsoleLogger();
-    const useEphemeralWallet = config.useEphemeralWallet ?? true; // Default to true for backward compatibility
     const chainId = config.chainId || polygon.id; // Default to Polygon mainnet
 
-    // Get USDC address for the specified chain
-    const usdcAddress = getPolygonUSDCAddress(chainId);
+    // Warn if deprecated smart wallet parameters are provided
+    if (config.useEphemeralWallet === true) {
+      logger.warn('Smart Wallet mode (useEphemeralWallet=true) is not supported on Polygon. Using Direct Wallet mode instead.');
+    }
+    if (config.allowance !== undefined || config.periodInDays !== undefined) {
+      logger.warn('allowance and periodInDays parameters are ignored in Direct Wallet mode.');
+    }
+    if (config.coinbaseCdpApiKey !== undefined) {
+      logger.warn('coinbaseCdpApiKey parameter is ignored in Direct Wallet mode.');
+    }
 
     // Some wallets don't support wallet_connect, so
     // will just continue if it fails
@@ -53,159 +58,49 @@ export class PolygonBrowserAccount implements Account {
       logger.warn(`wallet_connect not supported, continuing with initialization. ${error}`);
     }
 
-    // If using main wallet mode, return early with main wallet payment maker
-    if (!useEphemeralWallet) {
-      logger.info(`Using main wallet mode for address: ${config.walletAddress}`);
-      return new PolygonBrowserAccount(
-        null, // No spend permission in main wallet mode
-        null, // No ephemeral wallet in main wallet mode
-        logger,
-        config.walletAddress,
-        config.provider,
-        chainId
-      );
-    }
+    logger.info(`Initializing Polygon account in Direct Wallet mode for address: ${config.walletAddress}`);
 
-    // Initialize cache
-    const baseCache = config?.cache || new BrowserCache();
-    const cache = new IntermediaryCache(baseCache);
-    const cacheKey = this.toCacheKey(config.walletAddress);
-
-    // Try to load existing permission
-    const existingData = this.loadSavedWalletAndPermission(cache, cacheKey);
-    if (existingData) {
-      const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey, chainId);
-      return new PolygonBrowserAccount(existingData.permission, ephemeralSmartWallet, logger, undefined, undefined, chainId);
-    }
-
-    const privateKey = generatePrivateKey();
-    const smartWallet = await toEphemeralSmartWallet(privateKey, chainId);
-    logger.info(`Generated ephemeral wallet: ${smartWallet.address}`);
-    await this.deploySmartWallet(smartWallet);
-    logger.info(`Deployed smart wallet: ${smartWallet.address}`);
-
-    const permission = await requestSpendPermission({
-      account: config.walletAddress,
-      spender: smartWallet.address,
-      token: usdcAddress,
-      chainId: chainId,
-      allowance: config?.allowance ?? DEFAULT_ALLOWANCE,
-      periodInDays: config?.periodInDays ?? DEFAULT_PERIOD_IN_DAYS,
-      provider: config.provider,
-    });
-
-    // Save wallet and permission
-    cache.set(cacheKey, {privateKey, permission});
-
-    return new PolygonBrowserAccount(permission, smartWallet, logger, undefined, undefined, chainId);
-  }
-
-  private static loadSavedWalletAndPermission(
-    permissionCache: IntermediaryCache,
-    cacheKey: string
-  ): Intermediary | null {
-    const cachedData = permissionCache.get(cacheKey);
-    if (!cachedData) return null;
-
-    // Check if permission is not expired
-    const now = Math.floor(Date.now() / 1000);
-    const permissionEnd = parseInt(cachedData.permission.permission.end.toString());
-    if (permissionEnd <= now) {
-      permissionCache.delete(cacheKey);
-      return null;
-    }
-
-    return cachedData;
-  }
-
-  private static async deploySmartWallet(
-    smartWallet: EphemeralSmartWallet,
-  ): Promise<void> {
-    const deployTx = await smartWallet.client.sendUserOperation({
-      calls: [{
-        to: smartWallet.address,
-        value: 0n,
-        data: '0x' as Hex
-      }],
-      paymaster: true
-    });
-
-    const receipt = await smartWallet.client.waitForUserOperationReceipt({
-      hash: deployTx
-    });
-
-    if (!receipt.success) {
-      throw new Error(`Smart wallet deployment failed. Receipt: ${JSON.stringify(receipt)}`);
-    }
+    return new PolygonBrowserAccount(
+      config.walletAddress,
+      config.provider,
+      logger,
+      chainId
+    );
   }
 
   constructor(
-    spendPermission: SpendPermission | null,
-    ephemeralSmartWallet: EphemeralSmartWallet | null,
-    logger?: Logger,
-    mainWalletAddress?: string,
-    provider?: MainWalletProvider,
+    walletAddress: string,
+    provider: MainWalletProvider,
+    logger: Logger,
     chainId: number = polygon.id
   ) {
+    this.walletAddress = walletAddress;
     this.chainId = chainId;
-    if (ephemeralSmartWallet) {
-      // Ephemeral wallet mode
-      if (!spendPermission) {
-        throw new Error('Spend permission is required for ephemeral wallet mode');
-      }
-      // Format accountId as network:address
-      this.accountId = `polygon:${ephemeralSmartWallet.address}` as AccountId;
-      this.ephemeralSmartWallet = ephemeralSmartWallet;
-      this.paymentMakers = [
-        new SmartWalletPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId)
-      ];
-    } else {
-      // Main wallet mode
-      if (!mainWalletAddress || !provider) {
-        throw new Error('Main wallet address and provider are required for main wallet mode');
-      }
-      // Format accountId as network:address
-      this.accountId = `polygon:${mainWalletAddress}` as AccountId;
-      this.mainWalletAddress = mainWalletAddress;
-      this.paymentMakers = [
-        new DirectWalletPaymentMaker(mainWalletAddress, provider, logger, chainId)
-      ];
-    }
+
+    // Format accountId as network:address
+    this.accountId = `polygon:${walletAddress}` as AccountId;
+
+    this.paymentMakers = [
+      new DirectWalletPaymentMaker(walletAddress, provider, logger, chainId)
+    ];
   }
 
   async getSources(): Promise<Source[]> {
-    const address = this.ephemeralSmartWallet?.address || this.mainWalletAddress;
-    if (!address) {
-      return [];
-    }
-
-    // For Polygon, we only support mainnet (137) for now
+    // For Polygon, we support both mainnet (137) and Amoy testnet (80002)
     const chain = ChainEnum.Polygon;
 
     return [{
-      address,
+      address: this.walletAddress,
       chain,
-      walletType: this.ephemeralSmartWallet ? WalletTypeEnum.Smart : WalletTypeEnum.EOA
+      walletType: WalletTypeEnum.EOA
     }];
   }
 
   /**
-   * Dynamically import the appropriate spend-permission module based on environment.
-   * Uses browser version as requestSpendPermission only exists there.
-   * Throws error if used in server-side environment.
+   * Clear cached data (no-op in Direct Wallet mode, kept for backward compatibility)
+   * @deprecated This method is a no-op in Direct Wallet mode
    */
-
-  static clearAllCachedData(userWalletAddress: string, cache?: ICache<string>): void {
-    // In non-browser environments, require an explicit cache parameter
-    if (!cache) {
-      const browserCache = new BrowserCache();
-      // Check if BrowserCache would work (i.e., we're in a browser)
-      if (typeof window === 'undefined') {
-        throw new Error('clearAllCachedData requires a cache to be provided outside of browser environments');
-      }
-      cache = browserCache;
-    }
-
-    cache.delete(this.toCacheKey(userWalletAddress));
+  static clearAllCachedData(_userWalletAddress: string, _cache?: unknown): void {
+    // No-op: Direct Wallet mode doesn't cache any data
   }
 }
