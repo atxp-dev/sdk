@@ -118,3 +118,8 @@ export {
   BrowserCache,
   MemoryCache
 } from './cache.js';
+
+// ATXP Account implementations
+export {
+  ATXPAccount
+} from './atxpAccount.js';

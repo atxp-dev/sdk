@@ -127,4 +127,3 @@ export class ATXPLocalAccount implements LocalAccount {
    */
   readonly source = 'custom' as const;
 }
-

@@ -1,8 +1,6 @@
 import type { Account, PaymentMaker } from './types.js';
-import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain, Source } from '@atxp/common';
+import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain, Source } from './types.js';
 import BigNumber from 'bignumber.js';
-import { LocalAccount } from 'viem';
-import { ATXPLocalAccount } from './atxpLocalAccount.js';
 
 function toBasicAuth(token: string): string {
   // Basic auth is base64("username:password"), password is blank
@@ -164,15 +162,6 @@ export class ATXPAccount implements Account {
     this.paymentMakers = [
       new ATXPHttpPaymentMaker(origin, token, fetchFn)
     ];
-  }
-
-
-  async getSigner(): Promise<LocalAccount> {
-    return ATXPLocalAccount.create(
-      this.origin,
-      this.token,
-      this.fetchFn
-    );
   }
 
   /**
