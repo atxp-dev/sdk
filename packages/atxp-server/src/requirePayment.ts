@@ -61,7 +61,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   }];
 
   try {
-    // TODO: Remove this once per-v0.8.0 clients are no longer supported - 0.8.0 only needs 'atxp'
+    // TODO: Remove this once pre-v0.8.0 clients are no longer supported - 0.8.0 only needs 'atxp'
     const sources = await config.destination.getSources();
     config.logger.debug(`Fetched ${sources.length} sources for destination account`);
 
