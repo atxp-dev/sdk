@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 import type { Eip1193Provider } from './types.js';
