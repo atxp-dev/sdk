@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import { atxpClient, BaseAccount, SolanaAccount } from '@atxp/client';
-import { PolygonAccount } from '@atxp/polygon';
+import { SimplePolygonAccount } from '@atxp/polygon';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -92,7 +92,7 @@ async function testPolygonPayment() {
   }
 
   try {
-    const account = new PolygonAccount(polygonRpc, polygonPrivateKey as `0x${string}`, 137);
+    const account = new SimplePolygonAccount(polygonRpc, polygonPrivateKey as `0x${string}`, 137);
     console.log('Using Polygon account:', account.accountId);
 
     const mcpClient = await atxpClient({
