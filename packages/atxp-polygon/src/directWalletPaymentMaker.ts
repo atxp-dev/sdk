@@ -87,11 +87,15 @@ export class DirectWalletPaymentMaker implements PaymentMaker {
     _memo: string,
     _paymentRequestId?: string
   ): Promise<PaymentIdentifier | null> {
+    this.logger.debug(`DirectWalletPaymentMaker: Received ${destinations.length} destinations`);
+    this.logger.debug(`DirectWalletPaymentMaker: Destinations: ${JSON.stringify(destinations)}`);
+
     // Filter to polygon chain destinations
     const polygonDestinations = destinations.filter(d => d.chain === 'polygon');
 
     if (polygonDestinations.length === 0) {
-      this.logger.debug('MainWalletPaymentMaker: No polygon destinations found, cannot handle payment');
+      const availableChains = destinations.map(d => d.chain).join(', ');
+      this.logger.warn(`DirectWalletPaymentMaker: This payment requires payment on [${availableChains}] but this account only supports Polygon. Please use a service that accepts Polygon payments, or use an account that supports one of these chains.`);
       return null; // Cannot handle these destinations
     }
 
