@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATXP Polygon Browser Test</title>
+  <script type="module">
+    // Import and setup Buffer polyfill
+    import { Buffer } from 'https://esm.sh/buffer@6.0.3';
+    window.Buffer = Buffer;
+    window.process = window.process || { env: {}, browser: true, version: 'v16.0.0' };
+    window.global = window.global || window;
+  </script>
+  <script type="importmap">
+    {
+      "imports": {
+        "@atxp/polygon": "/packages/atxp-polygon/dist/index.js",
+        "@atxp/client": "/packages/atxp-client/dist/index.js",
+        "@atxp/common": "/packages/atxp-common/dist/index.js",
+        "jose": "https://esm.sh/jose@5.9.6",
+        "oauth4webapi": "https://esm.sh/oauth4webapi@3.5.0",
+        "bignumber.js": "https://esm.sh/v135/bignumber.js@9.1.2/es2022/bignumber.mjs",
+        "bs58": "https://esm.sh/bs58@6.0.0",
+        "buffer": "https://esm.sh/buffer@6.0.3",
+        "zod": "https://esm.sh/zod@3.23.8",
+        "@modelcontextprotocol/sdk/": "https://esm.sh/@modelcontextprotocol/sdk@1.15.0/",
+        "@solana/web3.js": "https://esm.sh/@solana/web3.js@1.95.8",
+        "@solana/pay": "https://esm.sh/@solana/pay@0.2.5",
+        "@solana/spl-token": "https://esm.sh/@solana/spl-token@0.4.9",
+        "viem": "https://esm.sh/viem@2.34.0",
+        "viem/": "https://esm.sh/viem@2.34.0/",
+        "@noble/curves/secp256k1": "https://esm.sh/@noble/curves@1.6.0/secp256k1",
+        "@noble/hashes/sha256": "https://esm.sh/@noble/hashes@1.5.0/sha256",
+        "@noble/hashes/sha512": "https://esm.sh/@noble/hashes@1.5.0/sha512",
+        "@noble/hashes/utils": "https://esm.sh/@noble/hashes@1.5.0/utils",
+        "@noble/hashes/hmac": "https://esm.sh/@noble/hashes@1.5.0/hmac",
+        "@noble/hashes/pbkdf2": "https://esm.sh/@noble/hashes@1.5.0/pbkdf2",
+        "@scure/base": "https://esm.sh/@scure/base@1.1.9",
+        "@scure/bip32": "https://esm.sh/@scure/bip32@1.5.0",
+        "@scure/bip39": "https://esm.sh/@scure/bip39@1.4.0"
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 4px;
+    }
+    .section h2 {
+      margin-top: 0;
+      color: #444;
+      font-size: 18px;
+    }
+    button {
+      background: #0052ff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background: #0041cc;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .secondary {
+      background: #6c757d;
+    }
+    .secondary:hover {
+      background: #5a6268;
+    }
+    .status {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    .log {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 15px;
+      margin-top: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 2px 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+    .config-group {
+      margin: 15px 0;
+    }
+    .config-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: #555;
+    }
+    .config-group input, .config-group select, .config-group textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .config-group textarea {
+      min-height: 60px;
+      font-family: inherit;
+    }
+    .mode-selector {
+      display: flex;
+      gap: 10px;
+      margin: 15px 0;
+    }
+    .mode-option {
+      flex: 1;
+      padding: 15px;
+      border: 2px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .mode-option:hover {
+      border-color: #0052ff;
+    }
+    .mode-option.selected {
+      border-color: #0052ff;
+      background: #e7f1ff;
+    }
+    .mode-option h3 {
+      margin: 0 0 5px 0;
+      font-size: 16px;
+    }
+    .mode-option p {
+      margin: 0;
+      font-size: 12px;
+      color: #666;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    .image-gallery {
+      margin-top: 20px;
+    }
+    .image-card {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+    .image-card img {
+      width: 100%;
+      max-width: 512px;
+      height: auto;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    .image-card .prompt {
+      margin-top: 10px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .image-card .prompt-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+    .image-card .timestamp {
+      font-size: 11px;
+      color: #999;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ATXP Polygon Browser Test</h1>
+    <p class="subtitle">Test browser integration with payments and image generation</p>
+
+    <!-- Connection Section -->
+    <div class="section">
+      <h2>1. Connect Wallet</h2>
+      <button id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
+      <div id="walletStatus" class="status info" style="display: none;"></div>
+    </div>
+
+    <!-- Configuration Section -->
+    <div class="section">
+      <h2>2. Configure Account</h2>
+
+      <div class="mode-selector">
+        <div class="mode-option selected" id="modeSmartWallet" onclick="selectMode('smart')">
+          <h3>Smart Wallet Mode</h3>
+          <p>Gasless transactions with single approval</p>
+        </div>
+        <div class="mode-option" id="modeDirectWallet" onclick="selectMode('direct')">
+          <h3>Direct Wallet Mode</h3>
+          <p>User signs each transaction</p>
+        </div>
+      </div>
+
+      <div class="config-group">
+        <label for="chainSelect">Network:</label>
+        <select id="chainSelect">
+          <option value="137">Polygon Mainnet (137)</option>
+          <option value="80002" selected>Polygon Amoy Testnet (80002)</option>
+        </select>
+      </div>
+
+      <div class="config-group">
+        <label for="allowance">Allowance (USDC):</label>
+        <input type="number" id="allowance" value="10" step="0.01" min="0">
+      </div>
+
+      <div class="config-group">
+        <label for="periodDays">Period (days):</label>
+        <input type="number" id="periodDays" value="30" min="1">
+      </div>
+
+      <button id="initBtn" onclick="initializeAccount()" disabled>Initialize Account</button>
+      <div id="initStatus" class="status" style="display: none;"></div>
+    </div>
+
+    <!-- Account Info Section -->
+    <div class="section" id="accountSection" style="display: none;">
+      <h2>3. Account Information</h2>
+      <div id="accountInfo"></div>
+      <button onclick="refreshAccountInfo()">Refresh Info</button>
+      <button class="secondary" onclick="clearCache()">Clear Cache</button>
+    </div>
+
+    <!-- Image Generation Section -->
+    <div class="section" id="imageSection" style="display: none;">
+      <h2>4. Generate Image with Payment</h2>
+      <p style="margin-bottom: 15px; font-size: 14px; color: #666;">
+        Each image generation costs approximately $0.05 USDC
+      </p>
+
+      <div class="config-group">
+        <label for="imagePrompt">Image Prompt:</label>
+        <textarea id="imagePrompt" placeholder="e.g., A cat riding a horse">A cat riding a horse</textarea>
+      </div>
+
+      <button id="generateBtn" onclick="generateImage()">Generate Image</button>
+      <div id="imageStatus" class="status" style="display: none;"></div>
+
+      <div id="imageGallery" class="image-gallery" style="display: none;">
+        <h3>Generated Images:</h3>
+        <div id="imageList"></div>
+      </div>
+    </div>
+
+    <!-- Console Log -->
+    <div class="section">
+      <h2>Console Log</h2>
+      <button class="secondary" onclick="clearLog()">Clear Log</button>
+      <div id="consoleLog" class="log"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Import the polygon and client packages
+    import { PolygonBrowserAccount } from '@atxp/polygon';
+    import { atxpClient } from '@atxp/client';
+
+    // Global state
+    window.state = {
+      walletAddress: null,
+      account: null,
+      client: null,
+      mode: 'smart', // 'smart' or 'direct'
+      generatedImages: []
+    };
+
+    // Logging helper
+    window.log = function(message, type = 'info') {
+      const logDiv = document.getElementById('consoleLog');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const timestamp = new Date().toLocaleTimeString();
+      entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+
+      console.log(message);
+    };
+
+    window.clearLog = function() {
+      document.getElementById('consoleLog').innerHTML = '';
+    };
+
+    window.showStatus = function(elementId, message, type) {
+      const el = document.getElementById(elementId);
+      el.textContent = message;
+      el.className = `status ${type}`;
+      el.style.display = 'block';
+    };
+
+    window.selectMode = function(mode) {
+      window.state.mode = mode;
+      document.getElementById('modeSmartWallet').classList.toggle('selected', mode === 'smart');
+      document.getElementById('modeDirectWallet').classList.toggle('selected', mode === 'direct');
+      window.log(`Selected ${mode === 'smart' ? 'Smart Wallet' : 'Direct Wallet'} mode`);
+    };
+
+    window.connectWallet = async function() {
+      try {
+        window.log('Checking for wallet provider...');
+
+        if (!window.ethereum) {
+          throw new Error('No wallet provider found. Please install MetaMask or Coinbase Wallet.');
+        }
+
+        window.log('Requesting wallet connection...');
+        const accounts = await window.ethereum.request({
+          method: 'eth_requestAccounts'
+        });
+
+        if (!accounts || accounts.length === 0) {
+          throw new Error('No accounts found');
+        }
+
+        window.state.walletAddress = accounts[0];
+        window.log(`Connected to wallet: ${accounts[0]}`);
+        window.showStatus('walletStatus', `Connected: ${accounts[0]}`, 'success');
+
+        // Enable initialize button
+        document.getElementById('initBtn').disabled = false;
+
+      } catch (error) {
+        window.log(`Connection error: ${error.message}`, 'error');
+        window.showStatus('walletStatus', `Error: ${error.message}`, 'error');
+      }
+    };
+
+    window.initializeAccount = async function() {
+      try {
+        if (!window.state.walletAddress) {
+          throw new Error('Please connect wallet first');
+        }
+
+        const chainId = parseInt(document.getElementById('chainSelect').value);
+        const allowance = parseFloat(document.getElementById('allowance').value);
+        const periodDays = parseInt(document.getElementById('periodDays').value);
+        const useEphemeralWallet = window.state.mode === 'smart';
+
+        window.log('Initializing account...');
+        window.log(`- Mode: ${useEphemeralWallet ? 'Smart Wallet (gasless)' : 'Direct Wallet'}`);
+        window.log(`- Chain ID: ${chainId}`);
+        window.log(`- Allowance: ${allowance} USDC`);
+        window.log(`- Period: ${periodDays} days`);
+
+        window.showStatus('initStatus', 'Initializing...', 'info');
+
+        // Convert allowance to 6 decimals (USDC)
+        const allowanceBigInt = BigInt(Math.floor(allowance * 1_000_000));
+
+        const account = await PolygonBrowserAccount.initialize({
+          provider: window.ethereum,
+          walletAddress: window.state.walletAddress,
+          useEphemeralWallet,
+          allowance: allowanceBigInt,
+          periodInDays: periodDays,
+          chainId,
+          logger: {
+            info: (msg) => window.log(`[INFO] ${msg}`),
+            warn: (msg) => window.log(`[WARN] ${msg}`),
+            error: (msg) => window.log(`[ERROR] ${msg}`, 'error'),
+            debug: (msg) => window.log(`[DEBUG] ${msg}`)
+          }
+        });
+
+        window.state.account = account;
+        window.log('Account initialized successfully!');
+        window.showStatus('initStatus', 'Account initialized successfully!', 'success');
+
+        // Initialize ATXP client
+        window.log('Initializing ATXP client...');
+        const client = await atxpClient({
+          account: account,
+          mcpServer: 'https://image.mcp.atxp.ai/',
+          onPayment: async ({ payment }) => {
+            window.log(`Payment successful: ${payment.paymentId}`, 'success');
+            console.log('Payment details:', payment);
+          },
+          onPaymentFailure: async ({ payment, error }) => {
+            window.log(`Payment failed: ${error.message}`, 'error');
+            console.error('Payment error:', payment, error);
+          }
+        });
+
+        window.state.client = client;
+        window.log('ATXP client initialized successfully!');
+
+        // Show account info and image sections
+        document.getElementById('accountSection').style.display = 'block';
+        document.getElementById('imageSection').style.display = 'block';
+
+        await refreshAccountInfo();
+
+      } catch (error) {
+        window.log(`Initialization error: ${error.message}`, 'error');
+        window.showStatus('initStatus', `Error: ${error.message}`, 'error');
+        console.error('Full error:', error);
+      }
+    };
+
+    window.refreshAccountInfo = async function() {
+      try {
+        if (!window.state.account) {
+          throw new Error('No account initialized');
+        }
+
+        const account = window.state.account;
+        const sources = await account.getSources();
+
+        let html = '<pre>';
+        html += `<strong>Account ID:</strong> ${account.accountId}\n`;
+        html += `<strong>Mode:</strong> ${window.state.mode === 'smart' ? 'Smart Wallet' : 'Direct Wallet'}\n`;
+        html += `<strong>Payment Makers:</strong> ${account.paymentMakers.length}\n\n`;
+        html += `<strong>Sources:</strong>\n`;
+        sources.forEach((source, idx) => {
+          html += `  ${idx + 1}. Address: ${source.address}\n`;
+          html += `     Chain: ${source.chain}\n`;
+          html += `     Type: ${source.walletType}\n`;
+        });
+        html += '</pre>';
+
+        document.getElementById('accountInfo').innerHTML = html;
+        window.log('Account info refreshed');
+
+      } catch (error) {
+        window.log(`Error refreshing account info: ${error.message}`, 'error');
+        document.getElementById('accountInfo').innerHTML =
+          `<div class="status error">Error: ${error.message}</div>`;
+      }
+    };
+
+    window.generateImage = async function() {
+      try {
+        if (!window.state.client) {
+          throw new Error('Client not initialized');
+        }
+
+        const prompt = document.getElementById('imagePrompt').value.trim();
+        if (!prompt) {
+          throw new Error('Please enter an image prompt');
+        }
+
+        window.log(`Generating image: "${prompt}"`);
+        window.showStatus('imageStatus', 'Generating image...', 'info');
+
+        // Disable button
+        document.getElementById('generateBtn').disabled = true;
+
+        // Start async image generation
+        window.log('Calling image_create_image_async...');
+        const createResult = await window.state.client.callTool({
+          name: 'image_create_image_async',
+          arguments: { prompt }
+        });
+
+        window.log('Image generation started');
+        console.log('Create result:', createResult);
+
+        // Extract task ID from result
+        const taskId = createResult?.content?.[0]?.text || createResult?.taskId;
+        if (!taskId) {
+          throw new Error('No task ID returned from image generation');
+        }
+
+        window.log(`Task ID: ${taskId}`);
+        window.log('Polling for completion...');
+        window.showStatus('imageStatus', 'Waiting for image generation...', 'info');
+
+        // Poll for completion
+        let attempts = 0;
+        const maxAttempts = 30; // 30 attempts with 2 second intervals = 1 minute max
+        const pollInterval = 2000; // 2 seconds
+
+        while (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          attempts++;
+
+          window.log(`Checking status (attempt ${attempts}/${maxAttempts})...`);
+
+          const statusResult = await window.state.client.callTool({
+            name: 'image_get_image_async',
+            arguments: { task_id: taskId }
+          });
+
+          console.log('Status result:', statusResult);
+
+          const status = statusResult?.content?.[0]?.text || statusResult?.status;
+
+          if (typeof status === 'string' && status.includes('completed')) {
+            // Extract image URL from result
+            const urlMatch = status.match(/https?:\/\/[^\s]+/);
+            if (urlMatch) {
+              const imageUrl = urlMatch[0];
+              window.log('Image generated successfully!');
+              window.showStatus('imageStatus', 'Image generated successfully!', 'success');
+
+              // Add to gallery
+              window.state.generatedImages.unshift({
+                url: imageUrl,
+                prompt: prompt,
+                timestamp: new Date()
+              });
+
+              displayImages();
+              break;
+            }
+          } else if (typeof status === 'string' && status.includes('failed')) {
+            throw new Error('Image generation failed');
+          }
+        }
+
+        if (attempts >= maxAttempts) {
+          throw new Error('Image generation timed out');
+        }
+
+      } catch (error) {
+        window.log(`Image generation error: ${error.message}`, 'error');
+        window.showStatus('imageStatus', `Error: ${error.message}`, 'error');
+        console.error('Full error:', error);
+      } finally {
+        document.getElementById('generateBtn').disabled = false;
+      }
+    };
+
+    window.displayImages = function() {
+      const gallery = document.getElementById('imageGallery');
+      const imageList = document.getElementById('imageList');
+
+      if (window.state.generatedImages.length === 0) {
+        gallery.style.display = 'none';
+        return;
+      }
+
+      gallery.style.display = 'block';
+      imageList.innerHTML = '';
+
+      window.state.generatedImages.forEach((img) => {
+        const card = document.createElement('div');
+        card.className = 'image-card';
+        card.innerHTML = `
+          <img src="${img.url}" alt="${img.prompt}" />
+          <div class="prompt">Prompt:</div>
+          <div class="prompt-text">${img.prompt}</div>
+          <div class="timestamp">${img.timestamp.toLocaleString()}</div>
+        `;
+        imageList.appendChild(card);
+      });
+    };
+
+    window.clearCache = function() {
+      try {
+        if (!window.state.walletAddress) {
+          throw new Error('No wallet address');
+        }
+
+        PolygonBrowserAccount.clearAllCachedData(window.state.walletAddress);
+        window.log('Cache cleared successfully');
+        alert('Cache cleared! You will need to reinitialize the account.');
+
+        // Reset state
+        window.state.account = null;
+        window.state.client = null;
+        document.getElementById('accountSection').style.display = 'none';
+        document.getElementById('imageSection').style.display = 'none';
+
+      } catch (error) {
+        window.log(`Error clearing cache: ${error.message}`, 'error');
+        alert(`Error: ${error.message}`);
+      }
+    };
+
+    // Initialize
+    window.log('Page loaded. Click "Connect Wallet" to begin.');
+
+    // Check if wallet is already connected
+    if (window.ethereum && window.ethereum.selectedAddress) {
+      window.log(`Wallet already connected: ${window.ethereum.selectedAddress}`);
+    }
+  </script>
+</body>
+</html>
