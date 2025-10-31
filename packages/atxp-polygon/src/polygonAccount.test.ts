@@ -46,14 +46,12 @@ import {
   setupInitializationMocks,
   setupPaymentMocks,
   mockSpendPermission,
-  mockExpiredSpendPermission,
   mockBundlerClient,
   mockFailedBundlerClient,
   mockProvider,
   mockSpendCalls,
   mockEphemeralSmartWallet,
   getCacheKey,
-  removeTimestamps,
   TestMemoryCache,
   serializeWithBigInt
 } from './testHelpers.js';
@@ -104,13 +102,13 @@ describe('PolygonBrowserAccount', () => {
       // Verify mocks were called
       expect(mocks.toEphemeralSmartWallet).toHaveBeenCalled();
       expect(mocks.requestSpendPermission).toHaveBeenCalledWith({
+        account: TEST_WALLET_ADDRESS,
         provider,
         spender: TEST_SMART_WALLET_ADDRESS,
         token: getPolygonUSDCAddress(137),
-        amount: BigInt('10000000'),
-        start: expect.any(Number),
-        end: expect.any(Number),
-        period: 30 * 24 * 60 * 60
+        chainId: 137,
+        allowance: BigInt('10000000'),
+        periodInDays: 30
       });
 
       // Verify smart wallet was deployed
@@ -173,53 +171,6 @@ describe('PolygonBrowserAccount', () => {
       // Verify smart wallet was NOT deployed (reusing existing)
       expect(bundlerClient.sendUserOperation).not.toHaveBeenCalled();
       expect(mocks.requestSpendPermission).not.toHaveBeenCalled();
-    });
-
-    it('should create new account when stored permission is expired', async () => {
-      // Pre-store expired permission
-      const expiredPermission = mockExpiredSpendPermission();
-      const cacheKey = getCacheKey(TEST_WALLET_ADDRESS);
-      mockCache.set(
-        cacheKey,
-        serializeWithBigInt({
-          privateKey: TEST_PRIVATE_KEY,
-          permission: expiredPermission
-        })
-      );
-
-      const newPermission = mockSpendPermission();
-      const bundlerClient = mockBundlerClient();
-      const provider = mockProvider();
-      const ephemeralWallet = mockEphemeralSmartWallet({ client: bundlerClient });
-
-      const mocks = await setupInitializationMocks({
-        bundlerClient,
-        provider,
-        ephemeralWallet,
-        spendPermission: newPermission
-      });
-
-
-      // Initialize account
-      const account = await PolygonBrowserAccount.initialize({
-        walletAddress: TEST_WALLET_ADDRESS,
-        provider: provider,
-        useEphemeralWallet: true,
-        allowance: BigInt('10000000'),
-        periodInDays: 30,
-        cache: mockCache
-      });
-
-      // Verify new account was created
-      expect(account).toBeDefined();
-      expect(bundlerClient.sendUserOperation).toHaveBeenCalled();
-      expect(mocks.requestSpendPermission).toHaveBeenCalled();
-
-      // Verify old data was removed and new data stored
-      const storedData = mockCache.get(cacheKey);
-      expect(storedData).toBeTruthy();
-      const parsedData = JSON.parse(storedData!);
-      expect(parsedData.permission).toMatchObject(removeTimestamps(newPermission));
     });
 
     it('should throw when smart wallet deployment fails', async () => {

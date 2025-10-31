@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { vi, expect } from 'vitest';
 import type { Mock } from 'vitest';
 import type { SpendPermission, Eip1193Provider } from './types.js';
