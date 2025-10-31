@@ -53,7 +53,11 @@ async function waitForTransactionConfirmations(
   }
 }
 
-export class PolygonPaymentMaker implements PaymentMaker {
+/**
+ * Browser-based payment maker using ephemeral smart wallets with account abstraction.
+ * Uses Coinbase CDP for gasless transactions and spend permissions.
+ */
+export class SmartWalletPaymentMaker implements PaymentMaker {
   private logger: Logger;
   private spendPermission: SpendPermission;
   private smartWallet: EphemeralSmartWallet;

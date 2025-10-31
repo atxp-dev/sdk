@@ -1,8 +1,8 @@
 import type { Account, PaymentMaker, AccountId, Source } from '@atxp/common';
 import { WalletTypeEnum, ChainEnum } from '@atxp/common';
 import { getPolygonUSDCAddress } from '@atxp/client';
-import { PolygonPaymentMaker } from './polygonPaymentMaker.js';
-import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
+import { SmartWalletPaymentMaker } from './smartWalletPaymentMaker.js';
+import { DirectWalletPaymentMaker, type MainWalletProvider } from './directWalletPaymentMaker.js';
 import { generatePrivateKey } from 'viem/accounts';
 import { polygon } from 'viem/chains';
 import { Hex } from '@atxp/client';
@@ -15,7 +15,7 @@ import { ConsoleLogger, Logger } from '@atxp/common';
 const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
 
-export class PolygonAccount implements Account {
+export class PolygonBrowserAccount implements Account {
   accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private mainWalletAddress?: string;
@@ -36,7 +36,7 @@ export class PolygonAccount implements Account {
       logger?: Logger;
       chainId?: number; // 137 for mainnet
     },
-  ): Promise<PolygonAccount> {
+  ): Promise<PolygonBrowserAccount> {
     const logger = config.logger || new ConsoleLogger();
     const useEphemeralWallet = config.useEphemeralWallet ?? true; // Default to true for backward compatibility
     const chainId = config.chainId || polygon.id; // Default to Polygon mainnet
@@ -56,7 +56,7 @@ export class PolygonAccount implements Account {
     // If using main wallet mode, return early with main wallet payment maker
     if (!useEphemeralWallet) {
       logger.info(`Using main wallet mode for address: ${config.walletAddress}`);
-      return new PolygonAccount(
+      return new PolygonBrowserAccount(
         null, // No spend permission in main wallet mode
         null, // No ephemeral wallet in main wallet mode
         logger,
@@ -75,7 +75,7 @@ export class PolygonAccount implements Account {
     const existingData = this.loadSavedWalletAndPermission(cache, cacheKey);
     if (existingData) {
       const ephemeralSmartWallet = await toEphemeralSmartWallet(existingData.privateKey, chainId);
-      return new PolygonAccount(existingData.permission, ephemeralSmartWallet, logger, undefined, undefined, chainId);
+      return new PolygonBrowserAccount(existingData.permission, ephemeralSmartWallet, logger, undefined, undefined, chainId);
     }
 
     const privateKey = generatePrivateKey();
@@ -97,7 +97,7 @@ export class PolygonAccount implements Account {
     // Save wallet and permission
     cache.set(cacheKey, {privateKey, permission});
 
-    return new PolygonAccount(permission, smartWallet, logger, undefined, undefined, chainId);
+    return new PolygonBrowserAccount(permission, smartWallet, logger, undefined, undefined, chainId);
   }
 
   private static loadSavedWalletAndPermission(
@@ -157,7 +157,7 @@ export class PolygonAccount implements Account {
       this.accountId = `polygon:${ephemeralSmartWallet.address}` as AccountId;
       this.ephemeralSmartWallet = ephemeralSmartWallet;
       this.paymentMakers = [
-        new PolygonPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId)
+        new SmartWalletPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId)
       ];
     } else {
       // Main wallet mode
@@ -168,7 +168,7 @@ export class PolygonAccount implements Account {
       this.accountId = `polygon:${mainWalletAddress}` as AccountId;
       this.mainWalletAddress = mainWalletAddress;
       this.paymentMakers = [
-        new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId)
+        new DirectWalletPaymentMaker(mainWalletAddress, provider, logger, chainId)
       ];
     }
   }

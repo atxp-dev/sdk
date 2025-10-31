@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import { atxpClient, BaseAccount, SolanaAccount } from '@atxp/client';
+import { PolygonServerAccount } from '@atxp/polygon';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -79,6 +80,41 @@ async function testSolanaPayment() {
   }
 }
 
+async function testPolygonPayment() {
+  console.log('\n=== Testing Polygon Chain Payment ===');
+
+  const polygonRpc = process.env.POLYGON_RPC || 'https://polygon-rpc.com';
+  const polygonPrivateKey = process.env.POLYGON_PRIVATE_KEY;
+
+  if (!polygonPrivateKey) {
+    console.log('Skipping Polygon test - POLYGON_PRIVATE_KEY not set');
+    return;
+  }
+
+  try {
+    const account = new PolygonServerAccount(polygonRpc, polygonPrivateKey as `0x${string}`, 137);
+    console.log('Using Polygon account:', account.accountId);
+
+    const mcpClient = await atxpClient({
+      mcpServer: 'http://localhost:3009',
+      account,
+      allowedAuthorizationServers: ['http://localhost:3010', 'https://auth.atxp.ai'],
+      allowHttp: true,
+      logger: new ConsoleLogger({level: LogLevel.INFO})
+    });
+
+    console.log('Calling multi-chain-tool with Polygon account...');
+    const result = await mcpClient.callTool({
+      name: 'multi-chain-tool',
+      arguments: { message: 'Hello from Polygon!' }
+    });
+
+    console.log('Polygon payment result:', result);
+  } catch (error) {
+    console.error('Polygon payment failed:', error);
+  }
+}
+
 async function main() {
   console.log('====================================');
   console.log('   Multichain Payment Test Client   ');
@@ -99,11 +135,20 @@ async function main() {
   // Test Solana payment
   await testSolanaPayment();
 
+  // Small delay between tests
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Test Polygon payment
+  await testPolygonPayment();
+
   console.log('\n====================================');
   console.log('        Test Complete!              ');
   console.log('====================================\n');
-  console.log('The same server accepted payments from both Base and Solana chains!');
-  console.log('Check the accounts-mc service logs to see how it handled different chains.\n');
+  console.log('The same server accepted payments from multiple chains:');
+  console.log('- Base (mainnet)');
+  console.log('- Solana (mainnet)');
+  console.log('- Polygon (mainnet)');
+  console.log('\nCheck the accounts-mc service logs to see how it handled different chains.\n');
 }
 
 // Run the test

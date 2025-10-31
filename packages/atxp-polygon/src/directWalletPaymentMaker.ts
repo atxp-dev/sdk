@@ -18,7 +18,12 @@ export type MainWalletProvider = {
   }) => Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 };
 
-export class MainWalletPaymentMaker implements PaymentMaker {
+/**
+ * Browser-based payment maker using direct wallet signing.
+ * Each transaction requires user approval in their wallet.
+ * User pays gas fees in POL.
+ */
+export class DirectWalletPaymentMaker implements PaymentMaker {
   private logger: Logger;
   private chainId: number;
   private usdcAddress: string;

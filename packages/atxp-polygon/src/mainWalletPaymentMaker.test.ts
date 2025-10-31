@@ -6,23 +6,23 @@ vi.mock('viem', () => ({
 }));
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MainWalletPaymentMaker } from './mainWalletPaymentMaker.js';
+import { DirectWalletPaymentMaker } from './directWalletPaymentMaker.js';
 import BigNumber from 'bignumber.js';
-import { TEST_WALLET_ADDRESS, TEST_RECEIVER_ADDRESS, mockProvider, mockLogger } from './testHelpers.js';
+import { TEST_WALLET_ADDRESS, TEST_RECEIVER_ADDRESS, mockProvider, mockLogger, type MockEip1193Provider } from './testHelpers.js';
 import { getPolygonUSDCAddress } from '@atxp/client';
 
 const { encodeFunctionData, fromHex } = await import('viem');
 
-describe('MainWalletPaymentMaker', () => {
-  let provider: ReturnType<typeof mockProvider>;
+describe('DirectWalletPaymentMaker', () => {
+  let provider: MockEip1193Provider;
   let logger: ReturnType<typeof mockLogger>;
-  let paymentMaker: MainWalletPaymentMaker;
+  let paymentMaker: DirectWalletPaymentMaker;
 
   beforeEach(() => {
     vi.clearAllMocks();
     provider = mockProvider();
     logger = mockLogger();
-    paymentMaker = new MainWalletPaymentMaker(TEST_WALLET_ADDRESS, provider, logger, 137);
+    paymentMaker = new DirectWalletPaymentMaker(TEST_WALLET_ADDRESS, provider, logger, 137);
   });
 
   afterEach(() => {
@@ -109,9 +109,9 @@ describe('MainWalletPaymentMaker', () => {
       const mockSignature = '0xmocksignature';
       let capturedMessage = '';
 
-      provider.request.mockImplementation(async ({ method, params }) => {
+      provider.request.mockImplementation(async ({ method, params }: { method: string; params?: unknown[] }) => {
         if (method === 'personal_sign' && params) {
-          capturedMessage = params[0];
+          capturedMessage = params[0] as string;
           return mockSignature;
         }
         throw new Error(`Unexpected method: ${method}`);
@@ -161,7 +161,7 @@ describe('MainWalletPaymentMaker', () => {
         })
       };
 
-      const coinbasePaymentMaker = new MainWalletPaymentMaker(
+      const coinbasePaymentMaker = new DirectWalletPaymentMaker(
         TEST_WALLET_ADDRESS,
         coinbaseProvider,
         mockLogger(),
@@ -192,7 +192,7 @@ describe('MainWalletPaymentMaker', () => {
       };
 
       // Mock transaction submission
-      provider.request.mockImplementation(async ({ method }) => {
+      provider.request.mockImplementation(async ({ method }: { method: string }) => {
         if (method === 'eth_sendTransaction') return txHash;
         if (method === 'eth_getTransactionReceipt') return receipt;
         if (method === 'eth_blockNumber') return '0x102'; // 2 blocks after receipt
@@ -251,7 +251,7 @@ describe('MainWalletPaymentMaker', () => {
         blockNumber: '0x100'
       };
 
-      provider.request.mockImplementation(async ({ method }) => {
+      provider.request.mockImplementation(async ({ method }: { method: string }) => {
         if (method === 'eth_sendTransaction') return txHash;
         if (method === 'eth_getTransactionReceipt') return receipt;
         throw new Error(`Unexpected method: ${method}`);
@@ -308,7 +308,7 @@ describe('MainWalletPaymentMaker', () => {
       };
 
       let blockNumberCalls = 0;
-      provider.request.mockImplementation(async ({ method }) => {
+      provider.request.mockImplementation(async ({ method }: { method: string }) => {
         if (method === 'eth_sendTransaction') return txHash;
         if (method === 'eth_getTransactionReceipt') return receipt;
         if (method === 'eth_blockNumber') {
@@ -343,7 +343,7 @@ describe('MainWalletPaymentMaker', () => {
       };
 
       const callOrder: string[] = [];
-      provider.request.mockImplementation(async ({ method }) => {
+      provider.request.mockImplementation(async ({ method }: { method: string }) => {
         callOrder.push(method);
         if (method === 'eth_sendTransaction') return txHash;
         if (method === 'eth_getTransactionReceipt') return receipt;
@@ -395,7 +395,7 @@ describe('MainWalletPaymentMaker', () => {
         blockNumber: '0x100'
       };
 
-      provider.request.mockImplementation(async ({ method }) => {
+      provider.request.mockImplementation(async ({ method }: { method: string }) => {
         if (method === 'eth_sendTransaction') return txHash;
         if (method === 'eth_getTransactionReceipt') return receipt;
         if (method === 'eth_blockNumber') return '0x102';
@@ -435,8 +435,8 @@ describe('MainWalletPaymentMaker', () => {
     it('should handle invalid addresses', async () => {
       const invalidAddress = '0xinvalid';
 
-      provider.request.mockImplementation(async ({ method, params }) => {
-        if (method === 'eth_sendTransaction' && params?.[0]?.to === getPolygonUSDCAddress(137)) {
+      provider.request.mockImplementation(async ({ method, params }: { method: string; params?: unknown[] }) => {
+        if (method === 'eth_sendTransaction' && (params?.[0] as any)?.to === getPolygonUSDCAddress(137)) {
           throw new Error('invalid address');
         }
         throw new Error(`Unexpected method: ${method}`);

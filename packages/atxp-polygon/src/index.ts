@@ -1,6 +1,16 @@
-export { PolygonAccount } from './polygonAccount.js';
-export { PolygonPaymentMaker } from './polygonPaymentMaker.js';
-export { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
+// New names (recommended)
+export { PolygonBrowserAccount } from './polygonBrowserAccount.js';
+export { PolygonServerAccount } from './polygonServerAccount.js';
+export { SmartWalletPaymentMaker } from './smartWalletPaymentMaker.js';
+export { ServerPaymentMaker } from './serverPaymentMaker.js';
+export { DirectWalletPaymentMaker, type MainWalletProvider } from './directWalletPaymentMaker.js';
+
+// Legacy aliases for backward compatibility (deprecated)
+export { PolygonBrowserAccount as PolygonAccount } from './polygonBrowserAccount.js';
+export { PolygonServerAccount as SimplePolygonAccount } from './polygonServerAccount.js';
+export { SmartWalletPaymentMaker as PolygonPaymentMaker } from './smartWalletPaymentMaker.js';
+export { ServerPaymentMaker as SimplePolygonPaymentMaker } from './serverPaymentMaker.js';
+export { DirectWalletPaymentMaker as MainWalletPaymentMaker } from './directWalletPaymentMaker.js';
 export type { SpendPermission } from './types.js';
 export {
   type ICache,

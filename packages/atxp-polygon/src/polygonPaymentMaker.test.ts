@@ -30,9 +30,9 @@ import {
   mockFailedBundlerClient,
   TEST_RECEIVER_ADDRESS
 } from './testHelpers.js';
-import { PolygonPaymentMaker } from './polygonPaymentMaker.js';
+import { SmartWalletPaymentMaker } from './smartWalletPaymentMaker.js';
 
-describe('PolygonPaymentMaker', () => {
+describe('SmartWalletPaymentMaker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -42,7 +42,7 @@ describe('PolygonPaymentMaker', () => {
       const permission = mockSpendPermission();
       const smartWallet = mockEphemeralSmartWallet();
 
-      const paymentMaker = new PolygonPaymentMaker(permission, smartWallet as any);
+      const paymentMaker = new SmartWalletPaymentMaker(permission, smartWallet as any);
       const jwt = await paymentMaker.generateJWT({
         paymentRequestId: 'test-payment-id',
         codeChallenge: 'test-challenge'
@@ -78,7 +78,7 @@ describe('PolygonPaymentMaker', () => {
       const permission = mockSpendPermission();
       const smartWallet = mockEphemeralSmartWallet();
 
-      const paymentMaker = new PolygonPaymentMaker(permission, smartWallet as any);
+      const paymentMaker = new SmartWalletPaymentMaker(permission, smartWallet as any);
       const jwt = await paymentMaker.generateJWT({
         paymentRequestId: '',
         codeChallenge: ''
@@ -106,7 +106,7 @@ describe('PolygonPaymentMaker', () => {
         { to: getPolygonUSDCAddress(137), data: '0xapprovedata', value: 0n }
       ]);
 
-      const paymentMaker = new PolygonPaymentMaker(permission, smartWallet as any);
+      const paymentMaker = new SmartWalletPaymentMaker(permission, smartWallet as any);
 
       // Make payment
       const amount = new BigNumber(5.25); // 5.25 USDC
@@ -159,7 +159,7 @@ describe('PolygonPaymentMaker', () => {
         { to: getPolygonUSDCAddress(137), data: '0xdata', value: 0n }
       ]);
 
-      const paymentMaker = new PolygonPaymentMaker(permission, smartWallet as any);
+      const paymentMaker = new SmartWalletPaymentMaker(permission, smartWallet as any);
 
       // Make payment - should throw
       const destinations = [{
@@ -184,7 +184,7 @@ describe('PolygonPaymentMaker', () => {
         { to: getPolygonUSDCAddress(137), data: '0xdata', value: 0n }
       ]);
 
-      const paymentMaker = new PolygonPaymentMaker(permission, smartWallet as any);
+      const paymentMaker = new SmartWalletPaymentMaker(permission, smartWallet as any);
 
       // Make zero amount payment
       const destinations = [{
@@ -217,7 +217,7 @@ describe('PolygonPaymentMaker', () => {
         { to: getPolygonUSDCAddress(137), data: '0xdata', value: 0n }
       ]);
 
-      const paymentMaker = new PolygonPaymentMaker(permission, smartWallet as any);
+      const paymentMaker = new SmartWalletPaymentMaker(permission, smartWallet as any);
 
       // Test various fractional amounts
       const testCases = [
@@ -249,7 +249,7 @@ describe('PolygonPaymentMaker', () => {
       const permission = mockSpendPermission();
       const smartWallet = mockEphemeralSmartWallet();
 
-      const paymentMaker = new PolygonPaymentMaker(permission, smartWallet as any);
+      const paymentMaker = new SmartWalletPaymentMaker(permission, smartWallet as any);
 
       const destinations = [{
         chain: 'polygon' as const,
@@ -274,7 +274,7 @@ describe('PolygonPaymentMaker', () => {
         { to: getPolygonUSDCAddress(137), data: '0xdata', value: 0n }
       ]);
 
-      const paymentMaker = new PolygonPaymentMaker(permission, smartWallet as any);
+      const paymentMaker = new SmartWalletPaymentMaker(permission, smartWallet as any);
 
       const destinations = [{
         chain: 'polygon' as const,
@@ -309,7 +309,7 @@ describe('PolygonPaymentMaker', () => {
         { to: getPolygonUSDCAddress(137), data: '0xdata', value: 0n }
       ]);
 
-      const paymentMaker = new PolygonPaymentMaker(permission, smartWallet as any);
+      const paymentMaker = new SmartWalletPaymentMaker(permission, smartWallet as any);
 
       const destinations = [{
         chain: 'polygon' as const,

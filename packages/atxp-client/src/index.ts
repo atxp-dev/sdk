@@ -57,8 +57,11 @@ export {
 
 export {
   USDC_CONTRACT_ADDRESS_POLYGON_MAINNET,
+  USDC_CONTRACT_ADDRESS_POLYGON_AMOY,
   POLYGON_MAINNET,
+  POLYGON_AMOY,
   getPolygonMainnetWithRPC,
+  getPolygonAmoyWithRPC,
   getPolygonByChainId,
   getPolygonUSDCAddress,
   type PolygonChain

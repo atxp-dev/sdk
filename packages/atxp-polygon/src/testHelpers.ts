@@ -1,7 +1,13 @@
-import { vi } from 'vitest';
+import { vi, expect } from 'vitest';
+import type { Mock } from 'vitest';
 import type { SpendPermission, Eip1193Provider } from './types.js';
 import type { Hex } from 'viem';
 import { ICache } from '@atxp/common';
+
+// Type for mocked provider with vitest mock methods
+export type MockEip1193Provider = Eip1193Provider & {
+  request: Mock;
+};
 
 // Custom MemoryCache for tests that handles BigInt serialization
 export class TestMemoryCache implements ICache {
@@ -65,6 +71,7 @@ export function getCacheKey(walletAddress: string): string {
 export function removeTimestamps(obj: any): any {
   const { permission, ...rest } = obj;
   if (permission) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { start, end, ...permRest } = permission;
     return { permission: permRest, ...rest };
   }
@@ -92,14 +99,18 @@ export function mockLogger() {
 export function mockSpendPermission(overrides?: Partial<SpendPermission>): SpendPermission {
   const now = Math.floor(Date.now() / 1000);
   return {
-    account: TEST_WALLET_ADDRESS,
-    spender: TEST_SMART_WALLET_ADDRESS,
-    token: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' as Hex,
-    allowance: 10000000n,
-    period: 2592000, // 30 days in seconds
-    start: now,
-    end: now + 2592000,
-    salt: '0x1',
+    signature: '0xmocksignature',
+    permission: {
+      account: TEST_WALLET_ADDRESS,
+      spender: TEST_SMART_WALLET_ADDRESS,
+      token: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+      allowance: '10000000',
+      period: 2592000, // 30 days in seconds
+      start: now,
+      end: now + 2592000,
+      salt: '0x0',
+      extraData: '0x0'
+    },
     ...overrides
   };
 }
@@ -108,23 +119,27 @@ export function mockSpendPermission(overrides?: Partial<SpendPermission>): Spend
 export function mockExpiredSpendPermission(): SpendPermission {
   const pastTime = Math.floor(Date.now() / 1000) - 100000;
   return {
-    account: TEST_WALLET_ADDRESS,
-    spender: TEST_SMART_WALLET_ADDRESS,
-    token: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' as Hex,
-    allowance: 10000000n,
-    period: 2592000,
-    start: pastTime,
-    end: pastTime + 2592000,
-    salt: '0x1'
+    signature: '0xmocksignature',
+    permission: {
+      account: TEST_WALLET_ADDRESS,
+      spender: TEST_SMART_WALLET_ADDRESS,
+      token: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+      allowance: '10000000',
+      period: 2592000,
+      start: pastTime,
+      end: pastTime + 2592000,
+      salt: '0x0',
+      extraData: '0x0'
+    }
   };
 }
 
 // Mock EIP-1193 provider
-export function mockProvider(overrides?: Partial<Eip1193Provider>): Eip1193Provider {
+export function mockProvider(overrides?: Partial<MockEip1193Provider>): MockEip1193Provider {
   return {
     request: vi.fn().mockResolvedValue('0xmocksignature'),
     ...overrides
-  };
+  } as MockEip1193Provider;
 }
 
 // Mock smart account
@@ -184,9 +199,6 @@ export function mockEphemeralSmartWallet(overrides?: { client?: any; account?: a
 
 // Setup initialization mocks
 export async function setupInitializationMocks({
-  provider,
-  bundlerClient,
-  smartAccount,
   ephemeralWallet,
   spendPermission
 }: {

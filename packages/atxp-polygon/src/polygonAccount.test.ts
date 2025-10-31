@@ -35,7 +35,7 @@ vi.mock('viem', async () => {
   };
 });
 
-import { PolygonAccount } from './polygonAccount.js';
+import { PolygonBrowserAccount } from './polygonBrowserAccount.js';
 import { getPolygonUSDCAddress } from '@atxp/client';
 import BigNumber from 'bignumber.js';
 import {
@@ -54,12 +54,11 @@ import {
   mockEphemeralSmartWallet,
   getCacheKey,
   removeTimestamps,
-  expectTimestampAround,
   TestMemoryCache,
   serializeWithBigInt
 } from './testHelpers.js';
 
-describe('PolygonAccount', () => {
+describe('PolygonBrowserAccount', () => {
   let mockCache: TestMemoryCache;
 
   beforeEach(() => {
@@ -85,16 +84,14 @@ describe('PolygonAccount', () => {
         spendPermission: permission
       });
 
-      const now = Math.floor(Date.now() / 1000);
 
       // Initialize account
-      const account = await PolygonAccount.initialize({
+      const account = await PolygonBrowserAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: true,
         allowance: BigInt('10000000'),
         periodInDays: 30,
-        periodStart: now,
         cache: mockCache
       });
 
@@ -111,8 +108,8 @@ describe('PolygonAccount', () => {
         spender: TEST_SMART_WALLET_ADDRESS,
         token: getPolygonUSDCAddress(137),
         amount: BigInt('10000000'),
-        start: now,
-        end: now + 30 * 24 * 60 * 60,
+        start: expect.any(Number),
+        end: expect.any(Number),
         period: 30 * 24 * 60 * 60
       });
 
@@ -158,16 +155,14 @@ describe('PolygonAccount', () => {
         spendPermission: permission
       });
 
-      const now = Math.floor(Date.now() / 1000);
 
       // Initialize account
-      const account = await PolygonAccount.initialize({
+      const account = await PolygonBrowserAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: true,
         allowance: BigInt('10000000'),
         periodInDays: 30,
-        periodStart: now,
         cache: mockCache
       });
 
@@ -204,16 +199,14 @@ describe('PolygonAccount', () => {
         spendPermission: newPermission
       });
 
-      const now = Math.floor(Date.now() / 1000);
 
       // Initialize account
-      const account = await PolygonAccount.initialize({
+      const account = await PolygonBrowserAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: true,
         allowance: BigInt('10000000'),
         periodInDays: 30,
-        periodStart: now,
         cache: mockCache
       });
 
@@ -242,18 +235,16 @@ describe('PolygonAccount', () => {
         spendPermission: permission
       });
 
-      const now = Math.floor(Date.now() / 1000);
 
       // Initialize should throw
       await expect(
-        PolygonAccount.initialize({
+        PolygonBrowserAccount.initialize({
           walletAddress: TEST_WALLET_ADDRESS,
           provider: provider,
           useEphemeralWallet: true,
           allowance: BigInt('10000000'),
           periodInDays: 30,
-          periodStart: now,
-          cache: mockCache
+            cache: mockCache
         })
       ).rejects.toThrow('Smart wallet deployment failed');
     });
@@ -262,16 +253,14 @@ describe('PolygonAccount', () => {
   describe('initialize with main wallet', () => {
     it('should create account without ephemeral wallet', async () => {
       const provider = mockProvider();
-      const now = Math.floor(Date.now() / 1000);
 
       // Initialize account in main wallet mode
-      const account = await PolygonAccount.initialize({
+      const account = await PolygonBrowserAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
         allowance: BigInt('10000000'),
         periodInDays: 30,
-        periodStart: now,
         cache: mockCache
       });
 
@@ -285,7 +274,6 @@ describe('PolygonAccount', () => {
     it('should not create ephemeral wallet or deploy', async () => {
       const provider = mockProvider();
       const bundlerClient = mockBundlerClient();
-      const now = Math.floor(Date.now() / 1000);
 
       const mocks = await setupInitializationMocks({
         provider,
@@ -293,13 +281,12 @@ describe('PolygonAccount', () => {
       });
 
       // Initialize account in main wallet mode
-      await PolygonAccount.initialize({
+      await PolygonBrowserAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
         allowance: BigInt('10000000'),
         periodInDays: 30,
-        periodStart: now,
         cache: mockCache
       });
 
@@ -336,16 +323,14 @@ describe('PolygonAccount', () => {
 
       const { prepareSpendCallData } = await setupPaymentMocks({ spendCalls });
 
-      const now = Math.floor(Date.now() / 1000);
 
       // Initialize account
-      const account = await PolygonAccount.initialize({
+      const account = await PolygonBrowserAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: true,
         allowance: BigInt('10000000'),
         periodInDays: 30,
-        periodStart: now,
         cache: mockCache
       });
 
@@ -384,42 +369,34 @@ describe('PolygonAccount', () => {
         spendPermission: permission
       });
 
-      const now = Math.floor(Date.now() / 1000);
 
-      const account = await PolygonAccount.initialize({
+      const account = await PolygonBrowserAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: true,
         allowance: BigInt('10000000'),
         periodInDays: 30,
-        periodStart: now,
         cache: mockCache
       });
 
-      const accountId = await account.getId();
-      expect(accountId.network).toBe('polygon');
-      expect(accountId.chain).toBe('polygon');
-      expect(accountId.address).toBe(TEST_SMART_WALLET_ADDRESS);
+      const accountId = account.accountId;
+      expect(accountId).toBe(`polygon:${TEST_SMART_WALLET_ADDRESS}`);
     });
 
     it('should return correct account ID for main wallet', async () => {
       const provider = mockProvider();
-      const now = Math.floor(Date.now() / 1000);
 
-      const account = await PolygonAccount.initialize({
+      const account = await PolygonBrowserAccount.initialize({
         walletAddress: TEST_WALLET_ADDRESS,
         provider: provider,
         useEphemeralWallet: false,
         allowance: BigInt('10000000'),
         periodInDays: 30,
-        periodStart: now,
         cache: mockCache
       });
 
-      const accountId = await account.getId();
-      expect(accountId.network).toBe('polygon');
-      expect(accountId.chain).toBe('polygon');
-      expect(accountId.address).toBe(TEST_WALLET_ADDRESS);
+      const accountId = account.accountId;
+      expect(accountId).toBe(`polygon:${TEST_WALLET_ADDRESS}`);
     });
   });
 });

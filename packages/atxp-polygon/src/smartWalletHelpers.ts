@@ -5,7 +5,7 @@ import {
   type Address,
   type Hex,
 } from 'viem';
-import { polygon } from 'viem/chains';
+import { polygon, polygonAmoy } from 'viem/chains';
 import type { Chain } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
@@ -26,8 +26,10 @@ function getCoinbaseBundlerUrl(chainId: number): string {
   switch (chainId) {
     case 137: // Polygon mainnet
       return 'https://api.developer.coinbase.com/rpc/v1/polygon-mainnet';
+    case 80002: // Polygon Amoy testnet
+      return 'https://api.developer.coinbase.com/rpc/v1/polygon-amoy';
     default:
-      throw new Error(`Unsupported chain ID for Coinbase bundler: ${chainId}`);
+      throw new Error(`Unsupported chain ID for Coinbase bundler: ${chainId}. Supported: 137 (mainnet), 80002 (Amoy testnet)`);
   }
 }
 
@@ -39,8 +41,10 @@ function getCoinbasePaymasterUrl(chainId: number): string {
   switch (chainId) {
     case 137: // Polygon mainnet
       return 'https://api.developer.coinbase.com/rpc/v1/polygon-mainnet';
+    case 80002: // Polygon Amoy testnet
+      return 'https://api.developer.coinbase.com/rpc/v1/polygon-amoy';
     default:
-      throw new Error(`Unsupported chain ID for Coinbase paymaster: ${chainId}`);
+      throw new Error(`Unsupported chain ID for Coinbase paymaster: ${chainId}. Supported: 137 (mainnet), 80002 (Amoy testnet)`);
   }
 }
 
@@ -51,8 +55,10 @@ function getPolygonChain(chainId: number): Chain {
   switch (chainId) {
     case 137:
       return polygon;
+    case 80002:
+      return polygonAmoy;
     default:
-      throw new Error(`Unsupported Polygon chain ID: ${chainId}. Supported: 137 (mainnet)`);
+      throw new Error(`Unsupported Polygon chain ID: ${chainId}. Supported: 137 (mainnet), 80002 (Amoy testnet)`);
   }
 }
 
@@ -66,7 +72,7 @@ export interface EphemeralSmartWallet {
 /**
  * Creates an ephemeral smart wallet with paymaster support
  * @param privateKey - Private key for the wallet signer
- * @param chainId - Chain ID (defaults to 137 for Polygon mainnet)
+ * @param chainId - Chain ID (defaults to 137 for Polygon mainnet, or 80002 for Amoy testnet)
  *
  * NOTE: This implementation assumes Coinbase CDP supports Polygon.
  * Verify support and correct endpoint URLs before using in production.
