@@ -1,4 +1,4 @@
-import { RequirePaymentConfig, paymentRequiredError, extractNetworkFromAccountId, extractAddressFromAccountId } from "@atxp/common";
+import { RequirePaymentConfig, paymentRequiredError, extractNetworkFromAccountId, extractAddressFromAccountId, Network } from "@atxp/common";
 import { getATXPConfig, atxpAccountId } from "./atxpContext.js";
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
@@ -51,17 +51,41 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   }
 
   // For createPaymentRequest, use the minimumPayment if configured
+  // Fetch account sources to provide backwards compatibility with old clients
+  // that expect multiple payment destination options (base, solana, world, etc.)
+  const destinations = [{
+    network: destinationNetwork,
+    currency: config.currency,
+    address: destinationAddress,
+    amount: paymentAmount // Use minimumPayment or requested amount
+  }];
+
+  try {
+    // TODO: Remove this once pre-v0.8.0 clients are no longer supported - 0.8.0 only needs 'atxp'
+    const sources = await config.destination.getSources();
+    config.logger.debug(`Fetched ${sources.length} sources for destination account`);
+
+    // Add each source as an alternative payment destination
+    for (const source of sources) {
+      destinations.push({
+        network: source.chain as Network, // Chain and Network have compatible values
+        currency: config.currency,
+        address: source.address,
+        amount: paymentAmount
+      });
+    }
+    config.logger.debug(`Payment request will include ${destinations.length} total destinations`);
+  } catch (error) {
+    config.logger.warn(`Failed to fetch account sources, will use ATXP destination only: ${error}`);
+    // Continue with just the ATXP destination if sources fetch fails
+  }
+
   const paymentRequest = {
     source: user,
     sourceAccountId: user,
     destinationAccountId: destinationAccountId,
     payeeName: config.payeeName,
-    destinations: [{
-      network: destinationNetwork,
-      currency: config.currency,
-      address: destinationAddress,
-      amount: paymentAmount // Use minimumPayment or requested amount
-    }]
+    destinations
   };
 
   config.logger.debug(`Creating payment request with sourceAccountId: ${user}, destinationAccountId: ${charge.destinationAccountId}`);
