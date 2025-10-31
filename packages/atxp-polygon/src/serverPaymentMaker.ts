@@ -8,7 +8,6 @@ import {
   WalletClient,
   PublicActions,
   publicActions,
-  type Hex,
 } from "viem";
 import { BigNumber } from "bignumber.js";
 
@@ -116,7 +115,7 @@ export class ServerPaymentMaker implements PaymentMaker {
 
     // Sign the message with raw bytes
     const signResult = await this.signingClient.signMessage({
-      account: this.signingClient.account,
+      account: this.signingClient.account!,
       message: { raw: messageBytes },
     });
 
@@ -131,7 +130,7 @@ export class ServerPaymentMaker implements PaymentMaker {
     return jwt;
   }
 
-  async makePayment(destinations: Destination[], memo: string, paymentRequestId?: string): Promise<PaymentIdentifier | null> {
+  async makePayment(destinations: Destination[], _memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> {
     this.logger.info(`Making payment with ${destinations.length} destination(s)`);
 
     // Filter to polygon chain destinations
@@ -183,7 +182,7 @@ export class ServerPaymentMaker implements PaymentMaker {
 
       // Send the transaction
       const hash = await this.signingClient.sendTransaction({
-        account: this.signingClient.account,
+        account: this.signingClient.account!,
         to: usdcAddress as Address,
         data,
         chain: this.signingClient.chain,
