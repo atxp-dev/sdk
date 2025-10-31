@@ -160,36 +160,6 @@
       min-height: 60px;
       font-family: inherit;
     }
-    .mode-selector {
-      display: flex;
-      gap: 10px;
-      margin: 15px 0;
-    }
-    .mode-option {
-      flex: 1;
-      padding: 15px;
-      border: 2px solid #ddd;
-      border-radius: 4px;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.2s;
-    }
-    .mode-option:hover {
-      border-color: #0052ff;
-    }
-    .mode-option.selected {
-      border-color: #0052ff;
-      background: #e7f1ff;
-    }
-    .mode-option h3 {
-      margin: 0 0 5px 0;
-      font-size: 16px;
-    }
-    .mode-option p {
-      margin: 0;
-      font-size: 12px;
-      color: #666;
-    }
     pre {
       background: #f8f9fa;
       padding: 10px;
@@ -246,17 +216,9 @@
     <!-- Configuration Section -->
     <div class="section">
       <h2>2. Configure Account</h2>
-
-      <div class="mode-selector">
-        <div class="mode-option selected" id="modeSmartWallet" onclick="selectMode('smart')">
-          <h3>Smart Wallet Mode</h3>
-          <p>Gasless transactions with single approval</p>
-        </div>
-        <div class="mode-option" id="modeDirectWallet" onclick="selectMode('direct')">
-          <h3>Direct Wallet Mode</h3>
-          <p>User signs each transaction</p>
-        </div>
-      </div>
+      <p style="margin-bottom: 15px; font-size: 14px; color: #666;">
+        Using Direct Wallet mode - you'll sign each transaction with your wallet and pay gas fees in POL.
+      </p>
 
       <div class="config-group">
         <label for="chainSelect">Network:</label>
@@ -264,24 +226,6 @@
           <option value="137">Polygon Mainnet (137)</option>
           <option value="80002" selected>Polygon Amoy Testnet (80002)</option>
         </select>
-      </div>
-
-      <div class="config-group">
-        <label for="allowance">Allowance (USDC):</label>
-        <input type="number" id="allowance" value="10" step="0.01" min="0">
-      </div>
-
-      <div class="config-group">
-        <label for="periodDays">Period (days):</label>
-        <input type="number" id="periodDays" value="30" min="1">
-      </div>
-
-      <div class="config-group" id="apiKeyGroup" style="display: block;">
-        <label for="cdpApiKey">Coinbase CDP API Key (Smart Wallet only):</label>
-        <input type="text" id="cdpApiKey" placeholder="Optional - leave empty to use default">
-        <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">
-          Get your API key from <a href="https://portal.cdp.coinbase.com" target="_blank">Coinbase Developer Platform</a>
-        </p>
       </div>
 
       <button id="initBtn" onclick="initializeAccount()" disabled>Initialize Account</button>
@@ -335,7 +279,6 @@
       walletAddress: null,
       account: null,
       client: null,
-      mode: 'smart', // 'smart' or 'direct'
       generatedImages: []
     };
 
@@ -361,17 +304,6 @@
       el.textContent = message;
       el.className = `status ${type}`;
       el.style.display = 'block';
-    };
-
-    window.selectMode = function(mode) {
-      window.state.mode = mode;
-      document.getElementById('modeSmartWallet').classList.toggle('selected', mode === 'smart');
-      document.getElementById('modeDirectWallet').classList.toggle('selected', mode === 'direct');
-
-      // Show/hide API key field based on mode
-      const apiKeyGroup = document.getElementById('apiKeyGroup');
-      apiKeyGroup.style.display = mode === 'smart' ? 'block' : 'none';
-      window.log(`Selected ${mode === 'smart' ? 'Smart Wallet' : 'Direct Wallet'} mode`);
     };
 
     window.connectWallet = async function() {
@@ -411,33 +343,18 @@
         }
 
         const chainId = parseInt(document.getElementById('chainSelect').value);
-        const allowance = parseFloat(document.getElementById('allowance').value);
-        const periodDays = parseInt(document.getElementById('periodDays').value);
-        const useEphemeralWallet = window.state.mode === 'smart';
-        const cdpApiKey = document.getElementById('cdpApiKey').value.trim() || undefined;
 
         window.log('Initializing account...');
-        window.log(`- Mode: ${useEphemeralWallet ? 'Smart Wallet (gasless)' : 'Direct Wallet'}`);
+        window.log(`- Mode: Direct Wallet`);
         window.log(`- Chain ID: ${chainId}`);
-        window.log(`- Allowance: ${allowance} USDC`);
-        window.log(`- Period: ${periodDays} days`);
-        if (cdpApiKey && useEphemeralWallet) {
-          window.log(`- Using custom CDP API key: ${cdpApiKey.substring(0, 8)}...`);
-        }
 
         window.showStatus('initStatus', 'Initializing...', 'info');
-
-        // Convert allowance to 6 decimals (USDC)
-        const allowanceBigInt = BigInt(Math.floor(allowance * 1_000_000));
 
         const account = await PolygonBrowserAccount.initialize({
           provider: window.ethereum,
           walletAddress: window.state.walletAddress,
-          useEphemeralWallet,
-          allowance: allowanceBigInt,
-          periodInDays: periodDays,
+          useEphemeralWallet: false,
           chainId,
-          coinbaseCdpApiKey: cdpApiKey,
           logger: {
             info: (msg) => window.log(`[INFO] ${msg}`),
             warn: (msg) => window.log(`[WARN] ${msg}`),
@@ -492,7 +409,7 @@
 
         let html = '<pre>';
         html += `<strong>Account ID:</strong> ${account.accountId}\n`;
-        html += `<strong>Mode:</strong> ${window.state.mode === 'smart' ? 'Smart Wallet' : 'Direct Wallet'}\n`;
+        html += `<strong>Mode:</strong> Direct Wallet\n`;
         html += `<strong>Payment Makers:</strong> ${account.paymentMakers.length}\n\n`;
         html += `<strong>Sources:</strong>\n`;
         sources.forEach((source, idx) => {
