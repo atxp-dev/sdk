@@ -104,13 +104,13 @@ describe('PolygonBrowserAccount', () => {
       // Verify mocks were called
       expect(mocks.toEphemeralSmartWallet).toHaveBeenCalled();
       expect(mocks.requestSpendPermission).toHaveBeenCalledWith({
+        account: TEST_WALLET_ADDRESS,
         provider,
         spender: TEST_SMART_WALLET_ADDRESS,
         token: getPolygonUSDCAddress(137),
-        amount: BigInt('10000000'),
-        start: expect.any(Number),
-        end: expect.any(Number),
-        period: 30 * 24 * 60 * 60
+        chainId: 137,
+        allowance: BigInt('10000000'),
+        periodInDays: 30
       });
 
       // Verify smart wallet was deployed
