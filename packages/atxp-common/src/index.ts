@@ -106,7 +106,8 @@ export {
 
 // ES256K JWT utilities for browser wallets
 export {
-  createES256KJWT,
+  buildES256KJWTMessage,
+  completeES256KJWT,
   type ES256KJWTPayload
 } from './es256kJwtHelper.js';
 

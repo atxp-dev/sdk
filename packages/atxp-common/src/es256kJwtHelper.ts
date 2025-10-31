@@ -29,23 +29,17 @@ export interface ES256KJWTPayload {
 }
 
 /**
- * Create an ES256K JWT for browser wallet authentication
+ * Build the unsigned JWT message that needs to be signed
  *
- * @param params Parameters for creating the JWT
- * @param params.walletAddress The Ethereum wallet address (0x...)
- * @param params.signature The ECDSA signature from personal_sign (0x... 130 hex chars / 65 bytes)
- * @param params.codeChallenge PKCE code challenge for OAuth flow
- * @param params.paymentRequestId Optional payment request ID
- * @param params.accountId Optional account ID (e.g., 'polygon:0x...' for smart wallets)
- * @returns Complete ES256K JWT string
+ * @param params Parameters for building the JWT message
+ * @returns Object containing the message to sign and the encoded header/payload
  */
-export function createES256KJWT(params: {
+export function buildES256KJWTMessage(params: {
   walletAddress: string;
-  signature: string;
   codeChallenge: string;
   paymentRequestId: string;
   accountId?: AccountId | null;
-}): string {
+}): { message: string; headerB64: string; payloadB64: string } {
   const now = Math.floor(Date.now() / 1000);
 
   // Build the payload
@@ -55,11 +49,15 @@ export function createES256KJWT(params: {
     aud: AUDIENCE,
     iat: now,
     exp: now + 120, // 2 minutes expiration
-    code_challenge: params.codeChallenge,
-    payment_request_id: params.paymentRequestId,
   };
 
-  // Add optional fields
+  // Add optional fields only if they have values
+  if (params.codeChallenge) {
+    payload.code_challenge = params.codeChallenge;
+  }
+  if (params.paymentRequestId) {
+    payload.payment_request_id = params.paymentRequestId;
+  }
   if (params.accountId) {
     payload.account_id = params.accountId;
     payload.source_address = params.walletAddress;
@@ -75,6 +73,24 @@ export function createES256KJWT(params: {
   const headerB64 = base64urlEncode(JSON.stringify(header));
   const payloadB64 = base64urlEncode(JSON.stringify(payload));
 
+  // The message to sign is header.payload
+  const message = `${headerB64}.${payloadB64}`;
+
+  return { message, headerB64, payloadB64 };
+}
+
+/**
+ * Complete an ES256K JWT with a signature
+ *
+ * @param params Parameters for completing the JWT
+ * @param params.message The message that was signed (header.payload)
+ * @param params.signature The ECDSA signature from personal_sign (0x... 130 hex chars / 65 bytes)
+ * @returns Complete ES256K JWT string
+ */
+export function completeES256KJWT(params: {
+  message: string;
+  signature: string;
+}): string {
   // Convert the signature from hex to base64url
   // The signature from personal_sign is in format: 0x + r (32 bytes) + s (32 bytes) + v (1 byte)
   // For JWT ES256K, we need just r + s in base64url format (v is implicit)
@@ -111,7 +127,7 @@ export function createES256KJWT(params: {
   const signatureB64 = base64urlEncodeBytes(signatureBytes);
 
   // Construct the JWT
-  return `${headerB64}.${payloadB64}.${signatureB64}`;
+  return `${params.message}.${signatureB64}`;
 }
 
 /**

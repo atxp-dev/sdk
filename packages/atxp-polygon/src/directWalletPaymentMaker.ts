@@ -4,7 +4,8 @@ import { polygon } from 'viem/chains';
 import BigNumber from 'bignumber.js';
 import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import {
-  createES256KJWT
+  buildES256KJWTMessage,
+  completeES256KJWT
 } from '@atxp/common';
 
 const USDC_DECIMALS = 6;
@@ -50,23 +51,18 @@ export class DirectWalletPaymentMaker implements PaymentMaker {
     this.logger.info(`paymentRequestId: ${payload.paymentRequestId}`);
     this.logger.info(`walletAddress: ${this.walletAddress}`);
 
-    // For ES256K JWT, we need to sign a message with the wallet
-    // The message will be the JWT header + payload (without signature)
-    // This is standard JWT signing, but using personal_sign instead of a private key
-
-    // Temporary: create a placeholder message for the user to sign
-    // The actual message signed should be the JWT payload, but for now we'll construct it manually
-    const message = JSON.stringify({
+    // Step 1: Build the JWT message (header.payload) that needs to be signed
+    const { message } = buildES256KJWTMessage({
       walletAddress: this.walletAddress,
       codeChallenge: payload.codeChallenge,
       paymentRequestId: payload.paymentRequestId,
-      timestamp: Math.floor(Date.now() / 1000),
-      ...(payload.accountId ? { accountId: payload.accountId } : {}),
+      accountId: payload.accountId,
     });
 
-    this.logger.info(`Requesting signature for message: ${message}`);
+    this.logger.info(`Requesting signature for JWT message: ${message}`);
 
-    // Request signature from the wallet using personal_sign
+    // Step 2: Request signature from the wallet using personal_sign
+    // The user will sign the JWT message (header.payload)
     // This returns a 65-byte ECDSA signature (130 hex chars + 0x prefix)
     const signature = await this.provider.request({
       method: 'personal_sign',
@@ -75,13 +71,10 @@ export class DirectWalletPaymentMaker implements PaymentMaker {
 
     this.logger.info(`Received signature: ${signature}`);
 
-    // Create ES256K JWT using the signature
-    const jwtToken = createES256KJWT({
-      walletAddress: this.walletAddress,
-      signature,
-      codeChallenge: payload.codeChallenge,
-      paymentRequestId: payload.paymentRequestId,
-      accountId: payload.accountId,
+    // Step 3: Complete the JWT by adding the signature
+    const jwtToken = completeES256KJWT({
+      message,
+      signature
     });
 
     this.logger.info(`Generated ES256K JWT: ${jwtToken}`);
