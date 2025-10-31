@@ -22,10 +22,11 @@ export const USDC_CONTRACT_ADDRESS_POLYGON_MAINNET = "0x3c499c542cEF5E3811e1192c
 export const USDC_CONTRACT_ADDRESS_POLYGON_AMOY = "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"; // USDC on Polygon Amoy testnet
 
 // Polygon Mainnet (Chain ID: 137)
+// Note: Native currency upgraded from MATIC to POL on September 4, 2024
 export const POLYGON_MAINNET: PolygonChain = {
   id: 137,
   name: 'Polygon',
-  nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+  nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
   rpcUrls: {
     default: { http: ['https://polygon-rpc.com'] }
   },
@@ -35,10 +36,11 @@ export const POLYGON_MAINNET: PolygonChain = {
 } as const;
 
 // Polygon Amoy Testnet (Chain ID: 80002)
+// Note: Amoy testnet also uses POL as native currency (following mainnet upgrade)
 export const POLYGON_AMOY: PolygonChain = {
   id: 80002,
   name: 'Polygon Amoy',
-  nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+  nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
   rpcUrls: {
     default: { http: ['https://rpc-amoy.polygon.technology'] }
   },

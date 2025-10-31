@@ -99,8 +99,9 @@ This example now includes support for Polygon mainnet payments.
 
 1. **Get a Polygon wallet** (use MetaMask or any EVM wallet)
 
-2. **Get MATIC** for gas fees and **USDC** for payments:
+2. **Get POL** for gas fees and **USDC** for payments:
    - Bridge assets to Polygon mainnet
+   - Note: Polygon's native currency is POL (upgraded from MATIC in Sept 2024)
    - USDC Contract on Polygon: `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` (Native USDC)
 
 3. **Configure your .env**:
@@ -127,4 +128,4 @@ The test will automatically detect and use your Polygon configuration if present
 - **"Insufficient funds"**: Ensure your wallets have USDC on the respective chains
 - **"Account does not exist" (Solana)**: The Solana wallet may need SOL for rent. The accounts.atxp.ai service should handle this automatically when the address is first requested.
 - **Connection errors**: Verify accounts.atxp.ai is running and ATXP_DESTINATION is correct
-- **Polygon errors**: Ensure you have both MATIC (for gas) and USDC on Polygon mainnet
+- **Polygon errors**: Ensure you have both POL (for gas) and USDC on Polygon mainnet

@@ -34,8 +34,8 @@ describe('Polygon Constants', () => {
 
     it('should have correct native currency', () => {
       expect(POLYGON_MAINNET.nativeCurrency).toEqual({
-        name: 'MATIC',
-        symbol: 'MATIC',
+        name: 'POL',
+        symbol: 'POL',
         decimals: 18
       });
     });
@@ -66,8 +66,8 @@ describe('Polygon Constants', () => {
 
     it('should have correct native currency', () => {
       expect(POLYGON_AMOY.nativeCurrency).toEqual({
-        name: 'MATIC',
-        symbol: 'MATIC',
+        name: 'POL',
+        symbol: 'POL',
         decimals: 18
       });
     });
