@@ -29,3 +29,8 @@ export {
   requirePayment,
   atxpAccountId
 } from '@atxp/server';
+
+// Re-export ATXP Account implementations from @atxp/common
+export {
+  ATXPAccount
+} from '@atxp/common';

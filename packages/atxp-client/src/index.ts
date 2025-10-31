@@ -35,7 +35,7 @@ export {
 
 export {
   ATXPAccount
-} from './atxpAccount.js';
+} from '@atxp/common';
 
 export {
   USDC_CONTRACT_ADDRESS_BASE,

@@ -1,8 +1,33 @@
-import { ProspectivePayment, type FetchWrapper, type ClientArgs, ATXPAccount } from '@atxp/client';
+import { ProspectivePayment, type FetchWrapper, type ClientArgs, ATXPAccount, ATXPLocalAccount, BaseAccount } from '@atxp/client';
 import { FetchLike } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
 import { LocalAccount } from 'viem';
+
+/**
+ * Helper function to get a signer (LocalAccount) from different account types.
+ *
+ * Supports:
+ * - ATXPAccount: Creates an ATXPLocalAccount using the account's credentials
+ * - BaseAccount: Returns the LocalAccount via getLocalAccount()
+ */
+async function getSignerForAccount(account: unknown): Promise<LocalAccount> {
+  // Check if it's an ATXPAccount
+  if (account instanceof ATXPAccount) {
+    const atxpAccount = account as ATXPAccount & { origin: string; token: string; fetchFn: FetchLike };
+    return ATXPLocalAccount.create(atxpAccount.origin, atxpAccount.token, atxpAccount.fetchFn);
+  }
+
+  // Check if it's a BaseAccount
+  if (account instanceof BaseAccount) {
+    return account.getLocalAccount();
+  }
+
+  throw new Error(
+    'Account type not supported for X402 payments. ' +
+    'Only ATXPAccount and BaseAccount are supported.'
+  );
+}
 
 // Type guard for X402 challenge
 interface X402Challenge {
@@ -25,17 +50,6 @@ function isX402Challenge(obj: unknown): obj is X402Challenge {
 export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
   const { account, logger, fetchFn = fetch, approvePayment, onPayment, onPaymentFailure } = config;
   const log = logger ?? console;
-
-  // Check if account is an ATXPAccount - X402 support requires ATXPAccount
-  if (!(account instanceof ATXPAccount)) {
-    throw new Error('Only ATXPAccount is supported for X402 payments');
-  }
-
-  // Check if account has getSigner method
-  const accountWithSigner = account as { getSigner?: () => Promise<LocalAccount> };
-  if (!accountWithSigner.getSigner) {
-    throw new Error('Account does not support getSigner, X402 payments will not work');
-  }
 
   // Use arrow function to preserve context, matching atxpFetcher pattern
   const x402FetchWrapper: FetchLike = async (input: string | URL, init?: RequestInit): Promise<Response> => {
@@ -133,7 +147,7 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
 
       // Get the signer from the account
       log.debug('Getting signer from account');
-      const signer = await accountWithSigner.getSigner!();
+      const signer = await getSignerForAccount(account);
 
       // Log the address we're paying from
       log.info(`X402 payment will be made from address: ${signer.address}`);

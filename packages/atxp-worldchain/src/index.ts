@@ -11,3 +11,8 @@ export {
 } from './cache.js';
 
 export { createMiniKitWorldchainAccount } from './minikit.js';
+
+// Re-export ATXP Account implementations from @atxp/common
+export {
+  ATXPAccount
+} from '@atxp/common';

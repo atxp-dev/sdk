@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ATXPAccount } from './atxpAccount.js';
+import { ATXPAccount } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 
 describe('ATXPAccount', () => {

@@ -9,3 +9,8 @@ export {
   BrowserCache,
   MemoryCache
 } from './cache.js';
+
+// Re-export ATXP Account implementations from @atxp/common
+export {
+  ATXPAccount
+} from '@atxp/common';

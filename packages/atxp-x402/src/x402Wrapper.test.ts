@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { wrapWithX402 } from './x402Wrapper.js';
-import { ATXPAccount } from '@atxp/client';
+import { ATXPAccount, ATXPLocalAccount } from '@atxp/client';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 
 vi.mock('x402/client', () => ({
@@ -11,6 +11,27 @@ vi.mock('x402/client', () => ({
   })
 }));
 
+// Mock ATXPLocalAccount.create
+vi.mock('@atxp/client', async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    ATXPLocalAccount: {
+      create: vi.fn().mockResolvedValue({
+        address: '0x1234567890123456789012345678901234567890',
+        signTypedData: vi.fn().mockResolvedValue('0xmockedsignature'),
+        account: {
+          address: '0x1234567890123456789012345678901234567890',
+        },
+        chain: {
+          id: 8453,
+        },
+        transport: {},
+      })
+    }
+  };
+});
+
 describe('wrapWithX402', () => {
   let mockAccount: ATXPAccount;
   let mockFetch: ReturnType<typeof vi.fn>;
@@ -20,6 +41,9 @@ describe('wrapWithX402', () => {
   let mockOnPaymentFailure: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    // Reset mocks
+    vi.clearAllMocks();
+
     // Create a mock ATXPAccount instance using the proper connection string format
     mockAccount = new ATXPAccount('https://test.com?connection_token=test-token&account_id=atxp:test-account');
 
@@ -30,19 +54,6 @@ describe('wrapWithX402', () => {
         balance: { usdc: '100', iou: '0' }
       }), { status: 200 })
     );
-
-    // Override the getSigner method
-    mockAccount.getSigner = vi.fn().mockResolvedValue({
-      address: '0x1234567890123456789012345678901234567890',
-      signTypedData: vi.fn().mockResolvedValue('0xmockedsignature'),
-      account: {
-        address: '0x1234567890123456789012345678901234567890',
-      },
-      chain: {
-        id: 8453,
-      },
-      transport: {},
-    });
 
     // Mock fetch
     mockFetch = vi.fn();
@@ -56,22 +67,66 @@ describe('wrapWithX402', () => {
     mockOnPaymentFailure = vi.fn();
   });
 
-  it('should throw an error if account is not an ATXPAccount', () => {
-    // Create a non-ATXPAccount object
-    const nonATXPAccount = {
-      accountId: '0x1234567890123456789012345678901234567890',
-      network: 'base',
-      getSigner: vi.fn(),
+  it('should handle BaseAccount with getLocalAccount', async () => {
+    // Create a mock BaseAccount using the actual constructor
+    const mockBaseAccount = {
+      accountId: 'base:0x1234567890123456789012345678901234567890' as any,
+      paymentMakers: [],
+      getSources: vi.fn().mockResolvedValue([]),
+      getLocalAccount: vi.fn().mockReturnValue({
+        address: '0x1234567890123456789012345678901234567890',
+        signTypedData: vi.fn().mockResolvedValue('0xmockedsignature'),
+        account: {
+          address: '0x1234567890123456789012345678901234567890',
+        },
+        chain: {
+          id: 8453,
+        },
+        transport: {},
+      })
     };
 
-    expect(() => {
-      wrapWithX402({
-        mcpServer: 'https://example.com/mcp',
-        account: nonATXPAccount as any,
-        fetchFn: mockFetch,
-        logger: mockLogger,
-      });
-    }).toThrow('Only ATXPAccount is supported for X402 payments');
+    // Make it look like a BaseAccount instance
+    Object.setPrototypeOf(mockBaseAccount, (await import('@atxp/client')).BaseAccount.prototype);
+
+    const x402Challenge = {
+      x402Version: 1,
+      accepts: [
+        {
+          network: 'base',
+          scheme: 'exact',
+          payTo: '0xrecipient',
+          maxAmountRequired: '1000000',
+          description: 'Test payment',
+        },
+      ],
+    };
+
+    const first402Response = new Response(JSON.stringify(x402Challenge), {
+      status: 402,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const successResponse = new Response('Success', { status: 200 });
+
+    mockFetch
+      .mockResolvedValueOnce(first402Response)
+      .mockResolvedValueOnce(successResponse);
+
+    const wrappedFetch = wrapWithX402({
+      mcpServer: 'https://example.com/mcp',
+      account: mockBaseAccount as any,
+      fetchFn: mockFetch,
+      logger: mockLogger,
+      approvePayment: mockApprovePayment,
+    });
+
+    const result = await wrappedFetch('https://example.com/api');
+
+    expect(result.status).toBe(200);
+    expect(mockBaseAccount.getLocalAccount).toHaveBeenCalled();
   });
 
   it('should pass through normal requests without modification', async () => {
@@ -89,7 +144,7 @@ describe('wrapWithX402', () => {
 
     expect(result).toBe(mockResponse);
     expect(mockFetch).toHaveBeenCalledWith('https://example.com/api', undefined);
-    expect(mockAccount.getSigner).not.toHaveBeenCalled();
+    expect(ATXPLocalAccount.create).not.toHaveBeenCalled();
   });
 
   it('should handle 402 responses and retry with payment', async () => {
@@ -145,8 +200,8 @@ describe('wrapWithX402', () => {
     expect(result.status).toBe(200);
     expect(await result.text()).toBe('Success');
 
-    // Should have called getSigner
-    expect(mockAccount.getSigner).toHaveBeenCalled();
+    // Should have created ATXPLocalAccount
+    expect(ATXPLocalAccount.create).toHaveBeenCalled();
 
     // Should have called approve payment
     expect(mockApprovePayment).toHaveBeenCalledWith(
@@ -256,8 +311,8 @@ describe('wrapWithX402', () => {
     // Should return the original 402 response
     expect(result.status).toBe(402);
 
-    // Should not have tried to get signer
-    expect(mockAccount.getSigner).not.toHaveBeenCalled();
+    // Should not have tried to create signer
+    expect(ATXPLocalAccount.create).not.toHaveBeenCalled();
 
     // Should only have made one fetch call
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -286,8 +341,8 @@ describe('wrapWithX402', () => {
 
     mockFetch.mockResolvedValue(response402);
 
-    // Make getSigner throw an error
-    mockAccount.getSigner = vi.fn().mockRejectedValue(new Error('Signer error'));
+    // Make ATXPLocalAccount.create throw an error
+    (ATXPLocalAccount.create as Mock).mockRejectedValueOnce(new Error('Signer error'));
 
     const wrappedFetch = wrapWithX402({
       mcpServer: 'https://example.com/mcp',
@@ -358,8 +413,8 @@ describe('wrapWithX402', () => {
     // Should return the original 402 response
     expect(result.status).toBe(402);
 
-    // Should not have tried to get signer since no suitable payment option
-    expect(mockAccount.getSigner).not.toHaveBeenCalled();
+    // Should not have tried to create signer since no suitable payment option
+    expect(ATXPLocalAccount.create).not.toHaveBeenCalled();
 
     // Should not have called onPaymentFailure (just returns original 402)
     expect(mockOnPaymentFailure).not.toHaveBeenCalled();

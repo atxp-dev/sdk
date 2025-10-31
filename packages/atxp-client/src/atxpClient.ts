@@ -4,8 +4,7 @@ import { atxpFetch } from "./atxpFetcher.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createDestinationMakers } from './destinationMakers/index.js';
-import { DEFAULT_ATXP_ACCOUNTS_SERVER } from "@atxp/common";
-import { ATXPAccount } from './atxpAccount.js';
+import { DEFAULT_ATXP_ACCOUNTS_SERVER, ATXPAccount } from "@atxp/common";
 
 type RequiredClientConfigFields = 'mcpServer' | 'account';
 type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;

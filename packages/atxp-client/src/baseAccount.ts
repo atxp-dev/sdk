@@ -34,11 +34,10 @@ export class BaseAccount implements Account {
   }
 
   /**
-   * Get a signer that can be used with the x402 library
-   * This is only available for EVM-based accounts
+   * Get the LocalAccount (signer) for this account.
+   * This can be used with the x402 library or other signing operations.
    */
-  getSigner(): LocalAccount {
-    // Return the viem account directly - it implements LocalAccount interface
+  getLocalAccount(): LocalAccount {
     return this.account;
   }
 
