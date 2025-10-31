@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
-import { requirePayment } from '@atxp/server';
+import { ATXPPaymentDestination, requirePayment } from '@atxp/server';
 import type { AuthorizationServerUrl } from '@atxp/common';
 import { atxpExpress } from '@atxp/express';
 import { ATXPAccount } from '@atxp/client';
@@ -56,13 +56,12 @@ app.use(express.json());
 // Use ATXPAccount for multi-chain support
 // This will use the accounts.atxp.ai service which supports both Base and Solana
 const destinationConnectionString = process.env.ATXP_DESTINATION!;
-const destination = new ATXPAccount(destinationConnectionString);
 
 console.log('Starting multichain MCP server with destination', destinationConnectionString);
 console.log(`Server will listen on port ${PORT}`);
 
 const atxpRouter = atxpExpress({
-  destination: destination,
+  paymentDestination: new ATXPPaymentDestination(destinationConnectionString),
   resource: `http://localhost:${PORT}`,
   server: (process.env.ATXP_AUTH_SERVER || 'https://auth.atxp.ai') as AuthorizationServerUrl,
   mountPath: '/',
