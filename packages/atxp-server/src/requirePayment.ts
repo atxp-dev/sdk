@@ -1,4 +1,4 @@
-import { RequirePaymentConfig, paymentRequiredError, extractNetworkFromAccountId, extractAddressFromAccountId } from "@atxp/common";
+import { RequirePaymentConfig, paymentRequiredError, extractNetworkFromAccountId, extractAddressFromAccountId, Network } from "@atxp/common";
 import { getATXPConfig, atxpAccountId } from "./atxpContext.js";
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
@@ -53,7 +53,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   // For createPaymentRequest, use the minimumPayment if configured
   // Fetch account sources to provide backwards compatibility with old clients
   // that expect multiple payment destination options (base, solana, world, etc.)
-  let destinations = [{
+  const destinations = [{
     network: destinationNetwork,
     currency: config.currency,
     address: destinationAddress,
@@ -68,7 +68,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     // Add each source as an alternative payment destination
     for (const source of sources) {
       destinations.push({
-        network: source.chain as any, // Chain and Network have compatible values
+        network: source.chain as Network, // Chain and Network have compatible values
         currency: config.currency,
         address: source.address,
         amount: paymentAmount

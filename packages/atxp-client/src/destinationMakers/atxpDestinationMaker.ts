@@ -15,20 +15,30 @@ type DestinationsApiResponse = {
   paymentRequestId: string;
 };
 
-function isDestinationResponse(obj: any): obj is DestinationResponse {
-  return obj &&
+function isDestinationResponse(obj: unknown): obj is DestinationResponse {
+  return (
     typeof obj === 'object' &&
-    typeof obj.chain === 'string' &&
-    typeof obj.address === 'string' &&
-    typeof obj.currency === 'string' &&
-    typeof obj.amount === 'string';
+    obj !== null &&
+    'chain' in obj &&
+    'address' in obj &&
+    'currency' in obj &&
+    'amount' in obj &&
+    typeof (obj as Record<string, unknown>).chain === 'string' &&
+    typeof (obj as Record<string, unknown>).address === 'string' &&
+    typeof (obj as Record<string, unknown>).currency === 'string' &&
+    typeof (obj as Record<string, unknown>).amount === 'string'
+  );
 }
 
-function isDestinationsApiResponse(obj: any): obj is DestinationsApiResponse {
-  return obj &&
+function isDestinationsApiResponse(obj: unknown): obj is DestinationsApiResponse {
+  return (
     typeof obj === 'object' &&
-    Array.isArray(obj.destinations) &&
-    typeof obj.paymentRequestId === 'string';
+    obj !== null &&
+    'destinations' in obj &&
+    'paymentRequestId' in obj &&
+    Array.isArray((obj as Record<string, unknown>).destinations) &&
+    typeof (obj as Record<string, unknown>).paymentRequestId === 'string'
+  );
 }
 
 function parseDestinationsResponse(data: unknown): Destination[] {
