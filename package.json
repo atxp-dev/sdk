@@ -12,6 +12,7 @@
     "packages/atxp-client",
     "packages/atxp-base",
     "packages/atxp-worldchain",
+    "packages/atxp-polygon",
     "packages/atxp-express",
     "packages/atxp-cloudflare",
     "packages/atxp-x402"
