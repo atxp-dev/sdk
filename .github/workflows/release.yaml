@@ -57,6 +57,7 @@ jobs:
         continue-on-error: false
       
       - name: Update package.json versions and commit
+        continue-on-error: true
         run: |
           # Remove 'v' prefix if present (v1.2.3 → 1.2.3)
           VERSION=${{ github.event.release.tag_name }}
@@ -118,8 +119,8 @@ jobs:
           git pull --rebase origin main
           git push origin main
 
-      - name: Rebuild packages after version update
-        run: npm run build
+      # Don't rebuild here - packages were already built with correct workspace deps
+      # Rebuilding now would try to fetch updated versions from NPM before they're published
 
       - name: Publish packages to NPM
         env:
