@@ -108,16 +108,26 @@ export class SimplePolygonPaymentMaker implements PaymentMaker {
     const payload = toBase64Url(JSON.stringify(payloadObj));
     const message = `${header}.${payload}`;
 
-    // Sign the message
-    const signature = await this.signingClient.signMessage({
+    // Convert message to bytes
+    const messageBytes = typeof Buffer !== 'undefined'
+      ? Buffer.from(message, 'utf8')
+      : new TextEncoder().encode(message);
+
+    // Sign the message with raw bytes
+    const signResult = await this.signingClient.signMessage({
       account: this.signingClient.account,
-      message
+      message: { raw: messageBytes },
     });
 
-    // Convert signature to base64url (remove 0x prefix first)
-    const signatureBase64Url = toBase64Url(signature.slice(2));
+    // For ES256K, signature is typically 65 bytes (r,s,v)
+    // Server expects the hex signature string (with 0x prefix) to be base64url encoded
+    // This creates: base64url("0x6eb2565...") not base64url(rawBytes)
+    // Pass the hex string directly to toBase64Url which will UTF-8 encode and base64url it
+    const signature = toBase64Url(signResult);
 
-    return `${message}.${signatureBase64Url}`;
+    const jwt = `${header}.${payload}.${signature}`;
+    this.logger.info(`Generated ES256K JWT: ${jwt}`);
+    return jwt;
   }
 
   async makePayment(destinations: Destination[], memo: string, paymentRequestId?: string): Promise<PaymentIdentifier | null> {
