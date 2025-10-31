@@ -60,22 +60,28 @@ You'll need a test wallet with:
 
 ## Quick Start
 
+**Important:** Browser tests must be run from the **top level of the monorepo** to properly serve all packages.
+
 1. **Build the package**:
 ```bash
+# From the monorepo root
 cd packages/atxp-polygon
 npm run build
+cd ../..
 ```
 
-2. **Start the test server**:
+2. **Start the test server from the monorepo root**:
 ```bash
-npm run test:browser
+# From the monorepo root (e.g., atxp-dev-sdk/)
+npx -y http-server -p 8000 -c-1 --cors
 ```
 
 3. **Open the test page**:
-   - Navigate to: http://localhost:8000/test/browser/manual-test.html
-   - Or open: http://localhost:8000 and navigate to the test directory
+   - Navigate to: http://localhost:8000/packages/atxp-polygon/test/browser/manual-test.html
 
 4. **Follow the on-page instructions** to test wallet connection and account initialization
+
+**Why run from the monorepo root?** The test page uses import maps that reference packages with absolute paths like `/packages/atxp-polygon/dist/`. Running the server from the monorepo root ensures these paths resolve correctly.
 
 ## Testing Approaches
 
@@ -86,11 +92,16 @@ The `test/browser/manual-test.html` file provides a comprehensive interactive te
 #### Running the Manual Test
 
 ```bash
-# From packages/atxp-polygon directory
-npm run test:browser
+# Build the package first
+cd packages/atxp-polygon
+npm run build
+cd ../..
+
+# Start server from monorepo root
+npx -y http-server -p 8000 -c-1 --cors
 ```
 
-Then open http://localhost:8000/test/browser/manual-test.html in your browser.
+Then open http://localhost:8000/packages/atxp-polygon/test/browser/manual-test.html in your browser.
 
 #### Test Flow
 
@@ -279,10 +290,12 @@ Use this checklist to ensure comprehensive testing coverage:
 **Problem**: ES modules not loading correctly
 
 **Solutions**:
-- Ensure you're serving files with a web server (not opening HTML directly)
-- Build the package: `npm run build`
-- Check that `dist/` directory exists
-- Verify import paths in HTML file
+- Ensure you're serving files from the monorepo root (not a subdirectory)
+- Build the package: `cd packages/atxp-polygon && npm run build`
+- Check that `packages/atxp-polygon/dist/` directory exists
+- Verify the server is running from monorepo root: `npx -y http-server -p 8000 -c-1 --cors`
+- Don't open HTML directly - must be served via HTTP server
+- Check browser console for the exact import path that's failing
 
 #### Initialization Fails
 
