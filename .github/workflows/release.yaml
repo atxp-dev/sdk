@@ -16,6 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.repository.default_branch }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
       
@@ -98,7 +99,7 @@ jobs:
           # Commit all changes
           git add package.json package-lock.json packages/*/package.json
           git commit -m "bump version to $VERSION [skip ci]"
-          git push origin HEAD:${{ github.event.repository.default_branch }}
+          git push origin ${{ github.event.repository.default_branch }}
 
       - name: Rebuild packages after version update
         run: npm run build
