@@ -133,18 +133,16 @@ export class SimplePolygonPaymentMaker implements PaymentMaker {
   async makePayment(destinations: Destination[], memo: string, paymentRequestId?: string): Promise<PaymentIdentifier | null> {
     this.logger.info(`Making payment with ${destinations.length} destination(s)`);
 
-    if (destinations.length === 0) {
-      this.logger.warn('No destinations provided');
-      return null;
+    // Filter to polygon chain destinations
+    const polygonDestinations = destinations.filter(d => d.chain === 'polygon');
+
+    if (polygonDestinations.length === 0) {
+      this.logger.debug('SimplePolygonPaymentMaker: No polygon destinations found, cannot handle payment');
+      return null; // Cannot handle these destinations
     }
 
-    // For now, we only support single destination payments
-    // Multi-destination batching could be added in the future
-    if (destinations.length > 1) {
-      throw new Error('Multiple destinations not yet supported for Polygon payments');
-    }
-
-    const destination = destinations[0];
+    // Pick first polygon destination
+    const destination = polygonDestinations[0];
 
     // Validate currency
     if (destination.currency !== 'USDC') {
