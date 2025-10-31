@@ -1,16 +1,17 @@
 # @atxp/polygon
 
-ATXP for Polygon - Enable seamless payments in Polygon applications with smart wallet and direct wallet support.
+ATXP for Polygon - Enable seamless payments in Polygon applications with direct wallet support.
 
 ## Overview
 
-`@atxp/polygon` provides a complete solution for integrating ATXP (Autonomous Transaction eXecution Protocol) payments into Polygon applications. It handles Polygon-specific wallet interactions, USDC transfers, and smart wallet integration while abstracting away the complexity of blockchain transactions.
+`@atxp/polygon` provides a complete solution for integrating ATXP (Autonomous Transaction eXecution Protocol) payments into Polygon applications. It handles Polygon-specific wallet interactions and USDC transfers while abstracting away the complexity of blockchain transactions.
 
-The package supports three account types:
+**Note:** Smart Wallet mode is not supported on Polygon. Coinbase CDP does not provide Paymaster services for Polygon mainnet, which means gasless transactions via account abstraction are not available. All transactions require users to sign with their wallet and pay gas fees in POL.
+
+The package supports two account types:
 
 ### Browser-Based Accounts (`PolygonBrowserAccount`)
-- **Smart Wallet Mode** (`SmartWalletPaymentMaker`): Uses Coinbase CDP for ephemeral smart wallets with account abstraction and gasless transactions (default, best UX)
-- **Direct Wallet Mode** (`DirectWalletPaymentMaker`): Direct wallet integration where users sign each transaction
+- **Direct Wallet Mode** (`DirectWalletPaymentMaker`): Direct wallet integration where users sign each transaction and pay gas fees in POL
 
 ### Server/CLI Accounts (`PolygonServerAccount`)
 - **Server Mode** (`ServerPaymentMaker`): For backend services and CLI tools using private keys directly
@@ -37,39 +38,16 @@ npm install viem
 
 ### Browser Usage
 
-#### Option 1: Smart Wallet Mode (Recommended - Best UX)
-
 ```typescript
 import { PolygonBrowserAccount } from '@atxp/polygon';
 
 const account = await PolygonBrowserAccount.initialize({
   provider: window.ethereum, // or any EIP-1193 provider
   walletAddress: '0x1234...', // User's wallet address
-  useEphemeralWallet: true, // Smart wallet with gasless transactions
-
-  // Spend permission parameters
-  allowance: BigInt('10000000'), // 10 USDC (in 6 decimals)
-  periodInDays: 30, // Permission valid for 30 days
-  periodStart: Math.floor(Date.now() / 1000), // Start time in seconds
 
   // Optional configuration
   customRpcUrl: 'https://polygon-rpc.com', // Custom RPC endpoint
   logger: console // Logger instance
-});
-```
-
-#### Option 2: Direct Wallet Mode
-
-```typescript
-import { PolygonBrowserAccount } from '@atxp/polygon';
-
-const account = await PolygonBrowserAccount.initialize({
-  provider: window.ethereum,
-  walletAddress: '0x1234...',
-  useEphemeralWallet: false, // User signs each transaction
-  allowance: BigInt('10000000'),
-  periodInDays: 30,
-  periodStart: Math.floor(Date.now() / 1000)
 });
 ```
 
@@ -127,11 +105,7 @@ export const AtxpProvider = ({ children }) => {
   const loadAccount = useCallback(async (walletAddress: string) => {
     const account = await PolygonBrowserAccount.initialize({
       provider: window.ethereum,
-      walletAddress,
-      useEphemeralWallet: true,
-      allowance: BigInt('10000000'), // 10 USDC
-      periodInDays: 30,
-      periodStart: Math.floor(Date.now() / 1000)
+      walletAddress
     });
     setAtxpAccount(account);
 
@@ -175,19 +149,17 @@ export const AtxpProvider = ({ children }) => {
 
 ### `PolygonBrowserAccount.initialize(options)`
 
-Creates and initializes a browser-based Polygon account with smart wallet or direct wallet support.
+Creates and initializes a browser-based Polygon account with direct wallet support.
 
 #### Parameters
 
 - `provider: Eip1193Provider` - EIP-1193 compatible provider (e.g., window.ethereum)
 - `walletAddress: string` - The user's wallet address
-- `useEphemeralWallet?: boolean` - Whether to use smart wallet (true) or direct wallet (false). Default: true
-- `allowance: bigint` - Maximum USDC amount that can be spent (in 6 decimals)
-- `periodInDays: number` - Permission validity period in days
-- `periodStart: number` - Permission start time in Unix seconds
 - `customRpcUrl?: string` - Optional custom RPC URL (defaults to public Polygon RPC)
 - `chainId?: number` - Chain ID (137 for mainnet, 80002 for Amoy testnet)
 - `logger?: Logger` - Optional logger for debugging
+
+**Deprecated parameters:** `useEphemeralWallet`, `allowance`, `periodInDays`, `periodStart`, and `coinbaseCdpApiKey` are no longer supported as Smart Wallet mode is not available on Polygon.
 
 #### Returns
 
@@ -226,22 +198,8 @@ Browser-based account class that handles Polygon wallet interactions.
 #### Key Features
 
 - **USDC Transfers**: Handles native USDC transfers on Polygon (0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359)
-- **Message Signing**: Signs JWTs using EIP-1271 for smart wallets or standard signing for direct wallets
-- **Smart Wallet Integration**: Uses Coinbase CDP for account abstraction and gasless transactions
-- **Spend Permissions**: Manages recurring payment permissions with ERC-20 approvals
-- **Automatic Deployment**: Deploys smart wallet before first use (smart wallet mode only)
-
-### `SmartWalletPaymentMaker`
-
-Browser-based payment maker using ephemeral smart wallets with account abstraction.
-
-#### Features
-
-- Gasless transactions via Coinbase CDP bundler
-- Batched transaction support
-- Automatic memo appending to transfers
-- User operation handling
-- **Best for**: Production browser apps (best UX)
+- **Message Signing**: Signs JWTs using standard Ethereum message signing with special handling for Coinbase Wallet
+- **Transaction Confirmation**: Tracks and confirms transaction status on-chain
 
 ### `DirectWalletPaymentMaker`
 
@@ -253,7 +211,8 @@ Browser-based payment maker for direct wallet signing.
 - Support for Coinbase Wallet and standard wallets
 - Transaction confirmation tracking
 - Flexible message signing for different wallet providers
-- **Best for**: Users who want full control, compatibility mode
+- Users pay gas fees in POL
+- **Best for**: All Polygon browser applications
 
 ### `ServerPaymentMaker`
 
@@ -267,24 +226,6 @@ Server-side payment maker using direct private key signing.
 - Transaction confirmation
 - **Best for**: Backend services, CLI tools, testing
 
-### Caching System
-
-```typescript
-import { IntermediaryCache } from '@atxp/polygon';
-
-// Browser-based cache for persistent permission storage
-const cache = new IntermediaryCache();
-
-// Store permission
-await cache.set('cache-key', {
-  privateKey: '0x...',
-  permission: { /* spend permission data */ }
-});
-
-// Retrieve permission
-const intermediary = await cache.get('cache-key');
-```
-
 ## Configuration
 
 ### Default Configuration
@@ -294,44 +235,13 @@ The package comes with sensible defaults:
 - **Chain**: Polygon Mainnet (Chain ID: 137)
 - **RPC**: Public Polygon RPC endpoint (https://polygon-rpc.com)
 - **USDC Address**: Native USDC on Polygon (0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359)
-- **Bundler**: Coinbase CDP Polygon bundler
-- **Paymaster**: Coinbase CDP paymaster (gasless transactions)
-
-### Smart Wallet Mode (Browser - Default, Recommended)
-
-```typescript
-const account = await PolygonBrowserAccount.initialize({
-  provider: window.ethereum,
-  walletAddress: '0x1234...',
-  useEphemeralWallet: true, // default - uses SmartWalletPaymentMaker
-  allowance: BigInt('10000000'),
-  periodInDays: 30,
-  periodStart: Math.floor(Date.now() / 1000)
-});
-```
-
-**How it works:**
-1. Creates a new ephemeral smart wallet using Coinbase CDP
-2. Requests ERC-20 approval for the smart wallet to spend USDC
-3. Deploys the smart wallet on first use
-4. Stores permission and wallet in cache for subsequent use
-5. All transactions are gasless via Coinbase paymaster
-
-**Benefits:**
-- Single approval for multiple transactions
-- Gasless transactions (no native POL needed)
-- Improved UX with minimal user prompts
 
 ### Direct Wallet Mode (Browser)
 
 ```typescript
 const account = await PolygonBrowserAccount.initialize({
   provider: window.ethereum,
-  walletAddress: '0x1234...',
-  useEphemeralWallet: false, // uses DirectWalletPaymentMaker
-  allowance: BigInt('10000000'),
-  periodInDays: 30,
-  periodStart: Math.floor(Date.now() / 1000)
+  walletAddress: '0x1234...'
 });
 ```
 
@@ -341,10 +251,7 @@ const account = await PolygonBrowserAccount.initialize({
 3. Direct USDC transfers from user's wallet
 4. User pays gas fees in POL
 
-**When to use:**
-- Users want full control over each transaction
-- Development/testing environments
-- Compatibility with wallets that don't support smart contracts
+This is the only supported mode for Polygon browser applications.
 
 ### Server/CLI Mode
 
@@ -378,11 +285,7 @@ const account = new PolygonServerAccount(
 const account = await PolygonBrowserAccount.initialize({
   provider: window.ethereum,
   walletAddress: '0x1234...',
-  customRpcUrl: 'https://your-polygon-rpc.com',
-  useEphemeralWallet: true,
-  allowance: BigInt('10000000'),
-  periodInDays: 30,
-  periodStart: Math.floor(Date.now() / 1000)
+  customRpcUrl: 'https://your-polygon-rpc.com'
 });
 ```
 
@@ -432,22 +335,18 @@ const client = await atxpClient({
 });
 ```
 
-### Approval/Permission Errors
+### Wallet Connection Errors
 
 ```typescript
 try {
-  const account = await PolygonAccount.initialize({
+  const account = await PolygonBrowserAccount.initialize({
     provider: window.ethereum,
-    walletAddress: '0x1234...',
-    useEphemeralWallet: true,
-    allowance: BigInt('10000000'),
-    periodInDays: 30,
-    periodStart: Math.floor(Date.now() / 1000)
+    walletAddress: '0x1234...'
   });
 } catch (error) {
   if (error.message.includes('User rejected')) {
-    // User rejected the ERC-20 approval
-    console.log('Please approve USDC spending to continue');
+    // User rejected the wallet connection
+    console.log('Please connect your wallet to continue');
   }
 }
 ```
@@ -463,7 +362,7 @@ try {
 - Modern browser environment
 - EIP-1193 compatible wallet provider (e.g., MetaMask, Coinbase Wallet, WalletConnect)
 - USDC balance on Polygon
-- POL balance for gas fees (only in direct wallet mode; smart wallet mode is gasless)
+- POL balance for gas fees
 
 ### Server/CLI Usage
 - Node.js 16+
@@ -471,26 +370,19 @@ try {
 
 ## Technical Details
 
-### Smart Wallet Architecture
-
-The ephemeral wallet implementation uses:
-- **Coinbase CDP SDK** for smart wallet creation and management
-- **ERC-4337 Account Abstraction** for gasless transactions
-- **Coinbase Bundler** for user operation submission
-- **Coinbase Paymaster** for gas sponsorship
-
-### Spend Permission System
-
-Instead of native spend permissions (which Polygon doesn't support), this package uses:
-- **ERC-20 Approve/TransferFrom** pattern for permission management
-- **Approval caching** to avoid repeated approval requests
-- **Permission parameters** stored in cache for validation
-
 ### Authentication
 
-- **Smart Wallet Mode** (`SmartWalletPaymentMaker`): Uses EIP-1271 smart contract signature verification
 - **Direct Wallet Mode** (`DirectWalletPaymentMaker`): Uses standard Ethereum message signing with special handling for Coinbase Wallet
 - **Server Mode** (`ServerPaymentMaker`): Uses ES256K JWT with direct private key signing
+
+### Why No Smart Wallet Support?
+
+Coinbase CDP does not provide Paymaster services for Polygon mainnet, which means:
+- Gasless transactions via account abstraction are not available
+- ERC-4337 smart wallet operations would require users to pay gas fees
+- This eliminates the primary benefit of using smart wallets
+
+For the best user experience on Polygon, use Direct Wallet mode where users sign transactions directly with their wallet.
 
 ## License
 
