@@ -59,10 +59,20 @@ jobs:
           # Configure git
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
+
+          # Check current version in root package.json
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+          if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+            echo "Version is already $VERSION, skipping version bump"
+            exit 0
+          fi
+
+          echo "Updating version from $CURRENT_VERSION to $VERSION"
+
           # Update root package version
           npm version $VERSION --no-git-tag-version
-          
+
           # Update all workspace package versions
           npm version $VERSION --no-git-tag-version -w packages/atxp-common
           npm version $VERSION --no-git-tag-version -w packages/atxp-sqlite
@@ -75,7 +85,7 @@ jobs:
           npm version $VERSION --no-git-tag-version -w packages/atxp-express
           npm version $VERSION --no-git-tag-version -w packages/atxp-cloudflare
           npm version $VERSION --no-git-tag-version -w packages/atxp-x402
-          
+
           # Update cross-package dependencies to match new version
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-client
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-server
@@ -92,13 +102,14 @@ jobs:
           npm pkg set dependencies."@atxp/server"=$VERSION -w packages/atxp-cloudflare
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-x402
           npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-x402
-                    
+
           # Regenerate package-lock.json with updated versions
           npm install
-          
+
           # Commit all changes
           git add package.json package-lock.json packages/*/package.json
           git commit -m "bump version to $VERSION [skip ci]"
+          git pull --rebase origin ${{ github.event.repository.default_branch }}
           git push origin ${{ github.event.repository.default_branch }}
 
       - name: Rebuild packages after version update
