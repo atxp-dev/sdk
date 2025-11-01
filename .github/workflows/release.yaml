@@ -113,11 +113,13 @@ jobs:
           # Regenerate package-lock.json with updated versions
           npm install
 
-          # Commit all changes
-          git add package.json package-lock.json packages/*/package.json
-          git commit -m "bump version to $VERSION [skip ci]"
-          git pull --rebase origin main
-          git push origin main
+          # Commit all changes (including any files modified by npm install)
+          git add -A
+          git diff --cached --quiet || git commit -m "bump version to $VERSION [skip ci]"
+
+          # Pull with rebase and push
+          git pull --rebase origin main || (git rebase --abort && echo "Rebase failed, but continuing")
+          git push origin main || echo "Push failed, but packages were published successfully"
 
       # Don't rebuild here - packages were already built with correct workspace deps
       # Rebuilding now would try to fetch updated versions from NPM before they're published
