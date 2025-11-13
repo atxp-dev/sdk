@@ -68,7 +68,8 @@ const atxpRouter = atxpExpress({
   mountPath: '/',
   payeeName: 'Multichain Example Server',
   allowHttp: true,
-  logger: new ConsoleLogger({level: LogLevel.DEBUG})
+  logger: new ConsoleLogger({level: LogLevel.DEBUG}),
+  atxpConnectionToken: destination.token
 });
 
 app.use(atxpRouter as any);

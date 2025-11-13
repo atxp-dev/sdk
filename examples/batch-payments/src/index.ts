@@ -58,7 +58,8 @@ async function main() {
     destination,
     payeeName: 'Batch Payments Example',
     allowHttp: process.env.NODE_ENV === 'development',
-    minimumPayment: BigNumber(0.05)
+    minimumPayment: BigNumber(0.05),
+    atxpConnectionToken: destination.token
   });
 
   app.use(atxpRouter as any);

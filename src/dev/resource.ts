@@ -58,7 +58,8 @@ app.use(atxpExpress({
   payeeName: 'ATXP Client Example Resource Server',
   minimumPayment: BigNumber(0.01),
   allowHttp: true,
-  logger
+  logger,
+  atxpConnectionToken: destination.token
 }));
 
 

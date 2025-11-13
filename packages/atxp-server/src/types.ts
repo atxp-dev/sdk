@@ -61,6 +61,7 @@ export type ATXPConfig = {
   // If not provided, the resource will be inferred from the request URL
   resource: UrlString | null;
   allowHttp: boolean;
+  atxpConnectionToken?: string;
   //refundErrors: RefundErrors;
   logger: Logger;
   oAuthDb: OAuthDb;

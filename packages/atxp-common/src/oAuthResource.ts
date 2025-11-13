@@ -12,6 +12,7 @@ export interface OAuthResourceClientConfig {
   allowInsecureRequests?: boolean;
   clientName?: string;
   logger?: Logger;
+  atxpConnectionToken?: string;
 }
 
 export class OAuthResourceClient {
@@ -31,6 +32,7 @@ export class OAuthResourceClient {
   protected logger: Logger;
   // In-memory lock to prevent concurrent client registrations
   private registrationLocks = new Map<string, Promise<ClientCredentials>>();
+  protected atxpConnectionToken?: string;
 
   constructor({
     db,
@@ -40,7 +42,8 @@ export class OAuthResourceClient {
     strict = false,
     allowInsecureRequests = process.env.NODE_ENV === 'development',
     clientName = 'Token Introspection Client',
-    logger = new ConsoleLogger()
+    logger = new ConsoleLogger(),
+    atxpConnectionToken
   }: OAuthResourceClientConfig) {
     // Default values above are appropriate for a global client used directly. Subclasses should override these,
     // because things like the callbackUrl will actually be important for them
@@ -52,6 +55,7 @@ export class OAuthResourceClient {
     this.allowInsecureRequests = allowInsecureRequests;
     this.clientName = clientName;
     this.logger = logger;
+    this.atxpConnectionToken = atxpConnectionToken;
   }
 
   static trimToPath = (url: string): string => {
@@ -258,7 +262,8 @@ export class OAuthResourceClient {
       throw new Error('Authorization server does not support dynamic client registration');
     }
 
-    const clientMetadata = await this.getRegistrationMetadata();
+    const baseClientMetadata = await this.getRegistrationMetadata();
+    const clientMetadata = this.withRegistrationCredentials(baseClientMetadata);
     
     let registeredClient: oauth.Client;
     try {
@@ -292,6 +297,19 @@ export class OAuthResourceClient {
     await this.db.saveClientCredentials(authorizationServer.issuer, credentials);
     
     return credentials;
+  }
+
+  protected withRegistrationCredentials = (
+    metadata: Partial<oauth.OmitSymbolProperties<oauth.Client>>
+  ): Partial<oauth.OmitSymbolProperties<oauth.Client>> => {
+    if (!this.atxpConnectionToken) {
+      return metadata;
+    }
+
+    return {
+      ...metadata,
+      connection_token: this.atxpConnectionToken
+    };
   }
 
   protected getClientCredentials = async (authorizationServer: oauth.AuthorizationServer): Promise<ClientCredentials> => {

@@ -118,6 +118,7 @@ async function main() {
     destination,
     payeeName: 'ATXP Server Example',
     allowHttp: process.env.NODE_ENV === 'development',
+    ...(destination instanceof ATXPAccount ? { atxpConnectionToken: destination.token } : {})
   });
   
   // Use the router as middleware - Express v5 compatibility
