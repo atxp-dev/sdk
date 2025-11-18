@@ -6,7 +6,7 @@ type RequiredATXPConfigFields = 'destination';
 type RequiredATXPConfig = Pick<ATXPConfig, RequiredATXPConfigFields>;
 type OptionalATXPConfig = Omit<ATXPConfig, RequiredATXPConfigFields>;
 export type ATXPArgs = RequiredATXPConfig & Partial<OptionalATXPConfig>;
-type BuildableATXPConfigFields = 'oAuthDb' | 'oAuthClient' | 'paymentServer' | 'logger' | 'minimumPayment' | 'atxpConnectionToken';
+type BuildableATXPConfigFields = 'oAuthDb' | 'oAuthClient' | 'paymentServer' | 'logger' | 'minimumPayment';
 
 export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConfigFields>> = {
   mountPath: '/',
@@ -34,11 +34,16 @@ export function buildServerConfig(args: ATXPArgs): ATXPConfig {
   };
   const withDefaults = { ...envDefaults, ...args };
   const oAuthDb = withDefaults.oAuthDb ?? new MemoryOAuthDb()
+
+  // Extract token from destination using duck typing
+  const destinationWithToken = withDefaults.destination as { token?: string };
+  const atxpConnectionToken = destinationWithToken.token;
+
   const oAuthClient = withDefaults.oAuthClient ?? new OAuthResourceClient({
     db: oAuthDb,
     allowInsecureRequests: withDefaults.allowHttp,
     clientName: withDefaults.payeeName,
-    atxpConnectionToken: withDefaults.atxpConnectionToken
+    atxpConnectionToken
   });
   const logger = withDefaults.logger ?? new ConsoleLogger();
   const paymentServer = withDefaults.paymentServer ?? new ATXPPaymentServer(withDefaults.server, logger)

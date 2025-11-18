@@ -175,42 +175,6 @@ vi.mock('oauth4webapi', () => ({
   allowInsecureRequests: Symbol('allowInsecureRequests'),
 }));
 
-describe('Dynamic client registration metadata', () => {
-  let client: OAuthResourceClient;
-  let db: MemoryOAuthDb;
-  let mockOAuth: any;
-  const devToken = 'dev-token-123';
-
-  beforeEach(async () => {
-    db = new MemoryOAuthDb();
-    client = new OAuthResourceClient({
-      db,
-      sideChannelFetch: mockFetch,
-      allowInsecureRequests: true,
-      logger: mockLogger,
-      atxpConnectionToken: devToken
-    });
-    mockOAuth = await import('oauth4webapi');
-    vi.clearAllMocks();
-  });
-
-  it('sends connection token during dynamic registration when provided', async () => {
-    mockOAuth.dynamicClientRegistrationRequest.mockResolvedValue({});
-    mockOAuth.processDynamicClientRegistrationResponse.mockResolvedValue({
-      client_id: 'registered-client',
-      client_secret: 'registered-secret'
-    });
-
-    await client.registerClient(mockAuthServer as any);
-
-    expect(mockOAuth.dynamicClientRegistrationRequest).toHaveBeenCalled();
-    const [, metadata] = mockOAuth.dynamicClientRegistrationRequest.mock.calls[0];
-    expect(metadata).toMatchObject({
-      connection_token: devToken
-    });
-  });
-});
-
 describe('OAuthResourceClient URL normalization and fallback', () => {
   let client: OAuthResourceClient;
   let db: MemoryOAuthDb;

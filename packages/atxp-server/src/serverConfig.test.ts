@@ -72,16 +72,4 @@ describe('buildServerConfig', () => {
       }).not.toThrow();
     });
   });
-
-  it('propagates atxpConnectionToken from args to the OAuth client', () => {
-    const destination = mockAccount('testDestination');
-
-    const config = buildServerConfig({
-      destination,
-      atxpConnectionToken: 'test_token'
-    });
-
-    const client = config.oAuthClient as any;
-    expect(client.atxpConnectionToken).toBe('test_token');
-  });
 });
