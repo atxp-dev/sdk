@@ -3,15 +3,6 @@ import { atxpClient, ATXPAccount, BaseAccount, SolanaAccount } from '@atxp/clien
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import 'dotenv/config';
 
-function validateEnv() {
-  const requiredVars = ['BASE_RPC', 'BASE_PRIVATE_KEY'];
-  const missing = requiredVars.filter(varName => !process.env[varName]);
-  
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}\nPlease set them in your .env file or environment.`);
-  }
-}
-
 function parseArgs() {
   const args = process.argv.slice(2);
   const url = args[0] || 'http://localhost:3009';
@@ -45,11 +36,7 @@ async function main() {
   }
   
   try {
-    validateEnv();
-
-    //const account = new SolanaAccount(process.env.SOLANA_ENDPOINT!, process.env.SOLANA_PRIVATE_KEY!);
     const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
-    //const account = new BaseAccount(process.env.BASE_RPC!, process.env.BASE_PRIVATE_KEY! as `0x${string}`);
     const mcpClient = await atxpClient({
       mcpServer: url,
       account,

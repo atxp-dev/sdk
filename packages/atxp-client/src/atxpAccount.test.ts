@@ -3,6 +3,41 @@ import { ATXPAccount } from '@atxp/common';
 import BigNumber from 'bignumber.js';
 
 describe('ATXPAccount', () => {
+  describe('constructor with invalid connection strings', () => {
+    it('should throw helpful error when connection string is empty string', () => {
+      expect(() => new ATXPAccount('')).toThrow('ATXPAccount: connection string is empty or not provided');
+    });
+
+    it('should throw helpful error when connection string is whitespace only', () => {
+      expect(() => new ATXPAccount('   ')).toThrow('ATXPAccount: connection string is empty or not provided');
+    });
+
+    it('should throw helpful error when connection string is undefined', () => {
+      expect(() => new ATXPAccount(undefined as any)).toThrow('ATXPAccount: connection string is empty or not provided');
+    });
+
+    it('should throw helpful error when connection string is null', () => {
+      expect(() => new ATXPAccount(null as any)).toThrow('ATXPAccount: connection string is empty or not provided');
+    });
+
+    it('should throw error when connection string is malformed URL', () => {
+      expect(() => new ATXPAccount('not-a-valid-url')).toThrow();
+    });
+
+    it('should throw error when connection string is missing connection_token', () => {
+      expect(() => new ATXPAccount('https://accounts.atxp.ai?account_id=acc_123')).toThrow(
+        'ATXPAccount: connection string missing connection token'
+      );
+    });
+
+    it('should throw error when connection string is missing account_id', () => {
+      expect(() => new ATXPAccount('https://accounts.atxp.ai?connection_token=test_token')).toThrow(
+        'ATXPAccount: connection string missing account id'
+      );
+    });
+  });
+
+
   describe('ATXPHttpPaymentMaker.getSourceAddress', () => {
     it('should call /address_for_payment endpoint and return sourceAddress', async () => {
       const mockFetch = vi.fn();

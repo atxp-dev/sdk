@@ -9,6 +9,9 @@ function toBasicAuth(token: string): string {
 }
 
 function parseConnectionString(connectionString: string): { origin: string; token: string; accountId: string } {
+  if (!connectionString || connectionString.trim() === '') {
+    throw new Error('ATXPAccount: connection string is empty or not provided');
+  }
   const url = new URL(connectionString);
   const origin = url.origin;
   const token = url.searchParams.get('connection_token') || '';
