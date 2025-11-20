@@ -78,7 +78,8 @@ export class OAuthClient extends OAuthResourceClient {
       strict,
       allowInsecureRequests,
       clientName,
-      logger
+      logger,
+      registrationType: 'client'
     });
     this.db = db;
     this.userId = userId;

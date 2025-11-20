@@ -117,7 +117,7 @@ async function main() {
   const atxpRouter = atxpExpress({
     destination,
     payeeName: 'ATXP Server Example',
-    allowHttp: process.env.NODE_ENV === 'development',
+    allowHttp: process.env.NODE_ENV === 'development'
   });
   
   // Use the router as middleware - Express v5 compatibility

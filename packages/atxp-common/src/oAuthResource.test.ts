@@ -169,6 +169,8 @@ vi.mock('oauth4webapi', () => ({
   processResourceDiscoveryResponse: vi.fn(),
   discoveryRequest: vi.fn(),
   processDiscoveryResponse: vi.fn(),
+  dynamicClientRegistrationRequest: vi.fn(),
+  processDynamicClientRegistrationResponse: vi.fn(),
   customFetch: Symbol('customFetch'),
   allowInsecureRequests: Symbol('allowInsecureRequests'),
 }));

@@ -12,6 +12,8 @@ export interface OAuthResourceClientConfig {
   allowInsecureRequests?: boolean;
   clientName?: string;
   logger?: Logger;
+  atxpConnectionToken?: string;
+  registrationType?: 'server' | 'client';
 }
 
 export class OAuthResourceClient {
@@ -31,6 +33,8 @@ export class OAuthResourceClient {
   protected logger: Logger;
   // In-memory lock to prevent concurrent client registrations
   private registrationLocks = new Map<string, Promise<ClientCredentials>>();
+  protected atxpConnectionToken?: string;
+  protected registrationType: 'server' | 'client';
 
   constructor({
     db,
@@ -40,7 +44,9 @@ export class OAuthResourceClient {
     strict = false,
     allowInsecureRequests = process.env.NODE_ENV === 'development',
     clientName = 'Token Introspection Client',
-    logger = new ConsoleLogger()
+    logger = new ConsoleLogger(),
+    atxpConnectionToken,
+    registrationType = 'server'
   }: OAuthResourceClientConfig) {
     // Default values above are appropriate for a global client used directly. Subclasses should override these,
     // because things like the callbackUrl will actually be important for them
@@ -52,6 +58,8 @@ export class OAuthResourceClient {
     this.allowInsecureRequests = allowInsecureRequests;
     this.clientName = clientName;
     this.logger = logger;
+    this.atxpConnectionToken = atxpConnectionToken;
+    this.registrationType = registrationType;
   }
 
   static trimToPath = (url: string): string => {
@@ -258,16 +266,26 @@ export class OAuthResourceClient {
       throw new Error('Authorization server does not support dynamic client registration');
     }
 
-    const clientMetadata = await this.getRegistrationMetadata();
+    const baseClientMetadata = await this.getRegistrationMetadata();
+    const clientMetadata = this.withRegistrationCredentials(baseClientMetadata);
     
     let registeredClient: oauth.Client;
+    const withRegistrationHeader: FetchLike = (input, init) => {
+      const headers = new Headers(init?.headers ?? undefined);
+      headers.set('X-ATXP-Registration-Type', this.registrationType);
+      if (this.atxpConnectionToken) {
+        headers.set('X-ATXP-TOKEN', this.atxpConnectionToken);
+      }
+      return this.sideChannelFetch(input, { ...init, headers });
+    };
+
     try {
       // Make the registration request
       const response = await oauth.dynamicClientRegistrationRequest(
         authorizationServer,
         clientMetadata,
         {
-          [oauth.customFetch]: this.sideChannelFetch,
+          [oauth.customFetch]: withRegistrationHeader,
           [oauth.allowInsecureRequests]: this.allowInsecureRequests
         }
       );
@@ -292,6 +310,13 @@ export class OAuthResourceClient {
     await this.db.saveClientCredentials(authorizationServer.issuer, credentials);
     
     return credentials;
+  }
+
+  protected withRegistrationCredentials = (
+    metadata: Partial<oauth.OmitSymbolProperties<oauth.Client>>
+  ): Partial<oauth.OmitSymbolProperties<oauth.Client>> => {
+    // Connection tokens are now transmitted via the X-ATXP-TOKEN header
+    return metadata;
   }
 
   protected getClientCredentials = async (authorizationServer: oauth.AuthorizationServer): Promise<ClientCredentials> => {
