@@ -13,6 +13,7 @@ export interface OAuthResourceClientConfig {
   clientName?: string;
   logger?: Logger;
   atxpConnectionToken?: string;
+  registrationType?: 'server' | 'client';
 }
 
 export class OAuthResourceClient {
@@ -33,6 +34,7 @@ export class OAuthResourceClient {
   // In-memory lock to prevent concurrent client registrations
   private registrationLocks = new Map<string, Promise<ClientCredentials>>();
   protected atxpConnectionToken?: string;
+  protected registrationType: 'server' | 'client';
 
   constructor({
     db,
@@ -43,7 +45,8 @@ export class OAuthResourceClient {
     allowInsecureRequests = process.env.NODE_ENV === 'development',
     clientName = 'Token Introspection Client',
     logger = new ConsoleLogger(),
-    atxpConnectionToken
+    atxpConnectionToken,
+    registrationType = 'server'
   }: OAuthResourceClientConfig) {
     // Default values above are appropriate for a global client used directly. Subclasses should override these,
     // because things like the callbackUrl will actually be important for them
@@ -56,6 +59,7 @@ export class OAuthResourceClient {
     this.clientName = clientName;
     this.logger = logger;
     this.atxpConnectionToken = atxpConnectionToken;
+    this.registrationType = registrationType;
   }
 
   static trimToPath = (url: string): string => {
@@ -266,13 +270,19 @@ export class OAuthResourceClient {
     const clientMetadata = this.withRegistrationCredentials(baseClientMetadata);
     
     let registeredClient: oauth.Client;
+    const withRegistrationHeader: FetchLike = (input, init) => {
+      const headers = new Headers(init?.headers ?? undefined);
+      headers.set('X-ATXP-Registration-Type', this.registrationType);
+      return this.sideChannelFetch(input, { ...init, headers });
+    };
+
     try {
       // Make the registration request
       const response = await oauth.dynamicClientRegistrationRequest(
         authorizationServer,
         clientMetadata,
         {
-          [oauth.customFetch]: this.sideChannelFetch,
+          [oauth.customFetch]: withRegistrationHeader,
           [oauth.allowInsecureRequests]: this.allowInsecureRequests
         }
       );
