@@ -273,6 +273,9 @@ export class OAuthResourceClient {
     const withRegistrationHeader: FetchLike = (input, init) => {
       const headers = new Headers(init?.headers ?? undefined);
       headers.set('X-ATXP-Registration-Type', this.registrationType);
+      if (this.atxpConnectionToken) {
+        headers.set('X-ATXP-TOKEN', this.atxpConnectionToken);
+      }
       return this.sideChannelFetch(input, { ...init, headers });
     };
 
@@ -312,14 +315,8 @@ export class OAuthResourceClient {
   protected withRegistrationCredentials = (
     metadata: Partial<oauth.OmitSymbolProperties<oauth.Client>>
   ): Partial<oauth.OmitSymbolProperties<oauth.Client>> => {
-    if (!this.atxpConnectionToken) {
-      return metadata;
-    }
-
-    return {
-      ...metadata,
-      connection_token: this.atxpConnectionToken
-    };
+    // Connection tokens are now transmitted via the X-ATXP-TOKEN header
+    return metadata;
   }
 
   protected getClientCredentials = async (authorizationServer: oauth.AuthorizationServer): Promise<ClientCredentials> => {
