@@ -54,12 +54,12 @@ const TEST_UI_HTML = `
     <div class="status" id="status">Connecting...</div>
   </div>
   <script>
-    // Listen for tool result from host
+    // Listen for tool result from host (MCP Apps spec)
     window.addEventListener('message', (event) => {
       console.log('[UI] Received message:', event.data);
       const msg = event.data;
 
-      // Handle tool result notification
+      // Handle tool result notification (MCP Apps spec: ui/notifications/tool-result)
       if (msg && msg.method === 'ui/notifications/tool-result') {
         const result = msg.params;
         document.getElementById('status').textContent = 'Data received!';
@@ -71,7 +71,7 @@ const TEST_UI_HTML = `
         }
       }
 
-      // Handle tool input notification (arguments before execution)
+      // Handle tool input notification (MCP Apps spec: ui/notifications/tool-input)
       if (msg && msg.method === 'ui/notifications/tool-input') {
         document.getElementById('status').textContent = 'Processing...';
         if (msg.params && msg.params.arguments) {
