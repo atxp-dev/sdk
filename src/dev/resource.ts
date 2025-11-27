@@ -99,13 +99,13 @@ const getServer = () => {
     'ui://secure-data',
     {
       description: 'UI template for the secure-data tool',
-      mimeType: 'text/html+mcp',
+      mimeType: 'text/html',
     },
     async (): Promise<ReadResourceResult> => ({
       contents: [
         {
           uri: 'ui://secure-data',
-          mimeType: 'text/html+mcp',
+          mimeType: 'text/html',
           text: TEST_UI_HTML,
         }
       ],
