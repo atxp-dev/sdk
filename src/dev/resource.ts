@@ -22,17 +22,22 @@ const TEST_UI_HTML = `
 <head>
   <meta charset="utf-8">
   <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 180px;
+    }
     body {
       font-family: system-ui, -apple-system, sans-serif;
       padding: 20px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      min-height: 100px;
-      margin: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      box-sizing: border-box;
     }
     .container {
       background: rgba(255,255,255,0.1);
