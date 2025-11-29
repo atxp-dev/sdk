@@ -65,13 +65,6 @@ export type Source = {
   walletType: WalletType;
 }
 
-export type PaymentRequestOption = {
-  network: Network;
-  currency: Currency;
-  address: string;
-  amount: BigNumber;
-}
-
 export type Destination = {
   chain: Chain;
   currency: Currency;
@@ -79,29 +72,25 @@ export type Destination = {
   amount: BigNumber;
 }
 
-export type PaymentRequestData = {
-  // New multi-destination format
-  destinations?: PaymentRequestOption[];
-  // Legacy single destination fields (for backwards compatibility)
-  amount?: BigNumber;
-  currency?: Currency;
-  network?: Network;
-  destination?: string;
-  // Common fields
-  source: string;
-  sourceAccountId?: AccountId | null;
-  destinationAccountId?: AccountId | null;
-  resource: URL;
-  resourceName: string;
-  payeeName?: string | null;
-  iss: string;
+export type PaymentRequestOption = {
+  network: Network;
+  currency: Currency;
+  address: string;
+  amount: BigNumber;
 }
 
+export type PaymentRequest = {
+  options: PaymentRequestOption[];
+  sourceAccountId: AccountId;
+  destinationAccountId: AccountId;
+  resource: URL;
+  payeeName: string | null;
+}
 
 export type CustomJWTPayload = {
   code_challenge?: string;
   payment_request_id?: string;
-  account_id?: AccountId;
+  account_id: AccountId;
 }
 
 export type ClientCredentials = {
