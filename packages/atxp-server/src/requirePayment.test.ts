@@ -27,6 +27,7 @@ describe('requirePayment', () => {
           amount: BigNumber(0.01)
         }],
         sourceAccountId: 'test-user',
+        sourceAccountToken: 'test-token',
         destinationAccountId: `base:${TH.DESTINATION}`,
         payeeName: config.payeeName,
       });
@@ -151,6 +152,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // charge uses requested amount
             }],
             sourceAccountId: 'test-user',
+            sourceAccountToken: 'test-token',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
           });
@@ -192,6 +194,7 @@ describe('requirePayment', () => {
             amount: BigNumber(0.01) // charge ALWAYS uses the requested amount, not minimumPayment
           }],
           sourceAccountId: 'test-user',
+          sourceAccountToken: 'test-token',
           destinationAccountId: `base:${TH.DESTINATION}`,
           payeeName: config.payeeName,
         });
@@ -222,6 +225,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // charge uses requested amount
             }],
             sourceAccountId: 'test-user',
+            sourceAccountToken: 'test-token',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
           });
@@ -268,6 +272,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.10) // Uses requested amount
             }],
             sourceAccountId: 'test-user',
+            sourceAccountToken: 'test-token',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
           });
@@ -312,6 +317,7 @@ describe('requirePayment', () => {
               amount: BigNumber(0.01) // Uses requested amount for charge
             }],
             sourceAccountId: 'test-user',
+            sourceAccountToken: 'test-token',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
           });

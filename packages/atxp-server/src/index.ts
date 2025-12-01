@@ -22,6 +22,7 @@ export {
   getATXPConfig,
   getATXPResource,
   atxpAccountId,
+  atxpToken,
   withATXPContext
 } from './atxpContext.js';
 
