@@ -8,7 +8,6 @@ export {
   type McpOperationPattern,
   type RefundErrors,
   type Charge,
-  type ChargeResponse,
   type PaymentServer,
   type ATXPConfig,
   TokenProblem,

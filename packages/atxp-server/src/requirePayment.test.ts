@@ -7,7 +7,7 @@ import { PAYMENT_REQUIRED_ERROR_CODE } from '@atxp/common';
 
 describe('requirePayment', () => {
   it('should pass if there is money', async () => {
-    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue({success: true, requiredPaymentId: null})});
+    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue(true)});
     const config = TH.config({ paymentServer });
     await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
       await expect(requirePayment({price: BigNumber(0.01)})).resolves.not.toThrow();
@@ -15,18 +15,17 @@ describe('requirePayment', () => {
   });
 
   it('should call the atxp server /charge endpoint', async () => {
-    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue({success: true, requiredPaymentId: null})});
+    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue(true)});
     const config = TH.config({ paymentServer });
     await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
       await expect(requirePayment({price: BigNumber(0.01)})).resolves.not.toThrow();
       expect(paymentServer.charge).toHaveBeenCalledWith({
-        destinations: [{
+        options: [{
           network: 'base',
           currency: config.currency,
           address: TH.DESTINATION,
           amount: BigNumber(0.01)
         }],
-        source: 'test-user',
         sourceAccountId: 'test-user',
         destinationAccountId: `base:${TH.DESTINATION}`,
         payeeName: config.payeeName,
@@ -35,7 +34,7 @@ describe('requirePayment', () => {
   });
 
   it('should throw an error if there is no money', async () => {
-    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'})});
+    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue(false)});
     const config = TH.config({ paymentServer });
     await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
       try {
@@ -47,7 +46,7 @@ describe('requirePayment', () => {
   });
 
   it('should create a payment request if there is no money', async () => {
-    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'})});
+    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue(false)});
     const config = TH.config({ paymentServer });
     await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
       try {
@@ -55,13 +54,12 @@ describe('requirePayment', () => {
       } catch (err: any) {
         expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
         expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-          destinations: [{
+          options: [{
             network: 'base',
             currency: config.currency,
             address: TH.DESTINATION,
             amount: BigNumber(0.01)
           }],
-          source: 'test-user',
           sourceAccountId: 'test-user',
           destinationAccountId: `base:${TH.DESTINATION}`,
           payeeName: config.payeeName,
@@ -84,7 +82,7 @@ describe('requirePayment', () => {
   });
 
   it('error should include the elicitation url constructed from atxpServer() config', async () => {
-    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'})});
+    const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue(false)});
     const config = TH.config({ paymentServer, server: 'https://example.com' });
     await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
       try {
@@ -98,7 +96,7 @@ describe('requirePayment', () => {
   });
 
   it('should provide a way for consumer to do an idempotency check', async () => {
-    const paymentServer = TH.paymentServer({ charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'}) });
+    const paymentServer = TH.paymentServer({ charge: vi.fn().mockResolvedValue(false) });
     const config = TH.config({ paymentServer });
     await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
       try {
@@ -114,7 +112,7 @@ describe('requirePayment', () => {
 
   it('should throw an error if the payment request fails', async () => {
     const paymentServer = TH.paymentServer({
-      charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'}),
+      charge: vi.fn().mockResolvedValue(false),
       createPaymentRequest: vi.fn().mockRejectedValue(new Error('Payment request failed')),
     });
     const config = TH.config({ paymentServer });
@@ -131,7 +129,7 @@ describe('requirePayment', () => {
   describe('minimumPayment override', () => {
     it('should use minimumPayment from config when provided, passing to createPaymentRequest', async () => {
       const paymentServer = TH.paymentServer({
-        charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'})
+        charge: vi.fn().mockResolvedValue(false)
       });
       const config = TH.config({
         paymentServer,
@@ -146,13 +144,12 @@ describe('requirePayment', () => {
 
           // Verify charge was called with requested amount (0.01), NOT minimumPayment
           expect(paymentServer.charge).toHaveBeenCalledWith({
-            destinations: [{
+            options: [{
               network: 'base',
               currency: config.currency,
               address: TH.DESTINATION,
               amount: BigNumber(0.01) // charge uses requested amount
             }],
-            source: 'test-user',
             sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
@@ -160,13 +157,12 @@ describe('requirePayment', () => {
 
           // Should use minimumPayment (0.05) for createPaymentRequest
           expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-            destinations: [{
+            options: [{
               network: 'base',
               currency: config.currency,
               address: TH.DESTINATION,
               amount: BigNumber(0.05) // Uses minimumPayment override
             }],
-            source: 'test-user',
             sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
@@ -177,7 +173,7 @@ describe('requirePayment', () => {
 
     it('should NOT use minimumPayment for charge call - always use requested amount', async () => {
       const paymentServer = TH.paymentServer({
-        charge: vi.fn().mockResolvedValue({success: true, requiredPaymentId: null})
+        charge: vi.fn().mockResolvedValue(true)
       });
       const config = TH.config({
         paymentServer,
@@ -189,13 +185,12 @@ describe('requirePayment', () => {
 
         // Should ALWAYS use requested amount (0.01) for charge, NOT minimumPayment
         expect(paymentServer.charge).toHaveBeenCalledWith({
-          destinations: [{
+          options: [{
             network: 'base',
             currency: config.currency,
             address: TH.DESTINATION,
             amount: BigNumber(0.01) // charge ALWAYS uses the requested amount, not minimumPayment
           }],
-          source: 'test-user',
           sourceAccountId: 'test-user',
           destinationAccountId: `base:${TH.DESTINATION}`,
           payeeName: config.payeeName,
@@ -205,7 +200,7 @@ describe('requirePayment', () => {
 
     it('should use requirePayment amount when minimumPayment is not specified', async () => {
       const paymentServer = TH.paymentServer({
-        charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'})
+        charge: vi.fn().mockResolvedValue(false)
       });
       const config = TH.config({
         paymentServer
@@ -220,13 +215,12 @@ describe('requirePayment', () => {
 
           // Verify charge was called with requested amount (0.01)
           expect(paymentServer.charge).toHaveBeenCalledWith({
-            destinations: [{
+            options: [{
               network: 'base',
               currency: config.currency,
               address: TH.DESTINATION,
               amount: BigNumber(0.01) // charge uses requested amount
             }],
-            source: 'test-user',
             sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
@@ -234,13 +228,12 @@ describe('requirePayment', () => {
 
           // Should use the requested amount (0.01) for createPaymentRequest
           expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-            destinations: [{
+            options: [{
               network: 'base',
               currency: config.currency,
               address: TH.DESTINATION,
               amount: BigNumber(0.01) // Uses requested amount
             }],
-            source: 'test-user',
             sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
@@ -253,7 +246,7 @@ describe('requirePayment', () => {
   describe('minimumPayment with price comparison', () => {
     it('should use requested price when it exceeds minimumPayment for both charge and createPaymentRequest', async () => {
       const paymentServer = TH.paymentServer({
-        charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'})
+        charge: vi.fn().mockResolvedValue(false)
       });
       const config = TH.config({
         paymentServer,
@@ -268,13 +261,12 @@ describe('requirePayment', () => {
 
           // Should use requested amount (0.10) for charge since it's higher than minimumPayment
           expect(paymentServer.charge).toHaveBeenCalledWith({
-            destinations: [{
+            options: [{
               network: 'base',
               currency: config.currency,
               address: TH.DESTINATION,
               amount: BigNumber(0.10) // Uses requested amount
             }],
-            source: 'test-user',
             sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
@@ -282,13 +274,12 @@ describe('requirePayment', () => {
 
           // Should also use requested amount (0.10) for createPaymentRequest since it's higher
           expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-            destinations: [{
+            options: [{
               network: 'base',
               currency: config.currency,
               address: TH.DESTINATION,
               amount: BigNumber(0.10) // Uses requested amount, not minimumPayment
             }],
-            source: 'test-user',
             sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
@@ -299,7 +290,7 @@ describe('requirePayment', () => {
 
     it('should use minimumPayment when it exceeds requested price for createPaymentRequest only', async () => {
       const paymentServer = TH.paymentServer({
-        charge: vi.fn().mockResolvedValue({success: false, requiredPaymentId: 'test-payment-request-id'})
+        charge: vi.fn().mockResolvedValue(false)
       });
       const config = TH.config({
         paymentServer,
@@ -314,13 +305,12 @@ describe('requirePayment', () => {
 
           // Should use requested amount (0.01) for charge
           expect(paymentServer.charge).toHaveBeenCalledWith({
-            destinations: [{
+            options: [{
               network: 'base',
               currency: config.currency,
               address: TH.DESTINATION,
               amount: BigNumber(0.01) // Uses requested amount for charge
             }],
-            source: 'test-user',
             sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,
@@ -328,13 +318,12 @@ describe('requirePayment', () => {
 
           // Should use minimumPayment (0.05) for createPaymentRequest since it's higher
           expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
-            destinations: [{
+            options: [{
               network: 'base',
               currency: config.currency,
               address: TH.DESTINATION,
               amount: BigNumber(0.05) // Uses minimumPayment since it's higher
             }],
-            source: 'test-user',
             sourceAccountId: 'test-user',
             destinationAccountId: `base:${TH.DESTINATION}`,
             payeeName: config.payeeName,

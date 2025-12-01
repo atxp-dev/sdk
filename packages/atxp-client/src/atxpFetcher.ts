@@ -1,5 +1,5 @@
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequestData, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Network, DestinationMaker, Account } from '@atxp/common';
+import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequest, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Network, DestinationMaker, Account } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
 import { InsufficientFundsError, PaymentNetworkError } from './types.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
@@ -126,21 +126,21 @@ export class ATXPFetcher {
 
 
   protected handleMultiDestinationPayment = async (
-    paymentRequestData: PaymentRequestData,
+    paymentRequest: PaymentRequest,
     paymentRequestUrl: string,
     paymentRequestId: string
   ): Promise<boolean> => {
-    if (!paymentRequestData.destinations || paymentRequestData.destinations.length === 0) {
+    if (!paymentRequest.options || paymentRequest.options.length === 0) {
       return false;
     }
 
     // Get sources from the account
     const sources = await this.account.getSources();
 
-    // Apply destination mappers to transform destinations
-    // Convert PaymentRequestDestination[] to Destination[] for mapper compatibility
+    // Apply destination mappers to transform options
+    // Convert PaymentRequestOption[] to Destination[] for mapper compatibility
     const mappedDestinations: Destination[] = [];
-    for (const option of paymentRequestData.destinations) {
+    for (const option of paymentRequest.options) {
       const destinationMaker = this.destinationMakers.get(option.network);
       if (!destinationMaker) {
         this.logger.debug(`ATXP: destination maker for network '${option.network}' not available, trying next destination`);
@@ -165,11 +165,11 @@ export class ATXPFetcher {
     const firstDest = mappedDestinations[0];
     const prospectivePayment: ProspectivePayment = {
       accountId: this.account.accountId,
-      resourceUrl: paymentRequestData.resource?.toString() ?? '',
-      resourceName: paymentRequestData.resourceName ?? '',
+      resourceUrl: paymentRequest.resource?.toString() ?? '',
+      resourceName: paymentRequest.payeeName ?? '',
       currency: firstDest.currency,
       amount: firstDest.amount,
-      iss: paymentRequestData.iss ?? '',
+      iss: paymentRequest.payeeName ?? '',
     };
 
     // Ask for approval once for all payment attempts
@@ -185,7 +185,7 @@ export class ATXPFetcher {
     for (const paymentMaker of this.account.paymentMakers) {
       try {
         // Pass all destinations to payment maker - it will filter and pick the one it can handle
-        const result = await paymentMaker.makePayment(mappedDestinations, paymentRequestData.iss, paymentRequestId);
+        const result = await paymentMaker.makePayment(mappedDestinations, paymentRequest.payeeName ?? '', paymentRequestId);
 
         if (result === null) {
           this.logger.debug(`ATXP: payment maker cannot handle these destinations, trying next`);
@@ -260,32 +260,32 @@ export class ATXPFetcher {
       return false;
     }
 
-    const paymentRequestData = await this.getPaymentRequestData(paymentRequestUrl);
-    if (!paymentRequestData) {
+    const paymentRequest = await this.getPaymentRequest(paymentRequestUrl);
+    if (!paymentRequest) {
       throw new Error(`ATXP: payment request ${paymentRequestId} not found on server ${paymentRequestUrl}`);
     }
 
-    // Handle multi-destination format
-    if (paymentRequestData.destinations && paymentRequestData.destinations.length > 0) {
-      return this.handleMultiDestinationPayment(paymentRequestData, paymentRequestUrl, paymentRequestId);
+    // Handle multi-option format
+    if (paymentRequest.options && paymentRequest.options.length > 0) {
+      return this.handleMultiDestinationPayment(paymentRequest, paymentRequestUrl, paymentRequestId);
     }
 
-    // Payment request doesn't have destinations - this shouldn't happen with new SDK
-    throw new Error(`ATXP: payment request does not contain destinations array`);
+    // Payment request doesn't have options - this shouldn't happen with new SDK
+    throw new Error(`ATXP: payment request does not contain options array`);
   }
 
-  protected getPaymentRequestData = async (paymentRequestUrl: string): Promise<PaymentRequestData | null> => {
+  protected getPaymentRequest = async (paymentRequestUrl: string): Promise<PaymentRequest | null> => {
     const prRequest = await this.sideChannelFetch(paymentRequestUrl);
     if (!prRequest.ok) {
       throw new Error(`ATXP: GET ${paymentRequestUrl} failed: ${prRequest.status} ${prRequest.statusText}`);
     }
-    const paymentRequest = await prRequest.json() as PaymentRequestData;
+    const paymentRequest = await prRequest.json() as PaymentRequest;
 
     // Parse amount strings to BigNumber objects
-    if (paymentRequest.destinations) {
-      for (const dest of paymentRequest.destinations) {
-        if (typeof dest.amount === 'string' || typeof dest.amount === 'number') {
-          dest.amount = new BigNumber(dest.amount);
+    if (paymentRequest.options) {
+      for (const option of paymentRequest.options) {
+        if (typeof option.amount === 'string' || typeof option.amount === 'number') {
+          option.amount = new BigNumber(option.amount);
         }
       }
     }
