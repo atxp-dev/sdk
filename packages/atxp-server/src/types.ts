@@ -40,7 +40,10 @@ export type RefundErrors = boolean | 'nonMcpOnly';
 // When the server is talking to the ATXP Authorization Server, it doesn't need to provide
 // the resource or resourceName - those are already known by the AS, and
 // we shouldn't trust the RS to self-report them
-export type Charge = Pick<PaymentRequest, 'options' | 'sourceAccountId' | 'destinationAccountId' | 'payeeName'>;
+export type Charge = Pick<PaymentRequest, 'options' | 'sourceAccountId' | 'destinationAccountId' | 'payeeName'> & {
+  // User's OAuth token or connection_token for on-demand charging
+  sourceAccountToken?: string;
+};
 
 export type PaymentServer = {
   /** Returns true if the charge succeeded, false if payment is required */

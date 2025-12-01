@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from "async_hooks";
 const contextStorage = new AsyncLocalStorage<ATXPContext | null>();
 
 type ATXPContext = {
+  token: string | null;
   tokenData: TokenData | null;
   config: ATXPConfig;
   resource: URL;
@@ -24,6 +25,12 @@ export function getATXPResource(): URL | null {
 export function atxpAccountId(): AccountId | null {
   const context = contextStorage.getStore();
   return context?.tokenData?.sub as AccountId | null ?? null;
+}
+
+// Helper function to get the current request's token (for on-demand charging)
+export function atxpToken(): string | null {
+  const context = contextStorage.getStore();
+  return context?.token ?? null;
 }
 
 // Helper function to run code within a user context
@@ -46,6 +53,7 @@ export async function withATXPContext(config: ATXPConfig, resource: URL, tokenIn
   }
 
   const ctx = {
+    token: tokenInfo?.token || null,
     tokenData: tokenInfo?.data || null,
     config,
     resource

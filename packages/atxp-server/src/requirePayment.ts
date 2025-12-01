@@ -1,5 +1,5 @@
 import { RequirePaymentConfig, paymentRequiredError, extractNetworkFromAccountId, extractAddressFromAccountId, Network } from "@atxp/common";
-import { getATXPConfig, atxpAccountId } from "./atxpContext.js";
+import { getATXPConfig, atxpAccountId, atxpToken } from "./atxpContext.js";
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
   const config = getATXPConfig();
@@ -22,6 +22,9 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   const destinationNetwork = extractNetworkFromAccountId(destinationAccountId);
   const destinationAddress = extractAddressFromAccountId(destinationAccountId);
 
+  // Get the user's token for on-demand charging (connection_token flow)
+  const token = atxpToken();
+
   // Always use multi-option format
   const charge = {
     options: [{
@@ -33,6 +36,8 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     sourceAccountId: user,
     destinationAccountId: destinationAccountId,
     payeeName: config.payeeName,
+    // Include token for on-demand charging via AccountsOnDemandChargeStrategy
+    ...(token && { sourceAccountToken: token }),
   };
 
   config.logger.debug(`Charging ${paymentConfig.price} to ${charge.options.length} options for source ${user}`);
