@@ -45,7 +45,7 @@ export {
   type AccountId,
   type PaymentRequestOption,
   type Destination,
-  type PaymentRequestData,
+  type PaymentRequest,
   type CustomJWTPayload,
   type ClientCredentials,
   type PKCEValues,

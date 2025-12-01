@@ -1,4 +1,4 @@
-import { AuthorizationServerUrl, Currency, Logger, PaymentRequestData, UrlString, OAuthDb, TokenData, OAuthResourceClient, Account } from "@atxp/common";
+import { AuthorizationServerUrl, Currency, Logger, PaymentRequest, UrlString, OAuthDb, TokenData, OAuthResourceClient, Account } from "@atxp/common";
 import { BigNumber } from "bignumber.js";
 
 // https://github.com/modelcontextprotocol/typescript-sdk/blob/c6ac083b1b37b222b5bfba5563822daa5d03372e/src/types.ts
@@ -40,11 +40,11 @@ export type RefundErrors = boolean | 'nonMcpOnly';
 // When the server is talking to the ATXP Authorization Server, it doesn't need to provide
 // the resource or resourceName - those are already known by the AS, and
 // we shouldn't trust the RS to self-report them
-export type Charge = Pick<PaymentRequestData, 'options' | 'sourceAccountId' | 'destinationAccountId' | 'payeeName'>;
+export type Charge = Pick<PaymentRequest, 'options' | 'sourceAccountId' | 'destinationAccountId' | 'payeeName'>;
 
 export type ChargeResponse = {
   success: boolean;
-  requiredPayment: PaymentRequestData | null;
+  requiredPayment: PaymentRequest | null;
 }
 
 export type PaymentServer = {

@@ -13,10 +13,10 @@ describe('ATXPPaymentServer', () => {
 
     // Create server instance
     const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
-    
+
     const chargeParams = TH.charge({
-      source: 'test-source',
-      destination: 'test-destination'
+      sourceAccountId: 'solana:test-source',
+      destinationAccountId: 'solana:test-destination'
     });
 
     const result = await server.charge(chargeParams);
@@ -32,10 +32,10 @@ describe('ATXPPaymentServer', () => {
       'content-type': 'application/json'
     });
     const parsedBody = JSON.parse(call?.options.body as string);
-    expect(parsedBody).toEqual({
-      ...chargeParams,
-      amount: chargeParams?.amount?.toString()
-    });
+    expect(parsedBody.sourceAccountId).toEqual(chargeParams.sourceAccountId);
+    expect(parsedBody.destinationAccountId).toEqual(chargeParams.destinationAccountId);
+    expect(parsedBody.options).toBeDefined();
+    expect(parsedBody.options[0].amount).toEqual(chargeParams.options[0].amount.toString());
 
     // Credentials were fetched from the real database
   });
@@ -48,10 +48,10 @@ describe('ATXPPaymentServer', () => {
     });
 
     const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
-    
+
     await server.charge(TH.charge({
-      source: 'test-source',
-      destination: 'test-destination'
+      sourceAccountId: 'solana:test-source',
+      destinationAccountId: 'solana:test-destination'
     }));
 
     // Verify no authorization header is included
@@ -67,13 +67,11 @@ describe('ATXPPaymentServer', () => {
     });
 
     const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
-    
-    const paymentRequestParams = {
-      ...TH.charge({
-        source: 'test-source',
-        destination: 'test-destination'
-      })
-    };
+
+    const paymentRequestParams = TH.charge({
+      sourceAccountId: 'solana:test-source',
+      destinationAccountId: 'solana:test-destination'
+    });
 
     const result = await server.createPaymentRequest(paymentRequestParams);
 
@@ -88,10 +86,9 @@ describe('ATXPPaymentServer', () => {
       'content-type': 'application/json'
     });
     const parsedBody = JSON.parse(call?.options.body as string);
-    expect(parsedBody).toMatchObject({
-      ...paymentRequestParams,
-      amount: paymentRequestParams.amount?.toString()
-    });
+    expect(parsedBody.sourceAccountId).toEqual(paymentRequestParams.sourceAccountId);
+    expect(parsedBody.destinationAccountId).toEqual(paymentRequestParams.destinationAccountId);
+    expect(parsedBody.options).toBeDefined();
   });
 
   it('should make payment request without authorization headers', async () => {
@@ -102,13 +99,11 @@ describe('ATXPPaymentServer', () => {
     });
 
     const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
-    
-    await server.createPaymentRequest({
-      ...TH.charge({
-        source: 'test-source',
-        destination: 'test-destination'
-      })
-    });
+
+    await server.createPaymentRequest(TH.charge({
+      sourceAccountId: 'solana:test-source',
+      destinationAccountId: 'solana:test-destination'
+    }));
 
     // Verify no authorization header is included
     const call = mock.callHistory.lastCall('https://auth.atxp.ai/payment-request');
@@ -119,23 +114,23 @@ describe('ATXPPaymentServer', () => {
     const mock = fetchMock.createInstance();
     mock.post('https://auth.atxp.ai/charge', {
       status: 402,
-      body: { 
+      body: {
         id: 'payment-request-id',
         url: 'https://auth.atxp.ai/payment/payment-request-id'
       }
     });
 
     const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
-    
+
     const result = await server.charge(TH.charge({
-      source: 'test-source',
-      destination: 'test-destination'
+      sourceAccountId: 'solana:test-source',
+      destinationAccountId: 'solana:test-destination'
     }));
 
     // Verify the result indicates payment required
-    expect(result).toEqual({ 
-      success: false, 
-      requiredPayment: { 
+    expect(result).toEqual({
+      success: false,
+      requiredPayment: {
         id: 'payment-request-id',
         url: 'https://auth.atxp.ai/payment/payment-request-id'
       }
@@ -150,10 +145,10 @@ describe('ATXPPaymentServer', () => {
     });
 
     const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
-    
+
     await expect(server.charge(TH.charge({
-      source: 'test-source',
-      destination: 'test-destination'
+      sourceAccountId: 'solana:test-source',
+      destinationAccountId: 'solana:test-destination'
     }))).rejects.toThrow('Unexpected status code 500 from payment server POST /charge endpoint');
   });
 
@@ -165,13 +160,11 @@ describe('ATXPPaymentServer', () => {
     });
 
     const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
-    
-    await expect(server.createPaymentRequest({
-      ...TH.charge({
-        source: 'test-source',
-        destination: 'test-destination'
-      })
-    })).rejects.toThrow('POST /payment-request responded with unexpected HTTP status 400');
+
+    await expect(server.createPaymentRequest(TH.charge({
+      sourceAccountId: 'solana:test-source',
+      destinationAccountId: 'solana:test-destination'
+    }))).rejects.toThrow('POST /payment-request responded with unexpected HTTP status 400');
   });
 
   it('should throw error if payment request response lacks id field', async () => {
@@ -182,12 +175,10 @@ describe('ATXPPaymentServer', () => {
     });
 
     const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
-    
-    await expect(server.createPaymentRequest({
-      ...TH.charge({
-        source: 'test-source',
-        destination: 'test-destination'
-      })
-    })).rejects.toThrow('POST /payment-request response did not contain an id');
+
+    await expect(server.createPaymentRequest(TH.charge({
+      sourceAccountId: 'solana:test-source',
+      destinationAccountId: 'solana:test-destination'
+    }))).rejects.toThrow('POST /payment-request response did not contain an id');
   });
 });

@@ -22,21 +22,20 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   const destinationNetwork = extractNetworkFromAccountId(destinationAccountId);
   const destinationAddress = extractAddressFromAccountId(destinationAccountId);
 
-  // Always use multi-destination format
+  // Always use multi-option format
   const charge = {
-    source: user,
-    destinations: [{
+    options: [{
       network: destinationNetwork,
       currency: config.currency,
       address: destinationAddress,
-      amount: paymentConfig.price // Destination gets the requested amount for charge
+      amount: paymentConfig.price // Option gets the requested amount for charge
     }],
     sourceAccountId: user,
     destinationAccountId: destinationAccountId,
     payeeName: config.payeeName,
   };
 
-  config.logger.debug(`Charging ${paymentConfig.price} to ${charge.destinations.length} destinations for source ${user}`);
+  config.logger.debug(`Charging ${paymentConfig.price} to ${charge.options.length} options for source ${user}`);
 
   const chargeResponse = await config.paymentServer.charge(charge);
   if (chargeResponse.success) {
@@ -52,8 +51,8 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
 
   // For createPaymentRequest, use the minimumPayment if configured
   // Fetch account sources to provide backwards compatibility with old clients
-  // that expect multiple payment destination options (base, solana, world, etc.)
-  const destinations = [{
+  // that expect multiple payment options (base, solana, world, etc.)
+  const options = [{
     network: destinationNetwork,
     currency: config.currency,
     address: destinationAddress,
@@ -65,27 +64,26 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     const sources = await config.destination.getSources();
     config.logger.debug(`Fetched ${sources.length} sources for destination account`);
 
-    // Add each source as an alternative payment destination
+    // Add each source as an alternative payment option
     for (const source of sources) {
-      destinations.push({
+      options.push({
         network: source.chain as Network, // Chain and Network have compatible values
         currency: config.currency,
         address: source.address,
         amount: paymentAmount
       });
     }
-    config.logger.debug(`Payment request will include ${destinations.length} total destinations`);
+    config.logger.debug(`Payment request will include ${options.length} total options`);
   } catch (error) {
-    config.logger.warn(`Failed to fetch account sources, will use ATXP destination only: ${error}`);
-    // Continue with just the ATXP destination if sources fetch fails
+    config.logger.warn(`Failed to fetch account sources, will use ATXP option only: ${error}`);
+    // Continue with just the ATXP option if sources fetch fails
   }
 
   const paymentRequest = {
-    source: user,
+    options,
     sourceAccountId: user,
     destinationAccountId: destinationAccountId,
     payeeName: config.payeeName,
-    destinations
   };
 
   config.logger.debug(`Creating payment request with sourceAccountId: ${user}, destinationAccountId: ${charge.destinationAccountId}`);

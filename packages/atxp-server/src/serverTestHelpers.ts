@@ -27,17 +27,31 @@ export function charge({
     amount = BigNumber(0.01),
     currency = 'USDC',
     network = 'solana',
-    destination = DESTINATION,
-    source = SOURCE
+    destinationAddress = DESTINATION,
+    sourceAccountId = `${network}:${SOURCE}` as any,
+    destinationAccountId = `${network}:${DESTINATION}` as any,
+    payeeName = 'Test Payee'
   }: {
     amount?: BigNumber,
     currency?: Currency,
     network?: Network,
-    destination?: string,
-    source?: string
+    destinationAddress?: string,
+    sourceAccountId?: string,
+    destinationAccountId?: string,
+    payeeName?: string
   } = {}): Charge {
 
-  return { amount, currency, network, destination, source };
+  return {
+    options: [{
+      network: network,
+      currency: currency,
+      address: destinationAddress,
+      amount: amount
+    }],
+    sourceAccountId: sourceAccountId as any,
+    destinationAccountId: destinationAccountId as any,
+    payeeName: payeeName
+  };
 }
 
 export const oneCentCharge = charge({amount: BigNumber(0.01)});

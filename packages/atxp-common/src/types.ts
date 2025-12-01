@@ -90,7 +90,7 @@ export type PaymentRequest = {
 export type CustomJWTPayload = {
   code_challenge?: string;
   payment_request_id?: string;
-  account_id: AccountId;
+  account_id?: AccountId;
 }
 
 export type ClientCredentials = {

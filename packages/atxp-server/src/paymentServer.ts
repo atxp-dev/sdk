@@ -1,5 +1,5 @@
 import { PaymentServer, ChargeResponse, Charge } from "./types.js";
-import { AuthorizationServerUrl, FetchLike, Logger, PaymentRequestData } from "@atxp/common";
+import { AuthorizationServerUrl, FetchLike, Logger, PaymentRequest } from "@atxp/common";
 
 /**
  * ATXP Payment Server implementation
@@ -23,7 +23,7 @@ export class ATXPPaymentServer implements PaymentServer {
 
   charge = async(chargeRequest: Charge): Promise<ChargeResponse> => {
     const chargeResponse = await this.makeRequest('POST', '/charge', chargeRequest);
-    const json = await chargeResponse.json() as PaymentRequestData | null;
+    const json = await chargeResponse.json() as PaymentRequest | null;
     if (chargeResponse.status === 200) {
       return {success: true, requiredPayment: null};
     } else if (chargeResponse.status === 402) {

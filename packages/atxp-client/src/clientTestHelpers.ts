@@ -76,13 +76,16 @@ export function mockAuthorizationServer(mock: FetchMock, baseUrl: string = DEFAU
       url: `${baseUrl}/payment-request/${paymentRequestId}`,
       method: 'get',
       response: {
-        destinations: [{
+        options: [{
           amount: amount.toString(),
           currency: 'USDC',
           network: 'solana',
           address: 'testDestination'
         }],
-        resourceName: 'testResourceName'
+        sourceAccountId: 'solana:testSource',
+        destinationAccountId: 'solana:testDestination',
+        resource: new URL('https://example.com/resource'),
+        payeeName: 'testPayeeName'
       }
     });
     mock.route({
