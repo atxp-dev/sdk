@@ -22,7 +22,7 @@ describe('ATXPPaymentServer', () => {
     const result = await server.charge(chargeParams);
 
     // Verify the result
-    expect(result).toEqual({ success: true, requiredPayment: null });
+    expect(result).toBe(true);
 
     // Verify fetch was called with correct parameters
     const call = mock.callHistory.lastCall('https://auth.atxp.ai/charge');
@@ -115,8 +115,9 @@ describe('ATXPPaymentServer', () => {
     mock.post('https://auth.atxp.ai/charge', {
       status: 402,
       body: {
-        id: 'payment-request-id',
-        url: 'https://auth.atxp.ai/payment/payment-request-id'
+        sourceAccountId: 'solana:test-source',
+        destinationAccountId: 'solana:test-destination',
+        shortage: '0.01'
       }
     });
 
@@ -127,14 +128,8 @@ describe('ATXPPaymentServer', () => {
       destinationAccountId: 'solana:test-destination'
     }));
 
-    // Verify the result indicates payment required
-    expect(result).toEqual({
-      success: false,
-      requiredPayment: {
-        id: 'payment-request-id',
-        url: 'https://auth.atxp.ai/payment/payment-request-id'
-      }
-    });
+    // Verify the result indicates payment required (returns false)
+    expect(result).toBe(false);
   });
 
   it('should throw error for unexpected status codes from charge endpoint', async () => {

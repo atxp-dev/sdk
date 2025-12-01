@@ -42,13 +42,9 @@ export type RefundErrors = boolean | 'nonMcpOnly';
 // we shouldn't trust the RS to self-report them
 export type Charge = Pick<PaymentRequest, 'options' | 'sourceAccountId' | 'destinationAccountId' | 'payeeName'>;
 
-export type ChargeResponse = {
-  success: boolean;
-  requiredPayment: PaymentRequest | null;
-}
-
 export type PaymentServer = {
-  charge: (args: Charge) => Promise<ChargeResponse>;
+  /** Returns true if the charge succeeded, false if payment is required */
+  charge: (args: Charge) => Promise<boolean>;
   createPaymentRequest: (args: Charge) => Promise<string>;
 }
 

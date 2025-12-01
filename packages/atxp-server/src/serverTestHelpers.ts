@@ -99,7 +99,7 @@ export function config(args: Partial<ATXPConfig> = {}): ATXPConfig {
 }
 
 export function paymentServer({
-  charge = vi.fn().mockResolvedValue({success: true, requiredPaymentId: null}),
+  charge = vi.fn().mockResolvedValue(true),
   createPaymentRequest = vi.fn().mockResolvedValue('test-payment-request-id')
 } = {}) : PaymentServer {
   return {

@@ -37,8 +37,8 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
 
   config.logger.debug(`Charging ${paymentConfig.price} to ${charge.options.length} options for source ${user}`);
 
-  const chargeResponse = await config.paymentServer.charge(charge);
-  if (chargeResponse.success) {
+  const chargeSucceeded = await config.paymentServer.charge(charge);
+  if (chargeSucceeded) {
     config.logger.info(`Charged ${paymentConfig.price} for source ${user}`);
     return;
   }
