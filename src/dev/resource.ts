@@ -10,7 +10,7 @@ import { ConsoleLogger, LogLevel } from '@atxp/common';
 import { ATXPAccount } from '@atxp/client';
 import 'dotenv/config';
 
-const PORT = 3009;
+const PORT = parseInt(process.env.PORT || '3009', 10);
 
 // MCP Apps UI resource key (from @modelcontextprotocol/ext-apps)
 const RESOURCE_URI_META_KEY = 'ui/resourceUri';
@@ -94,7 +94,7 @@ const SECURE_DATA_UI_HTML = `
 const getServer = () => {
   // Create an MCP server with implementation details
   const server = new McpServer({
-    name: 'stateless-streamable-http-server',
+    name: `mcp-server-port-${PORT}`,
     version: '1.0.0',
   }, { capabilities: { logging: {}, resources: {} } });
 
@@ -131,7 +131,7 @@ const getServer = () => {
     async ({ message }: { message?: string }): Promise<CallToolResult> => {
       const userId = atxpAccountId();
       await requirePayment({price: BigNumber(0.01)});
-      const responseMessage = `Secure data for user ${userId}: ${message || 'No message provided'}`;
+      const responseMessage = `[PORT ${PORT}] Secure data for user ${userId}: ${message || 'No message provided'}`;
       return {
         content: [
           {
