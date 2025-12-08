@@ -1,12 +1,12 @@
 {
-  "name": "@atxp/client",
+  "name": "@atxp/solana",
   "version": "0.8.3",
-  "description": "ATXP Client - MCP client with OAuth authentication and payment processing",
+  "description": "ATXP Solana - Solana blockchain support for ATXP",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/atxp-dev/sdk.git",
-    "directory": "packages/atxp-client"
+    "directory": "packages/atxp-solana"
   },
   "type": "module",
   "sideEffects": false,
@@ -33,26 +33,20 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
+    "@atxp/client": "0.8.3",
     "@atxp/common": "0.8.3",
-    "@modelcontextprotocol/sdk": "^1.15.0",
-    "bignumber.js": "^9.3.0",
-    "oauth4webapi": "^3.5.0"
+    "bignumber.js": "^9.3.0"
   },
   "peerDependencies": {
-    "expo-crypto": ">=14.0.0",
-    "react-native-url-polyfill": "^2.0.0"
+    "@solana/pay": "^0.2.5",
+    "@solana/web3.js": "^1.98.1",
+    "bs58": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
-    "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
     "eslint": "^9.32.0",
-    "fetch-mock": "^12.5.2",
-    "happy-dom": "^15.11.6",
-    "jsdom": "^25.0.1",
-    "react-native-url-polyfill": "^2.0.0",
-    "supertest": "^7.1.4",
     "typescript": "^5.7.3",
     "vitest": "^3.0.9"
   }

@@ -1,5 +1,5 @@
-import type { PaymentMaker, Hex } from './types.js';
-import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from './types.js';
+import type { PaymentMaker, Hex } from '@atxp/client';
+import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from '@atxp/client';
 import { Logger, Currency, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {

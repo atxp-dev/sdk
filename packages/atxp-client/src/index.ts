@@ -18,31 +18,12 @@ export {
   atxpFetch
 } from './atxpFetcher.js';
 
-// Payment makers for different networks
-export {
-  ValidateTransferError,
-  SolanaPaymentMaker
-} from './solanaPaymentMaker.js';
-
-export {
-  BasePaymentMaker
-} from './basePaymentMaker.js';
-
-// Account implementations
-export {
-  SolanaAccount
-} from './solanaAccount.js';
-
+// Account implementations - re-export from @atxp/common
 export {
   ATXPAccount
 } from '@atxp/common';
 
-export {
-  USDC_CONTRACT_ADDRESS_BASE,
-  USDC_CONTRACT_ADDRESS_BASE_SEPOLIA,
-  getBaseUSDCAddress
-} from './baseConstants.js';
-
+// World chain constants (still in client for now)
 export {
   USDC_CONTRACT_ADDRESS_WORLD_MAINNET,
   USDC_CONTRACT_ADDRESS_WORLD_SEPOLIA,
@@ -55,6 +36,7 @@ export {
   type WorldChain
 } from './worldConstants.js';
 
+// Polygon chain constants (still in client for now)
 export {
   USDC_CONTRACT_ADDRESS_POLYGON_MAINNET,
   USDC_CONTRACT_ADDRESS_POLYGON_AMOY,
@@ -66,10 +48,6 @@ export {
   getPolygonUSDCAddress,
   type PolygonChain
 } from './polygonConstants.js';
-
-export {
-  BaseAccount
-} from './baseAccount.js';
 
 // Core types and interfaces
 export {
@@ -85,6 +63,7 @@ export {
   type PaymentMaker
 } from './types.js';
 
+// ATXPLocalAccount - generic EVM account helper (used by x402 and other packages)
 export {
   ATXPLocalAccount
 } from './atxpLocalAccount.js';

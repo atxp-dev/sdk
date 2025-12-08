@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { wrapWithX402 } from './x402Wrapper.js';
 import { ATXPAccount, ATXPLocalAccount } from '@atxp/client';
+import { BaseAccount } from '@atxp/base';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 
 vi.mock('x402/client', () => ({
@@ -87,7 +88,7 @@ describe('wrapWithX402', () => {
     };
 
     // Make it look like a BaseAccount instance
-    Object.setPrototypeOf(mockBaseAccount, (await import('@atxp/client')).BaseAccount.prototype);
+    Object.setPrototypeOf(mockBaseAccount, (await import('@atxp/base')).BaseAccount.prototype);
 
     const x402Challenge = {
       x402Version: 1,

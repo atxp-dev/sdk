@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker } from './types.js';
+import type { Account, PaymentMaker } from '@atxp/client';
 import type { AccountId, Source } from '@atxp/common';
 import { SolanaPaymentMaker } from './solanaPaymentMaker.js';
 import { Keypair } from "@solana/web3.js";
