@@ -87,6 +87,7 @@ jobs:
           npm version $VERSION --no-git-tag-version -w packages/atxp-server
           npm version $VERSION --no-git-tag-version -w packages/atxp-client
           npm version $VERSION --no-git-tag-version -w packages/atxp-base
+          npm version $VERSION --no-git-tag-version -w packages/atxp-solana
           npm version $VERSION --no-git-tag-version -w packages/atxp-worldchain
           npm version $VERSION --no-git-tag-version -w packages/atxp-polygon
           npm version $VERSION --no-git-tag-version -w packages/atxp-express
@@ -100,6 +101,8 @@ jobs:
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-redis
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-base
           npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-base
+          npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-solana
+          npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-solana
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-worldchain
           npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-worldchain
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-polygon
@@ -107,8 +110,9 @@ jobs:
           npm pkg set dependencies."@atxp/server"=$VERSION -w packages/atxp-express
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-cloudflare
           npm pkg set dependencies."@atxp/server"=$VERSION -w packages/atxp-cloudflare
-          npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-x402
+          npm pkg set dependencies."@atxp/base"=$VERSION -w packages/atxp-x402
           npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-x402
+          npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-x402
 
           # Regenerate package-lock.json with updated versions
           npm install
@@ -135,6 +139,7 @@ jobs:
           npm publish -w packages/atxp-server --provenance --access public
           npm publish -w packages/atxp-client --provenance --access public
           npm publish -w packages/atxp-base --provenance --access public
+          npm publish -w packages/atxp-solana --provenance --access public
           npm publish -w packages/atxp-worldchain --provenance --access public
           npm publish -w packages/atxp-polygon --provenance --access public
           npm publish -w packages/atxp-express --provenance --access public

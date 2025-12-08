@@ -1,4 +1,4 @@
-import { getBaseUSDCAddress } from '@atxp/client';
+import { getBaseUSDCAddress } from './baseConstants.js';
 import { base } from 'viem/chains';
 import { Logger, Currency, ConsoleLogger, PaymentMaker, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import { Address, encodeFunctionData, Hex, parseEther } from 'viem';

@@ -1,5 +1,6 @@
 import { encodeFunctionData, toHex } from 'viem';
-import { getBaseUSDCAddress, type Hex } from '@atxp/client';
+import { getBaseUSDCAddress } from './baseConstants.js';
+import { type Hex } from '@atxp/client';
 import { base } from 'viem/chains';
 import BigNumber from 'bignumber.js';
 import { ConsoleLogger, Logger, Currency, PaymentMaker, AccountId, PaymentIdentifier, Destination } from '@atxp/common';

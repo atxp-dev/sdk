@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { SolanaPaymentMaker } from './solanaPaymentMaker.js';
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
+import { BigNumber } from "bignumber.js";
+
 import nacl from "tweetnacl";
 
 describe('solanaPaymentMaker.generateJWT', () => {
@@ -63,7 +65,7 @@ describe('solanaPaymentMaker.getSourceAddress', () => {
     const keypair = Keypair.generate();
     const paymentMaker = new SolanaPaymentMaker('https://example.com', bs58.encode(keypair.secretKey));
 
-    const sourceAddress = paymentMaker.getSourceAddress();
+    const sourceAddress = paymentMaker.getSourceAddress({ amount: new BigNumber(0), currency: "USDC" as any, receiver: "", memo: "" });
 
     expect(sourceAddress).toBe(keypair.publicKey.toBase58());
   });
@@ -72,7 +74,7 @@ describe('solanaPaymentMaker.getSourceAddress', () => {
     const keypair = Keypair.generate();
     const paymentMaker = new SolanaPaymentMaker('https://example.com', bs58.encode(keypair.secretKey));
 
-    const sourceAddress = paymentMaker.getSourceAddress();
+    const sourceAddress = paymentMaker.getSourceAddress({ amount: new BigNumber(0), currency: "USDC" as any, receiver: "", memo: "" });
 
     // Should be a valid base58 string (typically 32-44 characters for Solana addresses)
     expect(sourceAddress).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
@@ -85,8 +87,8 @@ describe('solanaPaymentMaker.getSourceAddress', () => {
     const keypair = Keypair.generate();
     const paymentMaker = new SolanaPaymentMaker('https://example.com', bs58.encode(keypair.secretKey));
 
-    const address1 = paymentMaker.getSourceAddress();
-    const address2 = paymentMaker.getSourceAddress();
+    const address1 = paymentMaker.getSourceAddress({ amount: new BigNumber(0), currency: "USDC" as any, receiver: "", memo: "" });
+    const address2 = paymentMaker.getSourceAddress({ amount: new BigNumber(0), currency: "USDC" as any, receiver: "", memo: "" });
 
     expect(address1).toBe(address2);
   });

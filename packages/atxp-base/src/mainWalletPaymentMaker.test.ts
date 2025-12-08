@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MainWalletPaymentMaker } from './mainWalletPaymentMaker.js';
 import BigNumber from 'bignumber.js';
 import { TEST_WALLET_ADDRESS, TEST_RECEIVER_ADDRESS, mockProvider } from './testHelpers.js';
-import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseConstants.js';
 
 const { encodeFunctionData, fromHex } = await import('viem');
 

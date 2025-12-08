@@ -1,3 +1,5 @@
+import { BigNumber } from "bignumber.js";
+
 import { describe, it, expect } from 'vitest';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { createWalletClient, http } from 'viem';
@@ -80,7 +82,7 @@ describe('basePaymentMaker.getSourceAddress', () => {
     });
     const paymentMaker = new BasePaymentMaker('https://example.com', walletClient);
 
-    const sourceAddress = paymentMaker.getSourceAddress();
+    const sourceAddress = paymentMaker.getSourceAddress({ amount: new BigNumber(0), currency: "USDC" as any, receiver: "", memo: "" });
 
     expect(sourceAddress).toBe(account.address);
     expect(sourceAddress).toMatch(/^0x[a-fA-F0-9]{40}$/); // Valid Ethereum address format
@@ -96,8 +98,8 @@ describe('basePaymentMaker.getSourceAddress', () => {
     });
     const paymentMaker = new BasePaymentMaker('https://example.com', walletClient);
 
-    const address1 = paymentMaker.getSourceAddress();
-    const address2 = paymentMaker.getSourceAddress();
+    const address1 = paymentMaker.getSourceAddress({ amount: new BigNumber(0), currency: "USDC" as any, receiver: "", memo: "" });
+    const address2 = paymentMaker.getSourceAddress({ amount: new BigNumber(0), currency: "USDC" as any, receiver: "", memo: "" });
 
     expect(address1).toBe(address2);
   });
