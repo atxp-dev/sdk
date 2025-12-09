@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { wrapWithX402 } from './x402Wrapper.js';
 import { ATXPAccount, ATXPLocalAccount } from '@atxp/client';
-import { BaseAccount } from '@atxp/base';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 
 vi.mock('x402/client', () => ({
