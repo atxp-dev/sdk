@@ -7,25 +7,15 @@ import { z } from 'zod';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
 import { atxpExpress, requirePayment } from '@atxp/express';
-import { Network } from '@atxp/common';
-import { ATXPAccount, Account } from '@atxp/client';
-import { BaseAccount } from '@atxp/base';
-import { SolanaAccount } from '@atxp/solana';
+import { ATXPAccount } from '@atxp/client';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
 
 // Validate required environment variables
 function validateEnvironment() {
-  // Support either ATXP connection string OR static funding destination
-  const hasAtxpConnection = process.env.ATXP_CONNECTION_STRING;
-  const hasStaticFunding = process.env.FUNDING_DESTINATION && process.env.FUNDING_NETWORK;
-
-  if (!hasAtxpConnection && !hasStaticFunding) {
-    console.error('❌ Missing required environment variables:');
-    console.error('   Either provide:');
-    console.error('     - ATXP_CONNECTION_STRING (for dynamic destination resolution)');
-    console.error('   OR');
-    console.error('     - FUNDING_DESTINATION and FUNDING_NETWORK (for static destination)');
+  if (!process.env.ATXP_CONNECTION_STRING) {
+    console.error('❌ Missing required environment variable: ATXP_CONNECTION_STRING');
+    console.error('   This should be a connection string from accounts.atxp.ai');
     console.error('\nPlease check your .env file or environment setup.');
     process.exit(1);
   }
@@ -98,23 +88,7 @@ async function main() {
   // Create OAuth components (automatically uses in-memory implementation for ':memory:')
   
   // Create ATXP router and use it as middleware
-  // Use either ATXP connection string for dynamic resolution or static funding destination
-  let destination: Account;
-  if (process.env.ATXP_CONNECTION_STRING) {
-    destination = new ATXPAccount(process.env.ATXP_CONNECTION_STRING);
-  } else {
-    const network = process.env.FUNDING_NETWORK! as Network;
-    const address = process.env.FUNDING_DESTINATION!;
-
-    // Create appropriate account type based on network
-    if (network === 'base') {
-      destination = new BaseAccount(address);
-    } else if (network === 'solana') {
-      destination = new SolanaAccount(address);
-    } else {
-      throw new Error(`Unsupported network: ${network}. Please use 'base' or 'solana'.`);
-    }
-  }
+  const destination = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
 
   const atxpRouter = atxpExpress({
     destination,
