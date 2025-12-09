@@ -8,7 +8,9 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
 import { atxpExpress, requirePayment } from '@atxp/express';
 import { Network } from '@atxp/common';
-import { ATXPAccount, Account, BaseAccount, SolanaAccount } from '@atxp/client';
+import { ATXPAccount, Account } from '@atxp/client';
+import { BaseAccount } from '@atxp/base';
+import { SolanaAccount } from '@atxp/solana';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3010;
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
-import { buildStreamableTransport, SolanaAccount } from '@atxp/client';
+import { buildStreamableTransport } from '@atxp/client';
+import { SolanaAccount } from '@atxp/solana';
 import { Message, generateText, experimental_createMCPClient as createMCPClient } from "ai";
 import { openai } from "@ai-sdk/openai";
 
