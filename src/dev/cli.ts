@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { atxpClient, ATXPAccount } from '@atxp/client';
-import { BaseAccount } from '@atxp/base';
-import { SolanaAccount } from '@atxp/solana';
+//import { BaseAccount } from '@atxp/base';
+//import { SolanaAccount } from '@atxp/solana';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 import 'dotenv/config';
 

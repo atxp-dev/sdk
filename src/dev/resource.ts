@@ -515,6 +515,29 @@ const getServer = () => {
     }
   );
 
+  // Secure data tool for testing authenticated requests
+  server.registerTool(
+    'secure-data',
+    {
+      description: 'A secure endpoint that requires authentication. Echoes back the provided message.',
+      inputSchema: {
+        message: z.string().optional().describe('Optional message to echo back'),
+      },
+    },
+    async ({ message }: { message?: string }): Promise<CallToolResult> => {
+      const userId = atxpAccountId() || 'anonymous';
+      await requirePayment({ price: BigNumber(0.01) });
+
+      const responseMessage = message
+        ? `Secure response for user ${userId}: ${message}`
+        : `Secure response for user ${userId}: Hello from the secure endpoint!`;
+
+      return {
+        content: [{ type: 'text', text: responseMessage }],
+      };
+    }
+  );
+
   return server;
 }
 
