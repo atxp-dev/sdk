@@ -38,7 +38,7 @@ vi.mock('viem', async () => {
 import { BaseAppAccount } from './baseAppAccount.js';
 import { MemoryCache } from './cache.js';
 import { base } from 'viem/chains';
-import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseConstants.js';
 import BigNumber from 'bignumber.js';
 import {
   TEST_WALLET_ADDRESS,

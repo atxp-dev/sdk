@@ -22,7 +22,7 @@ vi.mock('viem', async () => {
 });
 
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
-import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseConstants.js';
 import BigNumber from 'bignumber.js';
 import {
   mockSpendPermission,

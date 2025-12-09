@@ -32,7 +32,7 @@ import { BaseAppAccount } from './baseAppAccount.js';
 import { MainWalletPaymentMaker } from './mainWalletPaymentMaker.js';
 import { MemoryCache } from './cache.js';
 import BigNumber from 'bignumber.js';
-import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseConstants.js';
 import {
   TEST_WALLET_ADDRESS,
   mockProvider,

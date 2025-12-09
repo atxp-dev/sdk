@@ -87,7 +87,7 @@ describe('wrapWithX402', () => {
     };
 
     // Make it look like a BaseAccount instance
-    Object.setPrototypeOf(mockBaseAccount, (await import('@atxp/client')).BaseAccount.prototype);
+    Object.setPrototypeOf(mockBaseAccount, (await import('@atxp/base')).BaseAccount.prototype);
 
     const x402Challenge = {
       x402Version: 1,

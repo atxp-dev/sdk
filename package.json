@@ -11,6 +11,7 @@
     "packages/atxp-server",
     "packages/atxp-client",
     "packages/atxp-base",
+    "packages/atxp-solana",
     "packages/atxp-worldchain",
     "packages/atxp-polygon",
     "packages/atxp-express",

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SolanaPaymentMaker } from './solanaPaymentMaker.js';
-import { InsufficientFundsError, PaymentNetworkError } from './types.js';
+import { InsufficientFundsError, PaymentNetworkError } from '@atxp/client';
 import { BigNumber } from 'bignumber.js';
 
 // Mock Solana web3.js

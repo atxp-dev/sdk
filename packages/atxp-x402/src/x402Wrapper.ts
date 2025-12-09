@@ -1,4 +1,5 @@
-import { ProspectivePayment, type FetchWrapper, type ClientArgs, ATXPAccount, ATXPLocalAccount, BaseAccount } from '@atxp/client';
+import { ProspectivePayment, type FetchWrapper, type ClientArgs, ATXPAccount, ATXPLocalAccount } from '@atxp/client';
+import { BaseAccount } from '@atxp/base';
 import { FetchLike } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';

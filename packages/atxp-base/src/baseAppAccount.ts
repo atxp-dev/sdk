@@ -1,6 +1,6 @@
 import type { Account, PaymentMaker, AccountId, Source } from '@atxp/common';
 import { WalletTypeEnum, ChainEnum } from '@atxp/common';
-import { getBaseUSDCAddress } from '@atxp/client';
+import { getBaseUSDCAddress } from './baseConstants.js';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
 import { generatePrivateKey } from 'viem/accounts';

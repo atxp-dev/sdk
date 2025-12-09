@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BasePaymentMaker } from './basePaymentMaker.js';
-import { InsufficientFundsError, PaymentNetworkError } from './types.js';
+import { InsufficientFundsError, PaymentNetworkError } from '@atxp/client';
 import { BigNumber } from 'bignumber.js';
 import { USDC_CONTRACT_ADDRESS_BASE } from './baseConstants.js';
 

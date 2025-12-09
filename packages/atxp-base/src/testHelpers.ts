@@ -2,7 +2,7 @@
 import { vi, expect } from 'vitest';
 import type { SpendPermission } from './types.js';
 import type { EphemeralSmartWallet } from './smartWalletHelpers.js';
-import { USDC_CONTRACT_ADDRESS_BASE } from '@atxp/client';
+import { USDC_CONTRACT_ADDRESS_BASE } from './baseConstants.js';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import type { Address, Hex } from 'viem';

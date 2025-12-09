@@ -1,5 +1,5 @@
-import type { PaymentMaker } from './types.js';
-import { InsufficientFundsError, PaymentNetworkError } from './types.js';
+import type { PaymentMaker } from '@atxp/client';
+import { InsufficientFundsError, PaymentNetworkError } from '@atxp/client';
 import { Keypair, Connection, PublicKey, ComputeBudgetProgram, sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTransfer, ValidateTransferError as _ValidateTransferError } from "@solana/pay";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";

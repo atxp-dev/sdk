@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker, Hex } from './types.js';
+import type { Account, PaymentMaker, Hex } from '@atxp/client';
 import type { AccountId, Source } from '@atxp/common';
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { BasePaymentMaker } from './basePaymentMaker.js';
