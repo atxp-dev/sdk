@@ -35,9 +35,7 @@
   "dependencies": {
     "@atxp/client": "0.8.3",
     "@atxp/common": "0.8.3",
-    "bignumber.js": "^9.3.0"
-  },
-  "peerDependencies": {
+    "bignumber.js": "^9.3.0",
     "viem": "^2.34.0"
   },
   "devDependencies": {
