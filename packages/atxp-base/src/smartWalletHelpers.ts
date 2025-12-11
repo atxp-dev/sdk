@@ -14,6 +14,7 @@ import {
   type BundlerClient,
   type SmartAccount
 } from 'viem/account-abstraction';
+import { alchemy } from '@account-kit/infra';
 
 // Coinbase CDP API Key
 const COINBASE_API_KEY = 'snPdXqIzOGhRkGNJvEHM5bl9Hm3yRO3m';
@@ -47,6 +48,14 @@ function getCoinbasePaymasterUrl(chainId: number): string {
 }
 
 /**
+ * Check if Alchemy is configured via environment variables.
+ * Both ALCHEMY_API_KEY and ALCHEMY_GAS_POLICY_ID must be set.
+ */
+function isAlchemyConfigured(): boolean {
+  return !!(process.env.ALCHEMY_API_KEY && process.env.ALCHEMY_GAS_POLICY_ID);
+}
+
+/**
  * Get Base chain configuration by chain ID
  */
 function getBaseChain(chainId: number): Chain {
@@ -68,11 +77,61 @@ export interface EphemeralSmartWallet {
 }
 
 /**
- * Creates an ephemeral smart wallet with paymaster support
+ * Creates an ephemeral smart wallet with paymaster support using Alchemy infrastructure.
+ * Uses the official @account-kit/infra transport for proper Alchemy integration.
  * @param privateKey - Private key for the wallet signer
  * @param chainId - Chain ID (defaults to 8453 for Base mainnet, can be 84532 for Base Sepolia)
  */
-export async function toEphemeralSmartWallet(
+async function toEphemeralSmartWalletAlchemy(
+  privateKey: Hex,
+  chainId: number = base.id
+): Promise<EphemeralSmartWallet> {
+  const alchemyApiKey = process.env.ALCHEMY_API_KEY!;
+  const alchemyPolicyId = process.env.ALCHEMY_GAS_POLICY_ID!;
+  const signer = privateKeyToAccount(privateKey);
+  const chain = getBaseChain(chainId);
+
+  // Use the official Alchemy transport from @account-kit/infra
+  const alchemyTransport = alchemy({ apiKey: alchemyApiKey });
+
+  const publicClient = createPublicClient({
+    chain,
+    transport: alchemyTransport
+  });
+
+  // Create the Coinbase smart wallet (works with any ERC-4337 bundler)
+  const account = await toCoinbaseSmartAccount({
+    client: publicClient,
+    owners: [signer],
+    version: '1'
+  });
+
+  // Create bundler client with Alchemy paymaster support
+  const bundlerClient = createBundlerClient({
+    account,
+    client: publicClient,
+    transport: alchemyTransport,
+    chain,
+    paymaster: true,
+    paymasterContext: {
+      policyId: alchemyPolicyId
+    }
+  });
+
+  return {
+    address: account.address,
+    client: bundlerClient,
+    account,
+    signer,
+  };
+}
+
+/**
+ * Creates an ephemeral smart wallet with paymaster support using Coinbase infrastructure.
+ * @param privateKey - Private key for the wallet signer
+ * @param chainId - Chain ID (defaults to 8453 for Base mainnet, can be 84532 for Base Sepolia)
+ */
+async function toEphemeralSmartWalletCoinbase(
   privateKey: Hex,
   chainId: number = base.id
 ): Promise<EphemeralSmartWallet> {
@@ -100,7 +159,7 @@ export async function toEphemeralSmartWallet(
     client: publicClient,
     transport: http(`${bundlerUrl}/${apiKey}`),
     chain,
-    paymaster: true, // Enable paymaster sponsorship
+    paymaster: true,
     paymasterContext: {
       transport: http(`${paymasterUrl}/${apiKey}`)
     }
@@ -112,4 +171,23 @@ export async function toEphemeralSmartWallet(
     account,
     signer,
   };
+}
+
+/**
+ * Creates an ephemeral smart wallet with paymaster support.
+ *
+ * Uses Alchemy infrastructure if ALCHEMY_API_KEY and ALCHEMY_GAS_POLICY_ID
+ * environment variables are set, otherwise falls back to Coinbase.
+ *
+ * @param privateKey - Private key for the wallet signer
+ * @param chainId - Chain ID (defaults to 8453 for Base mainnet, can be 84532 for Base Sepolia)
+ */
+export async function toEphemeralSmartWallet(
+  privateKey: Hex,
+  chainId: number = base.id
+): Promise<EphemeralSmartWallet> {
+  if (isAlchemyConfigured()) {
+    return toEphemeralSmartWalletAlchemy(privateKey, chainId);
+  }
+  return toEphemeralSmartWalletCoinbase(privateKey, chainId);
 }
