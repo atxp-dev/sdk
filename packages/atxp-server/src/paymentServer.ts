@@ -8,7 +8,7 @@ interface PaymentServerErrorResponse {
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   message?: string;
 }
@@ -52,12 +52,17 @@ export class ATXPPaymentServer implements PaymentServer {
       // Create a structured error with detailed information
       const error = new Error(
         `Payment server returned ${chargeResponse.status} from /charge: ${errorMessage}`
-      );
+      ) as Error & {
+        statusCode: number;
+        errorCode: string;
+        details: unknown;
+        endpoint: string;
+      };
       // Attach structured data to the error for downstream handling
-      (error as any).statusCode = chargeResponse.status;
-      (error as any).errorCode = errorCode;
-      (error as any).details = errorDetails;
-      (error as any).endpoint = '/charge';
+      error.statusCode = chargeResponse.status;
+      error.errorCode = errorCode;
+      error.details = errorDetails;
+      error.endpoint = '/charge';
 
       throw error;
     }
@@ -78,11 +83,16 @@ export class ATXPPaymentServer implements PaymentServer {
       // Create structured error with detailed information
       const error = new Error(
         `Payment server returned ${response.status} from /payment-request: ${errorMessage}`
-      );
-      (error as any).statusCode = response.status;
-      (error as any).errorCode = errorCode;
-      (error as any).details = errorDetails;
-      (error as any).endpoint = '/payment-request';
+      ) as Error & {
+        statusCode: number;
+        errorCode: string;
+        details: unknown;
+        endpoint: string;
+      };
+      error.statusCode = response.status;
+      error.errorCode = errorCode;
+      error.details = errorDetails;
+      error.endpoint = '/payment-request';
 
       throw error;
     }

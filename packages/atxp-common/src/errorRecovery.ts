@@ -30,7 +30,7 @@ export interface RecoverableError extends Error {
   code: string;
   retryable: boolean;
   actionableMessage: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 /**
@@ -156,7 +156,7 @@ export interface ErrorTelemetry {
   transactionHash?: string;
   rpcUrl?: string;
   timestamp: string;
-  context: Record<string, any>;
+  context: Record<string, unknown>;
 }
 
 /**
@@ -178,7 +178,7 @@ export interface ErrorTelemetry {
  */
 export function captureErrorTelemetry(
   error: Error,
-  additionalContext?: Record<string, any>
+  additionalContext?: Record<string, unknown>
 ): ErrorTelemetry {
   const telemetry: ErrorTelemetry = {
     errorCode: isRecoverableError(error) ? error.code : 'UNKNOWN',

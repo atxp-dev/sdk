@@ -9,7 +9,7 @@ export abstract class ATXPPaymentError extends Error {
   abstract readonly retryable: boolean;
   abstract readonly actionableMessage: string;
 
-  constructor(message: string, public readonly context?: Record<string, any>) {
+  constructor(message: string, public readonly context?: Record<string, unknown>) {
     super(message);
     this.name = this.constructor.name;
   }
@@ -162,7 +162,7 @@ export class PaymentServerError extends ATXPPaymentError {
     public readonly endpoint: string,
     public readonly serverMessage?: string,
     errorCode?: string,
-    public readonly details?: any
+    public readonly details?: unknown
   ) {
     super(
       `Payment server returned ${statusCode} from ${endpoint}${serverMessage ? `: ${serverMessage}` : ''}`,

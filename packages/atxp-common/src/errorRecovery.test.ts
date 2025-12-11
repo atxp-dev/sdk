@@ -2,24 +2,17 @@ import { describe, it, expect } from 'vitest';
 import {
   getErrorRecoveryHint,
   captureErrorTelemetry,
-  isRecoverableError,
-  type ErrorRecoveryHint,
-  type ErrorTelemetry
+  isRecoverableError
 } from './errorRecovery.js';
 
 // Mock error classes for testing
-class MockRecoverableError extends Error implements {
+class MockRecoverableError extends Error {
   code: string;
   retryable: boolean;
   actionableMessage: string;
-  context?: Record<string, any>;
-} {
-  code: string;
-  retryable: boolean;
-  actionableMessage: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 
-  constructor(code: string, message: string, retryable: boolean, actionableMessage: string, context?: Record<string, any>) {
+  constructor(code: string, message: string, retryable: boolean, actionableMessage: string, context?: Record<string, unknown>) {
     super(message);
     this.name = 'MockRecoverableError';
     this.code = code;
