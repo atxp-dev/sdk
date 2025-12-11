@@ -144,7 +144,7 @@ describe('ATXPPaymentServer', () => {
     await expect(server.charge(TH.charge({
       sourceAccountId: 'solana:test-source',
       destinationAccountId: 'solana:test-destination'
-    }))).rejects.toThrow('Unexpected status code 500 from payment server POST /charge endpoint');
+    }))).rejects.toThrow('Payment server returned 500 from /charge');
   });
 
   it('should throw error for non-200 status from payment request endpoint', async () => {
@@ -159,7 +159,7 @@ describe('ATXPPaymentServer', () => {
     await expect(server.createPaymentRequest(TH.charge({
       sourceAccountId: 'solana:test-source',
       destinationAccountId: 'solana:test-destination'
-    }))).rejects.toThrow('POST /payment-request responded with unexpected HTTP status 400');
+    }))).rejects.toThrow('Payment server returned 400 from /payment-request');
   });
 
   it('should throw error if payment request response lacks id field', async () => {
