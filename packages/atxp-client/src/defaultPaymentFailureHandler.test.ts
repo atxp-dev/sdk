@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ATXPFetcher } from './atxpFetcher.js';
-import { InsufficientFundsError, PaymentNetworkError, ProspectivePayment } from './types.js';
+import { InsufficientFundsError, PaymentNetworkError } from './errors.js';
+import type { ProspectivePayment } from './types.js';
 import { BigNumber } from 'bignumber.js';
 
 // Mock dependencies

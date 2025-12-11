@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { InsufficientFundsError, PaymentNetworkError } from './types.js';
+import { InsufficientFundsError, PaymentNetworkError } from './errors.js';
 import { BigNumber } from 'bignumber.js';
 
 describe('InsufficientFundsError', () => {

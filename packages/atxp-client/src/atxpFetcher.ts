@@ -19,7 +19,7 @@ import {
   getErrorRecoveryHint
 } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig, PaymentFailureContext } from './types.js';
-import { InsufficientFundsError, PaymentNetworkError, ATXPPaymentError } from './types.js';
+import { InsufficientFundsError, PaymentNetworkError, ATXPPaymentError } from './errors.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
