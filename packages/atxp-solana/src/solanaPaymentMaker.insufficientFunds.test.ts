@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SolanaPaymentMaker } from './solanaPaymentMaker.js';
-import { InsufficientFundsError, PaymentNetworkError } from '@atxp/client';
+import { InsufficientFundsError, PaymentNetworkError, RpcError } from '@atxp/client';
 import { BigNumber } from 'bignumber.js';
 
 // Mock Solana web3.js
@@ -190,7 +190,7 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     expect(sendAndConfirmTransaction).toHaveBeenCalled();
   });
 
-  it('should wrap unexpected errors in PaymentNetworkError', async () => {
+  it('should wrap network errors in RpcError', async () => {
     // Mock getAssociatedTokenAddress to throw unexpected error
     const unexpectedError = new Error('Network connection timeout');
     vi.mocked(getAssociatedTokenAddress).mockRejectedValue(unexpectedError);
@@ -204,16 +204,15 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
 
     await expect(
       paymentMaker.makePayment(destinations, 'dummy memo')
-    ).rejects.toThrow(PaymentNetworkError);
+    ).rejects.toThrow(RpcError);
 
     try {
       await paymentMaker.makePayment(destinations, 'dummy memo');
     } catch (error) {
-      expect(error).toBeInstanceOf(PaymentNetworkError);
+      expect(error).toBeInstanceOf(RpcError);
 
-      if (error instanceof PaymentNetworkError) {
-        expect(error.message).toContain('Payment failed on Solana network');
-        expect(error.message).toContain('Network connection timeout');
+      if (error instanceof RpcError) {
+        expect(error.network).toBe('solana');
         expect(error.originalError).toBe(unexpectedError);
       }
     }
@@ -344,7 +343,7 @@ describe('SolanaPaymentMaker insufficient funds handling', () => {
     } catch (error) {
       if (error instanceof PaymentNetworkError) {
         expect(error.originalError).toBe(accountError);
-        expect(error.message).toContain('Payment failed on Solana network');
+        expect(error.message).toContain('Payment failed on solana network');
       }
     }
   });

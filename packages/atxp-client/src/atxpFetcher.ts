@@ -1,7 +1,25 @@
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, paymentRequiredError, AccessToken, AuthorizationServerUrl, FetchLike, OAuthDb, PaymentRequest, DEFAULT_AUTHORIZATION_SERVER, Logger, parsePaymentRequests, parseMcpMessages, ConsoleLogger, isSSEResponse, Network, DestinationMaker, Account } from '@atxp/common';
-import type { PaymentMaker, ProspectivePayment, ClientConfig } from './types.js';
-import { InsufficientFundsError, PaymentNetworkError } from './types.js';
+import {
+  PAYMENT_REQUIRED_ERROR_CODE,
+  paymentRequiredError,
+  AccessToken,
+  AuthorizationServerUrl,
+  FetchLike,
+  OAuthDb,
+  PaymentRequest,
+  DEFAULT_AUTHORIZATION_SERVER,
+  Logger,
+  parsePaymentRequests,
+  parseMcpMessages,
+  ConsoleLogger,
+  isSSEResponse,
+  Network,
+  DestinationMaker,
+  Account,
+  getErrorRecoveryHint
+} from '@atxp/common';
+import type { PaymentMaker, ProspectivePayment, ClientConfig, PaymentFailureContext } from './types.js';
+import { InsufficientFundsError, ATXPPaymentError } from './errors.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
@@ -27,7 +45,8 @@ export function atxpFetch(config: ClientConfig): FetchLike {
     onAuthorize: config.onAuthorize,
     onAuthorizeFailure: config.onAuthorizeFailure,
     onPayment: config.onPayment,
-    onPaymentFailure: config.onPaymentFailure
+    onPaymentFailure: config.onPaymentFailure,
+    onPaymentAttemptFailed: config.onPaymentAttemptFailed
   });
   return fetcher.fetch;
 }
@@ -43,8 +62,9 @@ export class ATXPFetcher {
   protected logger: Logger;
   protected onAuthorize: (args: { authorizationServer: AuthorizationServerUrl, userId: string }) => Promise<void>;
   protected onAuthorizeFailure: (args: { authorizationServer: AuthorizationServerUrl, userId: string, error: Error }) => Promise<void>;
-  protected onPayment: (args: { payment: ProspectivePayment }) => Promise<void>;
-  protected onPaymentFailure: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
+  protected onPayment: (args: { payment: ProspectivePayment, transactionHash: string, network: string }) => Promise<void>;
+  protected onPaymentFailure: (context: PaymentFailureContext) => Promise<void>;
+  protected onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
   constructor(config: {
     account: Account;
     db: OAuthDb;
@@ -58,8 +78,9 @@ export class ATXPFetcher {
     logger?: Logger;
     onAuthorize?: (args: { authorizationServer: AuthorizationServerUrl, userId: string }) => Promise<void>;
     onAuthorizeFailure?: (args: { authorizationServer: AuthorizationServerUrl, userId: string, error: Error }) => Promise<void>;
-    onPayment?: (args: { payment: ProspectivePayment }) => Promise<void>;
-    onPaymentFailure?: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
+    onPayment?: (args: { payment: ProspectivePayment, transactionHash: string, network: string }) => Promise<void>;
+    onPaymentFailure?: (context: PaymentFailureContext) => Promise<void>;
+    onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
   }) {
     const {
       account,
@@ -75,7 +96,8 @@ export class ATXPFetcher {
       onAuthorize = async () => {},
       onAuthorizeFailure = async () => {},
       onPayment = async () => {},
-      onPaymentFailure = async () => {}
+      onPaymentFailure,
+      onPaymentAttemptFailed
     } = config;
     // Use React Native safe fetch if in React Native environment
     const safeFetchFn = getIsReactNative() ? createReactNativeSafeFetch(fetchFn) : fetchFn;
@@ -106,21 +128,42 @@ export class ATXPFetcher {
     this.onAuthorizeFailure = onAuthorizeFailure;
     this.onPayment = onPayment;
     this.onPaymentFailure = onPaymentFailure || this.defaultPaymentFailureHandler;
+    this.onPaymentAttemptFailed = onPaymentAttemptFailed;
   }
 
-  private defaultPaymentFailureHandler = async ({ payment, error }: { payment: ProspectivePayment, error: Error }) => {
+  private defaultPaymentFailureHandler = async (context: PaymentFailureContext) => {
+    const { payment, error, attemptedNetworks, retryable } = context;
+    const recoveryHint = getErrorRecoveryHint(error);
+
+    this.logger.info(`PAYMENT FAILED: ${recoveryHint.title}`);
+    this.logger.info(`Description: ${recoveryHint.description}`);
+
+    if (attemptedNetworks.length > 0) {
+      this.logger.info(`Attempted networks: ${attemptedNetworks.join(', ')}`);
+    }
+
+    this.logger.info(`Account: ${payment.accountId}`);
+
+    // Log actionable guidance
+    if (recoveryHint.actions.length > 0) {
+      this.logger.info(`What to do:`);
+      recoveryHint.actions.forEach((action, index) => {
+        this.logger.info(`  ${index + 1}. ${action}`);
+      });
+    }
+
+    if (retryable) {
+      this.logger.info(`This payment can be retried.`);
+    }
+
+    // Log additional context for specific error types
     if (error instanceof InsufficientFundsError) {
-      const networkText = error.network ? ` on ${error.network}` : '';
-      this.logger.info(`PAYMENT FAILED: Insufficient ${error.currency} funds${networkText}`);
       this.logger.info(`Required: ${error.required} ${error.currency}`);
       if (error.available) {
         this.logger.info(`Available: ${error.available} ${error.currency}`);
       }
-      this.logger.info(`Account: ${payment.accountId}`);
-    } else if (error instanceof PaymentNetworkError) {
-      this.logger.info(`PAYMENT FAILED: Network error: ${error.message}`);
-    } else {
-      this.logger.info(`PAYMENT FAILED: ${error.message}`);
+    } else if (error instanceof ATXPPaymentError && error.context) {
+      this.logger.debug(`Error context: ${JSON.stringify(error.context)}`);
     }
   };
 
@@ -178,9 +221,11 @@ export class ATXPFetcher {
       return false;
     }
 
-    // Try each payment maker in order
+    // Try each payment maker in order, tracking attempts
     let lastPaymentError: Error | null = null;
     let paymentAttempted = false;
+    const attemptedNetworks: string[] = [];
+    const failureReasons = new Map<string, Error>();
 
     for (const paymentMaker of this.account.paymentMakers) {
       try {
@@ -197,7 +242,11 @@ export class ATXPFetcher {
         // Payment was successful
         this.logger.info(`ATXP: made payment of ${firstDest.amount.toString()} ${firstDest.currency} on ${result.chain}: ${result.transactionId}`);
 
-        await this.onPayment({ payment: prospectivePayment });
+        await this.onPayment({
+          payment: prospectivePayment,
+          transactionHash: result.transactionId,
+          network: result.chain
+        });
 
         // Submit payment to the server
         const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: '', accountId: this.account.accountId});
@@ -228,14 +277,49 @@ export class ATXPFetcher {
         const typedError = error as Error;
         paymentAttempted = true;
         lastPaymentError = typedError;
-        this.logger.warn(`ATXP: payment maker failed: ${typedError.message}`);
-        await this.onPaymentFailure({ payment: prospectivePayment, error: typedError });
+
+        // Extract network from error context if available
+        let network = 'unknown';
+        if (typedError instanceof ATXPPaymentError && typedError.context?.network) {
+          network = typeof typedError.context.network === 'string' ? typedError.context.network : 'unknown';
+        }
+
+        attemptedNetworks.push(network);
+        failureReasons.set(network, typedError);
+
+        this.logger.warn(`ATXP: payment maker failed on ${network}: ${typedError.message}`);
+
+        // Call optional per-attempt failure callback
+        if (this.onPaymentAttemptFailed) {
+          const remainingMakers = this.account.paymentMakers.length - (attemptedNetworks.length);
+          const remainingNetworks = remainingMakers > 0 ? ['next available'] : [];
+          await this.onPaymentAttemptFailed({
+            network,
+            error: typedError,
+            remainingNetworks
+          });
+        }
+
         // Continue to next payment maker
       }
     }
 
-    // If payment was attempted but all failed, rethrow the last error
+    // If payment was attempted but all failed, create full context and call onPaymentFailure
     if (paymentAttempted && lastPaymentError) {
+      const isRetryable = lastPaymentError instanceof ATXPPaymentError
+        ? lastPaymentError.retryable
+        : true; // Default to retryable for unknown errors
+
+      const failureContext: PaymentFailureContext = {
+        payment: prospectivePayment,
+        error: lastPaymentError,
+        attemptedNetworks,
+        failureReasons,
+        retryable: isRetryable,
+        timestamp: new Date()
+      };
+
+      await this.onPaymentFailure(failureContext);
       throw lastPaymentError;
     }
 

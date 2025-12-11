@@ -2,6 +2,18 @@ import { PaymentServer, Charge } from "./types.js";
 import { AuthorizationServerUrl, FetchLike, Logger } from "@atxp/common";
 
 /**
+ * Expected error response format from ATXP payment server
+ */
+interface PaymentServerErrorResponse {
+  error?: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+  message?: string;
+}
+
+/**
  * ATXP Payment Server implementation
  * 
  * This class handles payment operations with the ATXP authorization server.
@@ -28,26 +40,68 @@ export class ATXPPaymentServer implements PaymentServer {
     } else if (chargeResponse.status === 402) {
       return false;
     } else {
-      const json = await chargeResponse.json();
-      const msg = `Unexpected status code ${chargeResponse.status} from payment server POST /charge endpoint`;
-      this.logger.warn(msg);
-      this.logger.debug(`Response body: ${JSON.stringify(json)}`);
-      throw new Error(msg);
+      const errorBody = await chargeResponse.json() as PaymentServerErrorResponse;
+
+      // Extract detailed error information from response
+      const errorCode = errorBody.error?.code || 'UNKNOWN_ERROR';
+      const errorMessage = errorBody.error?.message || errorBody.message || 'Unknown error';
+      const errorDetails = errorBody.error?.details;
+
+      this.logger.warn(`Payment server charge failed with ${chargeResponse.status}: ${errorMessage} (code: ${errorCode})`);
+
+      // Create a structured error with detailed information
+      const error = new Error(
+        `Payment server returned ${chargeResponse.status} from /charge: ${errorMessage}`
+      ) as Error & {
+        statusCode: number;
+        errorCode: string;
+        details: unknown;
+        endpoint: string;
+      };
+      // Attach structured data to the error for downstream handling
+      error.statusCode = chargeResponse.status;
+      error.errorCode = errorCode;
+      error.details = errorDetails;
+      error.endpoint = '/charge';
+
+      throw error;
     }
   }
 
   createPaymentRequest = async(charge: Charge): Promise<string> => {
     const response = await this.makeRequest('POST', '/payment-request', charge);
-    const json = await response.json() as {id?: string};
+    const json = await response.json() as ({ id?: string } & PaymentServerErrorResponse);
+
     if (response.status !== 200) {
-      this.logger.warn(`POST /payment-request responded with unexpected HTTP status ${response.status}`);
-      this.logger.debug(`Response body: ${JSON.stringify(json)}`);
-      throw new Error(`POST /payment-request responded with unexpected HTTP status ${response.status}`); 
+      // Extract error details from response
+      const errorCode = json.error?.code || 'UNKNOWN_ERROR';
+      const errorMessage = json.error?.message || json.message || 'Unknown error';
+      const errorDetails = json.error?.details;
+
+      this.logger.warn(`POST /payment-request responded with unexpected HTTP status ${response.status}: ${errorMessage} (code: ${errorCode})`);
+
+      // Create structured error with detailed information
+      const error = new Error(
+        `Payment server returned ${response.status} from /payment-request: ${errorMessage}`
+      ) as Error & {
+        statusCode: number;
+        errorCode: string;
+        details: unknown;
+        endpoint: string;
+      };
+      error.statusCode = response.status;
+      error.errorCode = errorCode;
+      error.details = errorDetails;
+      error.endpoint = '/payment-request';
+
+      throw error;
     }
-    if(!json.id) {
+
+    if (!json.id) {
       throw new Error(`POST /payment-request response did not contain an id`);
     }
-    return json.id; 
+
+    return json.id;
   }
 
   /**

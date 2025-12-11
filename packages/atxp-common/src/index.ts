@@ -17,11 +17,21 @@ export {
 } from './oAuthResource.js';
 
 // Payment error handling
-export { 
+export {
   PAYMENT_REQUIRED_ERROR_CODE,
   PAYMENT_REQUIRED_PREAMBLE,
-  paymentRequiredError 
+  paymentRequiredError
 } from './paymentRequiredError.js';
+
+// Error recovery utilities
+export {
+  type ErrorRecoveryHint,
+  type RecoverableError,
+  type ErrorTelemetry,
+  isRecoverableError,
+  getErrorRecoveryHint,
+  captureErrorTelemetry
+} from './errorRecovery.js';
 
 // Server configurations
 export { Servers } from './servers.js';

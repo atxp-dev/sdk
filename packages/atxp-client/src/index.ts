@@ -55,13 +55,26 @@ export {
   type AccountIdString,
   type Account,
   type ProspectivePayment,
+  type PaymentFailureContext,
   type ClientConfig,
   type ClientArgs,
   type FetchWrapper,
-  InsufficientFundsError,
-  PaymentNetworkError,
   type PaymentMaker
 } from './types.js';
+
+// Error classes
+export {
+  ATXPPaymentError,
+  InsufficientFundsError,
+  TransactionRevertedError,
+  UnsupportedCurrencyError,
+  GasEstimationError,
+  RpcError,
+  UserRejectedError,
+  PaymentServerError,
+  PaymentExpiredError,
+  PaymentNetworkError
+} from './errors.js';
 
 // ATXPLocalAccount - generic EVM account helper (used by x402 and other packages)
 export {

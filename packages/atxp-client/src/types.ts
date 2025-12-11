@@ -18,6 +18,24 @@ export type ProspectivePayment = {
   iss: string;
 }
 
+/**
+ * Rich context provided when a payment fails
+ */
+export interface PaymentFailureContext {
+  /** The payment that failed */
+  payment: ProspectivePayment;
+  /** The error that caused the failure */
+  error: Error;
+  /** Networks that were attempted for payment */
+  attemptedNetworks: string[];
+  /** Map of network to error for each failed attempt */
+  failureReasons: Map<string, Error>;
+  /** Whether the payment can be retried */
+  retryable: boolean;
+  /** Timestamp when the failure occurred */
+  timestamp: Date;
+}
+
 export type ClientConfig = {
   mcpServer: string;
   account: Account;
@@ -34,8 +52,10 @@ export type ClientConfig = {
   clientOptions: ClientOptions;
   onAuthorize: (args: { authorizationServer: AuthorizationServerUrl, userId: string }) => Promise<void>;
   onAuthorizeFailure: (args: { authorizationServer: AuthorizationServerUrl, userId: string, error: Error }) => Promise<void>;
-  onPayment: (args: { payment: ProspectivePayment }) => Promise<void>;
-  onPaymentFailure: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
+  onPayment: (args: { payment: ProspectivePayment, transactionHash: string, network: string }) => Promise<void>;
+  onPaymentFailure: (context: PaymentFailureContext) => Promise<void>;
+  /** Optional callback when a single payment attempt fails (before trying other networks) */
+  onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
 }
 
 // ClientArgs for creating clients - required fields plus optional overrides
@@ -47,30 +67,19 @@ export type ClientArgs = RequiredClientConfig & Partial<OptionalClientConfig>;
 // Type for a fetch wrapper function that takes ClientArgs and returns wrapped fetch
 export type FetchWrapper = (config: ClientArgs) => FetchLike;
 
-export class InsufficientFundsError extends Error {
-  constructor(
-    public readonly currency: Currency,
-    public readonly required: BigNumber,
-    public readonly available?: BigNumber,
-    public readonly network?: string
-  ) {
-    const availableText = available ? `, Available: ${available}` : '';
-    const networkText = network ? ` on ${network}` : '';
-    super(
-      `Payment failed due to insufficient ${currency} funds${networkText}. ` +
-      `Required: ${required}${availableText}. ` +
-      `Please ensure your account has adequate balance before retrying.`
-    );
-    this.name = 'InsufficientFundsError';
-  }
-}
-
-export class PaymentNetworkError extends Error {
-  constructor(message: string, public readonly originalError?: Error) {
-    super(`Payment failed due to network error: ${message}`);
-    this.name = 'PaymentNetworkError';
-  }
-}
+// Re-export error classes from errors.ts
+export {
+  ATXPPaymentError,
+  InsufficientFundsError,
+  TransactionRevertedError,
+  UnsupportedCurrencyError,
+  GasEstimationError,
+  RpcError,
+  UserRejectedError,
+  PaymentServerError,
+  PaymentExpiredError,
+  PaymentNetworkError
+} from './errors.js';
 
 // Re-export Account and PaymentMaker for backwards compatibility
 export type { Account, PaymentMaker };

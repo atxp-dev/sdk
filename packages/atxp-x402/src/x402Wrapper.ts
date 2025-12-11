@@ -1,4 +1,4 @@
-import { ProspectivePayment, type FetchWrapper, type ClientArgs, ATXPAccount, ATXPLocalAccount } from '@atxp/client';
+import { ProspectivePayment, type FetchWrapper, type ClientArgs, ATXPAccount, ATXPLocalAccount, ATXPPaymentError } from '@atxp/client';
 import { BaseAccount } from '@atxp/base';
 import { FetchLike } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
@@ -113,7 +113,8 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
 
       // Convert amount from wei to human-readable for logging and approval
       const amountInUsdc = Number(selectedPaymentRequirements.maxAmountRequired) / (10 ** 6);
-      log.debug(`Payment required: ${amountInUsdc} USDC on ${selectedPaymentRequirements.network} to ${selectedPaymentRequirements.payTo}`);
+      const network = selectedPaymentRequirements.network;
+      log.debug(`Payment required: ${amountInUsdc} USDC on ${network} to ${selectedPaymentRequirements.payTo}`);
 
       // Create the ProspectivePayment object for callbacks
       const url = typeof input === 'string' ? input : input.toString();
@@ -133,9 +134,14 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         if (!approved) {
           log.info('Payment not approved by user');
           if (onPaymentFailure) {
+            const error = new Error('Payment not approved');
             await onPaymentFailure({
               payment: prospectivePayment,
-              error: new Error('Payment not approved')
+              error,
+              attemptedNetworks: [network],
+              failureReasons: new Map([[network, error]]),
+              retryable: true,
+              timestamp: new Date()
             });
           }
           return new Response(responseBody, {
@@ -232,15 +238,25 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
 
         // Call onPayment callback if provided
         if (onPayment) {
-          await onPayment({ payment: prospectivePayment });
+          // X402 doesn't provide transaction hash, use payment header as identifier
+          await onPayment({
+            payment: prospectivePayment,
+            transactionHash: paymentHeader.substring(0, 66), // Use first part of payment header as ID
+            network
+          });
         }
       } else {
         log.warn(`Request failed after payment with status ${retryResponse.status}`);
 
         if (onPaymentFailure) {
+          const error = new Error(`Request failed with status ${retryResponse.status}`);
           await onPaymentFailure({
             payment: prospectivePayment,
-            error: new Error(`Request failed with status ${retryResponse.status}`)
+            error,
+            attemptedNetworks: [network],
+            failureReasons: new Map([[network, error]]),
+            retryable: false, // Server rejected payment
+            timestamp: new Date()
           });
         }
       }
@@ -254,6 +270,10 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         const firstOption = paymentChallenge.accepts[0] as { maxAmountRequired?: string | number; description?: string; network?: string; payTo?: string };
         const amount = firstOption.maxAmountRequired ? Number(firstOption.maxAmountRequired) / (10 ** 6) : 0;
         const url = typeof input === 'string' ? input : input.toString();
+        const errorNetwork = firstOption.network || 'unknown';
+        const typedError = error as Error;
+        const isRetryable = typedError instanceof ATXPPaymentError ? typedError.retryable : true;
+
         await onPaymentFailure({
           payment: {
             accountId: account.accountId,
@@ -263,7 +283,11 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
             amount: new BigNumber(amount),
             iss: firstOption.payTo || ''
           },
-          error: error as Error
+          error: typedError,
+          attemptedNetworks: [errorNetwork],
+          failureReasons: new Map([[errorNetwork, typedError]]),
+          retryable: isRetryable,
+          timestamp: new Date()
         });
       }
 

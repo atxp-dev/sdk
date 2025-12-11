@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BasePaymentMaker } from './basePaymentMaker.js';
-import { InsufficientFundsError, PaymentNetworkError } from '@atxp/client';
+import { InsufficientFundsError, PaymentNetworkError, UnsupportedCurrencyError, TransactionRevertedError } from '@atxp/client';
 import { BigNumber } from 'bignumber.js';
 import { USDC_CONTRACT_ADDRESS_BASE } from './baseConstants.js';
 
@@ -153,7 +153,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     expect(mockSigningClient.waitForTransactionReceipt).toHaveBeenCalled();
   });
 
-  it('should throw PaymentNetworkError for unsupported currency', async () => {
+  it('should throw UnsupportedCurrencyError for unsupported currency', async () => {
     const destinations = [{
       chain: 'base' as const,
       currency: 'ETH' as any,
@@ -163,15 +163,16 @@ describe('BasePaymentMaker insufficient funds handling', () => {
 
     await expect(
       paymentMaker.makePayment(destinations, '')
-    ).rejects.toThrow(PaymentNetworkError);
+    ).rejects.toThrow(UnsupportedCurrencyError);
 
     try {
       await paymentMaker.makePayment(destinations, '');
     } catch (error) {
-      expect(error).toBeInstanceOf(PaymentNetworkError);
+      expect(error).toBeInstanceOf(UnsupportedCurrencyError);
 
-      if (error instanceof PaymentNetworkError) {
-        expect(error.message).toContain('Only USDC currency is supported');
+      if (error instanceof UnsupportedCurrencyError) {
+        expect(error.currency).toBe('ETH');
+        expect(error.network).toBe('base');
       }
     }
 
@@ -179,7 +180,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
     expect(mockSigningClient.readContract).not.toHaveBeenCalled();
   });
 
-  it('should throw PaymentNetworkError when transaction reverts', async () => {
+  it('should throw TransactionRevertedError when transaction reverts', async () => {
     // Mock sufficient balance
     const balanceInWei = BigInt(15 * 1_000_000);
     mockSigningClient.readContract.mockResolvedValue(balanceInWei);
@@ -200,16 +201,16 @@ describe('BasePaymentMaker insufficient funds handling', () => {
 
     await expect(
       paymentMaker.makePayment(destinations, '')
-    ).rejects.toThrow(PaymentNetworkError);
+    ).rejects.toThrow(TransactionRevertedError);
 
     try {
       await paymentMaker.makePayment(destinations, '');
     } catch (error) {
-      expect(error).toBeInstanceOf(PaymentNetworkError);
+      expect(error).toBeInstanceOf(TransactionRevertedError);
 
-      if (error instanceof PaymentNetworkError) {
-        expect(error.message).toContain('Transaction reverted');
-        expect(error.originalError?.message).toContain('Transaction reverted on chain');
+      if (error instanceof TransactionRevertedError) {
+        expect(error.transactionHash).toBe('0xtransactionhash');
+        expect(error.network).toBe('base');
       }
     }
   });
@@ -236,7 +237,7 @@ describe('BasePaymentMaker insufficient funds handling', () => {
       expect(error).toBeInstanceOf(PaymentNetworkError);
 
       if (error instanceof PaymentNetworkError) {
-        expect(error.message).toContain('Payment failed on Base network');
+        expect(error.message).toContain('Payment failed on base network');
         expect(error.message).toContain('RPC connection failed');
         expect(error.originalError).toBe(unexpectedError);
       }

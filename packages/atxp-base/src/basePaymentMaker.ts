@@ -1,5 +1,14 @@
 import type { PaymentMaker, Hex } from '@atxp/client';
-import { InsufficientFundsError as InsufficientFundsErrorClass, PaymentNetworkError as PaymentNetworkErrorClass } from '@atxp/client';
+import {
+  InsufficientFundsError as InsufficientFundsErrorClass,
+  PaymentNetworkError as PaymentNetworkErrorClass,
+  TransactionRevertedError,
+  UnsupportedCurrencyError,
+  GasEstimationError,
+  RpcError,
+  UserRejectedError,
+  ATXPPaymentError
+} from '@atxp/client';
 import { Logger, Currency, AccountId, PaymentIdentifier, Destination } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
 import {
@@ -137,7 +146,7 @@ export class BasePaymentMaker implements PaymentMaker {
     const receiver = dest.address;
 
     if (currency.toUpperCase() !== 'USDC') {
-      throw new PaymentNetworkErrorClass('Only USDC currency is supported; received ' + currency);
+      throw new UnsupportedCurrencyError(currency, 'base', ['USDC']);
     }
 
     this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Base from ${this.signingClient.account!.address}`);
@@ -183,7 +192,9 @@ export class BasePaymentMaker implements PaymentMaker {
       });
 
       if (receipt.status === 'reverted') {
-        throw new PaymentNetworkErrorClass(`Transaction reverted: ${hash}`, new Error('Transaction reverted on chain'));
+        // Try to extract revert reason if available
+        // Note: viem doesn't provide revert reason in receipt, would need additional call
+        throw new TransactionRevertedError(hash, 'base');
       }
 
       this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
@@ -195,12 +206,41 @@ export class BasePaymentMaker implements PaymentMaker {
         currency: 'USDC'
       };
     } catch (error) {
-      if (error instanceof InsufficientFundsErrorClass || error instanceof PaymentNetworkErrorClass) {
+      // Re-throw our custom payment errors
+      if (error instanceof ATXPPaymentError) {
         throw error;
       }
 
-      // Wrap other errors in PaymentNetworkError
-      throw new PaymentNetworkErrorClass(`Payment failed on Base network: ${(error as Error).message}`, error as Error);
+      // Categorize viem/blockchain errors
+      const errorMessage = (error as Error).message || '';
+      const errorName = (error as Error).name || '';
+
+      // User rejected in wallet
+      if (errorMessage.includes('User rejected') ||
+          errorMessage.includes('user rejected') ||
+          errorMessage.includes('User denied') ||
+          errorName === 'UserRejectedRequestError') {
+        throw new UserRejectedError('base');
+      }
+
+      // Gas estimation failed
+      if (errorMessage.includes('gas') &&
+          (errorMessage.includes('estimation') || errorMessage.includes('estimate'))) {
+        throw new GasEstimationError('base', errorMessage);
+      }
+
+      // RPC/network errors
+      if (errorMessage.includes('fetch failed') ||
+          errorMessage.includes('network') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('ECONNREFUSED') ||
+          errorMessage.includes('ETIMEDOUT') ||
+          errorName === 'FetchError') {
+        throw new RpcError('base', undefined, error as Error);
+      }
+
+      // Fallback to generic network error with original error attached
+      throw new PaymentNetworkErrorClass('base', errorMessage || 'Unknown error', error as Error);
     }
   }
 
