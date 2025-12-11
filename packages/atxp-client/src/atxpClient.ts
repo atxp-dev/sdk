@@ -9,7 +9,6 @@ import { DEFAULT_ATXP_ACCOUNTS_SERVER, ATXPAccount } from "@atxp/common";
 type RequiredClientConfigFields = 'mcpServer' | 'account';
 type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
 type BuildableClientConfigFields = 'oAuthDb' | 'logger' | 'destinationMakers';
-type OptionalCallbackFields = 'onPaymentAttemptFailed';
 
 // Detect if we're in a browser environment and bind fetch appropriately
 const getFetch = (): typeof fetch => {
@@ -21,7 +20,7 @@ const getFetch = (): typeof fetch => {
   return fetch;
 };
 
-export const DEFAULT_CLIENT_CONFIG: Required<Omit<OptionalClientConfig, BuildableClientConfigFields | OptionalCallbackFields>> & Pick<OptionalClientConfig, OptionalCallbackFields> = {
+export const DEFAULT_CLIENT_CONFIG: Required<Omit<OptionalClientConfig, BuildableClientConfigFields>> = {
   allowedAuthorizationServers: [DEFAULT_AUTHORIZATION_SERVER],
   atxpAccountsServer: DEFAULT_ATXP_ACCOUNTS_SERVER,
   approvePayment: async (_p) => true,
@@ -38,7 +37,8 @@ export const DEFAULT_CLIENT_CONFIG: Required<Omit<OptionalClientConfig, Buildabl
   onAuthorize: async () => {},
   onAuthorizeFailure: async () => {},
   onPayment: async () => {},
-  onPaymentFailure: async () => {}
+  onPaymentFailure: async () => {},
+  onPaymentAttemptFailed: async () => {}
 };
 
 export function buildClientConfig(args: ClientArgs): ClientConfig {
