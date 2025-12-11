@@ -82,16 +82,16 @@ export function getErrorRecoveryHint(
 
     // Add context-specific actions based on error code
     if (error.code === 'INSUFFICIENT_FUNDS' && error.context?.network) {
-      const network = error.context.network;
+      const network = String(error.context.network);
       hint.actions.push(
         `Bridge tokens from another chain to ${network}`,
         'Check that you have enough for both the payment and gas fees'
       );
       hint.supportLink = `${baseUrl}/wallets/${network}`;
     } else if (error.code === 'TRANSACTION_REVERTED' && error.context?.transactionHash) {
-      const network = error.context.network || 'ethereum';
+      const network = error.context.network ? String(error.context.network) : 'ethereum';
       hint.actions.push('View transaction details on block explorer');
-      hint.supportLink = getBlockExplorerUrl(network, error.context.transactionHash);
+      hint.supportLink = getBlockExplorerUrl(network, String(error.context.transactionHash));
     } else if (error.code === 'RPC_ERROR') {
       hint.actions.push(
         'Verify your internet connection is stable',
@@ -195,11 +195,11 @@ export function captureErrorTelemetry(
   if (isRecoverableError(error) && error.context) {
     const ctx = error.context;
 
-    if (ctx.network) telemetry.network = ctx.network;
-    if (ctx.currency) telemetry.currency = ctx.currency;
-    if (ctx.required) telemetry.amount = ctx.required;
-    if (ctx.transactionHash) telemetry.transactionHash = ctx.transactionHash;
-    if (ctx.rpcUrl) telemetry.rpcUrl = ctx.rpcUrl;
+    if (ctx.network && typeof ctx.network === 'string') telemetry.network = ctx.network;
+    if (ctx.currency && typeof ctx.currency === 'string') telemetry.currency = ctx.currency;
+    if (ctx.required && typeof ctx.required === 'string') telemetry.amount = ctx.required;
+    if (ctx.transactionHash && typeof ctx.transactionHash === 'string') telemetry.transactionHash = ctx.transactionHash;
+    if (ctx.rpcUrl && typeof ctx.rpcUrl === 'string') telemetry.rpcUrl = ctx.rpcUrl;
 
     // Include all context data
     telemetry.context = { ...telemetry.context, ...ctx };

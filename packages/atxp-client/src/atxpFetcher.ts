@@ -281,7 +281,7 @@ export class ATXPFetcher {
         // Extract network from error context if available
         let network = 'unknown';
         if (typedError instanceof ATXPPaymentError && typedError.context?.network) {
-          network = typedError.context.network;
+          network = typeof typedError.context.network === 'string' ? typedError.context.network : 'unknown';
         }
 
         attemptedNetworks.push(network);
