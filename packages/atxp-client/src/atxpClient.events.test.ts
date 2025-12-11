@@ -131,7 +131,9 @@ describe('atxpClient events', () => {
         accountId: account.accountId,
         amount: BigNumber(0.01),
         currency: 'USDC'
-      })
+      }),
+      network: 'solana',
+      transactionHash: 'test-payment-result-id'
     });
   });
   
@@ -179,7 +181,11 @@ describe('atxpClient events', () => {
         amount: new BigNumber(0.01),
         currency: expect.any(String)
       }),
-      error: expect.any(Error)
+      error: expect.any(Error),
+      attemptedNetworks: expect.any(Array),
+      failureReasons: expect.any(Map),
+      retryable: expect.any(Boolean),
+      timestamp: expect.any(Date)
     });
   });
 });

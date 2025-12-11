@@ -163,7 +163,7 @@ export class ATXPFetcher {
         this.logger.info(`Available: ${error.available} ${error.currency}`);
       }
     } else if (error instanceof ATXPPaymentError && error.context) {
-      this.logger.debug(`Error context:`, error.context);
+      this.logger.debug(`Error context: ${JSON.stringify(error.context)}`);
     }
   };
 
