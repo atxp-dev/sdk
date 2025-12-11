@@ -1,6 +1,6 @@
 {
   "name": "@atxp/solana",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "ATXP Solana - Solana blockchain support for ATXP",
   "license": "MIT",
   "repository": {
@@ -33,8 +33,8 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/client": "0.9.0",
-    "@atxp/common": "0.9.0",
+    "@atxp/client": "0.9.1",
+    "@atxp/common": "0.9.1",
     "@solana/pay": "^0.2.5",
     "@solana/web3.js": "^1.98.1",
     "bignumber.js": "^9.3.0",
