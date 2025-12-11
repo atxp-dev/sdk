@@ -30,10 +30,63 @@ describe('ATXPAccount', () => {
       );
     });
 
-    it('should throw error when connection string is missing account_id', () => {
-      expect(() => new ATXPAccount('https://accounts.atxp.ai?connection_token=test_token')).toThrow(
-        'ATXPAccount: connection string missing account id'
-      );
+    it('should generate deterministic account ID when connection string is missing account_id', () => {
+      const account1 = new ATXPAccount('https://accounts.atxp.ai?connection_token=test_token');
+      const account2 = new ATXPAccount('https://accounts.atxp.ai?connection_token=test_token');
+
+      // Should generate a derived account ID
+      expect(account1.accountId).toMatch(/^atxp:derived_/);
+      expect(account1.isDerivedAccountId).toBe(true);
+
+      // Same token should produce same ID (deterministic)
+      expect(account1.accountId).toBe(account2.accountId);
+
+      // Different token should produce different ID
+      const account3 = new ATXPAccount('https://accounts.atxp.ai?connection_token=different_token');
+      expect(account3.accountId).not.toBe(account1.accountId);
+    });
+
+    it('should not mark account as derived when account_id is provided', () => {
+      const account = new ATXPAccount('https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123');
+      expect(account.accountId).toBe('atxp:acc_123');
+      expect(account.isDerivedAccountId).toBe(false);
+    });
+  });
+
+  describe('ATXPAccount.create (async)', () => {
+    it('should generate deterministic SHA-256 based account ID when account_id is missing', async () => {
+      const account1 = await ATXPAccount.create('https://accounts.atxp.ai?connection_token=test_token');
+      const account2 = await ATXPAccount.create('https://accounts.atxp.ai?connection_token=test_token');
+
+      // Should generate a derived account ID
+      expect(account1.accountId).toMatch(/^atxp:derived_/);
+      expect(account1.isDerivedAccountId).toBe(true);
+
+      // Same token should produce same ID (deterministic)
+      expect(account1.accountId).toBe(account2.accountId);
+
+      // Different token should produce different ID
+      const account3 = await ATXPAccount.create('https://accounts.atxp.ai?connection_token=different_token');
+      expect(account3.accountId).not.toBe(account1.accountId);
+    });
+
+    it('should use explicit account_id when provided', async () => {
+      const account = await ATXPAccount.create('https://accounts.atxp.ai?connection_token=test_token&account_id=acc_123');
+      expect(account.accountId).toBe('atxp:acc_123');
+      expect(account.isDerivedAccountId).toBe(false);
+    });
+
+    it('should produce different IDs than sync constructor for same token (different hash algorithms)', async () => {
+      const syncAccount = new ATXPAccount('https://accounts.atxp.ai?connection_token=test_token');
+      const asyncAccount = await ATXPAccount.create('https://accounts.atxp.ai?connection_token=test_token');
+
+      // Both should be derived
+      expect(syncAccount.isDerivedAccountId).toBe(true);
+      expect(asyncAccount.isDerivedAccountId).toBe(true);
+
+      // But use different algorithms, so different IDs
+      // (sync uses djb2, async uses SHA-256)
+      expect(syncAccount.accountId).not.toBe(asyncAccount.accountId);
     });
   });
 

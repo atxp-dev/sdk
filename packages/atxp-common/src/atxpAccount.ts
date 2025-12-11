@@ -1,6 +1,7 @@
 import type { Account, PaymentMaker } from './types.js';
 import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain, Source } from './types.js';
 import BigNumber from 'bignumber.js';
+import { crypto as platformCrypto } from './platform/index.js';
 
 function toBasicAuth(token: string): string {
   // Basic auth is base64("username:password"), password is blank
@@ -8,7 +9,47 @@ function toBasicAuth(token: string): string {
   return `Basic ${b64}`;
 }
 
-function parseConnectionString(connectionString: string): { origin: string; token: string; accountId: string } {
+/**
+ * Generate a deterministic account ID from a connection token (sync version).
+ * Uses a simple hash algorithm that works synchronously in all environments.
+ * This is used when the connection string doesn't include an explicit account_id.
+ * The hash ensures the same token always produces the same ID without exposing the token.
+ */
+function generateDeterministicAccountIdSync(token: string): string {
+  // Simple hash implementation for synchronous use
+  // Uses djb2 hash algorithm - fast, deterministic, good distribution
+  let hash = 5381;
+  for (let i = 0; i < token.length; i++) {
+    hash = ((hash << 5) + hash) ^ token.charCodeAt(i);
+    hash = hash >>> 0; // Convert to unsigned 32-bit integer
+  }
+
+  // Also hash the reverse to get more bits and better distribution
+  let hash2 = 5381;
+  for (let i = token.length - 1; i >= 0; i--) {
+    hash2 = ((hash2 << 5) + hash2) ^ token.charCodeAt(i);
+    hash2 = hash2 >>> 0;
+  }
+
+  // Combine into a longer hex string for a more unique ID
+  const combined = hash.toString(16).padStart(8, '0') + hash2.toString(16).padStart(8, '0');
+  return `derived_${combined}`;
+}
+
+/**
+ * Generate a deterministic account ID from a connection token (async version).
+ * Uses SHA-256 for cryptographically strong hashing.
+ */
+async function generateDeterministicAccountIdAsync(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBytes = await platformCrypto.digest(data);
+  const hashHex = platformCrypto.toHex(hashBytes);
+  // Use first 32 characters (128 bits) for a reasonable ID length
+  return `derived_${hashHex.substring(0, 32)}`;
+}
+
+function parseConnectionStringSync(connectionString: string): { origin: string; token: string; accountId: string | null } {
   if (!connectionString || connectionString.trim() === '') {
     throw new Error('ATXPAccount: connection string is empty or not provided');
   }
@@ -18,9 +59,6 @@ function parseConnectionString(connectionString: string): { origin: string; toke
   const accountId = url.searchParams.get('account_id');
   if (!token) {
     throw new Error('ATXPAccount: connection string missing connection token');
-  }
-  if (!accountId) {
-    throw new Error('ATXPAccount: connection string missing account id');
   }
   return { origin, token, accountId };
 }
@@ -148,15 +186,36 @@ export class ATXPAccount implements Account {
   token: string;
   fetchFn: FetchLike;
   private unqualifiedAccountId: string;
+  /** True if accountId was derived from hashing the connection token (no explicit account_id in connection string) */
+  readonly isDerivedAccountId: boolean;
 
+  /**
+   * Create an ATXPAccount from a connection string.
+   *
+   * If the connection string doesn't include an account_id, a deterministic ID
+   * will be generated from the connection token hash. This allows the same token
+   * to always produce the same accountId for consistent tracking.
+   *
+   * @param connectionString - The ATXP connection string (e.g., https://accounts.atxp.ai?connection_token=xxx&account_id=yyy)
+   * @param opts - Optional configuration including fetchFn
+   */
   constructor(connectionString: string, opts?: { fetchFn?: FetchLike; }) {
-    const { origin, token, accountId } = parseConnectionString(connectionString);
+    const { origin, token, accountId: explicitAccountId } = parseConnectionStringSync(connectionString);
     const fetchFn = opts?.fetchFn ?? fetch;
 
-    // Store for use in X402 payment creation
     this.origin = origin;
     this.token = token;
     this.fetchFn = fetchFn;
+
+    let accountId: string;
+    if (explicitAccountId) {
+      accountId = explicitAccountId;
+      this.isDerivedAccountId = false;
+    } else {
+      // Generate deterministic account ID from token hash (sync version)
+      accountId = generateDeterministicAccountIdSync(token);
+      this.isDerivedAccountId = true;
+    }
 
     // Format accountId as network:address
     // Connection string provides just the atxp_acct_xxx part (no prefix for UI)
@@ -165,6 +224,38 @@ export class ATXPAccount implements Account {
     this.paymentMakers = [
       new ATXPHttpPaymentMaker(origin, token, fetchFn)
     ];
+  }
+
+  /**
+   * Create an ATXPAccount from a connection string (async version).
+   *
+   * If the connection string doesn't include an account_id, a deterministic ID
+   * will be generated using SHA-256 hash of the connection token.
+   *
+   * Use this method when you need cryptographically strong hashing.
+   * The regular constructor uses a faster but simpler hash algorithm.
+   *
+   * @param connectionString - The ATXP connection string
+   * @param opts - Optional configuration including fetchFn
+   */
+  static async create(connectionString: string, opts?: { fetchFn?: FetchLike; }): Promise<ATXPAccount> {
+    const { token, accountId: explicitAccountId } = parseConnectionStringSync(connectionString);
+
+    // If we have an explicit account ID, just use the constructor
+    if (explicitAccountId) {
+      return new ATXPAccount(connectionString, opts);
+    }
+
+    // Generate deterministic account ID from SHA-256 hash
+    const derivedAccountId = await generateDeterministicAccountIdAsync(token);
+
+    // Create account and override the sync-derived ID with the async one
+    const account = new ATXPAccount(connectionString, opts);
+    // Use Object.defineProperty to update the readonly field
+    Object.defineProperty(account, 'unqualifiedAccountId', { value: derivedAccountId });
+    Object.defineProperty(account, 'accountId', { value: `atxp:${derivedAccountId}` as AccountId });
+
+    return account;
   }
 
   /**
