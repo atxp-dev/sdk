@@ -1,5 +1,11 @@
 import type { PaymentMaker } from '@atxp/client';
-import { InsufficientFundsError, PaymentNetworkError } from '@atxp/client';
+import {
+  InsufficientFundsError,
+  PaymentNetworkError,
+  UnsupportedCurrencyError,
+  RpcError,
+  ATXPPaymentError
+} from '@atxp/client';
 import { Keypair, Connection, PublicKey, ComputeBudgetProgram, sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTransfer, ValidateTransferError as _ValidateTransferError } from "@solana/pay";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
@@ -69,7 +75,7 @@ export class SolanaPaymentMaker implements PaymentMaker {
     const receiver = dest.address;
 
     if (currency.toUpperCase() !== 'USDC') {
-      throw new PaymentNetworkError('Only USDC currency is supported; received ' + currency);
+      throw new UnsupportedCurrencyError(currency, 'solana', ['USDC']);
     }
 
     const receiverKey = new PublicKey(receiver);
@@ -135,12 +141,38 @@ export class SolanaPaymentMaker implements PaymentMaker {
         currency: 'USDC'
       };
     } catch (error) {
-      if (error instanceof InsufficientFundsError || error instanceof PaymentNetworkError) {
+      // Re-throw our custom payment errors
+      if (error instanceof ATXPPaymentError) {
         throw error;
       }
 
-      // Wrap other errors in PaymentNetworkError
-      throw new PaymentNetworkError(`Payment failed on Solana network: ${(error as Error).message}`, error as Error);
+      // Categorize Solana-specific errors
+      const errorMessage = (error as Error).message || '';
+      const errorName = (error as Error).name || '';
+
+      // RPC/network errors
+      if (errorMessage.includes('fetch failed') ||
+          errorMessage.includes('network') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('ECONNREFUSED') ||
+          errorMessage.includes('ETIMEDOUT') ||
+          errorMessage.includes('Failed to get') ||
+          errorMessage.includes('RPC') ||
+          errorName === 'FetchError') {
+        throw new RpcError('solana', this.connection.rpcEndpoint, error as Error);
+      }
+
+      // Transaction simulation failed - often indicates insufficient funds for fees or invalid transaction
+      if (errorMessage.includes('simulation failed') ||
+          errorMessage.includes('insufficient') ||
+          errorMessage.includes('0x1') /* Custom program error */) {
+        // Could be insufficient SOL for fees or other issues
+        // Wrap with more context
+        throw new PaymentNetworkError('solana', `Transaction failed: ${errorMessage}`, error as Error);
+      }
+
+      // Fallback to generic network error with original error attached
+      throw new PaymentNetworkError('solana', errorMessage || 'Unknown error', error as Error);
     }
   }
 }
