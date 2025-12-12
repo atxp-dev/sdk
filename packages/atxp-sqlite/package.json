@@ -1,6 +1,6 @@
 {
   "name": "@atxp/sqlite",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "ATXP SQLite Database - SQLite platform implementation for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
@@ -34,7 +34,7 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/common": "0.9.1",
+    "@atxp/common": "0.9.2",
     "better-sqlite3": "^12.2.0"
   },
   "devDependencies": {
