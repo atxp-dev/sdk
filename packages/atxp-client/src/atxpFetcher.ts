@@ -33,10 +33,11 @@ export function atxpFetch(config: ClientConfig): FetchLike {
 }
 
 export class ATXPFetcher {
-  protected oauthClient: OAuthClient;
+  protected oauthClient: OAuthClient | null = null;
   protected account: Account;
   protected destinationMakers: Map<Network, DestinationMaker>;
   protected sideChannelFetch: FetchLike;
+  protected safeFetchFn: FetchLike;
   protected db: OAuthDb;
   protected allowedAuthorizationServers: AuthorizationServerUrl[];
   protected approvePayment: (payment: ProspectivePayment) => Promise<boolean>;
@@ -45,6 +46,8 @@ export class ATXPFetcher {
   protected onAuthorizeFailure: (args: { authorizationServer: AuthorizationServerUrl, userId: string, error: Error }) => Promise<void>;
   protected onPayment: (args: { payment: ProspectivePayment }) => Promise<void>;
   protected onPaymentFailure: (args: { payment: ProspectivePayment, error: Error }) => Promise<void>;
+  protected strict: boolean;
+  protected allowInsecureRequests: boolean;
   constructor(config: {
     account: Account;
     db: OAuthDb;
@@ -78,27 +81,16 @@ export class ATXPFetcher {
       onPaymentFailure = async () => {}
     } = config;
     // Use React Native safe fetch if in React Native environment
-    const safeFetchFn = getIsReactNative() ? createReactNativeSafeFetch(fetchFn) : fetchFn;
+    this.safeFetchFn = getIsReactNative() ? createReactNativeSafeFetch(fetchFn) : fetchFn;
     const safeSideChannelFetch = getIsReactNative() ? createReactNativeSafeFetch(sideChannelFetch) : sideChannelFetch;
 
-    // ATXPClient should never actually use the callback url - instead of redirecting the user to
-    // an authorization url which redirects back to the callback url, ATXPClient posts the payment
-    // directly to the authorization server, then does the token exchange itself
-    this.oauthClient = new OAuthClient({
-      userId: account.accountId,
-      db,
-      callbackUrl: 'http://localhost:3000/unused-dummy-atxp-callback',
-      isPublic: false,
-      fetchFn: safeFetchFn,
-      sideChannelFetch: safeSideChannelFetch,
-      strict,
-      allowInsecureRequests,
-      logger: logger
-    });
+    // OAuthClient is initialized lazily in getOAuthClient() since it needs async accountId
     this.account = account;
     this.destinationMakers = destinationMakers;
     this.sideChannelFetch = safeSideChannelFetch;
     this.db = db;
+    this.strict = strict;
+    this.allowInsecureRequests = allowInsecureRequests;
     this.allowedAuthorizationServers = allowedAuthorizationServers;
     this.approvePayment = approvePayment;
     this.logger = logger;
@@ -106,6 +98,29 @@ export class ATXPFetcher {
     this.onAuthorizeFailure = onAuthorizeFailure;
     this.onPayment = onPayment;
     this.onPaymentFailure = onPaymentFailure || this.defaultPaymentFailureHandler;
+  }
+
+  /**
+   * Get or create the OAuthClient (lazy initialization to support async accountId)
+   */
+  protected async getOAuthClient(): Promise<OAuthClient> {
+    if (this.oauthClient) {
+      return this.oauthClient;
+    }
+
+    const accountId = await this.account.getAccountId();
+    this.oauthClient = new OAuthClient({
+      userId: accountId,
+      db: this.db,
+      callbackUrl: 'http://localhost:3000/unused-dummy-atxp-callback',
+      isPublic: false,
+      fetchFn: this.safeFetchFn,
+      sideChannelFetch: this.sideChannelFetch,
+      strict: this.strict,
+      allowInsecureRequests: this.allowInsecureRequests,
+      logger: this.logger
+    });
+    return this.oauthClient;
   }
 
   private defaultPaymentFailureHandler = async ({ payment, error }: { payment: ProspectivePayment, error: Error }) => {
@@ -163,8 +178,9 @@ export class ATXPFetcher {
 
     // Create prospective payment for approval (using first destination for display)
     const firstDest = mappedDestinations[0];
+    const accountId = await this.account.getAccountId();
     const prospectivePayment: ProspectivePayment = {
-      accountId: this.account.accountId,
+      accountId,
       resourceUrl: paymentRequest.resource?.toString() ?? '',
       resourceName: paymentRequest.payeeName ?? '',
       currency: firstDest.currency,
@@ -200,7 +216,7 @@ export class ATXPFetcher {
         await this.onPayment({ payment: prospectivePayment });
 
         // Submit payment to the server
-        const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: '', accountId: this.account.accountId});
+        const jwt = await paymentMaker.generateJWT({paymentRequestId, codeChallenge: '', accountId});
         const response = await this.sideChannelFetch(paymentRequestUrl.toString(), {
           method: 'PUT',
           headers: {
@@ -316,7 +332,8 @@ export class ATXPFetcher {
       throw new Error(`Payment maker is missing generateJWT method. Available payment maker count: ${paymentMakerCount}. This indicates the payment maker object does not implement the PaymentMaker interface. If using TypeScript, ensure your payment maker properly implements the PaymentMaker interface.`);
     }
 
-    const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId: this.account.accountId});
+    const accountId = await this.account.getAccountId();
+    const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId});
 
     // Make a fetch call to the authorization URL with the payment ID
     // redirect=false is a hack
@@ -372,8 +389,9 @@ export class ATXPFetcher {
     if (paymentMaker) {
       // We can do the full OAuth flow - we'll generate a signed JWT and call /authorize on the
       // AS to get a code, then exchange the code for an access token
-      const authorizationUrl = await this.oauthClient.makeAuthorizationUrl(
-        error.url, 
+      const oauthClient = await this.getOAuthClient();
+      const authorizationUrl = await oauthClient.makeAuthorizationUrl(
+        error.url,
         error.resourceServerUrl
       );
 
@@ -384,34 +402,38 @@ export class ATXPFetcher {
       try {
         const redirectUrl = await this.makeAuthRequestWithPaymentMaker(authorizationUrl, paymentMaker);
         // Handle the OAuth callback
-        await this.oauthClient.handleCallback(redirectUrl);
-        
+        const oauthClient = await this.getOAuthClient();
+        await oauthClient.handleCallback(redirectUrl);
+
         // Call onAuthorize callback after successful authorization
-        await this.onAuthorize({ 
-          authorizationServer: authorizationUrl.origin as AuthorizationServerUrl, 
-          userId: this.account.accountId 
+        const accountId = await this.account.getAccountId();
+        await this.onAuthorize({
+          authorizationServer: authorizationUrl.origin as AuthorizationServerUrl,
+          userId: accountId
         });
       } catch (authError) {
         // Call onAuthorizeFailure callback if authorization fails
-        await this.onAuthorizeFailure({ 
-          authorizationServer: authorizationUrl.origin as AuthorizationServerUrl, 
-          userId: this.account.accountId,
+        const accountId = await this.account.getAccountId();
+        await this.onAuthorizeFailure({
+          authorizationServer: authorizationUrl.origin as AuthorizationServerUrl,
+          userId: accountId,
           error: authError as Error
         });
         throw authError;
       }
     } else {
-      // Else, we'll see if we've already got an OAuth token from OUR caller (if any). 
+      // Else, we'll see if we've already got an OAuth token from OUR caller (if any).
       // If we do, we'll use it to auth to the downstream resource
       // (In pass-through scenarios, the atxpServer() middleware stores the incoming
       // token in the DB under the '' resource URL).
-      const existingToken = await this.db.getAccessToken(this.account.accountId, '');
+      const accountId = await this.account.getAccountId();
+      const existingToken = await this.db.getAccessToken(accountId, '');
       if (!existingToken) {
         this.logger.info(`ATXP: no token found for the current server - we can't exchange a token if we don't have one`);
         throw error;
       }
       const newToken = await this.exchangeToken(existingToken, error.resourceServerUrl);
-      this.db.saveAccessToken(this.account.accountId, error.resourceServerUrl, newToken);
+      this.db.saveAccessToken(accountId, error.resourceServerUrl, newToken);
     }
   }
 
@@ -458,9 +480,10 @@ export class ATXPFetcher {
   fetch: FetchLike = async (url, init) => {
     let response: Response | null = null;
     let fetchError: Error | null = null;
+    const oauthClient = await this.getOAuthClient();
     try {
       // Try to fetch the resource
-      response = await this.oauthClient.fetch(url, init);
+      response = await oauthClient.fetch(url, init);
       await this.checkForATXPResponse(response);
       return response;
     } catch (error: unknown) {
@@ -473,7 +496,7 @@ export class ATXPFetcher {
 
         try {
           // Retry the request once - we should be auth'd now
-          response = await this.oauthClient.fetch(url, init);
+          response = await oauthClient.fetch(url, init);
           await this.checkForATXPResponse(response);
           return response;
         } catch (eTwo) {
@@ -490,7 +513,7 @@ export class ATXPFetcher {
         this.logger.info(`Payment required - ATXP client starting payment flow ${(mcpError?.data as {paymentRequestUrl: string}|undefined)?.paymentRequestUrl}`);
         if(await this.handlePaymentRequestError(mcpError)) {
           // Retry the request once - we should be auth'd now
-          response = await this.oauthClient.fetch(url, init);
+          response = await oauthClient.fetch(url, init);
           await this.checkForATXPResponse(response);
         } else {
           this.logger.info(`ATXP: payment request was not completed successfully`);

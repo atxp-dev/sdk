@@ -27,13 +27,13 @@ describe('atxpClient', () => {
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
-      accountId: 'bdj',
+      getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
       getSources: vi.fn().mockResolvedValue([])
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
-      account, 
+      account,
       fetchFn: f.fetchHandler
     });
 
@@ -64,13 +64,13 @@ describe('atxpClient', () => {
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
-      accountId: 'bdj',
+      getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
       getSources: vi.fn().mockResolvedValue([])
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
-      account, 
+      account,
       fetchFn: f.fetchHandler
     });
 
@@ -114,7 +114,7 @@ describe('atxpClient', () => {
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
-      accountId: 'bdj',
+      getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
       getSources: vi.fn().mockResolvedValue([])
     };

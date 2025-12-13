@@ -8,8 +8,9 @@ describe('buildConfig', () => {
       fetchFn,
       mcpServer: 'https://example.com/mcp',
       account: {
-        accountId: 'bdj',
-        paymentMakers: []
+        getAccountId: async () => 'bdj' as any,
+        paymentMakers: [],
+        getSources: async () => []
       }
     });
     expect(config.oAuthChannelFetch).toBe(fetchFn);

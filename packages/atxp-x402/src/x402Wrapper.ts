@@ -117,8 +117,9 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
 
       // Create the ProspectivePayment object for callbacks
       const url = typeof input === 'string' ? input : input.toString();
+      const accountId = await account.getAccountId();
       const prospectivePayment: ProspectivePayment = {
-        accountId: account.accountId,
+        accountId,
         resourceUrl: url,
         resourceName: selectedPaymentRequirements.description || url,
         currency: 'USDC',
@@ -254,9 +255,10 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         const firstOption = paymentChallenge.accepts[0] as { maxAmountRequired?: string | number; description?: string; network?: string; payTo?: string };
         const amount = firstOption.maxAmountRequired ? Number(firstOption.maxAmountRequired) / (10 ** 6) : 0;
         const url = typeof input === 'string' ? input : input.toString();
+        const accountId = await account.getAccountId();
         await onPaymentFailure({
           payment: {
-            accountId: account.accountId,
+            accountId,
             resourceUrl: url,
             resourceName: firstOption.description || url,
             currency: 'USDC',

@@ -18,7 +18,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     : paymentConfig.price;
 
   // Get network and address from destination Account
-  const destinationAccountId = config.destination.accountId;
+  const destinationAccountId = await config.destination.getAccountId();
   const destinationNetwork = extractNetworkFromAccountId(destinationAccountId);
   const destinationAddress = extractAddressFromAccountId(destinationAccountId);
 

@@ -159,7 +159,7 @@ export interface DestinationMaker {
 }
 
 export type Account = {
-  accountId: AccountId;
+  getAccountId: () => Promise<AccountId>;
   paymentMakers: PaymentMaker[];
   getSources: () => Promise<Source[]>;
 }

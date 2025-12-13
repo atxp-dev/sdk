@@ -30,9 +30,9 @@ function atxpFetcher(
   destinationMakers.set('solana', new PassthroughDestinationMaker('solana'));
 
   const account: Account = {
-    accountId: "bdj" as any,
+    getAccountId: async () => "bdj" as any,
     paymentMakers: paymentMakers ?? mockPaymentMakers(),
-    getSources: () => [{
+    getSources: async () => [{
       address: 'SolAddress123',
       chain: 'solana' as any,
       walletType: 'eoa' as any
