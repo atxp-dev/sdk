@@ -16,7 +16,7 @@ const DEFAULT_ALLOWANCE = 10n;
 const DEFAULT_PERIOD_IN_DAYS = 7;
 
 export class BaseAppAccount implements Account {
-  accountId: AccountId;
+  private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private mainWalletAddress?: string;
   private ephemeralSmartWallet?: EphemeralSmartWallet;
@@ -154,7 +154,7 @@ export class BaseAppAccount implements Account {
         throw new Error('Spend permission is required for ephemeral wallet mode');
       }
       // Format accountId as network:address
-      this.accountId = `base:${ephemeralSmartWallet.address}` as AccountId;
+      this._accountId = `base:${ephemeralSmartWallet.address}` as AccountId;
       this.ephemeralSmartWallet = ephemeralSmartWallet;
       this.paymentMakers = [
         new BaseAppPaymentMaker(spendPermission, ephemeralSmartWallet, logger, chainId)
@@ -165,12 +165,19 @@ export class BaseAppAccount implements Account {
         throw new Error('Main wallet address and provider are required for main wallet mode');
       }
       // Format accountId as network:address
-      this.accountId = `base:${mainWalletAddress}` as AccountId;
+      this._accountId = `base:${mainWalletAddress}` as AccountId;
       this.mainWalletAddress = mainWalletAddress;
       this.paymentMakers = [
         new MainWalletPaymentMaker(mainWalletAddress, provider, logger, chainId)
       ];
     }
+  }
+
+  /**
+   * Get the account ID
+   */
+  async getAccountId(): Promise<AccountId> {
+    return this._accountId;
   }
 
   async getSources(): Promise<Source[]> {

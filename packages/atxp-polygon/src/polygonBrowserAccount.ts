@@ -17,7 +17,7 @@ import { ConsoleLogger, Logger } from '@atxp/common';
  * does not provide Paymaster services for Polygon mainnet.
  */
 export class PolygonBrowserAccount implements Account {
-  accountId: AccountId;
+  private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private walletAddress: string;
   private chainId: number;
@@ -78,11 +78,18 @@ export class PolygonBrowserAccount implements Account {
     this.chainId = chainId;
 
     // Format accountId as network:address
-    this.accountId = `polygon:${walletAddress}` as AccountId;
+    this._accountId = `polygon:${walletAddress}` as AccountId;
 
     this.paymentMakers = [
       new DirectWalletPaymentMaker(walletAddress, provider, logger, chainId)
     ];
+  }
+
+  /**
+   * Get the account ID
+   */
+  async getAccountId(): Promise<AccountId> {
+    return this._accountId;
   }
 
   async getSources(): Promise<Source[]> {

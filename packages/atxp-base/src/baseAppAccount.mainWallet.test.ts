@@ -62,7 +62,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       });
 
       // Should have main wallet address as account ID (qualified with network)
-      expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
+      expect(await account.getAccountId()).toBe(`base:${TEST_WALLET_ADDRESS}`);
 
       // Should have main wallet payment maker (first in array)
       expect(account.paymentMakers).toHaveLength(1);
@@ -105,7 +105,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
         cache,
       });
 
-      expect(account.accountId).toBe(`base:${TEST_WALLET_ADDRESS}`);
+      expect(await account.getAccountId()).toBe(`base:${TEST_WALLET_ADDRESS}`);
       expect(account.paymentMakers).toHaveLength(1);
       expect(account.paymentMakers[0]).toBeInstanceOf(MainWalletPaymentMaker);
     });
@@ -181,7 +181,7 @@ describe('BaseAppAccount - Main Wallet Mode', () => {
       expect(account.paymentMakers).toHaveLength(1);
       expect(account.paymentMakers[0]).toBeDefined();
       // In ephemeral mode, we expect the account ID to be different from wallet address
-      expect(account.accountId).not.toBe(TEST_WALLET_ADDRESS);
+      expect(await account.getAccountId()).not.toBe(TEST_WALLET_ADDRESS);
     });
   });
 

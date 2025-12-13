@@ -25,9 +25,9 @@ import {
 // Helper to create a mock Account for testing
 function mockAccount(accountId: string): Account {
   return {
-    accountId,
-    paymentMakers: {},
-    network: () => 'base'
+    getAccountId: async () => accountId as any,
+    paymentMakers: [],
+    getSources: async () => []
   };
 }
 

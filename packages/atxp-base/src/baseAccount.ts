@@ -6,7 +6,7 @@ import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
 import { base } from 'viem/chains';
 
 export class BaseAccount implements Account {
-  accountId: AccountId;
+  private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private walletClient: WalletClient;
   private account: PrivateKeyAccount;
@@ -22,7 +22,7 @@ export class BaseAccount implements Account {
     this.account = privateKeyToAccount(sourceSecretKey as Hex);
 
     // Format accountId as network:address
-    this.accountId = `base:${this.account.address}` as AccountId;
+    this._accountId = `base:${this.account.address}` as AccountId;
     this.walletClient = createWalletClient({
       account: this.account,
       chain: base,
@@ -31,6 +31,13 @@ export class BaseAccount implements Account {
     this.paymentMakers = [
       new BasePaymentMaker(baseRPCUrl, this.walletClient)
     ];
+  }
+
+  /**
+   * Get the account ID
+   */
+  async getAccountId(): Promise<AccountId> {
+    return this._accountId;
   }
 
   /**

@@ -25,7 +25,7 @@ async function testBasePayment() {
 
   try {
     const account = new BaseAccount(baseRpc, basePrivateKey as `0x${string}`);
-    console.log('Using Base account:', account.accountId);
+    console.log('Using Base account:', await account.getAccountId());
 
     const mcpClient = await atxpClient({
       mcpServer: 'http://localhost:3009',
@@ -60,7 +60,7 @@ async function testSolanaPayment() {
 
   try {
     const account = new SolanaAccount(solanaEndpoint, solanaPrivateKey);
-    console.log('Using Solana account:', account.accountId);
+    console.log('Using Solana account:', await account.getAccountId());
 
     const mcpClient = await atxpClient({
       mcpServer: 'http://localhost:3009',
@@ -95,7 +95,7 @@ async function testPolygonPayment() {
 
   try {
     const account = new PolygonServerAccount(polygonRpc, polygonPrivateKey as `0x${string}`, 137);
-    console.log('Using Polygon account:', account.accountId);
+    console.log('Using Polygon account:', await account.getAccountId());
 
     const mcpClient = await atxpClient({
       mcpServer: 'http://localhost:3009',

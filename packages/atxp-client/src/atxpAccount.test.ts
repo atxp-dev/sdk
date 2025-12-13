@@ -30,9 +30,28 @@ describe('ATXPAccount', () => {
       );
     });
 
-    it('should throw error when connection string is missing account_id', () => {
-      expect(() => new ATXPAccount('https://accounts.atxp.ai?connection_token=test_token')).toThrow(
-        'ATXPAccount: connection string missing account id'
+    it('should allow connection string without account_id (lazy fetch from /me)', async () => {
+      const mockFetch = vi.fn();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ account_id: 'fetched-account-123' })  // Raw account_id without atxp: prefix
+      });
+
+      // Should NOT throw on construction
+      const account = new ATXPAccount('https://accounts.atxp.ai?connection_token=test_token', { fetchFn: mockFetch });
+
+      // Should fetch account_id from /me endpoint when getAccountId() is called
+      // The returned value will have atxp: prefix added by the implementation
+      const accountId = await account.getAccountId();
+      expect(accountId).toBe('atxp:fetched-account-123');
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://accounts.atxp.ai/me',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Authorization': expect.stringContaining('Bearer'),
+          })
+        })
       );
     });
   });
