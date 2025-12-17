@@ -290,18 +290,10 @@ export class OAuthResourceClient {
         }
       );
 
-      this.logger.debug(`Registration response status: ${response.status} ${response.statusText}`);
-
       // Process the registration response
       registeredClient = await oauth.processDynamicClientRegistrationResponse(response);
     } catch (error: any) {
-      this.logger.error(`Client registration failure: ${error.name}: ${error.message}`);
-      if (error.cause) {
-        this.logger.error(`Error cause: ${JSON.stringify(error.cause, null, 2)}`);
-      }
-      if (error.response) {
-        this.logger.error(`Error response status: ${error.response.status}`);
-      }
+      this.logger.warn(`Client registration failure error_details: ${JSON.stringify(error.cause?.error_details)}`);
       throw error;
     }
     
