@@ -1,4 +1,4 @@
-import { AuthorizationServerUrl, Currency, Logger, PaymentRequest, UrlString, OAuthDb, TokenData, OAuthResourceClient, Account } from "@atxp/common";
+import { AuthorizationServerUrl, Currency, Logger, PaymentRequest, UrlString, OAuthDb, TokenData, OAuthResourceClient, PaymentDestination } from "@atxp/common";
 import { BigNumber } from "bignumber.js";
 
 // https://github.com/modelcontextprotocol/typescript-sdk/blob/c6ac083b1b37b222b5bfba5563822daa5d03372e/src/types.ts
@@ -52,7 +52,7 @@ export type PaymentServer = {
 }
 
 export type ATXPConfig = {
-  destination: Account;
+  destination: PaymentDestination;
   mountPath: string;
   currency: Currency;
   server: AuthorizationServerUrl;

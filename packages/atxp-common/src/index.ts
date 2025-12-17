@@ -68,6 +68,7 @@ export {
   type PaymentIdentifier,
   type PaymentMaker,
   type DestinationMaker,
+  type PaymentDestination,
   type Account,
   type Source,
   extractAddressFromAccountId,
@@ -133,3 +134,8 @@ export {
 export {
   ATXPAccount
 } from './atxpAccount.js';
+
+// Lightweight destination implementation (no connection_token required)
+export {
+  AccountIdDestination
+} from './accountIdDestination.js';

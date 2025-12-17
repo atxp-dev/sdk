@@ -158,10 +158,22 @@ export interface DestinationMaker {
   makeDestinations: (option: PaymentRequestOption, logger: Logger, paymentRequestId: string, sources: Source[]) => Promise<Destination[]>;
 }
 
-export type Account = {
+/**
+ * Minimal interface for payment destinations.
+ * Used by server middleware to identify where payments should be sent.
+ * Does not require the ability to make payments (no paymentMakers needed).
+ */
+export interface PaymentDestination {
   getAccountId: () => Promise<AccountId>;
-  paymentMakers: PaymentMaker[];
   getSources: () => Promise<Source[]>;
+}
+
+/**
+ * Full account interface that can both receive and make payments.
+ * Extends PaymentDestination so any Account can be used as a destination.
+ */
+export type Account = PaymentDestination & {
+  paymentMakers: PaymentMaker[];
 }
 
 /**
