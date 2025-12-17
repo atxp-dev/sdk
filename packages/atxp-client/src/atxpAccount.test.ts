@@ -34,13 +34,13 @@ describe('ATXPAccount', () => {
       const mockFetch = vi.fn();
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ account_id: 'fetched-account-123' })  // Raw account_id without atxp: prefix
+        json: async () => ({ accountId: 'fetched-account-123' })  // Raw accountId without atxp: prefix
       });
 
       // Should NOT throw on construction
       const account = new ATXPAccount('https://accounts.atxp.ai?connection_token=test_token', { fetchFn: mockFetch });
 
-      // Should fetch account_id from /me endpoint when getAccountId() is called
+      // Should fetch accountId from /me endpoint when getAccountId() is called
       // The returned value will have atxp: prefix added by the implementation
       const accountId = await account.getAccountId();
       expect(accountId).toBe('atxp:fetched-account-123');

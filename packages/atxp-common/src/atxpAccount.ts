@@ -205,14 +205,14 @@ export class ATXPAccount implements Account {
       throw new Error(`ATXPAccount: /me failed: ${response.status} ${response.statusText} ${text}`);
     }
 
-    const json = await response.json() as { account_id?: string };
-    if (!json?.account_id) {
-      throw new Error('ATXPAccount: /me did not return account_id');
+    const json = await response.json() as { accountId?: string };
+    if (!json?.accountId) {
+      throw new Error('ATXPAccount: /me did not return accountId');
     }
 
     // Cache the result
-    this._unqualifiedAccountId = json.account_id;
-    this._cachedAccountId = `atxp:${json.account_id}` as AccountId;
+    this._unqualifiedAccountId = json.accountId;
+    this._cachedAccountId = `atxp:${json.accountId}` as AccountId;
     return this._cachedAccountId;
   }
 
