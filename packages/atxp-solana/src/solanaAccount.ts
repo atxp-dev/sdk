@@ -5,7 +5,7 @@ import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 
 export class SolanaAccount implements Account {
-  accountId: AccountId;
+  private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private sourcePublicKey: string;
 
@@ -20,10 +20,17 @@ export class SolanaAccount implements Account {
     this.sourcePublicKey = source.publicKey.toBase58();
 
     // Format accountId as network:address
-    this.accountId = `solana:${this.sourcePublicKey}` as AccountId;
+    this._accountId = `solana:${this.sourcePublicKey}` as AccountId;
     this.paymentMakers = [
       new SolanaPaymentMaker(solanaEndpoint, sourceSecretKey)
     ];
+  }
+
+  /**
+   * Get the account ID
+   */
+  async getAccountId(): Promise<AccountId> {
+    return this._accountId;
   }
 
   /**

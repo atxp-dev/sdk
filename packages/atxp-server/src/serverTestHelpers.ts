@@ -16,8 +16,9 @@ export const SOURCE = 'testSource';
 
 // Helper to create a mock Account for testing
 export function mockAccount(accountId: string): Account {
+  const formattedAccountId = `base:${accountId}`;
   return {
-    accountId: `base:${accountId}` as any, // Format as base:address for tests
+    getAccountId: async () => formattedAccountId as any,
     paymentMakers: [],
     getSources: async () => [],
   };

@@ -11,9 +11,9 @@ vi.mock('x402/client', () => ({
   })
 }));
 
-// Mock ATXPLocalAccount.create
+// Mock ATXPLocalAccount.create while preserving actual exports like ATXPPaymentError
 vi.mock('@atxp/client', async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = await importOriginal() as Record<string, unknown>;
   return {
     ...actual,
     ATXPLocalAccount: {
@@ -28,7 +28,10 @@ vi.mock('@atxp/client', async (importOriginal) => {
         },
         transport: {},
       })
-    }
+    },
+    // Explicitly include classes that need to be preserved for instanceof checks
+    ATXPPaymentError: actual.ATXPPaymentError,
+    ATXPAccount: actual.ATXPAccount,
   };
 });
 
@@ -70,7 +73,7 @@ describe('wrapWithX402', () => {
   it('should handle BaseAccount with getLocalAccount', async () => {
     // Create a mock BaseAccount using the actual constructor
     const mockBaseAccount = {
-      accountId: 'base:0x1234567890123456789012345678901234567890' as any,
+      getAccountId: vi.fn().mockResolvedValue('base:0x1234567890123456789012345678901234567890'),
       paymentMakers: [],
       getSources: vi.fn().mockResolvedValue([]),
       getLocalAccount: vi.fn().mockReturnValue({

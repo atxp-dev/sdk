@@ -95,7 +95,7 @@ describe('BaseAppAccount', () => {
 
       // Verify account creation
       expect(account).toBeDefined();
-      expect(account.accountId).toBe(`base:${TEST_SMART_WALLET_ADDRESS}`);
+      expect(await account.getAccountId()).toBe(`base:${TEST_SMART_WALLET_ADDRESS}`);
       expect(account.paymentMakers).toBeDefined();
       expect(account.paymentMakers).toHaveLength(1);
       expect(account.paymentMakers[0]).toBeDefined();
@@ -160,7 +160,7 @@ describe('BaseAppAccount', () => {
 
       // Verify account was loaded from storage
       expect(account).toBeDefined();
-      expect(account.accountId).toBe(`base:${TEST_SMART_WALLET_ADDRESS}`);
+      expect(await account.getAccountId()).toBe(`base:${TEST_SMART_WALLET_ADDRESS}`);
 
       // Verify smart wallet was NOT deployed (reusing existing)
       expect(bundlerClient.sendUserOperation).not.toHaveBeenCalled();

@@ -27,7 +27,7 @@ import type { Chain } from 'viem/chains';
  * ```
  */
 export class PolygonServerAccount implements Account {
-  accountId: AccountId;
+  private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private walletClient: WalletClient;
   private account: PrivateKeyAccount;
@@ -49,7 +49,7 @@ export class PolygonServerAccount implements Account {
 
     // Determine network name for accountId
     const networkName = chainId === 137 ? 'polygon' : 'polygon_amoy';
-    this.accountId = `${networkName}:${this.account.address}` as AccountId;
+    this._accountId = `${networkName}:${this.account.address}` as AccountId;
 
     // Get the appropriate chain configuration
     const chain = this.getChain(chainId);
@@ -63,6 +63,13 @@ export class PolygonServerAccount implements Account {
     this.paymentMakers = [
       new ServerPaymentMaker(polygonRPCUrl, this.walletClient, chainId)
     ];
+  }
+
+  /**
+   * Get the account ID
+   */
+  async getAccountId(): Promise<AccountId> {
+    return this._accountId;
   }
 
   private getChain(chainId: number): Chain {

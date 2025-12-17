@@ -28,13 +28,13 @@ describe('atxpClient events', () => {
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
-      accountId: 'bdj',
+      getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
       getSources: vi.fn().mockResolvedValue([])
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
-      account, 
+      account,
       onAuthorize,
       fetchFn: f.fetchHandler
     });
@@ -43,7 +43,7 @@ describe('atxpClient events', () => {
     expect(res).toMatchObject({content: [{type: 'text', text: 'hello world'}]});
     expect(onAuthorize).toHaveBeenCalledWith({
       authorizationServer: DEFAULT_AUTHORIZATION_SERVER,
-      userId: account.accountId
+      userId: 'bdj'
     });
   });
 
@@ -68,27 +68,27 @@ describe('atxpClient events', () => {
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
-      accountId: 'bdj',
+      getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
       getSources: vi.fn().mockResolvedValue([])
     };
-    
+
     // The client initialization or callTool will throw an error due to OAuth failure
     await expect(async () => {
       const client = await atxpClient({
         mcpServer: 'https://example.com/mcp',
-        account, 
+        account,
         onAuthorizeFailure,
         fetchFn: f.fetchHandler
       });
       await client.callTool({ name: 'authorize', arguments: {} });
     }).rejects.toThrow('authorization response from the server is an error');
-    
+
     // The callback should have been called before the error was thrown
     expect(onAuthorizeFailure).toHaveBeenCalledTimes(1);
     expect(onAuthorizeFailure).toHaveBeenCalledWith({
       authorizationServer: DEFAULT_AUTHORIZATION_SERVER,
-      userId: account.accountId,
+      userId: 'bdj',
       error: expect.any(Error)
     });
   });
@@ -112,13 +112,13 @@ describe('atxpClient events', () => {
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
-      accountId: 'bdj',
+      getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
       getSources: vi.fn().mockResolvedValue([])
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
-      account, 
+      account,
       onPayment,
       fetchFn: f.fetchHandler
     });
@@ -128,7 +128,7 @@ describe('atxpClient events', () => {
     expect(paymentMaker.makePayment).toHaveBeenCalled();
     expect(onPayment).toHaveBeenCalledWith({
       payment: expect.objectContaining({
-        accountId: account.accountId,
+        accountId: 'bdj',
         amount: BigNumber(0.01),
         currency: 'USDC'
       }),
@@ -158,26 +158,26 @@ describe('atxpClient events', () => {
       generateJWT: vi.fn().mockResolvedValue('testJWT')
     };
     const account = {
-      accountId: 'bdj',
+      getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
       getSources: vi.fn().mockResolvedValue([])
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
-      account, 
+      account,
       onPaymentFailure,
       fetchFn: f.fetchHandler
     });
 
     // The payment will fail and throw an error
     await expect(client.callTool({ name: 'pay', arguments: {} })).rejects.toThrow('Payment failed');
-    
+
     // Verify the callbacks were called
     expect(paymentMaker.makePayment).toHaveBeenCalledTimes(1);
     expect(onPaymentFailure).toHaveBeenCalledTimes(1);
     expect(onPaymentFailure).toHaveBeenCalledWith({
       payment: expect.objectContaining({
-        accountId: account.accountId,
+        accountId: 'bdj',
         amount: new BigNumber(0.01),
         currency: expect.any(String)
       }),

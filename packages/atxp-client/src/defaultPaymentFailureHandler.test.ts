@@ -40,9 +40,9 @@ describe('Default Payment Failure Handler', () => {
 
     // Create an ATXPFetcher instance to access the default handler
     const account = {
-      accountId: 'test-account' as any,
+      getAccountId: async () => 'test-account' as any,
       paymentMakers: [],
-      getSources: () => []
+      getSources: async () => []
     };
 
     const fetcher = new ATXPFetcher({
