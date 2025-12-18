@@ -153,13 +153,12 @@ export class OAuthResourceClient {
   getAuthorizationServer = async (resourceServerUrl: string): Promise<oauth.AuthorizationServer> => {
     resourceServerUrl = this.normalizeResourceServerUrl(resourceServerUrl);
 
-    let prmResponse;
     const resourceUrl = new URL(resourceServerUrl);
     let fetchedUrl: string|undefined = undefined;
 
-    const fullPrmUrl = new URL(resourceServerUrl).toString() + '/.well-known/oauth-protected-resource';
+    const fullPrmUrl = new URL(resourceServerUrl).toString().replace(/\/+$/, '') + '/.well-known/oauth-protected-resource';
     fetchedUrl = fullPrmUrl;
-    prmResponse = await this.sideChannelFetch(fullPrmUrl);
+    const prmResponse = await this.sideChannelFetch(fullPrmUrl);
 
     let authServer: string | undefined = undefined;
     try {
