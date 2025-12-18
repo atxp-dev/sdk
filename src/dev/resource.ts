@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { CallToolResult, ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { BigNumber } from 'bignumber.js';
 import { atxpExpress, atxpAccountId, requirePayment } from '@atxp/express';
-import { ConsoleLogger, LogLevel } from '@atxp/common';
+import { ConsoleLogger, LogLevel, AccountIdDestination } from '@atxp/common';
 import { ATXPAccount } from '@atxp/client';
 import 'dotenv/config';
 
@@ -546,10 +546,12 @@ app.use(express.json());
 
 const logger = new ConsoleLogger({level: LogLevel.DEBUG});
 
-const destinationConnectionString = process.env.ATXP_DESTINATION!;
-const destination = new ATXPAccount(destinationConnectionString);
+//const destinationConnectionString = process.env.ATXP_DESTINATION!;
+//const destination = new ATXPAccount(destinationConnectionString);
+const destinationAccountId = process.env.ATXP_DESTINATION_ACCOUNT!;
+const destination = new AccountIdDestination(destinationAccountId);
+console.log('Starting MCP server with destination', destinationAccountId);
 
-console.log('Starting MCP server with destination', destinationConnectionString);
 app.use(atxpExpress({
   destination: destination,
   //server: 'http://localhost:3010',
