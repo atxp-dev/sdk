@@ -249,8 +249,9 @@ describe('oauthClient', () => {
       expect(res.issuer).toBe(DEFAULT_AUTHORIZATION_SERVER);
       expect(res.authorization_endpoint).toBe(`${DEFAULT_AUTHORIZATION_SERVER}/authorize`);
       expect(res.registration_endpoint).toBe(`${DEFAULT_AUTHORIZATION_SERVER}/register`);
-      
-      const prmCall = f.callHistory.lastCall('https://example.com/.well-known/oauth-protected-resource/mcp');
+
+      // RFC 9728: PRM URL is at {resourceUrl}/.well-known/oauth-protected-resource
+      const prmCall = f.callHistory.lastCall('https://example.com/mcp/.well-known/oauth-protected-resource');
       expect(prmCall).toBeDefined();
     });
 
@@ -261,8 +262,9 @@ describe('oauthClient', () => {
 
       const client = oauthClient(f.fetchHandler);
       await client.getAuthorizationServer('https://example.com/mcp?test=1');
-      
-      const prmCall = f.callHistory.lastCall('https://example.com/.well-known/oauth-protected-resource/mcp?test=1');
+
+      // RFC 9728: PRM URL is at {resourceUrl}/.well-known/oauth-protected-resource
+      const prmCall = f.callHistory.lastCall('https://example.com/mcp?test=1/.well-known/oauth-protected-resource');
       expect(prmCall).toBeDefined();
     });
 
@@ -270,10 +272,12 @@ describe('oauthClient', () => {
       // This is in violation of the MCP spec (the PRM endpoint is supposed to exist), but some older
       // servers serve OAuth metadata from the MCP server instead of PRM data, so we fallback to support them
       const f = fetchMock.createInstance().getOnce('https://example.com/mcp', 401);
+      // RFC 9728: PRM URL is at {resourceUrl}/.well-known/oauth-protected-resource
+      const prmUrl = 'https://example.com/mcp/.well-known/oauth-protected-resource';
       mockResourceServer(f, 'https://example.com', '/mcp')
         // Note: fetch-mock also supplies .removeRoute, but .modifyRoute has the nice property of
         // throwing if the route isn't already mocked, so we know we haven't screwed up the test
-        .modifyRoute('https://example.com/.well-known/oauth-protected-resource/mcp', {response: {status: 404}})
+        .modifyRoute(prmUrl, {response: {status: 404}})
         // Emulate the resource server serving AS metadata
         .get('https://example.com/.well-known/oauth-authorization-server', {
           issuer: DEFAULT_AUTHORIZATION_SERVER,
@@ -283,9 +287,9 @@ describe('oauthClient', () => {
       mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER);
 
       const client = oauthClient(f.fetchHandler, new MemoryOAuthDb(), true, false); // strict = false
-      
+
       await client.getAuthorizationServer('https://example.com/mcp');
-      const prmCall = f.callHistory.lastCall('https://example.com/.well-known/oauth-protected-resource/mcp');
+      const prmCall = f.callHistory.lastCall(prmUrl);
       expect(prmCall).toBeDefined();
       expect(prmCall?.response?.status).toBe(404);
       // Yes, example.com - again, this test is checking an old pattern where the resource server is
@@ -296,10 +300,12 @@ describe('oauthClient', () => {
 
     it('should throw if there is no way to find AS endpoints from resource server', async () => {
       const f = fetchMock.createInstance().get('https://example.com/mcp', 401);
+      // RFC 9728: PRM URL is at {resourceUrl}/.well-known/oauth-protected-resource
+      const prmUrl = 'https://example.com/mcp/.well-known/oauth-protected-resource';
       mockResourceServer(f, 'https://example.com', '/mcp')
         // Note: fetch-mock also supplies .removeRoute, but .modifyRoute has the nice property of
         // throwing if the route isn't already mocked, so we know we haven't screwed up the test
-        .modifyRoute('https://example.com/.well-known/oauth-protected-resource/mcp', {response: {status: 404}})
+        .modifyRoute(prmUrl, {response: {status: 404}})
 
       const client = oauthClient(f.fetchHandler);
       await expect(client.getAuthorizationServer('https://example.com/mcp')).rejects.toThrow('unexpected HTTP status code');

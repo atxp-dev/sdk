@@ -323,18 +323,16 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       expect(result).toEqual(mockAuthServer);
     });
 
-    it('should fall through when oauth4webapi succeeds', async () => {
+    it('should fall through when PRM returns 404', async () => {
       const resourceServerUrl = 'https://image.mcp.atxp.ai';
 
-      // Mock oauth4webapi succeeding with a 404 (triggering normal fallback path)
-      const mockResponse = { status: 404, json: async () => ({}) };
-      mockOAuth.resourceDiscoveryRequest.mockResolvedValue(mockResponse as any);
-
-      // Mock the normal OAuth AS fallback path
-      mockFetch.mockResolvedValueOnce({
-        status: 200,
-        json: async () => ({ issuer: 'https://auth.atxp.ai' })
-      });
+      // Mock PRM request returning 404 (triggering OAuth AS fallback)
+      mockFetch
+        .mockResolvedValueOnce({ status: 404, json: async () => ({}) }) // PRM fetch
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({ issuer: 'https://auth.atxp.ai' })
+        }); // OAuth AS fallback
 
       vi.spyOn(client, 'authorizationServerFromUrl').mockResolvedValue(mockAuthServer);
 
@@ -343,15 +341,12 @@ describe('OAuthResourceClient URL normalization and fallback', () => {
       expect(result).toEqual(mockAuthServer);
     });
 
-    it('should throw error when both oauth4webapi and direct fetch fail', async () => {
+    it('should throw error when fetch fails', async () => {
       const resourceServerUrl = 'https://image.mcp.atxp.ai';
 
-      const originalError = new Error('Request interrupted by user');
-      mockOAuth.resourceDiscoveryRequest.mockRejectedValue(originalError);
+      mockFetch.mockRejectedValue(new Error('Network error'));
 
-      mockFetch.mockRejectedValue(new Error('Direct fetch also failed'));
-
-      await expect(client.getAuthorizationServer(resourceServerUrl)).rejects.toThrow('Request interrupted by user');
+      await expect(client.getAuthorizationServer(resourceServerUrl)).rejects.toThrow('Network error');
     });
   });
 

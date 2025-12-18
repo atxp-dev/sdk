@@ -2,9 +2,11 @@ import { FetchMock } from 'fetch-mock';
 import { DEFAULT_AUTHORIZATION_SERVER } from '@atxp/common';
 
 export function mockResourceServer(mock: FetchMock, baseUrl: string = 'https://example.com', resourcePath: string = '/mcp', authServerUrl: string = DEFAULT_AUTHORIZATION_SERVER) {
+  // RFC 9728: PRM URL is at {resourceUrl}/.well-known/oauth-protected-resource
+  const prmUrl = `${baseUrl}${resourcePath}/.well-known/oauth-protected-resource`;
   mock.route({
-    name: `${baseUrl}/.well-known/oauth-protected-resource${resourcePath}`,
-    url: `${baseUrl}/.well-known/oauth-protected-resource${resourcePath}`,
+    name: prmUrl,
+    url: prmUrl,
     response: {
       body: {
         resource: baseUrl + resourcePath,
