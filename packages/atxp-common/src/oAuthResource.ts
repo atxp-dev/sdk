@@ -153,33 +153,18 @@ export class OAuthResourceClient {
   getAuthorizationServer = async (resourceServerUrl: string): Promise<oauth.AuthorizationServer> => {
     resourceServerUrl = this.normalizeResourceServerUrl(resourceServerUrl);
 
+    let prmResponse;
+    const resourceUrl = new URL(resourceServerUrl);
+    let fetchedUrl: string|undefined = undefined;
+
+    const fullPrmUrl = new URL(resourceServerUrl).toString() + '/.well-known/oauth-protected-resource';
+    fetchedUrl = fullPrmUrl;
+    prmResponse = await this.sideChannelFetch(fullPrmUrl);
+
+    let authServer: string | undefined = undefined;
     try {
-      const resourceUrl = new URL(resourceServerUrl);
-
-      let prmResponse;
-      try {
-        prmResponse = await oauth.resourceDiscoveryRequest(resourceUrl, {
-          [oauth.customFetch]: this.sideChannelFetch,
-          [oauth.allowInsecureRequests]: this.allowInsecureRequests
-        });
-      } catch (prmError) {
-        // We have seen oauth4webapi request failures due to requesting an incorrect URL
-        if ((prmError as Error)?.message?.includes('interrupted by user') ||
-            (prmError as Error)?.message?.includes('Load failed')) {
-          try {
-            const fullPrmUrl = `${resourceUrl.origin}/.well-known/oauth-protected-resource`;
-            prmResponse = await this.sideChannelFetch(fullPrmUrl);
-          } catch {
-            throw prmError; // throw original error if fallback fails
-          }
-        } else {
-          throw prmError;
-        }
-      }
-
       const fallbackToRsAs = !this.strict && prmResponse.status === 404;
 
-      let authServer: string | undefined = undefined;
       if (!fallbackToRsAs) {
         const resourceServer = await oauth.processResourceDiscoveryResponse(resourceUrl, prmResponse);
         authServer = resourceServer.authorization_servers?.[0];
@@ -190,6 +175,7 @@ export class OAuthResourceClient {
         // Trim off the path - OAuth metadata is also singular for a server and served from the root
         const rsUrl = new URL(resourceServerUrl);
         const rsAsUrl = rsUrl.origin + '/.well-known/oauth-authorization-server';
+        fetchedUrl = rsAsUrl;
         // Don't use oauth4webapi for this, because these servers might be specifiying an issuer that is not
         // themselves (in order to use a separate AS by just hosting the OAuth metadata on the MCP server)
         //   This is against the OAuth spec, but some servers do it anyway
@@ -203,15 +189,15 @@ export class OAuthResourceClient {
       if (!authServer) {
         throw new Error('No authorization_servers found in protected resource metadata');
       }
-
-      const authServerUrl = new URL(authServer);
-      const res = await this.authorizationServerFromUrl(authServerUrl);
-      return res;
     } catch (error) {
-      this.logger.warn(`Error fetching authorization server configuration: ${error}`);
+      this.logger.warn(`Error fetching authorization server url from PRM doc from ${fetchedUrl}: ${error}`);
       this.logger.warn((error as Error).stack || '');
       throw error;
     }
+
+    const authServerUrl = new URL(authServer);
+    const res = await this.authorizationServerFromUrl(authServerUrl);
+    return res;
   }
 
   authorizationServerFromUrl = async (authServerUrl: URL): Promise<oauth.AuthorizationServer> => {
@@ -230,7 +216,7 @@ export class OAuthResourceClient {
       const authorizationServer = await oauth.processDiscoveryResponse(authServerUrl, response);
       return authorizationServer;
     } catch (error: any) {
-      this.logger.warn(`Error fetching authorization server configuration: ${error}`);
+      this.logger.warn(`Error fetching authorization server url from ${authServerUrl.toString()}: ${error}`);
       throw error;
     }
   }

@@ -41,7 +41,7 @@
     "@atxp/common": "0.10.2",
     "@modelcontextprotocol/sdk": "^1.15.0",
     "bignumber.js": "^9.3.0",
-    "oauth4webapi": "^3.5.0"
+    "oauth4webapi": "^3.8.3"
   },
   "peerDependencies": {
     "content-type": "^1.0.5"
