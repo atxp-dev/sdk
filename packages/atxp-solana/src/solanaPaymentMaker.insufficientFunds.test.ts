@@ -14,10 +14,13 @@ vi.mock('@solana/web3.js', () => ({
       secretKey: new Uint8Array(64),
     })),
   },
-  Connection: vi.fn(() => ({
+  Connection: vi.fn(function(this: any) {
     // Mock connection methods if needed
-  })),
-  PublicKey: vi.fn((key) => ({ toString: () => key })),
+  }),
+  PublicKey: vi.fn(function(this: any, key: any) {
+    this.toString = () => key;
+    this.toBase58 = () => key;
+  }),
   ComputeBudgetProgram: {
     setComputeUnitLimit: vi.fn(),
     setComputeUnitPrice: vi.fn(),
