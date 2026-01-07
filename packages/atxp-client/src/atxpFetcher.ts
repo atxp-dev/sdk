@@ -18,7 +18,7 @@ import {
   Account,
   getErrorRecoveryHint
 } from '@atxp/common';
-import type { PaymentMaker, ProspectivePayment, ClientConfig, PaymentFailureContext } from './types.js';
+import type { PaymentMaker, ProspectivePayment, ClientConfig, PaymentFailureContext, ScopedSpendConfig } from './types.js';
 import { InsufficientFundsError, ATXPPaymentError } from './errors.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -46,7 +46,9 @@ export function atxpFetch(config: ClientConfig): FetchLike {
     onAuthorizeFailure: config.onAuthorizeFailure,
     onPayment: config.onPayment,
     onPaymentFailure: config.onPaymentFailure,
-    onPaymentAttemptFailed: config.onPaymentAttemptFailed
+    onPaymentAttemptFailed: config.onPaymentAttemptFailed,
+    atxpAccountsServer: config.atxpAccountsServer,
+    scopedSpendConfig: config.scopedSpendConfig
   });
   return fetcher.fetch;
 }
@@ -68,6 +70,8 @@ export class ATXPFetcher {
   protected onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
   protected strict: boolean;
   protected allowInsecureRequests: boolean;
+  protected atxpAccountsServer?: string;
+  protected scopedSpendConfig?: ScopedSpendConfig;
   constructor(config: {
     account: Account;
     db: OAuthDb;
@@ -84,6 +88,8 @@ export class ATXPFetcher {
     onPayment?: (args: { payment: ProspectivePayment, transactionHash: string, network: string }) => Promise<void>;
     onPaymentFailure?: (context: PaymentFailureContext) => Promise<void>;
     onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
+    atxpAccountsServer?: string;
+    scopedSpendConfig?: ScopedSpendConfig;
   }) {
     const {
       account,
@@ -100,7 +106,9 @@ export class ATXPFetcher {
       onAuthorizeFailure = async () => {},
       onPayment = async () => {},
       onPaymentFailure,
-      onPaymentAttemptFailed
+      onPaymentAttemptFailed,
+      atxpAccountsServer,
+      scopedSpendConfig
     } = config;
     // Use React Native safe fetch if in React Native environment
     this.safeFetchFn = getIsReactNative() ? createReactNativeSafeFetch(fetchFn) : fetchFn;
@@ -121,6 +129,8 @@ export class ATXPFetcher {
     this.onPayment = onPayment;
     this.onPaymentFailure = onPaymentFailure || this.defaultPaymentFailureHandler;
     this.onPaymentAttemptFailed = onPaymentAttemptFailed;
+    this.atxpAccountsServer = atxpAccountsServer;
+    this.scopedSpendConfig = scopedSpendConfig;
   }
 
   /**
@@ -417,25 +427,96 @@ export class ATXPFetcher {
     }
 
     const accountId = await this.account.getAccountId();
-    const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId});
+
+    // If scoped spend config is set and we have accounts server, use accounts /sign endpoint
+    // to get both JWT and scoped spend token
+    let authToken: string;
+    let scopedSpendToken: string | undefined;
+
+    if (this.scopedSpendConfig && this.atxpAccountsServer) {
+      this.logger.debug(`ATXP: using scoped spend token flow with limit ${this.scopedSpendConfig.spendLimit}`);
+
+      // First, resolve the destination account ID from auth server
+      const clientId = authorizationUrl.searchParams.get('client_id');
+      if (!clientId) {
+        throw new Error(`ATXP: client_id not found in authorization URL - cannot resolve destination for scoped spend token`);
+      }
+
+      // Call auth's resolve endpoint to get destination account ID
+      const resolveUrl = new URL(authorizationUrl.origin + '/authorize');
+      resolveUrl.searchParams.set('client_id', clientId);
+      resolveUrl.searchParams.set('resolve_only', 'true');
+
+      this.logger.debug(`ATXP: resolving destination account for client_id ${clientId}`);
+      const resolveResponse = await this.sideChannelFetch(resolveUrl.toString(), {
+        method: 'GET'
+      });
+
+      if (!resolveResponse.ok) {
+        const errorBody = await resolveResponse.text();
+        throw new Error(`ATXP: failed to resolve destination account for client_id ${clientId}: ${resolveResponse.status} ${errorBody}`);
+      }
+
+      const resolveData = await resolveResponse.json() as { destinationAccountId: string };
+      const destinationAccountId = resolveData.destinationAccountId;
+      this.logger.debug(`ATXP: resolved destination account ${destinationAccountId} for client_id ${clientId}`);
+
+      // Call accounts /sign endpoint to get JWT + scoped spend token
+      const signUrl = new URL('/sign', this.atxpAccountsServer);
+      const signBody = {
+        paymentRequestId: '',
+        codeChallenge: codeChallenge,
+        accountId: accountId,
+        destinationAccountId: destinationAccountId,
+        spendLimit: this.scopedSpendConfig.spendLimit
+      };
+
+      this.logger.debug(`ATXP: calling accounts /sign for JWT + scoped spend token`);
+      const signResponse = await this.sideChannelFetch(signUrl.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(signBody)
+      });
+
+      if (!signResponse.ok) {
+        const errorBody = await signResponse.text();
+        throw new Error(`ATXP: accounts /sign failed: ${signResponse.status} ${errorBody}`);
+      }
+
+      const signData = await signResponse.json() as { jwt: string; scopedSpendToken?: string };
+      authToken = signData.jwt;
+      scopedSpendToken = signData.scopedSpendToken;
+      this.logger.debug(`ATXP: got JWT${scopedSpendToken ? ' and scoped spend token' : ''} from accounts /sign`);
+    } else {
+      // Use original flow - generate JWT locally via paymentMaker
+      authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId});
+    }
+
+    // Build the authorization URL with optional scoped spend token
+    let finalAuthUrl = authorizationUrl.toString() + '&redirect=false';
+    if (scopedSpendToken) {
+      finalAuthUrl += '&scoped_spend_token=' + encodeURIComponent(scopedSpendToken);
+    }
 
     // Make a fetch call to the authorization URL with the payment ID
     // redirect=false is a hack
     // The OAuth spec calls for the authorization url to return with a redirect, but fetch
     // on mobile will automatically follow the redirect (it doesn't support the redirect=manual option)
-    // We want the redirect URL so we can extract the code from it, not the contents of the 
+    // We want the redirect URL so we can extract the code from it, not the contents of the
     // redirect URL (which might not even exist for agentic ATXP clients)
     //   So ATXP servers are set up to instead return a 200 with the redirect URL in the body
     // if we pass redirect=false.
     // TODO: Remove the redirect=false hack once we have a way to handle the redirect on mobile
-    const response = await this.sideChannelFetch(authorizationUrl.toString()+'&redirect=false', {
+    const response = await this.sideChannelFetch(finalAuthUrl, {
       method: 'GET',
       redirect: 'manual',
       headers: {
         'Authorization': `Bearer ${authToken}`
       }
     });
-    // Check if we got a redirect response (301, 302, etc.) in case the server follows 
+    // Check if we got a redirect response (301, 302, etc.) in case the server follows
     // the OAuth spec
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('Location');
