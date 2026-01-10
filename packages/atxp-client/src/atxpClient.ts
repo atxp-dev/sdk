@@ -9,7 +9,7 @@ import { DEFAULT_ATXP_ACCOUNTS_SERVER, ATXPAccount } from "@atxp/common";
 type RequiredClientConfigFields = 'mcpServer' | 'account';
 type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
 // BuildableClientConfigFields are excluded from DEFAULT_CLIENT_CONFIG - they're either truly optional or built at runtime
-type BuildableClientConfigFields = 'oAuthDb' | 'logger' | 'destinationMakers' | 'scopedSpendConfig';
+type BuildableClientConfigFields = 'oAuthDb' | 'logger' | 'destinationMakers';
 
 // Detect if we're in a browser environment and bind fetch appropriately
 const getFetch = (): typeof fetch => {
@@ -69,8 +69,8 @@ export function buildClientConfig(args: ClientArgs): ClientConfig {
     atxpAccountsServer: accountsServer,
     fetchFn
   });
-  
-  const built = { oAuthDb, logger, destinationMakers };
+
+  const built = { oAuthDb, logger, destinationMakers, atxpAccountsServer: accountsServer };
   return Object.freeze({ ...withDefaults, ...built });
 };
 

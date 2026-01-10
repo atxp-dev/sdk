@@ -18,7 +18,7 @@ import {
   Account,
   getErrorRecoveryHint
 } from '@atxp/common';
-import type { PaymentMaker, ProspectivePayment, ClientConfig, PaymentFailureContext, ScopedSpendConfig } from './types.js';
+import type { PaymentMaker, ProspectivePayment, ClientConfig, PaymentFailureContext } from './types.js';
 import { InsufficientFundsError, ATXPPaymentError } from './errors.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -48,7 +48,7 @@ export function atxpFetch(config: ClientConfig): FetchLike {
     onPaymentFailure: config.onPaymentFailure,
     onPaymentAttemptFailed: config.onPaymentAttemptFailed,
     atxpAccountsServer: config.atxpAccountsServer,
-    scopedSpendConfig: config.scopedSpendConfig
+    mcpServer: config.mcpServer
   });
   return fetcher.fetch;
 }
@@ -71,7 +71,7 @@ export class ATXPFetcher {
   protected strict: boolean;
   protected allowInsecureRequests: boolean;
   protected atxpAccountsServer?: string;
-  protected scopedSpendConfig?: ScopedSpendConfig;
+  protected mcpServer?: string;
   constructor(config: {
     account: Account;
     db: OAuthDb;
@@ -89,7 +89,7 @@ export class ATXPFetcher {
     onPaymentFailure?: (context: PaymentFailureContext) => Promise<void>;
     onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
     atxpAccountsServer?: string;
-    scopedSpendConfig?: ScopedSpendConfig;
+    mcpServer?: string;
   }) {
     const {
       account,
@@ -108,7 +108,7 @@ export class ATXPFetcher {
       onPaymentFailure,
       onPaymentAttemptFailed,
       atxpAccountsServer,
-      scopedSpendConfig
+      mcpServer
     } = config;
     // Use React Native safe fetch if in React Native environment
     this.safeFetchFn = getIsReactNative() ? createReactNativeSafeFetch(fetchFn) : fetchFn;
@@ -130,7 +130,7 @@ export class ATXPFetcher {
     this.onPaymentFailure = onPaymentFailure || this.defaultPaymentFailureHandler;
     this.onPaymentAttemptFailed = onPaymentAttemptFailed;
     this.atxpAccountsServer = atxpAccountsServer;
-    this.scopedSpendConfig = scopedSpendConfig;
+    this.mcpServer = mcpServer;
   }
 
   /**
@@ -410,11 +410,76 @@ export class ATXPFetcher {
     return this.allowedAuthorizationServers.includes(baseUrl);
   }
 
+  /**
+   * Gets the connection token from the account if available.
+   * Uses duck typing to check if the account has a token property (like ATXPAccount).
+   */
+  protected getAccountConnectionToken(): string | null {
+    // Check if account has a token property (duck typing for ATXPAccount)
+    const accountWithToken = this.account as { token?: string };
+    if (typeof accountWithToken.token === 'string' && accountWithToken.token.length > 0) {
+      return accountWithToken.token;
+    }
+    return null;
+  }
+
+  /**
+   * Creates a spend permission with the accounts service for the given resource URL.
+   * Returns the spend_permission_token to pass to auth.
+   */
+  protected createSpendPermission = async (resourceUrl: string): Promise<string | null> => {
+    if (!this.atxpAccountsServer) {
+      this.logger.debug(`ATXP: No accounts server configured, skipping spend permission creation`);
+      return null;
+    }
+
+    // Get connection token from account for authenticating to accounts service
+    const connectionToken = this.getAccountConnectionToken();
+    if (!connectionToken) {
+      this.logger.debug(`ATXP: No connection token available, skipping spend permission creation`);
+      return null;
+    }
+
+    try {
+      const spendPermissionUrl = `${this.atxpAccountsServer}/spend-permission`;
+      this.logger.debug(`ATXP: Creating spend permission at ${spendPermissionUrl} for resource ${resourceUrl}`);
+
+      const response = await this.sideChannelFetch(spendPermissionUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${connectionToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ resourceUrl })
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`ATXP: Failed to create spend permission: ${response.status} ${response.statusText}`);
+        return null;
+      }
+
+      const data = await response.json() as { spendPermissionToken?: string };
+      if (data.spendPermissionToken) {
+        this.logger.info(`ATXP: Created spend permission for resource ${resourceUrl}`);
+        return data.spendPermissionToken;
+      }
+
+      this.logger.warn(`ATXP: Spend permission response missing token`);
+      return null;
+    } catch (error) {
+      this.logger.warn(`ATXP: Error creating spend permission: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return null;
+    }
+  }
+
   protected makeAuthRequestWithPaymentMaker = async (authorizationUrl: URL, paymentMaker: PaymentMaker): Promise<string> => {
     const codeChallenge = authorizationUrl.searchParams.get('code_challenge');
     if (!codeChallenge) {
       throw new Error(`Code challenge not provided`);
     }
+
+    // Debug logging for spend permission configuration
+    this.logger.debug(`ATXP: makeAuthRequestWithPaymentMaker - mcpServer: ${this.mcpServer}, atxpAccountsServer: ${this.atxpAccountsServer}`);
 
     if (!paymentMaker) {
       const paymentMakerCount = this.account.paymentMakers.length;
@@ -429,76 +494,23 @@ export class ATXPFetcher {
 
     const accountId = await this.account.getAccountId();
 
-    // If scoped spend config is set and we have accounts server, use accounts /sign endpoint
-    // to get both JWT and scoped spend token
-    let authToken: string;
-    let scopedSpendToken: string | undefined;
+    // Generate JWT locally via paymentMaker
+    const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId});
 
-    if (this.scopedSpendConfig && this.atxpAccountsServer) {
-      this.logger.debug(`ATXP: using scoped spend token flow with limit ${this.scopedSpendConfig.spendLimit}`);
-
-      // First, resolve the destination account ID from auth server
-      const clientId = authorizationUrl.searchParams.get('client_id');
-      if (!clientId) {
-        throw new Error(`ATXP: client_id not found in authorization URL - cannot resolve destination for scoped spend token`);
-      }
-
-      // Call auth's resolve endpoint to get destination account ID
-      const resolveUrl = new URL(authorizationUrl.origin + '/authorize');
-      resolveUrl.searchParams.set('client_id', clientId);
-      resolveUrl.searchParams.set('resolve_only', 'true');
-
-      this.logger.debug(`ATXP: resolving destination account for client_id ${clientId}`);
-      const resolveResponse = await this.sideChannelFetch(resolveUrl.toString(), {
-        method: 'GET'
-      });
-
-      if (!resolveResponse.ok) {
-        const errorBody = await resolveResponse.text();
-        throw new Error(`ATXP: failed to resolve destination account for client_id ${clientId}: ${resolveResponse.status} ${errorBody}`);
-      }
-
-      const resolveData = await resolveResponse.json() as { destinationAccountId: string };
-      const destinationAccountId = resolveData.destinationAccountId;
-      this.logger.debug(`ATXP: resolved destination account ${destinationAccountId} for client_id ${clientId}`);
-
-      // Call accounts /sign endpoint to get JWT + scoped spend token
-      const signUrl = new URL('/sign', this.atxpAccountsServer);
-      const signBody = {
-        paymentRequestId: '',
-        codeChallenge: codeChallenge,
-        accountId: accountId,
-        destinationAccountId: destinationAccountId,
-        spendLimit: this.scopedSpendConfig.spendLimit
-      };
-
-      this.logger.debug(`ATXP: calling accounts /sign for JWT + scoped spend token`);
-      const signResponse = await this.sideChannelFetch(signUrl.toString(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(signBody)
-      });
-
-      if (!signResponse.ok) {
-        const errorBody = await signResponse.text();
-        throw new Error(`ATXP: accounts /sign failed: ${signResponse.status} ${errorBody}`);
-      }
-
-      const signData = await signResponse.json() as { jwt: string; scopedSpendToken?: string };
-      authToken = signData.jwt;
-      scopedSpendToken = signData.scopedSpendToken;
-      this.logger.debug(`ATXP: got JWT${scopedSpendToken ? ' and scoped spend token' : ''} from accounts /sign`);
-    } else {
-      // Use original flow - generate JWT locally via paymentMaker
-      authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId});
-    }
-
-    // Build the authorization URL with optional scoped spend token
+    // Build the authorization URL with resource parameter
+    // The resource parameter identifies the MCP server resource URL for spend permission scoping
     let finalAuthUrl = authorizationUrl.toString() + '&redirect=false';
-    if (scopedSpendToken) {
-      finalAuthUrl += '&scoped_spend_token=' + encodeURIComponent(scopedSpendToken);
+
+    // If we have a resource URL (MCP server), create a spend permission first
+    let spendPermissionToken: string | null = null;
+    if (this.mcpServer) {
+      finalAuthUrl += '&resource=' + encodeURIComponent(this.mcpServer);
+
+      // Create spend permission with accounts service using connection token
+      spendPermissionToken = await this.createSpendPermission(this.mcpServer);
+      if (spendPermissionToken) {
+        finalAuthUrl += '&spend_permission_token=' + encodeURIComponent(spendPermissionToken);
+      }
     }
 
     // Make a fetch call to the authorization URL with the payment ID
