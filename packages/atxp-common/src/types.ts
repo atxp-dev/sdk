@@ -85,6 +85,7 @@ export type PaymentRequest = {
   destinationAccountId: AccountId;
   resource: URL;
   payeeName: string | null;
+  iss?: string;
 }
 
 export type CustomJWTPayload = {
