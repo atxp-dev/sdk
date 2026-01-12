@@ -314,4 +314,88 @@ describe('atxpFetcher.fetch payment', () => {
     }
     expect(threw).toBe(true);
   });
+
+  it('should use iss field as memo when present in payment request', async () => {
+    const f = fetchMock.createInstance();
+    const errTxt = CTH.paymentRequiredMessage(DEFAULT_AUTHORIZATION_SERVER, 'foo');
+    const errMsg = CTH.mcpToolErrorResponse({content: [{type: 'text', text: errTxt}]});
+
+    mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER)
+      .postOnce('https://example.com/mcp', errMsg)
+      .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
+
+    // Mock payment request with both iss and payeeName
+    mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER, {});
+    f.getOnce(`${DEFAULT_AUTHORIZATION_SERVER}/payment-request/foo`, {
+      options: [{
+        amount: '0.01',
+        currency: 'USDC',
+        network: 'solana',
+        address: 'testDestination'
+      }],
+      sourceAccountId: 'solana:testSource',
+      destinationAccountId: 'solana:testDestination',
+      resource: new URL('https://example.com/resource'),
+      payeeName: 'Image',
+      iss: 'auth.atxp.ai'
+    });
+    f.putOnce(`${DEFAULT_AUTHORIZATION_SERVER}/payment-request/foo`, 200);
+
+    const paymentMaker = {
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId', chain: 'solana', currency: 'USDC' }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
+    };
+    const fetcher = atxpFetcher(f.fetchHandler, [paymentMaker]);
+    await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+
+    // Verify makePayment was called with iss as memo, not payeeName
+    expect(paymentMaker.makePayment).toHaveBeenCalledWith(
+      expect.anything(), // destinations
+      'auth.atxp.ai',    // memo should be iss value
+      'foo'              // paymentRequestId
+    );
+  });
+
+  it('should fall back to payeeName as memo when iss is not present in payment request', async () => {
+    const f = fetchMock.createInstance();
+    const errTxt = CTH.paymentRequiredMessage(DEFAULT_AUTHORIZATION_SERVER, 'bar');
+    const errMsg = CTH.mcpToolErrorResponse({content: [{type: 'text', text: errTxt}]});
+
+    mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER)
+      .postOnce('https://example.com/mcp', errMsg)
+      .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
+
+    // Mock payment request with only payeeName (no iss field)
+    mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER, {});
+    f.getOnce(`${DEFAULT_AUTHORIZATION_SERVER}/payment-request/bar`, {
+      options: [{
+        amount: '0.01',
+        currency: 'USDC',
+        network: 'solana',
+        address: 'testDestination'
+      }],
+      sourceAccountId: 'solana:testSource',
+      destinationAccountId: 'solana:testDestination',
+      resource: new URL('https://example.com/resource'),
+      payeeName: 'LegacyService'
+      // Note: no iss field
+    });
+    f.putOnce(`${DEFAULT_AUTHORIZATION_SERVER}/payment-request/bar`, 200);
+
+    const paymentMaker = {
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId', chain: 'solana', currency: 'USDC' }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
+    };
+    const fetcher = atxpFetcher(f.fetchHandler, [paymentMaker]);
+    await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+
+    // Verify makePayment was called with payeeName as memo (backward compatibility)
+    expect(paymentMaker.makePayment).toHaveBeenCalledWith(
+      expect.anything(),  // destinations
+      'LegacyService',    // memo should be payeeName when iss not present
+      'bar'               // paymentRequestId
+    );
+  });
 });
