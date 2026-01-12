@@ -228,7 +228,7 @@ export class ATXPFetcher {
       resourceName: paymentRequest.payeeName ?? '',
       currency: firstDest.currency,
       amount: firstDest.amount,
-      iss: paymentRequest.payeeName ?? '',
+      iss: paymentRequest.iss ?? paymentRequest.payeeName ?? '',
     };
 
     // Ask for approval once for all payment attempts
@@ -246,7 +246,8 @@ export class ATXPFetcher {
     for (const paymentMaker of this.account.paymentMakers) {
       try {
         // Pass all destinations to payment maker - it will filter and pick the one it can handle
-        const result = await paymentMaker.makePayment(mappedDestinations, paymentRequest.payeeName ?? '', paymentRequestId);
+        const memo = paymentRequest.iss ?? paymentRequest.payeeName ?? '';
+        const result = await paymentMaker.makePayment(mappedDestinations, memo, paymentRequestId);
 
         if (result === null) {
           this.logger.debug(`ATXP: payment maker cannot handle these destinations, trying next`);
