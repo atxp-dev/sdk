@@ -1,5 +1,5 @@
 import { PaymentServer, Charge } from "./types.js";
-import { AuthorizationServerUrl, FetchLike, Logger, OAuthDb } from "@atxp/common";
+import { AuthorizationServerUrl, FetchLike, Logger, OAuthDb, MemoryOAuthDb } from "@atxp/common";
 
 /**
  * Expected error response format from ATXP payment server
@@ -29,11 +29,15 @@ interface PaymentServerErrorResponse {
  * ```
  */
 export class ATXPPaymentServer implements PaymentServer {
+  private readonly oAuthDb: OAuthDb;
+
   constructor(
     private readonly server: AuthorizationServerUrl,
     private readonly logger: Logger,
     private readonly fetchFn: FetchLike = fetch.bind(globalThis),
-    private readonly oAuthDb?: OAuthDb) {
+    oAuthDb?: OAuthDb) {
+    // Default to MemoryOAuthDb if not provided
+    this.oAuthDb = oAuthDb ?? new MemoryOAuthDb();
   }
 
   charge = async(chargeRequest: Charge): Promise<boolean> => {
@@ -131,20 +135,18 @@ export class ATXPPaymentServer implements PaymentServer {
       'Content-Type': 'application/json'
     };
 
-    // Add Basic auth header with client credentials if available
+    // Add Basic auth header with client credentials
     // This authenticates the MCP server to enable resource_url validation
-    if (this.oAuthDb) {
-      try {
-        const credentials = await this.oAuthDb.getClientCredentials(this.server);
-        if (credentials?.clientId && credentials?.clientSecret) {
-          const credentialString = `${credentials.clientId}:${credentials.clientSecret}`;
-          const base64Credentials = Buffer.from(credentialString).toString('base64');
-          headers['Authorization'] = `Basic ${base64Credentials}`;
-        }
-      } catch (error) {
-        this.logger.warn('Failed to get client credentials for /charge authentication', error);
-      }
+    const credentials = await this.oAuthDb.getClientCredentials(this.server);
+    if (!credentials?.clientId || !credentials?.clientSecret) {
+      throw new Error(
+        `Missing client credentials for authorization server ${this.server}. ` +
+        `Ensure the MCP server has been registered and credentials are stored in the OAuthDb.`
+      );
     }
+    const credentialString = `${credentials.clientId}:${credentials.clientSecret}`;
+    const base64Credentials = Buffer.from(credentialString).toString('base64');
+    headers['Authorization'] = `Basic ${base64Credentials}`;
 
     const response = await this.fetchFn(url, {
       method,

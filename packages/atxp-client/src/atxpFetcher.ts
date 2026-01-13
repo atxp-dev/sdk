@@ -46,9 +46,7 @@ export function atxpFetch(config: ClientConfig): FetchLike {
     onAuthorizeFailure: config.onAuthorizeFailure,
     onPayment: config.onPayment,
     onPaymentFailure: config.onPaymentFailure,
-    onPaymentAttemptFailed: config.onPaymentAttemptFailed,
-    atxpAccountsServer: config.atxpAccountsServer,
-    mcpServer: config.mcpServer
+    onPaymentAttemptFailed: config.onPaymentAttemptFailed
   });
   return fetcher.fetch;
 }
@@ -70,8 +68,6 @@ export class ATXPFetcher {
   protected onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
   protected strict: boolean;
   protected allowInsecureRequests: boolean;
-  protected atxpAccountsServer?: string;
-  protected mcpServer?: string;
   constructor(config: {
     account: Account;
     db: OAuthDb;
@@ -88,8 +84,6 @@ export class ATXPFetcher {
     onPayment?: (args: { payment: ProspectivePayment, transactionHash: string, network: string }) => Promise<void>;
     onPaymentFailure?: (context: PaymentFailureContext) => Promise<void>;
     onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
-    atxpAccountsServer?: string;
-    mcpServer?: string;
   }) {
     const {
       account,
@@ -106,9 +100,7 @@ export class ATXPFetcher {
       onAuthorizeFailure = async () => {},
       onPayment = async () => {},
       onPaymentFailure,
-      onPaymentAttemptFailed,
-      atxpAccountsServer,
-      mcpServer
+      onPaymentAttemptFailed
     } = config;
     // Use React Native safe fetch if in React Native environment
     this.safeFetchFn = getIsReactNative() ? createReactNativeSafeFetch(fetchFn) : fetchFn;
@@ -129,8 +121,6 @@ export class ATXPFetcher {
     this.onPayment = onPayment;
     this.onPaymentFailure = onPaymentFailure || this.defaultPaymentFailureHandler;
     this.onPaymentAttemptFailed = onPaymentAttemptFailed;
-    this.atxpAccountsServer = atxpAccountsServer;
-    this.mcpServer = mcpServer;
   }
 
   /**
@@ -424,12 +414,28 @@ export class ATXPFetcher {
   }
 
   /**
+   * Gets the origin URL from the account if available.
+   * Uses duck typing to check if the account has an origin property (like ATXPAccount).
+   * This is the accounts service URL derived from the connection string.
+   */
+  protected getAccountOrigin(): string | null {
+    // Check if account has an origin property (duck typing for ATXPAccount)
+    const accountWithOrigin = this.account as { origin?: string };
+    if (typeof accountWithOrigin.origin === 'string' && accountWithOrigin.origin.length > 0) {
+      return accountWithOrigin.origin;
+    }
+    return null;
+  }
+
+  /**
    * Creates a spend permission with the accounts service for the given resource URL.
    * Returns the spend_permission_token to pass to auth.
    */
   protected createSpendPermission = async (resourceUrl: string): Promise<string | null> => {
-    if (!this.atxpAccountsServer) {
-      this.logger.debug(`ATXP: No accounts server configured, skipping spend permission creation`);
+    // Get accounts server URL from account's origin (derived from connection string)
+    const accountsServer = this.getAccountOrigin();
+    if (!accountsServer) {
+      this.logger.debug(`ATXP: No accounts server available from account, skipping spend permission creation`);
       return null;
     }
 
@@ -441,7 +447,7 @@ export class ATXPFetcher {
     }
 
     try {
-      const spendPermissionUrl = `${this.atxpAccountsServer}/spend-permission`;
+      const spendPermissionUrl = `${accountsServer}/spend-permission`;
       this.logger.debug(`ATXP: Creating spend permission at ${spendPermissionUrl} for resource ${resourceUrl}`);
 
       const response = await this.sideChannelFetch(spendPermissionUrl, {
@@ -472,14 +478,11 @@ export class ATXPFetcher {
     }
   }
 
-  protected makeAuthRequestWithPaymentMaker = async (authorizationUrl: URL, paymentMaker: PaymentMaker): Promise<string> => {
+  protected makeAuthRequestWithPaymentMaker = async (authorizationUrl: URL, paymentMaker: PaymentMaker, resourceUrl?: string): Promise<string> => {
     const codeChallenge = authorizationUrl.searchParams.get('code_challenge');
     if (!codeChallenge) {
       throw new Error(`Code challenge not provided`);
     }
-
-    // Debug logging for spend permission configuration
-    this.logger.debug(`ATXP: makeAuthRequestWithPaymentMaker - mcpServer: ${this.mcpServer}, atxpAccountsServer: ${this.atxpAccountsServer}`);
 
     if (!paymentMaker) {
       const paymentMakerCount = this.account.paymentMakers.length;
@@ -498,16 +501,16 @@ export class ATXPFetcher {
     const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId});
 
     // Build the authorization URL with resource parameter
-    // The resource parameter identifies the MCP server resource URL for spend permission scoping
+    // The resource parameter identifies the resource server URL for spend permission scoping
     let finalAuthUrl = authorizationUrl.toString() + '&redirect=false';
 
-    // If we have a resource URL (MCP server), create a spend permission first
+    // If we have a resource URL, create a spend permission first
     let spendPermissionToken: string | null = null;
-    if (this.mcpServer) {
-      finalAuthUrl += '&resource=' + encodeURIComponent(this.mcpServer);
+    if (resourceUrl) {
+      finalAuthUrl += '&resource=' + encodeURIComponent(resourceUrl);
 
       // Create spend permission with accounts service using connection token
-      spendPermissionToken = await this.createSpendPermission(this.mcpServer);
+      spendPermissionToken = await this.createSpendPermission(resourceUrl);
       if (spendPermissionToken) {
         finalAuthUrl += '&spend_permission_token=' + encodeURIComponent(spendPermissionToken);
       }
@@ -578,7 +581,8 @@ export class ATXPFetcher {
       }
 
       try {
-        const redirectUrl = await this.makeAuthRequestWithPaymentMaker(authorizationUrl, paymentMaker);
+        // Pass the resource server URL for spend permission scoping
+        const redirectUrl = await this.makeAuthRequestWithPaymentMaker(authorizationUrl, paymentMaker, error.resourceServerUrl);
         // Handle the OAuth callback
         const oauthClient = await this.getOAuthClient();
         await oauthClient.handleCallback(redirectUrl);
