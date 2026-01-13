@@ -46,7 +46,8 @@ export function buildServerConfig(args: ATXPArgs): ATXPConfig {
     atxpConnectionToken
   });
   const logger = withDefaults.logger ?? new ConsoleLogger();
-  const paymentServer = withDefaults.paymentServer ?? new ATXPPaymentServer(withDefaults.server, logger)
+  // Pass oAuthDb to PaymentServer so it can authenticate /charge requests with client credentials
+  const paymentServer = withDefaults.paymentServer ?? new ATXPPaymentServer(withDefaults.server, logger, fetch.bind(globalThis), oAuthDb)
 
   const built = { oAuthDb, oAuthClient, paymentServer, logger};
   return Object.freeze({ ...withDefaults, ...built });
