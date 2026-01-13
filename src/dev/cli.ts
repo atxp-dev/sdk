@@ -39,15 +39,12 @@ async function main() {
   
   try {
     const account = new ATXPAccount(process.env.ATXP_CONNECTION_STRING!);
-    // Use local accounts server for development if MCP server is localhost
-    const isLocalDev = url.includes('localhost');
     const mcpClient = await atxpClient({
       mcpServer: url,
       account,
       allowedAuthorizationServers: ['http://localhost:3010', 'https://auth.atxp.ai', 'https://atpx-auth-staging.onrender.com'],
       allowHttp: true,
-      logger: new ConsoleLogger({level: LogLevel.DEBUG}),
-      ...(isLocalDev && { atxpAccountsServer: 'http://localhost:8016' })
+      logger: new ConsoleLogger({level: LogLevel.DEBUG})
     });
     const res = await mcpClient.callTool({
       name: toolName,
