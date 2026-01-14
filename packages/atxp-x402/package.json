@@ -1,6 +1,6 @@
 {
   "name": "@atxp/x402",
-  "version": "0.10.4",
+  "version": "0.10.5",
   "description": "ATXP X402 - X402 protocol integration for ATXP SDK",
   "license": "MIT",
   "repository": {
@@ -33,9 +33,9 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/base": "0.10.4",
-    "@atxp/client": "0.10.4",
-    "@atxp/common": "0.10.4",
+    "@atxp/base": "0.10.5",
+    "@atxp/client": "0.10.5",
+    "@atxp/common": "0.10.5",
     "bignumber.js": "^9.1.2",
     "viem": "^2.21.54",
     "x402": "^1.1.0"
