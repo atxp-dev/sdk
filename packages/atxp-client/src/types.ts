@@ -37,7 +37,9 @@ export interface PaymentFailureContext {
 }
 
 export type ClientConfig = {
+  mcpServer: string;
   account: Account;
+  atxpAccountsServer: string;
   destinationMakers: Map<Network, DestinationMaker>;
   allowedAuthorizationServers: AuthorizationServerUrl[];
   approvePayment: (payment: ProspectivePayment) => Promise<boolean>;
@@ -57,12 +59,10 @@ export type ClientConfig = {
 }
 
 // ClientArgs for creating clients - required fields plus optional overrides
-// mcpServer is required for atxpClient to know which MCP server to connect to
-// but it's not part of ClientConfig since the fetcher derives resource URLs from OAuth errors
-type RequiredClientConfigFields = 'account';
+type RequiredClientConfigFields = 'mcpServer' | 'account';
 type RequiredClientConfig = Pick<ClientConfig, RequiredClientConfigFields>;
 type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
-export type ClientArgs = RequiredClientConfig & Partial<OptionalClientConfig> & { mcpServer: string };
+export type ClientArgs = RequiredClientConfig & Partial<OptionalClientConfig>;
 
 // Type for a fetch wrapper function that takes ClientArgs and returns wrapped fetch
 export type FetchWrapper = (config: ClientArgs) => FetchLike;

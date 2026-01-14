@@ -400,85 +400,7 @@ export class ATXPFetcher {
     return this.allowedAuthorizationServers.includes(baseUrl);
   }
 
-  /**
-   * Gets the connection token from the account if available.
-   * Uses duck typing to check if the account has a token property (like ATXPAccount).
-   */
-  protected getAccountConnectionToken(): string | null {
-    // Check if account has a token property (duck typing for ATXPAccount)
-    const accountWithToken = this.account as { token?: string };
-    if (typeof accountWithToken.token === 'string' && accountWithToken.token.length > 0) {
-      return accountWithToken.token;
-    }
-    return null;
-  }
-
-  /**
-   * Gets the origin URL from the account if available.
-   * Uses duck typing to check if the account has an origin property (like ATXPAccount).
-   * This is the accounts service URL derived from the connection string.
-   */
-  protected getAccountOrigin(): string | null {
-    // Check if account has an origin property (duck typing for ATXPAccount)
-    const accountWithOrigin = this.account as { origin?: string };
-    if (typeof accountWithOrigin.origin === 'string' && accountWithOrigin.origin.length > 0) {
-      return accountWithOrigin.origin;
-    }
-    return null;
-  }
-
-  /**
-   * Creates a spend permission with the accounts service for the given resource URL.
-   * Returns the spend_permission_token to pass to auth.
-   */
-  protected createSpendPermission = async (resourceUrl: string): Promise<string | null> => {
-    // Get accounts server URL from account's origin (derived from connection string)
-    const accountsServer = this.getAccountOrigin();
-    if (!accountsServer) {
-      this.logger.debug(`ATXP: No accounts server available from account, skipping spend permission creation`);
-      return null;
-    }
-
-    // Get connection token from account for authenticating to accounts service
-    const connectionToken = this.getAccountConnectionToken();
-    if (!connectionToken) {
-      this.logger.debug(`ATXP: No connection token available, skipping spend permission creation`);
-      return null;
-    }
-
-    try {
-      const spendPermissionUrl = `${accountsServer}/spend-permission`;
-      this.logger.debug(`ATXP: Creating spend permission at ${spendPermissionUrl} for resource ${resourceUrl}`);
-
-      const response = await this.sideChannelFetch(spendPermissionUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${connectionToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ resourceUrl })
-      });
-
-      if (!response.ok) {
-        this.logger.warn(`ATXP: Failed to create spend permission: ${response.status} ${response.statusText}`);
-        return null;
-      }
-
-      const data = await response.json() as { spendPermissionToken?: string };
-      if (data.spendPermissionToken) {
-        this.logger.info(`ATXP: Created spend permission for resource ${resourceUrl}`);
-        return data.spendPermissionToken;
-      }
-
-      this.logger.warn(`ATXP: Spend permission response missing token`);
-      return null;
-    } catch (error) {
-      this.logger.warn(`ATXP: Error creating spend permission: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      return null;
-    }
-  }
-
-  protected makeAuthRequestWithPaymentMaker = async (authorizationUrl: URL, paymentMaker: PaymentMaker, resourceUrl?: string): Promise<string> => {
+  protected makeAuthRequestWithPaymentMaker = async (authorizationUrl: URL, paymentMaker: PaymentMaker): Promise<string> => {
     const codeChallenge = authorizationUrl.searchParams.get('code_challenge');
     if (!codeChallenge) {
       throw new Error(`Code challenge not provided`);
@@ -496,43 +418,25 @@ export class ATXPFetcher {
     }
 
     const accountId = await this.account.getAccountId();
-
-    // Generate JWT locally via paymentMaker
     const authToken = await paymentMaker.generateJWT({paymentRequestId: '', codeChallenge: codeChallenge, accountId});
-
-    // Build the authorization URL with resource parameter
-    // The resource parameter identifies the resource server URL for spend permission scoping
-    let finalAuthUrl = authorizationUrl.toString() + '&redirect=false';
-
-    // If we have a resource URL, create a spend permission first
-    let spendPermissionToken: string | null = null;
-    if (resourceUrl) {
-      finalAuthUrl += '&resource=' + encodeURIComponent(resourceUrl);
-
-      // Create spend permission with accounts service using connection token
-      spendPermissionToken = await this.createSpendPermission(resourceUrl);
-      if (spendPermissionToken) {
-        finalAuthUrl += '&spend_permission_token=' + encodeURIComponent(spendPermissionToken);
-      }
-    }
 
     // Make a fetch call to the authorization URL with the payment ID
     // redirect=false is a hack
     // The OAuth spec calls for the authorization url to return with a redirect, but fetch
     // on mobile will automatically follow the redirect (it doesn't support the redirect=manual option)
-    // We want the redirect URL so we can extract the code from it, not the contents of the
+    // We want the redirect URL so we can extract the code from it, not the contents of the 
     // redirect URL (which might not even exist for agentic ATXP clients)
     //   So ATXP servers are set up to instead return a 200 with the redirect URL in the body
     // if we pass redirect=false.
     // TODO: Remove the redirect=false hack once we have a way to handle the redirect on mobile
-    const response = await this.sideChannelFetch(finalAuthUrl, {
+    const response = await this.sideChannelFetch(authorizationUrl.toString()+'&redirect=false', {
       method: 'GET',
       redirect: 'manual',
       headers: {
         'Authorization': `Bearer ${authToken}`
       }
     });
-    // Check if we got a redirect response (301, 302, etc.) in case the server follows
+    // Check if we got a redirect response (301, 302, etc.) in case the server follows 
     // the OAuth spec
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('Location');
@@ -581,8 +485,7 @@ export class ATXPFetcher {
       }
 
       try {
-        // Pass the resource server URL for spend permission scoping
-        const redirectUrl = await this.makeAuthRequestWithPaymentMaker(authorizationUrl, paymentMaker, error.resourceServerUrl);
+        const redirectUrl = await this.makeAuthRequestWithPaymentMaker(authorizationUrl, paymentMaker);
         // Handle the OAuth callback
         const oauthClient = await this.getOAuthClient();
         await oauthClient.handleCallback(redirectUrl);

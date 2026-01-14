@@ -6,9 +6,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { createDestinationMakers } from './destinationMakers/index.js';
 import { DEFAULT_ATXP_ACCOUNTS_SERVER, ATXPAccount } from "@atxp/common";
 
-type RequiredClientConfigFields = 'account';
+type RequiredClientConfigFields = 'mcpServer' | 'account';
 type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
-// BuildableClientConfigFields are excluded from DEFAULT_CLIENT_CONFIG - they're either truly optional or built at runtime
 type BuildableClientConfigFields = 'oAuthDb' | 'logger' | 'destinationMakers';
 
 // Detect if we're in a browser environment and bind fetch appropriately
@@ -23,6 +22,7 @@ const getFetch = (): typeof fetch => {
 
 export const DEFAULT_CLIENT_CONFIG: Required<Omit<OptionalClientConfig, BuildableClientConfigFields>> = {
   allowedAuthorizationServers: [DEFAULT_AUTHORIZATION_SERVER],
+  atxpAccountsServer: DEFAULT_ATXP_ACCOUNTS_SERVER,
   approvePayment: async (_p) => true,
   fetchFn: getFetch(),
   oAuthChannelFetch: getFetch(),
@@ -57,16 +57,18 @@ export function buildClientConfig(args: ClientArgs): ClientConfig {
   const fetchFn = withDefaults.fetchFn;
   
   // Build destination makers if not provided
-  // Derive accounts server from account's origin if available
-  let accountsServer = DEFAULT_ATXP_ACCOUNTS_SERVER;
-  if (withDefaults.account && withDefaults.account instanceof ATXPAccount) {
+  let accountsServer = withDefaults.atxpAccountsServer;
+  // QoL hack for unspecified accounts server - if the caller is passing an atxpAccount, then assume the origin for that
+  // is what we should use for the accounts server. In practice, the only option is accounts.atxp.ai,
+  // but this supports staging environment
+  if (args.atxpAccountsServer === undefined && withDefaults.account && withDefaults.account instanceof ATXPAccount) {
     accountsServer = withDefaults.account.origin;
   }
   const destinationMakers = withDefaults.destinationMakers ?? createDestinationMakers({
     atxpAccountsServer: accountsServer,
     fetchFn
   });
-
+  
   const built = { oAuthDb, logger, destinationMakers };
   return Object.freeze({ ...withDefaults, ...built });
 };
@@ -83,8 +85,7 @@ export function buildStreamableTransport(args: ClientArgs): StreamableHTTPClient
 
 export async function atxpClient(args: ClientArgs): Promise<Client> {
   const config = buildClientConfig(args);
-  // Pass args (not config) to buildStreamableTransport since it needs mcpServer
-  const transport = buildStreamableTransport(args);
+  const transport = buildStreamableTransport(config);
 
   const client = new Client(config.clientInfo, config.clientOptions);
   await client.connect(transport);
