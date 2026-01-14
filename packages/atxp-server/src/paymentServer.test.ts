@@ -102,6 +102,29 @@ describe('ATXPPaymentServer', () => {
     expect(parsedBody.options).toBeDefined();
   });
 
+  it('should handle charge endpoint returning 202 status (async payment accepted)', async () => {
+    const mock = fetchMock.createInstance();
+    mock.post('https://auth.atxp.ai/charge', {
+      status: 202,
+      body: {
+        success: true,
+        pending: true,
+        paymentRequestId: 'async-payment-123'
+      }
+    });
+
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
+
+    const result = await server.charge(TH.charge({
+      sourceAccountId: 'solana:test-source',
+      destinationAccountId: 'solana:test-destination'
+    }));
+
+    // Verify the result indicates payment accepted (returns true)
+    expect(result).toBe(true);
+  });
+
   it('should handle charge endpoint returning 402 status (payment required)', async () => {
     const mock = fetchMock.createInstance();
     mock.post('https://auth.atxp.ai/charge', {
