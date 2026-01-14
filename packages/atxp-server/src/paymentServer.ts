@@ -42,7 +42,8 @@ export class ATXPPaymentServer implements PaymentServer {
 
   charge = async(chargeRequest: Charge): Promise<boolean> => {
     const chargeResponse = await this.makeRequest('POST', '/charge', chargeRequest);
-    if (chargeResponse.status === 200) {
+    // 200 = synchronous success, 202 = accepted (async payment in progress)
+    if (chargeResponse.status === 200 || chargeResponse.status === 202) {
       return true;
     } else if (chargeResponse.status === 402) {
       return false;
