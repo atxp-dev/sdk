@@ -400,6 +400,13 @@ export class ATXPFetcher {
     return this.allowedAuthorizationServers.includes(baseUrl);
   }
 
+  /**
+   * Type guard to check if account has createSpendPermission method (ATXPAccount-specific)
+   */
+  protected hasCreateSpendPermission = (account: Account): account is Account & { createSpendPermission: (resourceUrl: string) => Promise<string> } => {
+    return typeof (account as { createSpendPermission?: unknown }).createSpendPermission === 'function';
+  }
+
   protected makeAuthRequestWithPaymentMaker = async (authorizationUrl: URL, paymentMaker: PaymentMaker): Promise<string> => {
     const codeChallenge = authorizationUrl.searchParams.get('code_challenge');
     if (!codeChallenge) {
@@ -475,9 +482,25 @@ export class ATXPFetcher {
       // We can do the full OAuth flow - we'll generate a signed JWT and call /authorize on the
       // AS to get a code, then exchange the code for an access token
       const oauthClient = await this.getOAuthClient();
+
+      // For ATXP accounts, create a spend permission before authorization
+      // This is an ATXP-specific feature that allows pre-authorizing spending for MCP servers
+      let spendPermissionToken: string | undefined;
+      if (this.hasCreateSpendPermission(this.account)) {
+        try {
+          this.logger.info(`Creating spend permission for resource ${error.resourceServerUrl}`);
+          spendPermissionToken = await this.account.createSpendPermission(error.resourceServerUrl);
+          this.logger.debug(`Created spend permission token: ${spendPermissionToken.substring(0, 8)}...`);
+        } catch (spendPermissionError) {
+          // Log but don't fail - authorization can still proceed without spend permission
+          this.logger.warn(`Failed to create spend permission: ${(spendPermissionError as Error).message}`);
+        }
+      }
+
       const authorizationUrl = await oauthClient.makeAuthorizationUrl(
         error.url,
-        error.resourceServerUrl
+        error.resourceServerUrl,
+        { spendPermissionToken }
       );
 
       if (!this.isAllowedAuthServer(authorizationUrl)) {

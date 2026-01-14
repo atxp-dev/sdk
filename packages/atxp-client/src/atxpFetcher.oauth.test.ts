@@ -208,4 +208,158 @@ describe('atxpFetcher.fetch oauth', () => {
     const fetcher = atxpFetcher(f.fetchHandler, [brokenPaymentMaker]);
     await expect(fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })).rejects.toThrow('Payment maker is missing generateJWT method');
   });
+
+  it('should call createSpendPermission and include token in auth URL for ATXP accounts', async () => {
+    const f = fetchMock.createInstance();
+    mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER)
+      .postOnce('https://example.com/mcp', 401)
+      .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
+    mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
+      .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
+        const state = new URL(req.args[0] as string).searchParams.get('state');
+        return {
+          status: 301,
+          headers: {location: `https://atxp.ai?state=${state}&code=testCode`}
+        };
+      });
+
+    const paymentMaker = {
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId', chain: 'solana' }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
+    };
+
+    // Mock an ATXP-style account with createSpendPermission method
+    const createSpendPermission = vi.fn().mockResolvedValue('spt_test123');
+    const atxpAccount: Account & { createSpendPermission: typeof createSpendPermission } = {
+      getAccountId: async () => "bdj" as any,
+      paymentMakers: [paymentMaker],
+      getSources: async () => [{
+        address: 'SolAddress123',
+        chain: 'solana' as any,
+        walletType: 'eoa' as any
+      }],
+      createSpendPermission
+    };
+
+    const fetcher = new ATXPFetcher({
+      account: atxpAccount,
+      db: new MemoryOAuthDb(),
+      destinationMakers: new Map(),
+      fetchFn: f.fetchHandler
+    });
+
+    await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+
+    // Verify createSpendPermission was called with the resource URL
+    expect(createSpendPermission).toHaveBeenCalledWith('https://example.com/mcp');
+
+    // Verify the authorization URL includes the spend_permission_token
+    const authCall = f.callHistory.lastCall(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`);
+    expect(authCall).toBeDefined();
+    const authUrl = new URL(authCall!.args[0] as string);
+    expect(authUrl.searchParams.get('spend_permission_token')).toBe('spt_test123');
+    // Also verify resource is set
+    expect(authUrl.searchParams.get('resource')).toBe('https://example.com/mcp');
+  });
+
+  it('should continue auth flow if createSpendPermission fails', async () => {
+    const f = fetchMock.createInstance();
+    mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER)
+      .postOnce('https://example.com/mcp', 401)
+      .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
+    mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
+      .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
+        const state = new URL(req.args[0] as string).searchParams.get('state');
+        return {
+          status: 301,
+          headers: {location: `https://atxp.ai?state=${state}&code=testCode`}
+        };
+      });
+
+    const paymentMaker = {
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId', chain: 'solana' }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
+    };
+
+    // Mock an account where createSpendPermission fails
+    const createSpendPermission = vi.fn().mockRejectedValue(new Error('Network error'));
+    const atxpAccount: Account & { createSpendPermission: typeof createSpendPermission } = {
+      getAccountId: async () => "bdj" as any,
+      paymentMakers: [paymentMaker],
+      getSources: async () => [{
+        address: 'SolAddress123',
+        chain: 'solana' as any,
+        walletType: 'eoa' as any
+      }],
+      createSpendPermission
+    };
+
+    const fetcher = new ATXPFetcher({
+      account: atxpAccount,
+      db: new MemoryOAuthDb(),
+      destinationMakers: new Map(),
+      fetchFn: f.fetchHandler
+    });
+
+    // Should not throw - auth flow should continue without spend permission
+    const response = await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    expect(response.ok).toBe(true);
+
+    // Verify createSpendPermission was called
+    expect(createSpendPermission).toHaveBeenCalled();
+
+    // Verify the authorization URL does NOT include spend_permission_token (since it failed)
+    const authCall = f.callHistory.lastCall(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`);
+    const authUrl = new URL(authCall!.args[0] as string);
+    expect(authUrl.searchParams.get('spend_permission_token')).toBeNull();
+  });
+
+  it('should not call createSpendPermission for regular accounts without the method', async () => {
+    const f = fetchMock.createInstance();
+    mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER)
+      .postOnce('https://example.com/mcp', 401)
+      .postOnce('https://example.com/mcp', {content: [{type: 'text', text: 'hello world'}]});
+    mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
+      .get(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`, (req) => {
+        const state = new URL(req.args[0] as string).searchParams.get('state');
+        return {
+          status: 301,
+          headers: {location: `https://atxp.ai?state=${state}&code=testCode`}
+        };
+      });
+
+    const paymentMaker = {
+      makePayment: vi.fn().mockResolvedValue({ transactionId: 'testPaymentId', chain: 'solana' }),
+      generateJWT: vi.fn().mockResolvedValue('testJWT'),
+      getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
+    };
+
+    // Regular account without createSpendPermission
+    const regularAccount: Account = {
+      getAccountId: async () => "bdj" as any,
+      paymentMakers: [paymentMaker],
+      getSources: async () => [{
+        address: 'SolAddress123',
+        chain: 'solana' as any,
+        walletType: 'eoa' as any
+      }]
+    };
+
+    const fetcher = new ATXPFetcher({
+      account: regularAccount,
+      db: new MemoryOAuthDb(),
+      destinationMakers: new Map(),
+      fetchFn: f.fetchHandler
+    });
+
+    const response = await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    expect(response.ok).toBe(true);
+
+    // Verify the authorization URL does NOT include spend_permission_token
+    const authCall = f.callHistory.lastCall(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`);
+    const authUrl = new URL(authCall!.args[0] as string);
+    expect(authUrl.searchParams.get('spend_permission_token')).toBeNull();
+  });
 });
