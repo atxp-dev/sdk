@@ -255,4 +255,35 @@ export class ATXPAccount implements Account {
 
     return json;
   }
+
+  /**
+   * Create a spend permission for the given resource URL.
+   * This is an ATXP-specific feature that allows pre-authorizing spending
+   * for a specific MCP server during OAuth authorization.
+   *
+   * @param resourceUrl - The MCP server URL to create a spend permission for
+   * @returns The spend permission token to pass to the authorization URL
+   */
+  async createSpendPermission(resourceUrl: string): Promise<string> {
+    const response = await this.fetchFn(`${this.origin}/spend-permission`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ resourceUrl }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`ATXPAccount: /spend-permission failed: ${response.status} ${response.statusText} ${text}`);
+    }
+
+    const json = await response.json() as { spendPermissionToken?: string };
+    if (!json?.spendPermissionToken) {
+      throw new Error('ATXPAccount: /spend-permission did not return spendPermissionToken');
+    }
+
+    return json.spendPermissionToken;
+  }
 }

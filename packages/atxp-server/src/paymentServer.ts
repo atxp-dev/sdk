@@ -1,5 +1,5 @@
 import { PaymentServer, Charge } from "./types.js";
-import { AuthorizationServerUrl, FetchLike, Logger } from "@atxp/common";
+import { AuthorizationServerUrl, FetchLike, Logger, OAuthDb, MemoryOAuthDb } from "@atxp/common";
 
 /**
  * Expected error response format from ATXP payment server
@@ -15,22 +15,29 @@ interface PaymentServerErrorResponse {
 
 /**
  * ATXP Payment Server implementation
- * 
+ *
  * This class handles payment operations with the ATXP authorization server.
- * 
+ *
  * @example
  * ```typescript
  * const paymentServer = new ATXPPaymentServer(
  *   'https://auth.atxp.ai',
- *   logger
+ *   logger,
+ *   fetch,
+ *   oAuthDb  // For looking up client credentials
  * );
  * ```
  */
 export class ATXPPaymentServer implements PaymentServer {
+  private readonly oAuthDb: OAuthDb;
+
   constructor(
     private readonly server: AuthorizationServerUrl,
     private readonly logger: Logger,
-    private readonly fetchFn: FetchLike = fetch.bind(globalThis)) {
+    private readonly fetchFn: FetchLike = fetch.bind(globalThis),
+    oAuthDb?: OAuthDb) {
+    // Default to MemoryOAuthDb if not provided
+    this.oAuthDb = oAuthDb ?? new MemoryOAuthDb();
   }
 
   charge = async(chargeRequest: Charge): Promise<boolean> => {
@@ -106,12 +113,12 @@ export class ATXPPaymentServer implements PaymentServer {
 
   /**
    * Makes authenticated requests to the ATXP authorization server
-   * 
+   *
    * @param method - HTTP method ('GET' or 'POST')
    * @param path - API endpoint path
    * @param body - Request body (for POST requests)
    * @returns Promise<Response> - The HTTP response from the server
-   * 
+   *
    * @example
    * ```typescript
    * const response = await paymentServer.makeRequest('POST', '/charge', {
@@ -123,11 +130,27 @@ export class ATXPPaymentServer implements PaymentServer {
    */
   protected makeRequest = async(method: 'GET' | 'POST', path: string, body: unknown): Promise<Response> => {
     const url = new URL(path, this.server);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    // Add Basic auth header with client credentials
+    // This authenticates the MCP server to enable resource_url validation
+    const credentials = await this.oAuthDb.getClientCredentials(this.server);
+    if (!credentials?.clientId || !credentials?.clientSecret) {
+      throw new Error(
+        `Missing client credentials for authorization server ${this.server}. ` +
+        `Ensure the MCP server has been registered and credentials are stored in the OAuthDb.`
+      );
+    }
+    const credentialString = `${credentials.clientId}:${credentials.clientSecret}`;
+    const base64Credentials = Buffer.from(credentialString).toString('base64');
+    headers['Authorization'] = `Basic ${base64Credentials}`;
+
     const response = await this.fetchFn(url, {
       method,
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify(body)
     });
     return response;

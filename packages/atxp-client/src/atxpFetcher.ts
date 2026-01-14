@@ -475,9 +475,26 @@ export class ATXPFetcher {
       // We can do the full OAuth flow - we'll generate a signed JWT and call /authorize on the
       // AS to get a code, then exchange the code for an access token
       const oauthClient = await this.getOAuthClient();
+
+      // Try to create a spend permission before authorization
+      // This allows pre-authorizing spending for MCP servers (returns null for account types that don't support it)
+      let spendPermissionToken: string | null = null;
+      try {
+        const result = await this.account.createSpendPermission(error.resourceServerUrl);
+        if (result) {
+          this.logger.info(`Created spend permission for resource ${error.resourceServerUrl}`);
+          this.logger.debug(`Created spend permission token: ${result.substring(0, 8)}...`);
+          spendPermissionToken = result;
+        }
+      } catch (spendPermissionError) {
+        // Log but don't fail - authorization can still proceed without spend permission
+        this.logger.warn(`Failed to create spend permission: ${(spendPermissionError as Error).message}`);
+      }
+
       const authorizationUrl = await oauthClient.makeAuthorizationUrl(
         error.url,
-        error.resourceServerUrl
+        error.resourceServerUrl,
+        spendPermissionToken ? { spendPermissionToken } : undefined
       );
 
       if (!this.isAllowedAuthServer(authorizationUrl)) {

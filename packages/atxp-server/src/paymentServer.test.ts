@@ -2,17 +2,28 @@ import { describe, it, expect } from 'vitest';
 import { ATXPPaymentServer } from './paymentServer.js';
 import * as TH from './serverTestHelpers.js';
 import fetchMock from 'fetch-mock';
+import { MemoryOAuthDb, AuthorizationServerUrl } from '@atxp/common';
+
+// Helper to create OAuthDb with credentials stored
+async function createOAuthDbWithCredentials(server: AuthorizationServerUrl, clientId: string, clientSecret: string): Promise<MemoryOAuthDb> {
+  const db = new MemoryOAuthDb();
+  await db.saveClientCredentials(server, { clientId, clientSecret });
+  return db;
+}
 
 describe('ATXPPaymentServer', () => {
-  it('should call the charge endpoint', async () => {
+  it('should call the charge endpoint with client credentials', async () => {
     const mock = fetchMock.createInstance();
     mock.post('https://auth.atxp.ai/charge', {
       status: 200,
       body: { success: true }
     });
 
-    // Create server instance
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
+    // Create OAuthDb with credentials
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+
+    // Create server instance with credentials
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
 
     const chargeParams = TH.charge({
       sourceAccountId: 'solana:test-source',
@@ -24,49 +35,47 @@ describe('ATXPPaymentServer', () => {
     // Verify the result
     expect(result).toBe(true);
 
-    // Verify fetch was called with correct parameters
+    // Verify fetch was called with correct parameters including auth header
     const call = mock.callHistory.lastCall('https://auth.atxp.ai/charge');
     expect(call).toBeDefined();
     expect(call?.options.method).toBe('post');
-    expect(call?.options.headers).toEqual({
-      'content-type': 'application/json'
-    });
+
+    // Verify Authorization header is present with Basic auth
+    const expectedCredentials = Buffer.from('test-client-id:test-client-secret').toString('base64');
+    expect((call?.options.headers as Record<string, string>)?.['authorization']).toBe(`Basic ${expectedCredentials}`);
+
     const parsedBody = JSON.parse(call?.options.body as string);
     expect(parsedBody.sourceAccountId).toEqual(chargeParams.sourceAccountId);
     expect(parsedBody.destinationAccountId).toEqual(chargeParams.destinationAccountId);
     expect(parsedBody.options).toBeDefined();
     expect(parsedBody.options[0].amount).toEqual(chargeParams.options[0].amount.toString());
-
-    // Credentials were fetched from the real database
   });
 
-  it('should make requests without authorization headers', async () => {
+  it('should throw error when credentials are not configured', async () => {
     const mock = fetchMock.createInstance();
     mock.post('https://auth.atxp.ai/charge', {
       status: 200,
       body: { success: true }
     });
 
+    // Create server instance WITHOUT credentials (empty MemoryOAuthDb)
     const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
 
-    await server.charge(TH.charge({
+    await expect(server.charge(TH.charge({
       sourceAccountId: 'solana:test-source',
       destinationAccountId: 'solana:test-destination'
-    }));
-
-    // Verify no authorization header is included
-    const call = mock.callHistory.lastCall('https://auth.atxp.ai/charge');
-    expect((call?.options?.headers as any)?.['authorization']).toBeUndefined();
+    }))).rejects.toThrow('Missing client credentials');
   });
 
-  it('should call the create payment request endpoint', async () => {
+  it('should call the create payment request endpoint with credentials', async () => {
     const mock = fetchMock.createInstance();
     mock.post('https://auth.atxp.ai/payment-request', {
       status: 200,
       body: { id: 'test-payment-request-id' }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
 
     const paymentRequestParams = TH.charge({
       sourceAccountId: 'solana:test-source',
@@ -78,36 +87,19 @@ describe('ATXPPaymentServer', () => {
     // Verify the result
     expect(result).toBe('test-payment-request-id');
 
-    // Verify fetch was called with correct parameters
+    // Verify fetch was called with correct parameters including auth header
     const call = mock.callHistory.lastCall('https://auth.atxp.ai/payment-request');
     expect(call).toBeDefined();
     expect(call?.options.method).toBe('post');
-    expect(call?.options.headers).toEqual({
-      'content-type': 'application/json'
-    });
+
+    // Verify Authorization header is present
+    const expectedCredentials = Buffer.from('test-client-id:test-client-secret').toString('base64');
+    expect((call?.options.headers as Record<string, string>)?.['authorization']).toBe(`Basic ${expectedCredentials}`);
+
     const parsedBody = JSON.parse(call?.options.body as string);
     expect(parsedBody.sourceAccountId).toEqual(paymentRequestParams.sourceAccountId);
     expect(parsedBody.destinationAccountId).toEqual(paymentRequestParams.destinationAccountId);
     expect(parsedBody.options).toBeDefined();
-  });
-
-  it('should make payment request without authorization headers', async () => {
-    const mock = fetchMock.createInstance();
-    mock.post('https://auth.atxp.ai/payment-request', {
-      status: 200,
-      body: { id: 'test-payment-request-id' }
-    });
-
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
-
-    await server.createPaymentRequest(TH.charge({
-      sourceAccountId: 'solana:test-source',
-      destinationAccountId: 'solana:test-destination'
-    }));
-
-    // Verify no authorization header is included
-    const call = mock.callHistory.lastCall('https://auth.atxp.ai/payment-request');
-    expect((call?.options?.headers as any)?.['authorization']).toBeUndefined();
   });
 
   it('should handle charge endpoint returning 402 status (payment required)', async () => {
@@ -121,7 +113,8 @@ describe('ATXPPaymentServer', () => {
       }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
 
     const result = await server.charge(TH.charge({
       sourceAccountId: 'solana:test-source',
@@ -139,7 +132,8 @@ describe('ATXPPaymentServer', () => {
       body: { error: 'server error' }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
 
     await expect(server.charge(TH.charge({
       sourceAccountId: 'solana:test-source',
@@ -154,7 +148,8 @@ describe('ATXPPaymentServer', () => {
       body: { error: 'bad request' }
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
 
     await expect(server.createPaymentRequest(TH.charge({
       sourceAccountId: 'solana:test-source',
@@ -169,7 +164,8 @@ describe('ATXPPaymentServer', () => {
       body: { success: true } // Missing 'id' field
     });
 
-    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler);
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
 
     await expect(server.createPaymentRequest(TH.charge({
       sourceAccountId: 'solana:test-source',

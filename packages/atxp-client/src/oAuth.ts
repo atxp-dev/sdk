@@ -142,7 +142,7 @@ export class OAuthClient extends OAuthResourceClient {
     return response;
   }
 
-  makeAuthorizationUrl = async (url: string, resourceUrl: string): Promise<URL> => {
+  makeAuthorizationUrl = async (url: string, resourceUrl: string, options?: { spendPermissionToken?: string }): Promise<URL> => {
     resourceUrl = this.normalizeResourceServerUrl(resourceUrl);
     const authorizationServer = await this.getAuthorizationServer(resourceUrl);
     const credentials = await this.getClientCredentials(authorizationServer);
@@ -154,6 +154,12 @@ export class OAuthClient extends OAuthResourceClient {
     authorizationUrl.searchParams.set('code_challenge', pkceValues.codeChallenge);
     authorizationUrl.searchParams.set('code_challenge_method', 'S256');
     authorizationUrl.searchParams.set('state', pkceValues.state);
+    // Add resource URL so auth server knows which MCP server this is for
+    authorizationUrl.searchParams.set('resource', resourceUrl);
+    // Add spend permission token if provided (for ATXP accounts with scoped spend permissions)
+    if (options?.spendPermissionToken) {
+      authorizationUrl.searchParams.set('spend_permission_token', options.spendPermissionToken);
+    }
     return authorizationUrl;
   }
 

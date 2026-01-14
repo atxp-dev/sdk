@@ -10,7 +10,8 @@ describe('buildConfig', () => {
       account: {
         getAccountId: async () => 'bdj' as any,
         paymentMakers: [],
-        getSources: async () => []
+        getSources: async () => [],
+        createSpendPermission: async () => null
       }
     });
     expect(config.oAuthChannelFetch).toBe(fetchFn);

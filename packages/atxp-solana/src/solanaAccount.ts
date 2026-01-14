@@ -43,4 +43,12 @@ export class SolanaAccount implements Account {
       walletType: 'eoa'
     }];
   }
+
+  /**
+   * Create a spend permission for the given resource URL.
+   * Solana accounts don't support spend permissions, so this returns null.
+   */
+  async createSpendPermission(_resourceUrl: string): Promise<string | null> {
+    return null;
+  }
 }

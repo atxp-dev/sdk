@@ -218,4 +218,12 @@ export class WorldchainAccount implements Account {
 
     cache.delete(this.toCacheKey(userWalletAddress));
   }
+
+  /**
+   * Create a spend permission for the given resource URL.
+   * WorldchainAccount doesn't support spend permissions, so this returns null.
+   */
+  async createSpendPermission(_resourceUrl: string): Promise<string | null> {
+    return null;
+  }
 }

@@ -29,7 +29,8 @@ describe('atxpClient', () => {
     const account = {
       getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
-      getSources: vi.fn().mockResolvedValue([])
+      getSources: vi.fn().mockResolvedValue([]),
+      createSpendPermission: vi.fn().mockResolvedValue(null)
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -66,7 +67,8 @@ describe('atxpClient', () => {
     const account = {
       getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
-      getSources: vi.fn().mockResolvedValue([])
+      getSources: vi.fn().mockResolvedValue([]),
+      createSpendPermission: vi.fn().mockResolvedValue(null)
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
@@ -116,7 +118,8 @@ describe('atxpClient', () => {
     const account = {
       getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
-      getSources: vi.fn().mockResolvedValue([])
+      getSources: vi.fn().mockResolvedValue([]),
+      createSpendPermission: vi.fn().mockResolvedValue(null)
     };
     const client = await atxpClient({
       mcpServer: 'https://example.com/mcp',
