@@ -21,6 +21,7 @@ export function mockAccount(accountId: string): Account {
     getAccountId: async () => formattedAccountId as any,
     paymentMakers: [],
     getSources: async () => [],
+    createSpendPermission: async () => null,
   };
 }
 

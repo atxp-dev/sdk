@@ -24,7 +24,8 @@ function atxpFetcher(fetchFn: FetchLike, paymentMakers?: PaymentMaker[], db?: OA
       address: 'SolAddress123',
       chain: 'solana' as any,
       walletType: 'eoa' as any
-    }]
+    }],
+    createSpendPermission: async () => null
   };
 
   return new ATXPFetcher({
@@ -316,7 +317,7 @@ describe('atxpFetcher.fetch oauth', () => {
     expect(authUrl.searchParams.get('spend_permission_token')).toBeNull();
   });
 
-  it('should not call createSpendPermission for regular accounts without the method', async () => {
+  it('should not include spend_permission_token for accounts that return null', async () => {
     const f = fetchMock.createInstance();
     mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER)
       .postOnce('https://example.com/mcp', 401)
@@ -336,7 +337,8 @@ describe('atxpFetcher.fetch oauth', () => {
       getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
     };
 
-    // Regular account without createSpendPermission
+    // Account that returns null for createSpendPermission (e.g., SolanaAccount, BaseAccount)
+    const createSpendPermission = vi.fn().mockResolvedValue(null);
     const regularAccount: Account = {
       getAccountId: async () => "bdj" as any,
       paymentMakers: [paymentMaker],
@@ -344,7 +346,8 @@ describe('atxpFetcher.fetch oauth', () => {
         address: 'SolAddress123',
         chain: 'solana' as any,
         walletType: 'eoa' as any
-      }]
+      }],
+      createSpendPermission
     };
 
     const fetcher = new ATXPFetcher({
@@ -357,7 +360,10 @@ describe('atxpFetcher.fetch oauth', () => {
     const response = await fetcher.fetch('https://example.com/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
     expect(response.ok).toBe(true);
 
-    // Verify the authorization URL does NOT include spend_permission_token
+    // Verify createSpendPermission was called
+    expect(createSpendPermission).toHaveBeenCalledWith('https://example.com/mcp');
+
+    // Verify the authorization URL does NOT include spend_permission_token (since it returned null)
     const authCall = f.callHistory.lastCall(`begin:${DEFAULT_AUTHORIZATION_SERVER}/authorize`);
     const authUrl = new URL(authCall!.args[0] as string);
     expect(authUrl.searchParams.get('spend_permission_token')).toBeNull();

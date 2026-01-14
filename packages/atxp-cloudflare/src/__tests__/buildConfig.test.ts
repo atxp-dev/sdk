@@ -17,7 +17,8 @@ function mockAccount(accountId: string): Account {
   return {
     getAccountId: async () => accountId as any,
     paymentMakers: [],
-    getSources: async () => []
+    getSources: async () => [],
+    createSpendPermission: async () => null
   };
 }
 

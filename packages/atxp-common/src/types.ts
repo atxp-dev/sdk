@@ -175,6 +175,14 @@ export interface PaymentDestination {
  */
 export type Account = PaymentDestination & {
   paymentMakers: PaymentMaker[];
+  /**
+   * Create a spend permission for the given resource URL.
+   * This allows pre-authorizing spending for a specific MCP server during OAuth authorization.
+   *
+   * @param resourceUrl - The MCP server URL to create a spend permission for
+   * @returns The spend permission token, or null if this account type doesn't support spend permissions
+   */
+  createSpendPermission: (resourceUrl: string) => Promise<string | null>;
 }
 
 /**

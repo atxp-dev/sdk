@@ -36,7 +36,8 @@ function atxpFetcher(
       address: 'SolAddress123',
       chain: 'solana' as any,
       walletType: 'eoa' as any
-    }]
+    }],
+    createSpendPermission: async () => null
   };
 
   return new ATXPFetcher({

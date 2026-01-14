@@ -42,7 +42,8 @@ describe('Default Payment Failure Handler', () => {
     const account = {
       getAccountId: async () => 'test-account' as any,
       paymentMakers: [],
-      getSources: async () => []
+      getSources: async () => [],
+      createSpendPermission: async () => null
     };
 
     const fetcher = new ATXPFetcher({

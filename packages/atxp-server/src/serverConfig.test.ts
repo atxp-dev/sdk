@@ -9,6 +9,7 @@ function mockAccount(accountId: string): Account {
     getAccountId: async () => `base:${accountId}` as any,
     paymentMakers: [],
     getSources: async () => [],
+    createSpendPermission: async () => null,
   };
 }
 
