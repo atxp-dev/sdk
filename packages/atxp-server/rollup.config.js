@@ -35,19 +35,9 @@ const serverTestHelpersConfigs = [
     },
     plugins: [
       typescript({
-        tsconfig: false,
-        compilerOptions: {
-          target: 'es2020',
-          module: 'esnext',
-          lib: ['es2020', 'dom'],
-          moduleResolution: 'node',
-          allowSyntheticDefaultImports: true,
-          esModuleInterop: true,
-          skipLibCheck: true,
-          strict: true,
-          declaration: false,
-          sourceMap: true
-        }
+        tsconfig: './tsconfig.json',
+        declaration: false,
+        declarationMap: false
       }),
       resolve({ preferBuiltins: true, exportConditions: ['node'] }),
       commonjs(),
