@@ -36,6 +36,19 @@ export interface PaymentFailureContext {
   timestamp: Date;
 }
 
+/**
+ * Configuration for scoped spend tokens.
+ * When configured, the SDK will request scoped spend tokens during authorization,
+ * enabling async charging instead of blocking on payment before each operation.
+ */
+export interface ScopedSpendConfig {
+  /**
+   * Maximum amount the SDK is authorized to spend on behalf of the user.
+   * This is the spend limit for the scoped spend token, in USD (e.g., "50.00").
+   */
+  spendLimit: string;
+}
+
 export type ClientConfig = {
   mcpServer: string;
   account: Account;
@@ -56,6 +69,12 @@ export type ClientConfig = {
   onPaymentFailure: (context: PaymentFailureContext) => Promise<void>;
   /** Optional callback when a single payment attempt fails (before trying other networks) */
   onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
+  /**
+   * Optional scoped spend configuration.
+   * When provided, the SDK will request scoped spend tokens during authorization,
+   * enabling async charging instead of blocking on payment before each operation.
+   */
+  scopedSpendConfig?: ScopedSpendConfig;
 }
 
 // ClientArgs for creating clients - required fields plus optional overrides
