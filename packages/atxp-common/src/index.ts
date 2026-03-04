@@ -70,6 +70,7 @@ export {
   type DestinationMaker,
   type PaymentDestination,
   type Account,
+  type MeResponse,
   type Source,
   extractAddressFromAccountId,
   extractNetworkFromAccountId

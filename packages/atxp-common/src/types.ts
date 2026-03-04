@@ -186,6 +186,22 @@ export type Account = PaymentDestination & {
 }
 
 /**
+ * Response from the /me endpoint on the accounts service.
+ * Contains account identity and status information.
+ */
+export interface MeResponse {
+  accountId: string;
+  accountType: string;
+  funded?: boolean;
+  developerMode?: boolean;
+  stripeConnected?: boolean;
+  displayName?: string;
+  email?: string;
+  ownerEmail?: string;
+  isOrphan?: boolean;
+}
+
+/**
  * Extract the address portion from a fully-qualified accountId
  * @param accountId - Format: network:address
  * @returns The address portion

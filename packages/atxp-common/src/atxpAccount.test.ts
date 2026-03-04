@@ -122,4 +122,109 @@ describe('ATXPAccount', () => {
       );
     });
   });
+
+  describe('getProfile', () => {
+    it('should return cached profile after getAccountId fetches /me', async () => {
+      const meResponse = {
+        accountId: 'atxp_acct_test',
+        accountType: 'agent',
+        funded: false,
+        developerMode: false,
+        stripeConnected: false,
+      };
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => meResponse,
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123',
+        { fetchFn: mockFetch }
+      );
+
+      // First call triggers /me fetch
+      const profile = await account.getProfile();
+      expect(profile).toEqual(meResponse);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Second call returns cached — no extra fetch
+      const profile2 = await account.getProfile();
+      expect(profile2).toEqual(meResponse);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should share /me response with getAccountId (no duplicate request)', async () => {
+      const meResponse = {
+        accountId: 'atxp_acct_shared',
+        accountType: 'human',
+        funded: undefined,
+      };
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => meResponse,
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123',
+        { fetchFn: mockFetch }
+      );
+
+      // getAccountId fetches /me
+      const accountId = await account.getAccountId();
+      expect(accountId).toBe('atxp:atxp_acct_shared');
+
+      // getProfile returns cached data — no extra request
+      const profile = await account.getProfile();
+      expect(profile.accountType).toBe('human');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should fetch /me even when account_id is in connection string', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          accountId: 'atxp_acct_inline',
+          accountType: 'agent',
+          funded: false,
+        }),
+      });
+
+      // account_id is in the connection string, so getAccountId() won't call /me
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_inline',
+        { fetchFn: mockFetch }
+      );
+
+      // getAccountId uses cached value — no fetch
+      const accountId = await account.getAccountId();
+      expect(accountId).toBe('atxp:atxp_acct_inline');
+      expect(mockFetch).not.toHaveBeenCalled();
+
+      // getProfile must fetch /me to get full profile
+      const profile = await account.getProfile();
+      expect(profile.accountType).toBe('agent');
+      expect(profile.funded).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return profile with funded field for agent accounts', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          accountId: 'atxp_acct_agent',
+          accountType: 'agent',
+          funded: true,
+        }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123',
+        { fetchFn: mockFetch }
+      );
+
+      const profile = await account.getProfile();
+      expect(profile.accountType).toBe('agent');
+      expect(profile.funded).toBe(true);
+    });
+  });
 });
