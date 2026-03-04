@@ -148,6 +148,7 @@ export class ATXPAccount implements Account {
   private _unqualifiedAccountId: string | null = null;
   private _accountIdPromise: Promise<AccountId> | null = null;
   private _cachedProfile: MeResponse | null = null;
+  private _profilePromise: Promise<MeResponse> | null = null;
 
   constructor(connectionString: string, opts?: { fetchFn?: FetchLike; }) {
     const { origin, token, accountId } = parseConnectionString(connectionString);
@@ -198,9 +199,15 @@ export class ATXPAccount implements Account {
     if (this._cachedProfile) {
       return this._cachedProfile;
     }
-    // Force a /me fetch to populate the profile
-    await this.fetchAccountIdFromMe();
-    return this._cachedProfile!;
+    if (!this._profilePromise) {
+      this._profilePromise = this.fetchAccountIdFromMe().then(() => {
+        if (!this._cachedProfile) {
+          throw new Error('ATXPAccount: /me succeeded but profile was not cached');
+        }
+        return this._cachedProfile;
+      });
+    }
+    return this._profilePromise;
   }
 
   /**
