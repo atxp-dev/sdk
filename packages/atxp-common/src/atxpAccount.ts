@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker } from './types.js';
+import type { Account, PaymentMaker, MeResponse } from './types.js';
 import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain, Source } from './types.js';
 import BigNumber from 'bignumber.js';
 
@@ -147,6 +147,8 @@ export class ATXPAccount implements Account {
   private _cachedAccountId: AccountId | null = null;
   private _unqualifiedAccountId: string | null = null;
   private _accountIdPromise: Promise<AccountId> | null = null;
+  private _cachedProfile: MeResponse | null = null;
+  private _profilePromise: Promise<MeResponse> | null = null;
 
   constructor(connectionString: string, opts?: { fetchFn?: FetchLike; }) {
     const { origin, token, accountId } = parseConnectionString(connectionString);
@@ -189,6 +191,26 @@ export class ATXPAccount implements Account {
   }
 
   /**
+   * Get the full /me profile, fetching if not already cached.
+   * If getAccountId() was satisfied from the connection string (no /me call),
+   * this will make a /me request to get the full profile.
+   */
+  async getProfile(): Promise<MeResponse> {
+    if (this._cachedProfile) {
+      return this._cachedProfile;
+    }
+    if (!this._profilePromise) {
+      this._profilePromise = this.fetchAccountIdFromMe().then(() => {
+        if (!this._cachedProfile) {
+          throw new Error('ATXPAccount: /me succeeded but profile was not cached');
+        }
+        return this._cachedProfile;
+      });
+    }
+    return this._profilePromise;
+  }
+
+  /**
    * Fetch account ID from the /me endpoint using Bearer auth
    */
   private async fetchAccountIdFromMe(): Promise<AccountId> {
@@ -205,12 +227,13 @@ export class ATXPAccount implements Account {
       throw new Error(`ATXPAccount: /me failed: ${response.status} ${response.statusText} ${text}`);
     }
 
-    const json = await response.json() as { accountId?: string };
+    const json = await response.json() as MeResponse;
     if (!json?.accountId) {
       throw new Error('ATXPAccount: /me did not return accountId');
     }
 
-    // Cache the result
+    // Cache the full profile and account ID
+    this._cachedProfile = json;
     this._unqualifiedAccountId = json.accountId;
     this._cachedAccountId = `atxp:${json.accountId}` as AccountId;
     return this._cachedAccountId;
