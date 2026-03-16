@@ -102,11 +102,13 @@ export function config(args: Partial<ATXPConfig> = {}): ATXPConfig {
 
 export function paymentServer({
   charge = vi.fn().mockResolvedValue(true),
-  createPaymentRequest = vi.fn().mockResolvedValue('test-payment-request-id')
+  createPaymentRequest = vi.fn().mockResolvedValue('test-payment-request-id'),
+  getBalance = vi.fn().mockResolvedValue(new BigNumber('1.00'))
 } = {}) : PaymentServer {
   return {
     charge,
     createPaymentRequest,
+    getBalance,
   } as unknown as PaymentServer;
 }
 

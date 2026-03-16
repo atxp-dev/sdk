@@ -45,10 +45,18 @@ export type Charge = Pick<PaymentRequest, 'options' | 'sourceAccountId' | 'desti
   sourceAccountToken?: string;
 };
 
+export type BalanceRequest = {
+  sourceAccountId: string;
+  destinationAccountId: string;
+  sourceAccountToken?: string;
+}
+
 export type PaymentServer = {
   /** Returns true if the charge succeeded, false if payment is required */
   charge: (args: Charge) => Promise<boolean>;
   createPaymentRequest: (args: Charge) => Promise<string>;
+  /** Returns the user's available balance as a BigNumber (USD) */
+  getBalance: (args: BalanceRequest) => Promise<BigNumber>;
 }
 
 export type ATXPConfig = {

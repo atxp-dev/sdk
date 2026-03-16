@@ -1,4 +1,5 @@
-import { PaymentServer, Charge } from "./types.js";
+import { PaymentServer, Charge, BalanceRequest } from "./types.js";
+import { BigNumber } from "bignumber.js";
 import { AuthorizationServerUrl, FetchLike, Logger, OAuthDb, MemoryOAuthDb } from "@atxp/common";
 
 /**
@@ -110,6 +111,31 @@ export class ATXPPaymentServer implements PaymentServer {
     }
 
     return json.id;
+  }
+
+  getBalance = async(balanceRequest: BalanceRequest): Promise<BigNumber> => {
+    const response = await this.makeRequest('POST', '/balance', balanceRequest);
+
+    if (response.status === 200) {
+      const json = await response.json() as { balance?: string };
+      if (json.balance === undefined) {
+        throw new Error('Balance response did not contain a balance field');
+      }
+      return new BigNumber(json.balance);
+    }
+
+    const errorBody = await response.json().catch(() => ({})) as PaymentServerErrorResponse;
+    const errorMessage = errorBody.error?.message || errorBody.message || 'Unknown error';
+
+    this.logger.warn(`Payment server getBalance failed with ${response.status}: ${errorMessage}`);
+
+    const error = new Error(
+      `Payment server returned ${response.status} from /balance: ${errorMessage}`
+    ) as Error & { statusCode: number; endpoint: string };
+    error.statusCode = response.status;
+    error.endpoint = '/balance';
+
+    throw error;
   }
 
   /**

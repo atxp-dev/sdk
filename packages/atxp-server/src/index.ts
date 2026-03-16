@@ -8,6 +8,7 @@ export {
   type McpOperationPattern,
   type RefundErrors,
   type Charge,
+  type BalanceRequest,
   type PaymentServer,
   type ATXPConfig,
   TokenProblem,
@@ -54,6 +55,7 @@ export {
 
 // Payment functionality
 export { requirePayment } from './requirePayment.js';
+export { getBalance } from './getBalance.js';
 
 // Test utilities are available via separate export ./serverTestHelpers
 

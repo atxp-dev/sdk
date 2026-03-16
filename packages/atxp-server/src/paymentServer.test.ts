@@ -195,4 +195,64 @@ describe('ATXPPaymentServer', () => {
       destinationAccountId: 'solana:test-destination'
     }))).rejects.toThrow('POST /payment-request response did not contain an id');
   });
+
+  it('should return balance from the balance endpoint', async () => {
+    const mock = fetchMock.createInstance();
+    mock.post('https://auth.atxp.ai/balance', {
+      status: 200,
+      body: { balance: '42.50' }
+    });
+
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
+
+    const result = await server.getBalance({
+      sourceAccountId: 'atxp:test-source',
+      destinationAccountId: 'atxp:test-destination',
+      sourceAccountToken: 'test-token',
+    });
+
+    expect(result.toString()).toBe('42.5');
+
+    const call = mock.callHistory.lastCall('https://auth.atxp.ai/balance');
+    expect(call).toBeDefined();
+    expect(call?.options.method).toBe('post');
+
+    const parsedBody = JSON.parse(call?.options.body as string);
+    expect(parsedBody.sourceAccountId).toBe('atxp:test-source');
+    expect(parsedBody.destinationAccountId).toBe('atxp:test-destination');
+    expect(parsedBody.sourceAccountToken).toBe('test-token');
+  });
+
+  it('should throw error when balance endpoint returns non-200', async () => {
+    const mock = fetchMock.createInstance();
+    mock.post('https://auth.atxp.ai/balance', {
+      status: 502,
+      body: { error: { message: 'upstream failed' } }
+    });
+
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
+
+    await expect(server.getBalance({
+      sourceAccountId: 'atxp:test-source',
+      destinationAccountId: 'atxp:test-destination',
+    })).rejects.toThrow('Payment server returned 502 from /balance');
+  });
+
+  it('should throw error when balance response lacks balance field', async () => {
+    const mock = fetchMock.createInstance();
+    mock.post('https://auth.atxp.ai/balance', {
+      status: 200,
+      body: { success: true } // Missing 'balance' field
+    });
+
+    const oAuthDb = await createOAuthDbWithCredentials('https://auth.atxp.ai', 'test-client-id', 'test-client-secret');
+    const server = new ATXPPaymentServer('https://auth.atxp.ai', TH.logger(), mock.fetchHandler, oAuthDb);
+
+    await expect(server.getBalance({
+      sourceAccountId: 'atxp:test-source',
+      destinationAccountId: 'atxp:test-destination',
+    })).rejects.toThrow('Balance response did not contain a balance field');
+  });
 });
