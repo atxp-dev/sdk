@@ -76,6 +76,29 @@ export {
   getProtectedResourceMetadata,
 } from './protectedResourceMetadata.js';
 
+// Protocol detection and settlement
+export {
+  type PaymentProtocol,
+  type CredentialDetection,
+  type X402PaymentRequirements,
+  type X402PaymentOption,
+  type AtxpMcpChallengeData,
+  type OmniChallenge,
+  type VerifyResult,
+  type SettleResult,
+  detectProtocol,
+  ProtocolSettlement,
+} from './protocol.js';
+
+// Omni-challenge builders
+export {
+  buildX402Requirements,
+  buildAtxpMcpChallenge,
+  omniChallengeMcpError,
+  omniChallengeHttpResponse,
+  buildOmniChallenge,
+} from './omniChallenge.js';
+
 // Re-export ATXP Account implementations from @atxp/common
 export {
   ATXPAccount
