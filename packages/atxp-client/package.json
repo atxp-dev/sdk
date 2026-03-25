@@ -36,7 +36,8 @@
     "@atxp/common": "0.10.7",
     "@modelcontextprotocol/sdk": "^1.15.0",
     "bignumber.js": "^9.3.0",
-    "oauth4webapi": "^3.8.3"
+    "oauth4webapi": "^3.8.3",
+    "x402": "^1.1.0"
   },
   "peerDependencies": {
     "expo-crypto": ">=14.0.0",

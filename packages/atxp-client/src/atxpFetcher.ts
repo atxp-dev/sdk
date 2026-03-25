@@ -16,9 +16,11 @@ import {
   Network,
   DestinationMaker,
   Account,
-  getErrorRecoveryHint
+  getErrorRecoveryHint,
+  type ProtocolFlag
 } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig, PaymentFailureContext } from './types.js';
+import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import { InsufficientFundsError, ATXPPaymentError } from './errors.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -46,7 +48,9 @@ export function atxpFetch(config: ClientConfig): FetchLike {
     onAuthorizeFailure: config.onAuthorizeFailure,
     onPayment: config.onPayment,
     onPaymentFailure: config.onPaymentFailure,
-    onPaymentAttemptFailed: config.onPaymentAttemptFailed
+    onPaymentAttemptFailed: config.onPaymentAttemptFailed,
+    protocolHandlers: config.protocolHandlers,
+    protocolFlag: config.protocolFlag
   });
   return fetcher.fetch;
 }
@@ -66,6 +70,8 @@ export class ATXPFetcher {
   protected onPayment: (args: { payment: ProspectivePayment, transactionHash: string, network: string }) => Promise<void>;
   protected onPaymentFailure: (context: PaymentFailureContext) => Promise<void>;
   protected onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
+  protected protocolHandlers: ProtocolHandler[];
+  protected protocolFlag?: ProtocolFlag;
   protected strict: boolean;
   protected allowInsecureRequests: boolean;
   constructor(config: {
@@ -84,6 +90,8 @@ export class ATXPFetcher {
     onPayment?: (args: { payment: ProspectivePayment, transactionHash: string, network: string }) => Promise<void>;
     onPaymentFailure?: (context: PaymentFailureContext) => Promise<void>;
     onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
+    protocolHandlers?: ProtocolHandler[];
+    protocolFlag?: ProtocolFlag;
   }) {
     const {
       account,
@@ -100,7 +108,9 @@ export class ATXPFetcher {
       onAuthorizeFailure = async () => {},
       onPayment = async () => {},
       onPaymentFailure,
-      onPaymentAttemptFailed
+      onPaymentAttemptFailed,
+      protocolHandlers = [],
+      protocolFlag
     } = config;
     // Use React Native safe fetch if in React Native environment
     this.safeFetchFn = getIsReactNative() ? createReactNativeSafeFetch(fetchFn) : fetchFn;
@@ -121,6 +131,8 @@ export class ATXPFetcher {
     this.onPayment = onPayment;
     this.onPaymentFailure = onPaymentFailure || this.defaultPaymentFailureHandler;
     this.onPaymentAttemptFailed = onPaymentAttemptFailed;
+    this.protocolHandlers = protocolHandlers;
+    this.protocolFlag = protocolFlag;
   }
 
   /**
@@ -579,6 +591,63 @@ export class ATXPFetcher {
     }
   }
 
+  /**
+   * Build protocol config for passing to protocol handlers.
+   */
+  protected getProtocolConfig(): ProtocolConfig {
+    return {
+      account: this.account,
+      logger: this.logger,
+      fetchFn: this.safeFetchFn,
+      approvePayment: this.approvePayment,
+      onPayment: this.onPayment,
+      onPaymentFailure: this.onPaymentFailure
+    };
+  }
+
+  /**
+   * Try to handle an HTTP-level payment challenge using registered protocol handlers.
+   * For omni-challenges, uses protocolFlag to select the preferred handler.
+   * For single-protocol challenges, auto-detects from response format.
+   *
+   * @returns The retry response from the selected handler, or null if no handler matched
+   */
+  protected async tryProtocolHandlers(response: Response, url: string | URL, init?: RequestInit): Promise<Response | null> {
+    if (this.protocolHandlers.length === 0) return null;
+
+    // Find all handlers that can handle this response
+    const matchingHandlers: ProtocolHandler[] = [];
+    for (const handler of this.protocolHandlers) {
+      if (await handler.canHandle(response.clone())) {
+        matchingHandlers.push(handler);
+      }
+    }
+
+    if (matchingHandlers.length === 0) return null;
+
+    // Select handler: use protocolFlag for omni-challenges, otherwise use first match
+    let selectedHandler: ProtocolHandler;
+    if (matchingHandlers.length > 1 && this.protocolFlag) {
+      const accountId = await this.account.getAccountId();
+      const destination = typeof url === 'string' ? url : url.toString();
+      const preferredProtocol = this.protocolFlag(accountId, destination);
+
+      const preferred = matchingHandlers.find(h => h.protocol === preferredProtocol);
+      selectedHandler = preferred ?? matchingHandlers[0];
+      this.logger.info(`Protocol flag selected '${preferredProtocol}', using handler '${selectedHandler.protocol}'`);
+    } else {
+      selectedHandler = matchingHandlers[0];
+      this.logger.debug(`Auto-detected protocol handler: ${selectedHandler.protocol}`);
+    }
+
+    const config = this.getProtocolConfig();
+    return selectedHandler.handlePaymentChallenge(
+      response,
+      { url, init },
+      config
+    );
+  }
+
   fetch: FetchLike = async (url, init) => {
     let response: Response | null = null;
     let fetchError: Error | null = null;
@@ -586,6 +655,13 @@ export class ATXPFetcher {
     try {
       // Try to fetch the resource
       response = await oauthClient.fetch(url, init);
+
+      // Check HTTP-level protocol handlers first (e.g., X402 402 responses)
+      const handlerResult = await this.tryProtocolHandlers(response, url, init);
+      if (handlerResult) {
+        return handlerResult;
+      }
+
       await this.checkForATXPResponse(response);
       return response;
     } catch (error: unknown) {
@@ -599,6 +675,13 @@ export class ATXPFetcher {
         try {
           // Retry the request once - we should be auth'd now
           response = await oauthClient.fetch(url, init);
+
+          // Check protocol handlers again after auth
+          const handlerResult = await this.tryProtocolHandlers(response, url, init);
+          if (handlerResult) {
+            return handlerResult;
+          }
+
           await this.checkForATXPResponse(response);
           return response;
         } catch (eTwo) {

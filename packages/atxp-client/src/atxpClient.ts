@@ -8,7 +8,7 @@ import { DEFAULT_ATXP_ACCOUNTS_SERVER, ATXPAccount } from "@atxp/common";
 
 type RequiredClientConfigFields = 'mcpServer' | 'account';
 type OptionalClientConfig = Omit<ClientConfig, RequiredClientConfigFields>;
-type BuildableClientConfigFields = 'oAuthDb' | 'logger' | 'destinationMakers';
+type BuildableClientConfigFields = 'oAuthDb' | 'logger' | 'destinationMakers' | 'protocolHandlers' | 'protocolFlag';
 
 // Detect if we're in a browser environment and bind fetch appropriately
 const getFetch = (): typeof fetch => {

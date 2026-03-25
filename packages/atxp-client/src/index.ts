@@ -87,3 +87,17 @@ export {
   PassthroughDestinationMaker,
 } from './destinationMakers/index.js';
 
+// Protocol handler strategy pattern
+export type {
+  ProtocolHandler,
+  ProtocolConfig
+} from './protocolHandler.js';
+
+export {
+  X402ProtocolHandler
+} from './x402ProtocolHandler.js';
+
+export {
+  ATXPProtocolHandler
+} from './atxpProtocolHandler.js';
+
