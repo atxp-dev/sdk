@@ -30,10 +30,7 @@
     "prepack": "npm run build && npm run typecheck",
     "pack:dry": "npm pack --dry-run"
   },
-  "dependencies": {
-    "@atxp/common": "0.10.7",
-    "bignumber.js": "^9.3.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^25.0.3",
     "@typescript-eslint/eslint-plugin": "^8.51.0",

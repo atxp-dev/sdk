@@ -523,6 +523,71 @@ describe('MPPProtocolHandler', () => {
       // Should NOT have retried with payment header (only 1 call: /authorize/mpp)
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
+
+    it('should preserve original response headers and statusText in reconstructed response', async () => {
+      const mockOnPaymentFailure = vi.fn();
+      const config: ProtocolConfig = {
+        account: createMockAccount(),
+        logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
+        fetchFn: vi.fn(),
+        approvePayment: async () => false,
+        onPayment: async () => {},
+        onPaymentFailure: mockOnPaymentFailure,
+      };
+
+      const response = new Response('payment body', {
+        status: 402,
+        statusText: 'Payment Required',
+        headers: {
+          'WWW-Authenticate': createMPPWWWAuthenticateHeader(),
+          'X-Custom-Header': 'custom-value',
+        },
+      });
+
+      const result = await handler.handlePaymentChallenge(
+        response,
+        { url: 'https://example.com/api' },
+        config
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe(402);
+      expect(result!.statusText).toBe('Payment Required');
+      expect(result!.headers.get('X-Custom-Header')).toBe('custom-value');
+    });
+
+    it('should preserve headers/statusText on authorize fallback', async () => {
+      const mockFetch = vi.fn();
+      mockFetch.mockResolvedValueOnce(new Response('Not Found', { status: 404 }));
+
+      const config: ProtocolConfig = {
+        account: createMockAccount(),
+        logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
+        fetchFn: mockFetch,
+        approvePayment: async () => true,
+        onPayment: async () => {},
+        onPaymentFailure: async () => {},
+      };
+
+      const response = new Response('', {
+        status: 402,
+        statusText: 'Payment Required',
+        headers: {
+          'WWW-Authenticate': createMPPWWWAuthenticateHeader(),
+          'X-Request-Id': 'req-123',
+        },
+      });
+
+      const result = await handler.handlePaymentChallenge(
+        response,
+        { url: 'https://example.com/api' },
+        config
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.statusText).toBe('Payment Required');
+      expect(result!.headers.get('X-Request-Id')).toBe('req-123');
+    });
   });
 });
 

@@ -189,20 +189,60 @@ export class TempoPaymentMaker implements PaymentMaker {
     return new PaymentNetworkErrorClass('tempo', errorMessage || 'Unknown error', error as Error);
   }
 
-  async makePayment(destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> {
-    // Filter to tempo chain destinations
-    const tempoDestinations = destinations.filter(d => d.chain === 'tempo');
+  /**
+   * Encode a TIP-20 transfer call, using transferWithMemo when a memo is provided.
+   */
+  private encodeTransferData(receiver: string, amountInUnits: bigint, memo: string): Hex {
+    if (memo && memo.length > 0) {
+      const memoBytes = toHex(new TextEncoder().encode(memo));
+      return encodeFunctionData({
+        abi: TIP20_ABI,
+        functionName: "transferWithMemo",
+        args: [receiver as Address, amountInUnits, memoBytes],
+      });
+    }
+    return encodeFunctionData({
+      abi: TIP20_ABI,
+      functionName: "transfer",
+      args: [receiver as Address, amountInUnits],
+    });
+  }
 
+  /**
+   * Send a transaction and wait for confirmation, throwing on revert.
+   */
+  private async sendAndConfirm(chain: ReturnType<typeof getTempoChain>, data: Hex): Promise<string> {
+    const hash = await this.signingClient.sendTransaction({
+      chain,
+      account: this.signingClient.account!,
+      to: PATHUSD_CONTRACT_ADDRESS_TEMPO as Address,
+      data,
+      value: parseEther('0'),
+    });
+
+    this.logger.info(`Waiting for transaction confirmation: ${hash}`);
+    const receipt = await this.signingClient.waitForTransactionReceipt({
+      hash: hash as Hex,
+      confirmations: 1
+    });
+
+    if (receipt.status === 'reverted') {
+      throw new TransactionRevertedError(hash, 'tempo');
+    }
+
+    this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
+    return hash;
+  }
+
+  async makePayment(destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> {
+    const tempoDestinations = destinations.filter(d => d.chain === 'tempo');
     if (tempoDestinations.length === 0) {
       this.logger.debug('TempoPaymentMaker: No tempo destinations found, cannot handle payment');
       return null;
     }
 
-    // Pick first tempo destination
     const dest = tempoDestinations[0];
-    const amount = dest.amount;
-    const currency = dest.currency;
-    const receiver = dest.address;
+    const { amount, currency, address: receiver } = dest;
 
     if (currency.toUpperCase() !== 'USDC') {
       throw new UnsupportedCurrencyError(currency, 'tempo', ['USDC']);
@@ -210,59 +250,12 @@ export class TempoPaymentMaker implements PaymentMaker {
 
     this.logger.info(`Making payment of ${amount} ${currency} to ${receiver} on Tempo from ${this.signingClient.account!.address}`);
 
-    const chain = getTempoChain(this.chainId);
-
     try {
-      // Check balance before attempting payment
       await this.checkBalance(amount, currency);
-
-      // Convert amount to pathUSD units (6 decimals) as BigInt
       const amountInUnits = BigInt(amount.multipliedBy(10 ** PATHUSD_DECIMALS).toFixed(0));
-
-      let data: Hex;
-      if (memo && memo.length > 0) {
-        // Use transferWithMemo when a memo is provided
-        const memoBytes = toHex(new TextEncoder().encode(memo));
-        data = encodeFunctionData({
-          abi: TIP20_ABI,
-          functionName: "transferWithMemo",
-          args: [receiver as Address, amountInUnits, memoBytes],
-        });
-      } else {
-        // Use standard transfer when no memo
-        data = encodeFunctionData({
-          abi: TIP20_ABI,
-          functionName: "transfer",
-          args: [receiver as Address, amountInUnits],
-        });
-      }
-
-      const hash = await this.signingClient.sendTransaction({
-        chain,
-        account: this.signingClient.account!,
-        to: PATHUSD_CONTRACT_ADDRESS_TEMPO as Address,
-        data: data,
-        value: parseEther('0'),
-      });
-
-      // Wait for transaction confirmation
-      this.logger.info(`Waiting for transaction confirmation: ${hash}`);
-      const receipt = await this.signingClient.waitForTransactionReceipt({
-        hash: hash as Hex,
-        confirmations: 1
-      });
-
-      if (receipt.status === 'reverted') {
-        throw new TransactionRevertedError(hash, 'tempo');
-      }
-
-      this.logger.info(`Transaction confirmed: ${hash} in block ${receipt.blockNumber}`);
-
-      return {
-        transactionId: hash,
-        chain: 'tempo',
-        currency: 'USDC'
-      };
+      const data = this.encodeTransferData(receiver, amountInUnits, memo);
+      const hash = await this.sendAndConfirm(getTempoChain(this.chainId), data);
+      return { transactionId: hash, chain: 'tempo', currency: 'USDC' };
     } catch (error) {
       throw this.classifyError(error);
     }

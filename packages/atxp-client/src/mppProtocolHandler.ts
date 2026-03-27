@@ -70,7 +70,7 @@ export class MPPProtocolHandler implements ProtocolHandler {
     originalRequest: { url: string | URL; init?: RequestInit },
     config: ProtocolConfig
   ): Promise<Response | null> {
-    const { account, logger, approvePayment, onPaymentFailure } = config;
+    const { account, logger, approvePayment } = config;
 
     // Extract the challenge and body text from the response
     const extracted = await this.extractChallenge(response, logger);
@@ -92,19 +92,11 @@ export class MPPProtocolHandler implements ProtocolHandler {
     const approved = await approvePayment(prospectivePayment);
     if (!approved) {
       logger.info('MPP: payment not approved');
-      const error = new Error('Payment not approved');
-      await onPaymentFailure({
-        payment: prospectivePayment,
-        error,
-        attemptedNetworks: [challenge.network],
-        failureReasons: new Map([[challenge.network, error]]),
-        retryable: true,
-        timestamp: new Date(),
-      });
-      return this.reconstructResponse(bodyText, response.status);
+      await this.reportFailure(config, prospectivePayment, new Error('Payment not approved'), challenge.network, true);
+      return this.reconstructResponse(bodyText, response);
     }
 
-    return this.authorizeAndRetry(challenge, prospectivePayment, originalRequest, config, bodyText, response.status);
+    return this.authorizeAndRetry(challenge, prospectivePayment, originalRequest, config, bodyText, response);
   }
 
   /**
@@ -170,6 +162,26 @@ export class MPPProtocolHandler implements ProtocolHandler {
   }
 
   /**
+   * Report a payment failure via the onPaymentFailure callback.
+   */
+  private async reportFailure(
+    config: ProtocolConfig,
+    payment: ProspectivePayment,
+    error: Error,
+    network: string,
+    retryable: boolean
+  ): Promise<void> {
+    await config.onPaymentFailure({
+      payment,
+      error,
+      attemptedNetworks: [network],
+      failureReasons: new Map([[network, error]]),
+      retryable,
+      timestamp: new Date(),
+    });
+  }
+
+  /**
    * Call /authorize/mpp on accounts service and retry the original request with the credential.
    */
   private async authorizeAndRetry(
@@ -178,9 +190,9 @@ export class MPPProtocolHandler implements ProtocolHandler {
     originalRequest: { url: string | URL; init?: RequestInit },
     config: ProtocolConfig,
     bodyText: string,
-    originalStatus?: number
+    originalResponse: Response
   ): Promise<Response> {
-    const { logger, fetchFn, onPayment, onPaymentFailure } = config;
+    const { logger, fetchFn, onPayment } = config;
 
     try {
       logger.debug('MPP: calling /authorize/mpp on accounts service');
@@ -191,16 +203,12 @@ export class MPPProtocolHandler implements ProtocolHandler {
       });
 
       if (!authorizeResponse.ok) {
-        // Graceful fallback: return original response with original status
         logger.debug('MPP: /authorize/mpp not available, returning original response');
-        return this.reconstructResponse(bodyText, originalStatus);
+        return this.reconstructResponse(bodyText, originalResponse);
       }
 
       const authorizeResult = await authorizeResponse.json() as { credential: string; expiresAt: string };
-      const credential = authorizeResult.credential;
-
-      // Retry request with Authorization: Payment header
-      const retryHeaders = this.buildRetryHeaders(originalRequest.init?.headers, credential);
+      const retryHeaders = this.buildRetryHeaders(originalRequest.init?.headers, authorizeResult.credential);
       const retryInit: RequestInit = { ...originalRequest.init, headers: retryHeaders };
 
       logger.info('MPP: retrying request with Authorization: Payment header');
@@ -208,45 +216,25 @@ export class MPPProtocolHandler implements ProtocolHandler {
 
       if (retryResponse.ok) {
         logger.info('MPP: payment accepted');
-        await onPayment({
-          payment: prospectivePayment,
-          transactionHash: challenge.id,
-          network: challenge.network,
-        });
+        await onPayment({ payment: prospectivePayment, transactionHash: challenge.id, network: challenge.network });
       } else {
         logger.warn(`MPP: request failed after payment with status ${retryResponse.status}`);
-        const error = new Error(`Request failed with status ${retryResponse.status}`);
-        await onPaymentFailure({
-          payment: prospectivePayment,
-          error,
-          attemptedNetworks: [challenge.network],
-          failureReasons: new Map([[challenge.network, error]]),
-          retryable: false,
-          timestamp: new Date(),
-        });
+        await this.reportFailure(config, prospectivePayment, new Error(`Request failed with status ${retryResponse.status}`), challenge.network, false);
       }
 
       return retryResponse;
     } catch (error) {
       logger.error(`MPP: failed to handle payment challenge: ${error}`);
-
-      const typedError = error as Error;
-      await onPaymentFailure({
-        payment: prospectivePayment,
-        error: typedError,
-        attemptedNetworks: [challenge.network],
-        failureReasons: new Map([[challenge.network, typedError]]),
-        retryable: true,
-        timestamp: new Date(),
-      });
-
-      return this.reconstructResponse(bodyText);
+      await this.reportFailure(config, prospectivePayment, error as Error, challenge.network, true);
+      return this.reconstructResponse(bodyText, originalResponse);
     }
   }
 
-  private reconstructResponse(body: string, status?: number): Response {
+  private reconstructResponse(body: string, original: Response): Response {
     return new Response(body || null, {
-      status: status ?? 402,
+      status: original.status,
+      statusText: original.statusText,
+      headers: original.headers,
     });
   }
 
