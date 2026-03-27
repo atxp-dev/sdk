@@ -201,7 +201,8 @@ export class MPPProtocolHandler implements ProtocolHandler {
       return retryResponse;
     } catch (error) {
       logger.error(`MPP: failed to handle payment challenge: ${error}`);
-      await this.reportFailure(config, prospectivePayment, error as Error, challenge.network, true);
+      const cause = error instanceof Error ? error : new Error(String(error));
+      await this.reportFailure(config, prospectivePayment, cause, challenge.network, true);
       return this.reconstructResponse(bodyText, originalResponse);
     }
   }
