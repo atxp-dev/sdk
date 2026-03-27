@@ -178,11 +178,6 @@ describe('TempoPaymentMaker', () => {
     });
 
     it('throws UnsupportedCurrencyError for non-USDC currency', async () => {
-      const destinations: Destination[] = [
-        { chain: 'tempo', currency: 'USDC' as any, address: '0x1234567890123456789012345678901234567890', amount: new BigNumber('1.0') },
-      ];
-
-      // Override the currency check - we need a non-USDC currency
       const nonUsdcDestinations: Destination[] = [
         { chain: 'tempo', currency: 'ETH' as any, address: '0x1234567890123456789012345678901234567890', amount: new BigNumber('1.0') },
       ];

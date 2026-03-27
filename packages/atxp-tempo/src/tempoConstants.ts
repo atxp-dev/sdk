@@ -28,7 +28,7 @@ export const getTempoPathUSDAddress = (chainId: number): string => {
 export const tempoMainnet = {
   id: TEMPO_MAINNET_CHAIN_ID,
   name: 'Tempo',
-  nativeCurrency: { name: 'TEMPO', symbol: 'TEMPO', decimals: 18 },
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: {
     default: { http: ['https://rpc.tempo.xyz'] },
   },
@@ -40,7 +40,7 @@ export const tempoMainnet = {
 export const tempoTestnet = {
   id: TEMPO_TESTNET_CHAIN_ID,
   name: 'Tempo Moderato',
-  nativeCurrency: { name: 'TEMPO', symbol: 'TEMPO', decimals: 18 },
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: {
     default: { http: ['https://rpc.moderato.tempo.xyz'] },
   },

@@ -40,7 +40,7 @@ describe('TempoAccount', () => {
   it('can specify testnet chainId', async () => {
     const account = new TempoAccount('https://rpc.moderato.tempo.xyz', TEST_PRIVATE_KEY, TEMPO_TESTNET_CHAIN_ID);
     const id = await account.getAccountId();
-    expect(id).toMatch(/^tempo:0x/);
+    expect(id).toMatch(/^tempo_moderato:0x/);
     expect(account.paymentMakers).toHaveLength(1);
   });
 

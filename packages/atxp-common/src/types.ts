@@ -49,7 +49,8 @@ export enum ChainEnum {
   Tempo = 'tempo',
   BaseSepolia = 'base_sepolia',
   WorldSepolia = 'world_sepolia',
-  PolygonAmoy = 'polygon_amoy'
+  PolygonAmoy = 'polygon_amoy',
+  TempoModerato = 'tempo_moderato'
 }
 export type Chain = `${ChainEnum}`;
 

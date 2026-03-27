@@ -1,4 +1,4 @@
-import type { FetchLike, Logger } from '@atxp/common';
+import type { FetchLike, Logger, AccountId } from '@atxp/common';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import type { ProspectivePayment } from './types.js';
 import {
@@ -70,14 +70,15 @@ export class MPPProtocolHandler implements ProtocolHandler {
     originalRequest: { url: string | URL; init?: RequestInit },
     config: ProtocolConfig
   ): Promise<Response | null> {
-    const { account, logger, fetchFn, approvePayment, onPayment, onPaymentFailure } = config;
+    const { account, logger, approvePayment, onPaymentFailure } = config;
 
-    // Parse the MPP challenge from either HTTP header or MCP error body
-    const challenge = await this.extractChallenge(response, logger);
-    if (!challenge) {
+    // Extract the challenge and body text from the response
+    const extracted = await this.extractChallenge(response, logger);
+    if (!extracted) {
       logger.error('MPP: failed to extract challenge from response');
       return null;
     }
+    const { challenge, bodyText } = extracted;
 
     const url = typeof originalRequest.url === 'string'
       ? originalRequest.url
@@ -85,15 +86,7 @@ export class MPPProtocolHandler implements ProtocolHandler {
 
     // Build prospective payment for approval
     const accountId = await account.getAccountId();
-    const amountNum = Number(challenge.amount) / (10 ** 6);
-    const prospectivePayment: ProspectivePayment = {
-      accountId,
-      resourceUrl: url,
-      resourceName: url,
-      currency: challenge.currency as ProspectivePayment['currency'],
-      amount: new BigNumber(amountNum),
-      iss: challenge.recipient,
-    };
+    const prospectivePayment = this.buildProspectivePayment(challenge, url, accountId);
 
     // Ask for approval
     const approved = await approvePayment(prospectivePayment);
@@ -108,10 +101,87 @@ export class MPPProtocolHandler implements ProtocolHandler {
         retryable: true,
         timestamp: new Date(),
       });
-      return this.reconstructResponse(response);
+      return this.reconstructResponse(bodyText, response.status);
     }
 
-    // Call /authorize/mpp on accounts service
+    return this.authorizeAndRetry(challenge, prospectivePayment, originalRequest, config, bodyText, response.status);
+  }
+
+  /**
+   * Extract MPP challenge from response - tries HTTP header first, then MCP error body.
+   * Returns both the challenge and the body text to avoid double-consumption.
+   */
+  private async extractChallenge(response: Response, logger: Logger): Promise<{ challenge: MPPChallenge; bodyText: string } | null> {
+    // Try HTTP header first
+    const header = response.headers.get('WWW-Authenticate');
+    if (header) {
+      const challenge = parseMPPHeader(header);
+      if (challenge) {
+        logger.debug('MPP: parsed challenge from WWW-Authenticate header');
+        // Read body text for later reconstruction even though we don't need it for parsing
+        let bodyText = '';
+        try {
+          bodyText = await response.text();
+        } catch {
+          // Body may not be available
+        }
+        return { challenge, bodyText };
+      }
+    }
+
+    // Try MCP error body
+    try {
+      const bodyText = await response.text();
+      const parsed = JSON.parse(bodyText);
+
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        typeof parsed.error === 'object' &&
+        parsed.error !== null &&
+        parsed.error.code === MPP_ERROR_CODE
+      ) {
+        const challenge = parseMPPFromMCPError(parsed.error.data);
+        if (challenge) {
+          logger.debug('MPP: parsed challenge from MCP error body');
+          return { challenge, bodyText };
+        }
+      }
+    } catch {
+      // Not JSON or malformed
+    }
+
+    return null;
+  }
+
+  /**
+   * Build a ProspectivePayment from an MPP challenge.
+   */
+  private buildProspectivePayment(challenge: MPPChallenge, url: string, accountId: AccountId): ProspectivePayment {
+    const amountNum = Number(challenge.amount) / (10 ** 6);
+    return {
+      accountId,
+      resourceUrl: url,
+      resourceName: url,
+      currency: challenge.currency as ProspectivePayment['currency'],
+      amount: new BigNumber(amountNum),
+      iss: challenge.recipient,
+    };
+  }
+
+  /**
+   * Call /authorize/mpp on accounts service and retry the original request with the credential.
+   */
+  private async authorizeAndRetry(
+    challenge: MPPChallenge,
+    prospectivePayment: ProspectivePayment,
+    originalRequest: { url: string | URL; init?: RequestInit },
+    config: ProtocolConfig,
+    bodyText: string,
+    originalStatus?: number
+  ): Promise<Response> {
+    const { logger, fetchFn, onPayment, onPaymentFailure } = config;
+
     try {
       logger.debug('MPP: calling /authorize/mpp on accounts service');
       const authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/mpp`, {
@@ -121,9 +191,9 @@ export class MPPProtocolHandler implements ProtocolHandler {
       });
 
       if (!authorizeResponse.ok) {
-        // Graceful fallback: return original response
+        // Graceful fallback: return original response with original status
         logger.debug('MPP: /authorize/mpp not available, returning original response');
-        return this.reconstructResponse(response);
+        return this.reconstructResponse(bodyText, originalStatus);
       }
 
       const authorizeResult = await authorizeResponse.json() as { credential: string; expiresAt: string };
@@ -170,55 +240,13 @@ export class MPPProtocolHandler implements ProtocolHandler {
         timestamp: new Date(),
       });
 
-      return this.reconstructResponse(response);
+      return this.reconstructResponse(bodyText);
     }
   }
 
-  /**
-   * Extract MPP challenge from response - tries HTTP header first, then MCP error body.
-   */
-  private async extractChallenge(response: Response, logger: Logger): Promise<MPPChallenge | null> {
-    // Try HTTP header first
-    const header = response.headers.get('WWW-Authenticate');
-    if (header) {
-      const challenge = parseMPPHeader(header);
-      if (challenge) {
-        logger.debug('MPP: parsed challenge from WWW-Authenticate header');
-        return challenge;
-      }
-    }
-
-    // Try MCP error body
-    try {
-      const cloned = response.clone();
-      const body = await cloned.text();
-      const parsed = JSON.parse(body);
-
-      if (
-        typeof parsed === 'object' &&
-        parsed !== null &&
-        typeof parsed.error === 'object' &&
-        parsed.error !== null &&
-        parsed.error.code === MPP_ERROR_CODE
-      ) {
-        const challenge = parseMPPFromMCPError(parsed.error.data);
-        if (challenge) {
-          logger.debug('MPP: parsed challenge from MCP error body');
-          return challenge;
-        }
-      }
-    } catch {
-      // Not JSON or malformed
-    }
-
-    return null;
-  }
-
-  private reconstructResponse(original: Response): Response {
-    return new Response(null, {
-      status: original.status,
-      statusText: original.statusText,
-      headers: original.headers,
+  private reconstructResponse(body: string, status?: number): Response {
+    return new Response(body || null, {
+      status: status ?? 402,
     });
   }
 

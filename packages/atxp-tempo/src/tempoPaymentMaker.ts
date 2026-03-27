@@ -127,8 +127,66 @@ export class TempoPaymentMaker implements PaymentMaker {
     const signature = toBase64Url(signResult);
 
     const jwt = `${header}.${payload}.${signature}`;
-    this.logger.info(`Generated ES256K JWT: ${jwt}`);
+    this.logger.debug(`Generated ES256K JWT: ${jwt}`);
     return jwt;
+  }
+
+  /**
+   * Check balance and throw InsufficientFundsError if insufficient.
+   */
+  private async checkBalance(amount: BigNumber, currency: Currency): Promise<void> {
+    const balanceRaw = await this.signingClient.readContract({
+      address: PATHUSD_CONTRACT_ADDRESS_TEMPO as Address,
+      abi: TIP20_ABI,
+      functionName: 'balanceOf',
+      args: [this.signingClient.account!.address],
+    }) as bigint;
+
+    const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** PATHUSD_DECIMALS);
+
+    if (balance.lt(amount)) {
+      this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
+      throw new InsufficientFundsErrorClass(currency, amount, balance, 'tempo');
+    }
+  }
+
+  /**
+   * Classify viem/blockchain errors into ATXPPaymentError subclasses.
+   */
+  private classifyError(error: unknown): Error {
+    if (error instanceof ATXPPaymentError) {
+      return error;
+    }
+
+    const errorMessage = (error as Error).message || '';
+    const errorName = (error as Error).name || '';
+
+    // User rejected in wallet
+    if (errorMessage.includes('User rejected') ||
+        errorMessage.includes('user rejected') ||
+        errorMessage.includes('User denied') ||
+        errorName === 'UserRejectedRequestError') {
+      return new UserRejectedError('tempo');
+    }
+
+    // Gas estimation failed
+    if (errorMessage.includes('gas') &&
+        (errorMessage.includes('estimation') || errorMessage.includes('estimate'))) {
+      return new GasEstimationError('tempo', errorMessage);
+    }
+
+    // RPC/network errors
+    if (errorMessage.includes('fetch failed') ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('ECONNREFUSED') ||
+        errorMessage.includes('ETIMEDOUT') ||
+        errorName === 'FetchError') {
+      return new RpcError('tempo', undefined, error as Error);
+    }
+
+    // Fallback to generic network error with original error attached
+    return new PaymentNetworkErrorClass('tempo', errorMessage || 'Unknown error', error as Error);
   }
 
   async makePayment(destinations: Destination[], memo: string, _paymentRequestId?: string): Promise<PaymentIdentifier | null> {
@@ -156,19 +214,7 @@ export class TempoPaymentMaker implements PaymentMaker {
 
     try {
       // Check balance before attempting payment
-      const balanceRaw = await this.signingClient.readContract({
-        address: PATHUSD_CONTRACT_ADDRESS_TEMPO as Address,
-        abi: TIP20_ABI,
-        functionName: 'balanceOf',
-        args: [this.signingClient.account!.address],
-      }) as bigint;
-
-      const balance = new BigNumber(balanceRaw.toString()).dividedBy(10 ** PATHUSD_DECIMALS);
-
-      if (balance.lt(amount)) {
-        this.logger.warn(`Insufficient ${currency} balance for payment. Required: ${amount}, Available: ${balance}`);
-        throw new InsufficientFundsErrorClass(currency, amount, balance, 'tempo');
-      }
+      await this.checkBalance(amount, currency);
 
       // Convert amount to pathUSD units (6 decimals) as BigInt
       const amountInUnits = BigInt(amount.multipliedBy(10 ** PATHUSD_DECIMALS).toFixed(0));
@@ -218,41 +264,7 @@ export class TempoPaymentMaker implements PaymentMaker {
         currency: 'USDC'
       };
     } catch (error) {
-      // Re-throw our custom payment errors
-      if (error instanceof ATXPPaymentError) {
-        throw error;
-      }
-
-      // Categorize viem/blockchain errors
-      const errorMessage = (error as Error).message || '';
-      const errorName = (error as Error).name || '';
-
-      // User rejected in wallet
-      if (errorMessage.includes('User rejected') ||
-          errorMessage.includes('user rejected') ||
-          errorMessage.includes('User denied') ||
-          errorName === 'UserRejectedRequestError') {
-        throw new UserRejectedError('tempo');
-      }
-
-      // Gas estimation failed
-      if (errorMessage.includes('gas') &&
-          (errorMessage.includes('estimation') || errorMessage.includes('estimate'))) {
-        throw new GasEstimationError('tempo', errorMessage);
-      }
-
-      // RPC/network errors
-      if (errorMessage.includes('fetch failed') ||
-          errorMessage.includes('network') ||
-          errorMessage.includes('timeout') ||
-          errorMessage.includes('ECONNREFUSED') ||
-          errorMessage.includes('ETIMEDOUT') ||
-          errorName === 'FetchError') {
-        throw new RpcError('tempo', undefined, error as Error);
-      }
-
-      // Fallback to generic network error with original error attached
-      throw new PaymentNetworkErrorClass('tempo', errorMessage || 'Unknown error', error as Error);
+      throw this.classifyError(error);
     }
   }
 }

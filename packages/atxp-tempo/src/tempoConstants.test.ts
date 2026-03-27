@@ -55,14 +55,14 @@ describe('tempoConstants', () => {
   describe('chain configs', () => {
     it('tempoMainnet has correct structure', () => {
       expect(tempoMainnet.id).toBe(4217);
-      expect(tempoMainnet.nativeCurrency.symbol).toBe('TEMPO');
+      expect(tempoMainnet.nativeCurrency.symbol).toBe('ETH');
       expect(tempoMainnet.nativeCurrency.decimals).toBe(18);
       expect(tempoMainnet.rpcUrls.default.http[0]).toBe('https://rpc.tempo.xyz');
     });
 
     it('tempoTestnet has correct structure', () => {
       expect(tempoTestnet.id).toBe(42431);
-      expect(tempoTestnet.nativeCurrency.symbol).toBe('TEMPO');
+      expect(tempoTestnet.nativeCurrency.symbol).toBe('ETH');
       expect(tempoTestnet.nativeCurrency.decimals).toBe(18);
       expect(tempoTestnet.rpcUrls.default.http[0]).toBe('https://rpc.moderato.tempo.xyz');
     });

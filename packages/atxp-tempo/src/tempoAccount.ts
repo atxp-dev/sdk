@@ -3,7 +3,7 @@ import type { AccountId, Source } from '@atxp/common';
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { TempoPaymentMaker } from './tempoPaymentMaker.js';
 import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
-import { getTempoChain, TEMPO_MAINNET_CHAIN_ID } from './tempoConstants.js';
+import { getTempoChain, TEMPO_MAINNET_CHAIN_ID, TEMPO_TESTNET_CHAIN_ID } from './tempoConstants.js';
 
 export class TempoAccount implements Account {
   private _accountId: AccountId;
@@ -24,8 +24,9 @@ export class TempoAccount implements Account {
 
     this.account = privateKeyToAccount(sourceSecretKey as Hex);
 
-    // Format accountId as network:address
-    this._accountId = `tempo:${this.account.address}` as AccountId;
+    // Format accountId as network:address (tempo for mainnet, tempo_moderato for testnet)
+    const network = resolvedChainId === TEMPO_TESTNET_CHAIN_ID ? 'tempo_moderato' : 'tempo';
+    this._accountId = `${network}:${this.account.address}` as AccountId;
     this.walletClient = createWalletClient({
       account: this.account,
       chain,
