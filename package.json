@@ -16,6 +16,8 @@
     "packages/atxp-polygon",
     "packages/atxp-express",
     "packages/atxp-cloudflare",
+    "packages/atxp-mpp",
+    "packages/atxp-tempo",
     "packages/atxp-x402"
   ],
   "repository": {

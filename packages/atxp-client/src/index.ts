@@ -101,3 +101,7 @@ export {
   ATXPProtocolHandler
 } from './atxpProtocolHandler.js';
 
+export {
+  MPPProtocolHandler
+} from './mppProtocolHandler.js';
+

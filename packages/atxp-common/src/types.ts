@@ -32,9 +32,11 @@ export enum NetworkEnum {
   Base = 'base',
   World = 'world',
   Polygon = 'polygon',
+  Tempo = 'tempo',
   BaseSepolia = 'base_sepolia',
   WorldSepolia = 'world_sepolia',
   PolygonAmoy = 'polygon_amoy',
+  TempoModerato = 'tempo_moderato',
   ATXP = 'atxp'
 }
 export type Network = `${NetworkEnum}`;
@@ -44,6 +46,7 @@ export enum ChainEnum {
   Base = 'base',
   World = 'world',
   Polygon = 'polygon',
+  Tempo = 'tempo',
   BaseSepolia = 'base_sepolia',
   WorldSepolia = 'world_sepolia',
   PolygonAmoy = 'polygon_amoy'
