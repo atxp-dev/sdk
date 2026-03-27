@@ -40,6 +40,12 @@ export function createDestinationMakers(config: DestinationMakerFactoryConfig): 
       case NetworkEnum.PolygonAmoy:
         makers.set(network, new PassthroughDestinationMaker(network));
         break;
+      case NetworkEnum.Tempo:
+        makers.set(network, new PassthroughDestinationMaker(network));
+        break;
+      case NetworkEnum.TempoModerato:
+        makers.set(network, new PassthroughDestinationMaker(network));
+        break;
       case NetworkEnum.ATXP:
         makers.set(network, new ATXPDestinationMaker(atxpAccountsServer, fetchFn));
         break;

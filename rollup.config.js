@@ -18,7 +18,7 @@ const createConfig = (packageName, options = {}) => {
     // Check exact matches first
     const exactMatches = [
       '@atxp/common', '@atxp/client', '@atxp/server', '@atxp/redis',
-      '@atxp/sqlite', '@atxp/base', '@atxp/x402', '@modelcontextprotocol/sdk',
+      '@atxp/sqlite', '@atxp/base', '@atxp/x402', '@atxp/mpp', '@modelcontextprotocol/sdk',
       '@modelcontextprotocol/sdk/types.js', '@modelcontextprotocol/sdk/client',
       'bignumber.js', 'oauth4webapi', 'jose', 'tweetnacl', 'tweetnacl-util',
       ...platformExternals[platform],
