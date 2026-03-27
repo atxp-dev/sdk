@@ -158,8 +158,8 @@ export class TempoPaymentMaker implements PaymentMaker {
       return error;
     }
 
-    const errorMessage = (error as Error).message || '';
-    const errorName = (error as Error).name || '';
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorName = error instanceof Error ? error.name : '';
 
     // User rejected in wallet
     if (errorMessage.includes('User rejected') ||
@@ -182,11 +182,13 @@ export class TempoPaymentMaker implements PaymentMaker {
         errorMessage.includes('ECONNREFUSED') ||
         errorMessage.includes('ETIMEDOUT') ||
         errorName === 'FetchError') {
-      return new RpcError('tempo', undefined, error as Error);
+      const cause = error instanceof Error ? error : new Error(errorMessage);
+      return new RpcError('tempo', undefined, cause);
     }
 
     // Fallback to generic network error with original error attached
-    return new PaymentNetworkErrorClass('tempo', errorMessage || 'Unknown error', error as Error);
+    const cause = error instanceof Error ? error : new Error(errorMessage);
+    return new PaymentNetworkErrorClass('tempo', errorMessage || 'Unknown error', cause);
   }
 
   /**

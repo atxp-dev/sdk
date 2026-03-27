@@ -1,4 +1,4 @@
-import type { FetchLike, Logger, AccountId } from '@atxp/common';
+import type { Logger, AccountId } from '@atxp/common';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import type { ProspectivePayment } from './types.js';
 import {
@@ -7,6 +7,7 @@ import {
   parseMPPHeader,
   parseMPPFromMCPError,
   hasMPPChallenge,
+  hasMPPMCPError,
 } from '@atxp/mpp';
 import { BigNumber } from 'bignumber.js';
 
@@ -36,33 +37,8 @@ export class MPPProtocolHandler implements ProtocolHandler {
   }
 
   async canHandle(response: Response): Promise<boolean> {
-    // Check HTTP-level MPP challenge (WWW-Authenticate: Payment header)
-    if (hasMPPChallenge(response)) {
-      return true;
-    }
-
-    // Check MCP-level MPP challenge (JSON-RPC error code -32042)
-    try {
-      const cloned = response.clone();
-      const body = await cloned.text();
-      if (!body) return false;
-
-      const parsed = JSON.parse(body);
-      if (
-        typeof parsed === 'object' &&
-        parsed !== null &&
-        typeof parsed.error === 'object' &&
-        parsed.error !== null &&
-        parsed.error.code === MPP_ERROR_CODE
-      ) {
-        const challenge = parseMPPFromMCPError(parsed.error.data);
-        return challenge !== null;
-      }
-
-      return false;
-    } catch {
-      return false;
-    }
+    if (hasMPPChallenge(response)) return true;
+    return hasMPPMCPError(response);
   }
 
   async handlePaymentChallenge(

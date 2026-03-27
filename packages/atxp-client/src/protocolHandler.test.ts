@@ -6,7 +6,7 @@ import { ATXPProtocolHandler } from './atxpProtocolHandler.js';
 import { MPPProtocolHandler } from './mppProtocolHandler.js';
 import { MPP_ERROR_CODE } from '@atxp/mpp';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
-import type { PaymentMaker, ProspectivePayment, PaymentFailureContext } from './types.js';
+import type { PaymentMaker } from './types.js';
 import { PassthroughDestinationMaker } from './destinationMakers/passthroughDestinationMaker.js';
 const DEFAULT_AUTHORIZATION_SERVER = 'https://auth.atxp.ai';
 
