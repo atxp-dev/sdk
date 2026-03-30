@@ -546,15 +546,16 @@ app.use(express.json());
 
 const logger = new ConsoleLogger({level: LogLevel.DEBUG});
 
-//const destinationConnectionString = process.env.ATXP_DESTINATION!;
-//const destination = new ATXPAccount(destinationConnectionString);
-const destinationAccountId = process.env.ATXP_DESTINATION_ACCOUNT!;
-const destination = new AccountIdDestination(destinationAccountId);
-console.log('Starting MCP server with destination', destinationAccountId);
+const destinationConnectionString = process.env.ATXP_DESTINATION!;
+const destination = new ATXPAccount(destinationConnectionString);
+//const destinationAccountId = process.env.ATXP_DESTINATION_ACCOUNT!;
+//const destination = new AccountIdDestination(destinationAccountId);
+const acctId = await destination.getAccountId();
+console.log('Starting MCP server with destination', acctId);
 
 app.use(atxpExpress({
   destination: destination,
-  //server: 'http://localhost:3010',
+  server: 'http://localhost:3010',
   payeeName: 'ATXP Client Example Resource Server',
   minimumPayment: BigNumber(0.01),
   allowHttp: true,
