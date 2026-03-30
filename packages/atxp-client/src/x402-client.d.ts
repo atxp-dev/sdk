@@ -2,8 +2,6 @@
 // The x402 package uses .mts types which require moduleResolution: "bundler"
 // Since atxp-client uses moduleResolution: "node", we declare the types here
 declare module 'x402/client' {
-  import type { LocalAccount } from 'viem';
-
   export interface PaymentRequirements {
     network: string;
     scheme: string;
