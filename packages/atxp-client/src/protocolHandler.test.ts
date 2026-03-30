@@ -186,6 +186,36 @@ describe('X402ProtocolHandler', () => {
         })
       );
     });
+
+    it('should handle invalid /authorize/x402 response (missing paymentHeader)', async () => {
+      const mockFetch = vi.fn();
+      // /authorize/x402 returns response without paymentHeader
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ invalid: 'response' }), { status: 200 })
+      );
+
+      const mockOnPaymentFailure = vi.fn();
+      const config: ProtocolConfig = {
+        account: createMockAccount(),
+        logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
+        fetchFn: mockFetch,
+        approvePayment: async () => true,
+        onPayment: async () => {},
+        onPaymentFailure: mockOnPaymentFailure,
+      };
+
+      const response = new Response(JSON.stringify(createX402Challenge()), { status: 402 });
+      const result = await handler.handlePaymentChallenge(
+        response,
+        { url: 'https://example.com/api' },
+        config
+      );
+
+      // Should fall back to reconstructed response
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe(402);
+      expect(mockOnPaymentFailure).toHaveBeenCalled();
+    });
   });
 });
 
@@ -211,6 +241,55 @@ describe('ATXPProtocolHandler', () => {
     it('should not match empty response', async () => {
       const response = new Response('', { status: 200 });
       expect(await handler.canHandle(response)).toBe(false);
+    });
+
+    it('should return false for canHandle throwing', async () => {
+      // Response that will cause JSON.parse to fail in extractPaymentRequests
+      const response = new Response('not valid json or sse', { status: 200 });
+      expect(await handler.canHandle(response)).toBe(false);
+    });
+  });
+
+  describe('handlePaymentChallenge', () => {
+    it('should return null instead of throwing (strategy pattern contract)', async () => {
+      const config: ProtocolConfig = {
+        account: createMockAccount(),
+        logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
+        fetchFn: vi.fn(),
+        approvePayment: async () => true,
+        onPayment: async () => {},
+        onPaymentFailure: async () => {},
+      };
+
+      const response = new Response(createMcpPaymentRequiredResponse(), { status: 200 });
+      const result = await handler.handlePaymentChallenge(
+        response,
+        { url: 'https://example.com/api' },
+        config
+      );
+
+      // Should return null, not throw - the fetcher's checkForATXPResponse handles the MCP flow
+      expect(result).toBeNull();
+    });
+
+    it('should return null for empty payment requests', async () => {
+      const config: ProtocolConfig = {
+        account: createMockAccount(),
+        logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
+        fetchFn: vi.fn(),
+        approvePayment: async () => true,
+        onPayment: async () => {},
+        onPaymentFailure: async () => {},
+      };
+
+      const response = new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: {} }), { status: 200 });
+      const result = await handler.handlePaymentChallenge(
+        response,
+        { url: 'https://example.com/api' },
+        config
+      );
+
+      expect(result).toBeNull();
     });
   });
 });
@@ -554,6 +633,49 @@ describe('MPPProtocolHandler', () => {
       expect(result!.status).toBe(402);
       expect(result!.statusText).toBe('Payment Required');
       expect(result!.headers.get('X-Custom-Header')).toBe('custom-value');
+    });
+
+    it('should handle invalid /authorize/mpp response (missing credential)', async () => {
+      const mockFetch = vi.fn();
+      // /authorize/mpp returns response without credential field
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ somethingElse: 'value' }), { status: 200 })
+      );
+
+      const mockOnPaymentFailure = vi.fn();
+      const config: ProtocolConfig = {
+        account: createMockAccount(),
+        logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
+        fetchFn: mockFetch,
+        approvePayment: async () => true,
+        onPayment: async () => {},
+        onPaymentFailure: mockOnPaymentFailure,
+      };
+
+      const response = new Response('', {
+        status: 402,
+        headers: { 'WWW-Authenticate': createMPPWWWAuthenticateHeader() },
+      });
+
+      const result = await handler.handlePaymentChallenge(
+        response,
+        { url: 'https://example.com/api' },
+        config
+      );
+
+      // Should fall back to reconstructed response, not crash
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe(402);
+      expect(mockOnPaymentFailure).toHaveBeenCalled();
+    });
+
+    it('should handle malformed MPP headers gracefully', async () => {
+      const response = new Response('', {
+        status: 402,
+        headers: { 'WWW-Authenticate': 'Bearer realm="test"' },
+      });
+
+      expect(await handler.canHandle(response)).toBe(false);
     });
 
     it('should preserve headers/statusText on authorize fallback', async () => {

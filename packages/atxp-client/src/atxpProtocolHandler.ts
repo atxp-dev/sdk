@@ -1,5 +1,4 @@
 import {
-  PAYMENT_REQUIRED_ERROR_CODE,
   type AuthorizationServerUrl,
 } from '@atxp/common';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
@@ -7,9 +6,7 @@ import {
   isSSEResponse,
   parseMcpMessages,
   parsePaymentRequests,
-  paymentRequiredError,
 } from '@atxp/common';
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Protocol handler for ATXP-MCP payment challenges.
@@ -50,25 +47,25 @@ export class ATXPProtocolHandler implements ProtocolHandler {
         return null;
       }
 
+      // ATXP-MCP payment challenges are handled through the fetcher's
+      // checkForATXPResponse → handlePaymentRequestError flow, not at
+      // the HTTP protocol handler level. Return null so the fetcher's
+      // existing MCP payment flow picks it up.
+      // This handler's role in the strategy pattern is detection via
+      // canHandle() for protocol selection (e.g., protocolFlag), not
+      // direct payment handling.
       if (paymentRequests.length > 1) {
-        throw new Error(
+        logger.warn(
           `ATXP: multiple payment requirements found in MCP response. ` +
           `The client does not support multiple payment requirements. ` +
           `${paymentRequests.map(pr => pr.url).join(', ')}`
         );
+      } else {
+        logger.info(`ATXP: payment requirement found in MCP response - ${paymentRequests[0].url}`);
       }
 
-      const { url, id } = paymentRequests[0];
-      logger.info(`ATXP: payment requirement found in MCP response - ${url}`);
-
-      // Throw the payment required error so the ATXPFetcher can handle it
-      // through its existing handlePaymentRequestError flow
-      throw paymentRequiredError(url, id);
+      return null;
     } catch (error) {
-      // Re-throw McpError so the fetcher can handle it
-      if ((error as McpError)?.code === PAYMENT_REQUIRED_ERROR_CODE) {
-        throw error;
-      }
       logger.error(`ATXP: error checking for payment requirements: ${error}`);
       return null;
     }

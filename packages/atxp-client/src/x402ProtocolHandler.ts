@@ -31,6 +31,32 @@ function isX402Challenge(obj: unknown): obj is X402Challenge {
  * Configuration for X402 protocol handler.
  * accountsServer is the base URL for the accounts service (for /authorize/x402).
  */
+/**
+ * Type guard for accounts with origin and token properties (e.g., ATXPLocalAccount).
+ */
+interface AccountWithOrigin {
+  origin: string;
+  token: string;
+  fetchFn?: FetchLike;
+}
+
+function hasOriginAndToken(account: unknown): account is AccountWithOrigin {
+  const candidate = account as Record<string, unknown>;
+  return typeof candidate?.origin === 'string' && typeof candidate?.token === 'string';
+}
+
+/**
+ * Type guard for accounts with a getLocalAccount method.
+ */
+interface AccountWithLocalAccount {
+  getLocalAccount: () => unknown;
+}
+
+function hasGetLocalAccount(account: unknown): account is AccountWithLocalAccount {
+  const candidate = account as Record<string, unknown>;
+  return typeof candidate?.getLocalAccount === 'function';
+}
+
 export interface X402ProtocolHandlerConfig {
   accountsServer?: string;
 }
@@ -129,19 +155,30 @@ export class X402ProtocolHandler implements ProtocolHandler {
 
       // Try /authorize/x402 on accounts service first
       logger.debug('X402: calling /authorize/x402 on accounts service');
-      const authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/x402`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentRequirements: paymentChallenge.accepts,
-          selectedRequirement: selectedPaymentRequirements
-        })
-      });
+      const authorizeController = new AbortController();
+      const authorizeTimeout = setTimeout(() => authorizeController.abort(), 30000);
+      let authorizeResponse: Response;
+      try {
+        authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/x402`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentRequirements: paymentChallenge.accepts,
+            selectedRequirement: selectedPaymentRequirements
+          }),
+          signal: authorizeController.signal,
+        });
+      } finally {
+        clearTimeout(authorizeTimeout);
+      }
 
       let paymentHeader: string;
 
       if (authorizeResponse.ok) {
-        const authorizeResult = await authorizeResponse.json() as { paymentHeader: string };
+        const authorizeResult = await authorizeResponse.json() as Record<string, unknown>;
+        if (!authorizeResult.paymentHeader || typeof authorizeResult.paymentHeader !== 'string') {
+          throw new Error('X402: /authorize/x402 response missing or invalid paymentHeader');
+        }
         paymentHeader = authorizeResult.paymentHeader;
       } else {
         // Fallback: use local signer
@@ -246,14 +283,12 @@ export class X402ProtocolHandler implements ProtocolHandler {
     try {
       const { ATXPLocalAccount } = await import('./atxpLocalAccount.js');
 
-      const atxpAccount = account as { origin?: string; token?: string; fetchFn?: FetchLike };
-      if (atxpAccount.origin && atxpAccount.token) {
-        return ATXPLocalAccount.create(atxpAccount.origin, atxpAccount.token, atxpAccount.fetchFn);
+      if (hasOriginAndToken(account)) {
+        return ATXPLocalAccount.create(account.origin, account.token, account.fetchFn);
       }
 
-      const baseAccount = account as { getLocalAccount?: () => unknown };
-      if (typeof baseAccount.getLocalAccount === 'function') {
-        return baseAccount.getLocalAccount();
+      if (hasGetLocalAccount(account)) {
+        return account.getLocalAccount();
       }
 
       return null;
@@ -268,8 +303,8 @@ export class X402ProtocolHandler implements ProtocolHandler {
     fetchFn: FetchLike,
     logger: Logger
   ): Promise<void> {
-    const atxpAccount = account as { origin?: string; token?: string; fetchFn?: FetchLike };
-    if (!atxpAccount.origin || !atxpAccount.token) return;
+    if (!hasOriginAndToken(account)) return;
+    const atxpAccount = account;
 
     logger.debug('X402: ensuring sufficient on-chain USDC');
     const ensureResponse = await (atxpAccount.fetchFn || fetchFn)(`${atxpAccount.origin}/ensure-currency`, {

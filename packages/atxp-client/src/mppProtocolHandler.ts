@@ -80,26 +80,26 @@ export class MPPProtocolHandler implements ProtocolHandler {
    * Returns both the challenge and the body text to avoid double-consumption.
    */
   private async extractChallenge(response: Response, logger: Logger): Promise<{ challenge: MPPChallenge; bodyText: string } | null> {
+    // Read body once upfront to avoid double consumption (response.text() can only be called once)
+    let bodyText = '';
+    try {
+      bodyText = await response.text();
+    } catch {
+      // Body may not be available
+    }
+
     // Try HTTP header first
     const header = response.headers.get('WWW-Authenticate');
     if (header) {
       const challenge = parseMPPHeader(header);
       if (challenge) {
         logger.debug('MPP: parsed challenge from WWW-Authenticate header');
-        // Read body text for later reconstruction even though we don't need it for parsing
-        let bodyText = '';
-        try {
-          bodyText = await response.text();
-        } catch {
-          // Body may not be available
-        }
         return { challenge, bodyText };
       }
     }
 
     // Try MCP error body
     try {
-      const bodyText = await response.text();
       const parsed = JSON.parse(bodyText);
 
       if (
@@ -172,18 +172,29 @@ export class MPPProtocolHandler implements ProtocolHandler {
 
     try {
       logger.debug('MPP: calling /authorize/mpp on accounts service');
-      const authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/mpp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challenge }),
-      });
+      const authorizeController = new AbortController();
+      const authorizeTimeout = setTimeout(() => authorizeController.abort(), 30000);
+      let authorizeResponse: Response;
+      try {
+        authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/mpp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ challenge }),
+          signal: authorizeController.signal,
+        });
+      } finally {
+        clearTimeout(authorizeTimeout);
+      }
 
       if (!authorizeResponse.ok) {
         logger.debug('MPP: /authorize/mpp not available, returning original response');
         return this.reconstructResponse(bodyText, originalResponse);
       }
 
-      const authorizeResult = await authorizeResponse.json() as { credential: string; expiresAt: string };
+      const authorizeResult = await authorizeResponse.json() as Record<string, unknown>;
+      if (!authorizeResult.credential || typeof authorizeResult.credential !== 'string') {
+        throw new Error('MPP: /authorize/mpp response missing or invalid credential');
+      }
       const retryHeaders = this.buildRetryHeaders(originalRequest.init?.headers, authorizeResult.credential);
       const retryInit: RequestInit = { ...originalRequest.init, headers: retryHeaders };
 
