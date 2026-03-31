@@ -23,7 +23,7 @@ export function mockAccount(accountId: string): Account {
     getSources: async () => [],
     createSpendPermission: async () => null,
     authorize: async () => ({ protocol: 'atxp' as const, credential: '' }),
-  } as Account;
+  };
 }
 
 export function charge({
