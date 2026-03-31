@@ -44,21 +44,19 @@ export function buildPaymentHeaders(result: AuthorizeResult, originalHeaders?: H
  * account.authorize() for the actual authorization logic.
  */
 export class PaymentClient {
-  private accountsServer: string;
   private protocolFlag?: ProtocolFlag;
   private logger: Logger;
-  private fetchFn: FetchLike;
 
   constructor(config: {
-    accountsServer: string;
     protocolFlag?: ProtocolFlag;
     logger: Logger;
+    /** @deprecated No longer used — authorization delegates to account.authorize() */
+    accountsServer?: string;
+    /** @deprecated No longer used — authorization delegates to account.authorize() */
     fetchFn?: FetchLike;
   }) {
-    this.accountsServer = config.accountsServer;
     this.protocolFlag = config.protocolFlag;
     this.logger = config.logger;
-    this.fetchFn = config.fetchFn ?? fetch;
   }
 
   /**

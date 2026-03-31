@@ -115,6 +115,8 @@ export class ProtocolSettlement {
     private readonly authServer: AuthorizationServerUrl,
     private readonly logger: Logger,
     private readonly fetchFn: FetchLike = fetch.bind(globalThis),
+    /** Destination account ID for ATXP settle (the server/LLM's own account) */
+    private readonly destinationAccountId?: string,
   ) {}
 
   /**
@@ -191,11 +193,21 @@ export class ProtocolSettlement {
     }
 
     // ATXP: auth expects { sourceAccountId, destinationAccountId, sourceAccountToken, options }
+    // The credential is a self-contained JSON string from PaymentClient/ATXPAccount.authorize()
+    // containing sourceAccountId, sourceAccountToken, and options.
+    // destinationAccountId comes from this instance's config (it's the server's own account).
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = JSON.parse(credential);
+    } catch {
+      this.logger.warn('ProtocolSettlement: ATXP credential is not valid JSON, using context fallback');
+    }
+
     return {
-      sourceAccountId: context?.sourceAccountId,
-      destinationAccountId: context?.destinationAccountId,
-      sourceAccountToken: credential,
-      options: context?.options ?? [],
+      sourceAccountId: parsed.sourceAccountId ?? context?.sourceAccountId,
+      destinationAccountId: this.destinationAccountId ?? context?.destinationAccountId,
+      sourceAccountToken: parsed.sourceAccountToken ?? credential,
+      options: parsed.options ?? context?.options ?? [],
     };
   }
 }
