@@ -77,12 +77,16 @@ export class BaseAccount implements Account {
     switch (protocol) {
       case 'x402': {
         const { createPaymentHeader } = await import('x402/client');
-        const paymentRequirements = params.paymentRequirements as Record<string, unknown> | undefined;
-        const x402Version = (paymentRequirements?.x402Version as number) || 1;
+        if (!params.paymentRequirements) {
+          throw new Error('BaseAccount: x402 authorize requires paymentRequirements');
+        }
+        const reqs = params.paymentRequirements as Record<string, unknown>;
+        const x402Version = (reqs.x402Version as number) || 1;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const paymentHeader = await createPaymentHeader(
           this.getLocalAccount(),
           x402Version,
-          paymentRequirements
+          reqs as any,
         );
         return { protocol, credential: paymentHeader as string };
       }
