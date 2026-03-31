@@ -76,6 +76,7 @@ export {
   type Account,
   type AuthorizeParams,
   type AuthorizeResult,
+  AuthorizationError,
   type MeResponse,
   type Source,
   extractAddressFromAccountId,

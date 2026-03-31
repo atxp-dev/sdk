@@ -1,5 +1,6 @@
 import type { Account, PaymentMaker, MeResponse, AuthorizeParams, AuthorizeResult } from './types.js';
 import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain, Source } from './types.js';
+import { AuthorizationError } from './types.js';
 import BigNumber from 'bignumber.js';
 
 function toBasicAuth(token: string): string {
@@ -357,7 +358,16 @@ export class ATXPAccount implements Account {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`ATXPAccount: /authorize/${protocol} failed (${response.status}): ${errorText}`);
+      let errorCode = 'authorization_failed';
+      try {
+        const parsed = JSON.parse(errorText);
+        errorCode = parsed.error || errorCode;
+      } catch { /* not JSON */ }
+      throw new AuthorizationError(
+        `ATXPAccount: /authorize/${protocol} failed (${response.status}): ${errorText}`,
+        response.status,
+        errorCode,
+      );
     }
 
     const responseBody = await response.json() as Record<string, unknown>;

@@ -214,6 +214,22 @@ export interface AuthorizeResult {
 }
 
 /**
+ * Error thrown when authorization fails.
+ * Includes HTTP status code and error code for structured error handling.
+ */
+export class AuthorizationError extends Error {
+  public readonly statusCode: number;
+  public readonly errorCode: string;
+
+  constructor(message: string, statusCode: number, errorCode: string) {
+    super(message);
+    this.name = 'AuthorizationError';
+    this.statusCode = statusCode;
+    this.errorCode = errorCode;
+  }
+}
+
+/**
  * Full account interface that can both receive and make payments.
  * Extends PaymentDestination so any Account can be used as a destination.
  */

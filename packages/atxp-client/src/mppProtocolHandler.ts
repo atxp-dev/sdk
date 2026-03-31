@@ -1,4 +1,5 @@
 import type { Logger, AccountId } from '@atxp/common';
+import { AuthorizationError } from '@atxp/common';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import type { ProspectivePayment } from './types.js';
 import {
@@ -190,14 +191,12 @@ export class MPPProtocolHandler implements ProtocolHandler {
           challenge,
         });
       } catch (authorizeError) {
-        // Distinguish between server unavailable (HTTP error) and bad response data
-        const msg = authorizeError instanceof Error ? authorizeError.message : String(authorizeError);
-        if (msg.includes('/authorize/mpp failed')) {
-          // Server returned non-OK status -- graceful fallback
-          logger.debug('MPP: /authorize/mpp not available, returning original response');
+        // AuthorizationError = server rejected the request (HTTP error from accounts)
+        // Other errors = data validation or network failure
+        if (authorizeError instanceof AuthorizationError) {
+          logger.debug(`MPP: /authorize/mpp rejected (${authorizeError.statusCode}), returning original response`);
           return this.reconstructResponse(bodyText, originalResponse);
         }
-        // Data validation error (e.g. missing credential) -- let it propagate
         throw authorizeError;
       }
 
