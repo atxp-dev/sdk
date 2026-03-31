@@ -1,15 +1,8 @@
-import type { PaymentProtocol, ProtocolFlag, FetchLike, Logger, Account } from '@atxp/common';
+import type { PaymentProtocol, ProtocolFlag, FetchLike, Logger, Account, AuthorizeResult } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 
-/**
- * Result of authorizing a payment through the accounts service.
- * The credential is opaque to the caller -- its format depends on the protocol.
- */
-export interface AuthorizeResult {
-  protocol: PaymentProtocol;
-  /** Opaque credential string whose interpretation depends on the protocol */
-  credential: string;
-}
+// Re-export AuthorizeResult from common so existing imports keep working
+export type { AuthorizeResult } from '@atxp/common';
 
 /**
  * Build protocol-specific payment headers for retrying a request after authorization.
@@ -45,10 +38,10 @@ export function buildPaymentHeaders(result: AuthorizeResult, originalHeaders?: H
 }
 
 /**
- * Client for authorizing payments through the ATXP accounts service.
+ * Client for authorizing payments.
  *
- * Centralizes the logic for calling /authorize/{protocol} endpoints,
- * replacing duplicated code across protocol handlers.
+ * Resolves the payment protocol via protocolFlag, then delegates to
+ * account.authorize() for the actual authorization logic.
  */
 export class PaymentClient {
   private accountsServer: string;
@@ -69,14 +62,17 @@ export class PaymentClient {
   }
 
   /**
-   * Authorize a payment through the accounts service.
+   * Authorize a payment by delegating to the account's authorize method.
    *
-   * @param params.account - Account with .token for Basic auth
+   * PaymentClient resolves the protocol (via explicit param or protocolFlag),
+   * then delegates all protocol-specific logic to account.authorize().
+   *
+   * @param params.account - The account to authorize the payment through
    * @param params.userId - Passed to protocolFlag for protocol selection
-   * @param params.destination - Passed to protocolFlag for protocol selection
+   * @param params.destination - Payment destination address
    * @param params.protocol - Explicit protocol override (skips protocolFlag)
-   * @param params.amount - Payment amount (ATXP)
-   * @param params.memo - Payment memo (ATXP)
+   * @param params.amount - Payment amount
+   * @param params.memo - Payment memo
    * @param params.paymentRequirements - X402 payment requirements
    * @param params.challenge - MPP challenge object
    * @returns AuthorizeResult with protocol and opaque credential
@@ -93,82 +89,18 @@ export class PaymentClient {
   }): Promise<AuthorizeResult> {
     const { account, userId, destination } = params;
 
-    // 1. Determine protocol
+    // Determine protocol
     const protocol: PaymentProtocol = params.protocol
       ?? (this.protocolFlag ? this.protocolFlag(userId, destination) : 'atxp');
 
-    // 2. Build auth headers from account token
-    const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-    const atxpAcct = account as { token?: string };
-    if (atxpAcct.token) {
-      authHeaders['Authorization'] = `Basic ${Buffer.from(`${atxpAcct.token}:`).toString('base64')}`;
-    }
-
-    // 3. Build protocol-specific request body
-    let body: Record<string, unknown>;
-    switch (protocol) {
-      case 'atxp':
-        body = {
-          amount: params.amount?.toString(),
-          currency: 'USDC',
-          receiver: destination,
-          memo: params.memo,
-        };
-        break;
-      case 'x402':
-        body = { paymentRequirements: params.paymentRequirements };
-        break;
-      case 'mpp':
-        body = { challenge: params.challenge };
-        break;
-      default:
-        throw new Error(`PaymentClient: unsupported protocol '${protocol}'`);
-    }
-
-    // 4. Call /authorize/{protocol} with 30s timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-    let response: Response;
-    try {
-      response = await this.fetchFn(`${this.accountsServer}/authorize/${protocol}`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`PaymentClient: /authorize/${protocol} failed (${response.status}): ${errorText}`);
-    }
-
-    const responseBody = await response.json() as Record<string, unknown>;
-
-    // 5. Extract credential based on protocol
-    let credential: string;
-    switch (protocol) {
-      case 'atxp':
-        credential = JSON.stringify(responseBody);
-        break;
-      case 'x402':
-        if (!responseBody.paymentHeader || typeof responseBody.paymentHeader !== 'string') {
-          throw new Error('PaymentClient: /authorize/x402 response missing or invalid paymentHeader');
-        }
-        credential = responseBody.paymentHeader;
-        break;
-      case 'mpp':
-        if (!responseBody.credential || typeof responseBody.credential !== 'string') {
-          throw new Error('PaymentClient: /authorize/mpp response missing or invalid credential');
-        }
-        credential = responseBody.credential;
-        break;
-      default:
-        throw new Error(`PaymentClient: unsupported protocol '${protocol}'`);
-    }
-
-    return { protocol, credential };
+    // Delegate to the account's authorize method
+    return account.authorize({
+      protocol,
+      amount: params.amount!,
+      destination,
+      memo: params.memo,
+      paymentRequirements: params.paymentRequirements,
+      challenge: params.challenge,
+    });
   }
 }

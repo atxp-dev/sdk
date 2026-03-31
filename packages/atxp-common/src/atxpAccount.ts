@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker, MeResponse } from './types.js';
+import type { Account, PaymentMaker, MeResponse, AuthorizeParams, AuthorizeResult } from './types.js';
 import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain, Source } from './types.js';
 import BigNumber from 'bignumber.js';
 
@@ -308,5 +308,84 @@ export class ATXPAccount implements Account {
     }
 
     return json.spendPermissionToken;
+  }
+
+  /**
+   * Authorize a payment through the accounts service.
+   * Calls /authorize/{protocol} and returns an opaque credential.
+   */
+  async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
+    const { protocol } = params;
+    const authHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': toBasicAuth(this.token),
+    };
+
+    let body: Record<string, unknown>;
+    switch (protocol) {
+      case 'atxp':
+        body = {
+          amount: params.amount.toString(),
+          currency: 'USDC',
+          receiver: params.destination,
+          memo: params.memo,
+        };
+        break;
+      case 'x402':
+        body = { paymentRequirements: params.paymentRequirements };
+        break;
+      case 'mpp':
+        body = { challenge: params.challenge };
+        break;
+      default:
+        throw new Error(`ATXPAccount: unsupported protocol '${protocol}'`);
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    let response: Response;
+    try {
+      response = await this.fetchFn(`${this.origin}/authorize/${protocol}`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`ATXPAccount: /authorize/${protocol} failed (${response.status}): ${errorText}`);
+    }
+
+    const responseBody = await response.json() as Record<string, unknown>;
+
+    let credential: string;
+    switch (protocol) {
+      case 'atxp': {
+        // Inject the connection token so the credential is self-contained
+        responseBody.sourceAccountToken = this.token;
+        credential = JSON.stringify(responseBody);
+        break;
+      }
+      case 'x402':
+        if (!responseBody.paymentHeader || typeof responseBody.paymentHeader !== 'string') {
+          throw new Error('ATXPAccount: /authorize/x402 response missing or invalid paymentHeader');
+        }
+        credential = responseBody.paymentHeader;
+        break;
+      case 'mpp':
+        if (!responseBody.credential || typeof responseBody.credential !== 'string') {
+          throw new Error('ATXPAccount: /authorize/mpp response missing or invalid credential');
+        }
+        credential = responseBody.credential;
+        break;
+      default:
+        throw new Error(`ATXPAccount: unsupported protocol '${protocol}'`);
+    }
+
+    return { protocol, credential };
   }
 }

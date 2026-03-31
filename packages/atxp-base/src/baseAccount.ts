@@ -1,5 +1,6 @@
 import type { Account, PaymentMaker, Hex } from '@atxp/client';
-import type { AccountId, Source } from '@atxp/common';
+import type { AccountId, Source, AuthorizeParams, AuthorizeResult, Destination } from '@atxp/common';
+import { BigNumber } from 'bignumber.js';
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
@@ -65,5 +66,43 @@ export class BaseAccount implements Account {
    */
   async createSpendPermission(_resourceUrl: string): Promise<string | null> {
     return null;
+  }
+
+  /**
+   * Authorize a payment through the appropriate channel for Base accounts.
+   */
+  async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
+    const { protocol } = params;
+
+    switch (protocol) {
+      case 'x402': {
+        const { createPaymentHeader } = await import('x402/client');
+        const paymentRequirements = params.paymentRequirements as Record<string, unknown> | undefined;
+        const x402Version = (paymentRequirements?.x402Version as number) || 1;
+        const paymentHeader = await createPaymentHeader(
+          this.getLocalAccount(),
+          x402Version,
+          paymentRequirements
+        );
+        return { protocol, credential: paymentHeader as string };
+      }
+      case 'atxp': {
+        const destination: Destination = {
+          chain: 'base',
+          currency: 'USDC',
+          address: params.destination,
+          amount: new BigNumber(params.amount),
+        };
+        const result = await this.paymentMakers[0].makePayment([destination], params.memo || '');
+        if (!result) {
+          throw new Error('BaseAccount: payment execution returned no result');
+        }
+        return { protocol, credential: JSON.stringify({ transactionId: result.transactionId, chain: result.chain, currency: result.currency }) };
+      }
+      case 'mpp':
+        throw new Error('BaseAccount does not support MPP protocol');
+      default:
+        throw new Error(`BaseAccount: unsupported protocol '${protocol}'`);
+    }
   }
 }

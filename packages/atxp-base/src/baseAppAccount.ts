@@ -1,5 +1,6 @@
-import type { Account, PaymentMaker, AccountId, Source } from '@atxp/common';
+import type { Account, PaymentMaker, AccountId, Source, AuthorizeParams, AuthorizeResult, Destination } from '@atxp/common';
 import { WalletTypeEnum, ChainEnum } from '@atxp/common';
+import { BigNumber } from 'bignumber.js';
 import { getBaseUSDCAddress } from './baseConstants.js';
 import { BaseAppPaymentMaker } from './baseAppPaymentMaker.js';
 import { MainWalletPaymentMaker, type MainWalletProvider } from './mainWalletPaymentMaker.js';
@@ -222,5 +223,35 @@ export class BaseAppAccount implements Account {
    */
   async createSpendPermission(_resourceUrl: string): Promise<string | null> {
     return null;
+  }
+
+  /**
+   * Authorize a payment through the appropriate channel for Base browser accounts.
+   */
+  async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
+    const { protocol } = params;
+
+    switch (protocol) {
+      case 'atxp': {
+        const chain = this.chainId === 84532 ? ChainEnum.BaseSepolia : ChainEnum.Base;
+        const destination: Destination = {
+          chain,
+          currency: 'USDC',
+          address: params.destination,
+          amount: new BigNumber(params.amount),
+        };
+        const result = await this.paymentMakers[0].makePayment([destination], params.memo || '');
+        if (!result) {
+          throw new Error('BaseAppAccount: payment execution returned no result');
+        }
+        return { protocol, credential: JSON.stringify(result) };
+      }
+      case 'x402':
+        throw new Error('BaseAppAccount does not support x402 protocol');
+      case 'mpp':
+        throw new Error('BaseAppAccount does not support MPP protocol');
+      default:
+        throw new Error(`BaseAppAccount: unsupported protocol '${protocol}'`);
+    }
   }
 }

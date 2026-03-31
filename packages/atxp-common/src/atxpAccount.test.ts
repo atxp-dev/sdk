@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ATXPAccount } from './atxpAccount.js';
+import { BigNumber } from 'bignumber.js';
 
 describe('ATXPAccount', () => {
   describe('constructor', () => {
@@ -225,6 +226,164 @@ describe('ATXPAccount', () => {
       const profile = await account.getProfile();
       expect(profile.accountType).toBe('agent');
       expect(profile.funded).toBe(true);
+    });
+  });
+
+  describe('authorize', () => {
+    let mockFetch: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockFetch = vi.fn();
+    });
+
+    it('should call /authorize/atxp with correct body and inject sourceAccountToken', async () => {
+      const responseBody = { authorized: true, sourceAccountId: 'acct_123', options: {} };
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ ...responseBody }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      const result = await account.authorize({
+        protocol: 'atxp',
+        amount: new BigNumber('2.5'),
+        destination: '0xrecipient',
+        memo: 'test memo',
+      });
+
+      expect(result.protocol).toBe('atxp');
+      const parsed = JSON.parse(result.credential);
+      expect(parsed.authorized).toBe(true);
+      expect(parsed.sourceAccountToken).toBe('ct_abc123');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://accounts.example.com/authorize/atxp',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            amount: '2.5',
+            currency: 'USDC',
+            receiver: '0xrecipient',
+            memo: 'test memo',
+          }),
+        })
+      );
+
+      // Verify Basic auth header
+      const callHeaders = mockFetch.mock.calls[0][1].headers;
+      const expectedAuth = `Basic ${Buffer.from('ct_abc123:').toString('base64')}`;
+      expect(callHeaders['Authorization']).toBe(expectedAuth);
+    });
+
+    it('should call /authorize/x402 and return paymentHeader as credential', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ paymentHeader: 'x402-header-value' }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      const result = await account.authorize({
+        protocol: 'x402',
+        amount: new BigNumber('1'),
+        destination: 'https://example.com',
+        paymentRequirements: { network: 'base' },
+      });
+
+      expect(result.protocol).toBe('x402');
+      expect(result.credential).toBe('x402-header-value');
+    });
+
+    it('should call /authorize/mpp and return credential', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ credential: 'mpp-cred-value' }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      const result = await account.authorize({
+        protocol: 'mpp',
+        amount: new BigNumber('1'),
+        destination: 'https://example.com',
+        challenge: { id: 'ch_1' },
+      });
+
+      expect(result.protocol).toBe('mpp');
+      expect(result.credential).toBe('mpp-cred-value');
+    });
+
+    it('should throw when server returns non-OK status', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      await expect(
+        account.authorize({
+          protocol: 'atxp',
+          amount: new BigNumber('1'),
+          destination: '0xrecipient',
+        })
+      ).rejects.toThrow('/authorize/atxp failed (500)');
+    });
+
+    it('should throw when x402 response missing paymentHeader', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ invalid: 'response' }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      await expect(
+        account.authorize({
+          protocol: 'x402',
+          amount: new BigNumber('1'),
+          destination: 'https://example.com',
+          paymentRequirements: {},
+        })
+      ).rejects.toThrow('missing or invalid paymentHeader');
+    });
+
+    it('should throw when mpp response missing credential', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ somethingElse: 'value' }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      await expect(
+        account.authorize({
+          protocol: 'mpp',
+          amount: new BigNumber('1'),
+          destination: 'https://example.com',
+          challenge: {},
+        })
+      ).rejects.toThrow('missing or invalid credential');
     });
   });
 });

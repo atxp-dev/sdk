@@ -28,7 +28,8 @@ function createMockAccount(paymentMakers?: PaymentMaker[]): Account {
       getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
     }],
     getSources: async () => [{ address: 'SolAddress123', chain: 'solana' as any, walletType: 'eoa' as any }],
-    createSpendPermission: async () => null
+    createSpendPermission: async () => null,
+    authorize: vi.fn().mockResolvedValue({ protocol: 'atxp', credential: '{}' }),
   };
 }
 
@@ -117,18 +118,20 @@ describe('X402ProtocolHandler', () => {
   });
 
   describe('handlePaymentChallenge', () => {
-    it('should call /authorize/x402 and retry with X-PAYMENT header', async () => {
+    it('should call account.authorize for x402 and retry with X-PAYMENT header', async () => {
       const mockFetch = vi.fn();
-      // /authorize/x402 response
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ paymentHeader: 'test-payment-header' }), { status: 200 })
-      );
-      // Retry response
+      // Retry response (account.authorize handles /authorize/x402 now)
       mockFetch.mockResolvedValueOnce(new Response('Success', { status: 200 }));
+
+      const mockAccount = createMockAccount();
+      (mockAccount.authorize as ReturnType<typeof vi.fn>).mockResolvedValue({
+        protocol: 'x402',
+        credential: 'test-payment-header',
+      });
 
       const mockOnPayment = vi.fn();
       const config: ProtocolConfig = {
-        account: createMockAccount(),
+        account: mockAccount,
         logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
         fetchFn: mockFetch,
         approvePayment: async () => true,
@@ -146,14 +149,13 @@ describe('X402ProtocolHandler', () => {
       expect(result).not.toBeNull();
       expect(result!.status).toBe(200);
 
-      // Verify /authorize/x402 was called
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://accounts.test.com/authorize/x402',
-        expect.objectContaining({ method: 'POST' })
+      // Verify account.authorize was called with x402 protocol
+      expect(mockAccount.authorize).toHaveBeenCalledWith(
+        expect.objectContaining({ protocol: 'x402' })
       );
 
       // Verify retry included X-PAYMENT header
-      const retryCall = mockFetch.mock.calls[1];
+      const retryCall = mockFetch.mock.calls[0];
       const retryHeaders = retryCall[1].headers as Headers;
       expect(retryHeaders.get('X-PAYMENT')).toBe('test-payment-header');
 
@@ -190,14 +192,16 @@ describe('X402ProtocolHandler', () => {
 
     it('should handle invalid /authorize/x402 response (missing paymentHeader)', async () => {
       const mockFetch = vi.fn();
-      // /authorize/x402 returns response without paymentHeader
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ invalid: 'response' }), { status: 200 })
+
+      const mockAccount = createMockAccount();
+      // account.authorize throws when the server response is missing paymentHeader
+      (mockAccount.authorize as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('ATXPAccount: /authorize/x402 response missing or invalid paymentHeader')
       );
 
       const mockOnPaymentFailure = vi.fn();
       const config: ProtocolConfig = {
-        account: createMockAccount(),
+        account: mockAccount,
         logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
         fetchFn: mockFetch,
         approvePayment: async () => true,
@@ -336,27 +340,35 @@ describe('ATXPFetcher with protocol handlers', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(createX402Challenge()), { status: 402 })
     );
-    // /authorize/x402 response
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ paymentHeader: 'x402-header' }), { status: 200 })
-    );
-    // Retry response
+    // Retry response (account.authorize handles /authorize/x402 now)
     mockFetch.mockResolvedValueOnce(new Response('Success', { status: 200 }));
 
-    const fetcher = createFetcher(
-      mockFetch,
-      [x402Handler, atxpHandler],
-      (_userId: string, _destination: string) => 'x402'
-    );
+    const account = createMockAccount();
+    (account.authorize as ReturnType<typeof vi.fn>).mockResolvedValue({
+      protocol: 'x402',
+      credential: 'x402-header',
+    });
+
+    const destinationMakers = new Map();
+    destinationMakers.set('solana', new PassthroughDestinationMaker('solana'));
+    const fetcher = new ATXPFetcher({
+      account,
+      db: new MemoryOAuthDb(),
+      destinationMakers,
+      fetchFn: mockFetch,
+      protocolHandlers: [x402Handler, atxpHandler],
+      protocolFlag: (_userId: string, _destination: string) => 'x402',
+      onPayment: mockOnPayment,
+      onPaymentFailure: mockOnPaymentFailure,
+    });
 
     const result = await fetcher.fetch('https://example.com/api');
     expect(result.status).toBe(200);
     expect(await result.text()).toBe('Success');
 
-    // Verify /authorize/x402 was called (X402 handler was used)
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.test.com/authorize/x402',
-      expect.objectContaining({ method: 'POST' })
+    // Verify account.authorize was called (X402 handler was used)
+    expect(account.authorize).toHaveBeenCalledWith(
+      expect.objectContaining({ protocol: 'x402' })
     );
   });
 
@@ -401,15 +413,27 @@ describe('ATXPFetcher with protocol handlers', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(createX402Challenge()), { status: 402 })
     );
-    // /authorize/x402 response
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ paymentHeader: 'auto-detected-header' }), { status: 200 })
-    );
-    // Retry response
+    // Retry response (account.authorize handles /authorize/x402 now)
     mockFetch.mockResolvedValueOnce(new Response('Auto-detected', { status: 200 }));
 
+    const account = createMockAccount();
+    (account.authorize as ReturnType<typeof vi.fn>).mockResolvedValue({
+      protocol: 'x402',
+      credential: 'auto-detected-header',
+    });
+
+    const destinationMakers = new Map();
+    destinationMakers.set('solana', new PassthroughDestinationMaker('solana'));
     // No protocolFlag — auto-detect
-    const fetcher = createFetcher(mockFetch, [x402Handler]);
+    const fetcher = new ATXPFetcher({
+      account,
+      db: new MemoryOAuthDb(),
+      destinationMakers,
+      fetchFn: mockFetch,
+      protocolHandlers: [x402Handler],
+      onPayment: mockOnPayment,
+      onPaymentFailure: mockOnPaymentFailure,
+    });
 
     const result = await fetcher.fetch('https://example.com/api');
     expect(result.status).toBe(200);
@@ -490,18 +514,20 @@ describe('MPPProtocolHandler', () => {
   });
 
   describe('handlePaymentChallenge', () => {
-    it('should call /authorize/mpp and retry with Authorization: Payment header', async () => {
+    it('should call account.authorize for mpp and retry with Authorization: Payment header', async () => {
       const mockFetch = vi.fn();
-      // /authorize/mpp response
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ credential: 'mpp-credential-base64', expiresAt: '2026-12-31T00:00:00Z' }), { status: 200 })
-      );
-      // Retry response
+      // Retry response (account.authorize handles the /authorize/mpp call now)
       mockFetch.mockResolvedValueOnce(new Response('Success', { status: 200 }));
+
+      const mockAccount = createMockAccount();
+      (mockAccount.authorize as ReturnType<typeof vi.fn>).mockResolvedValue({
+        protocol: 'mpp',
+        credential: 'mpp-credential-base64',
+      });
 
       const mockOnPayment = vi.fn();
       const config: ProtocolConfig = {
-        account: createMockAccount(),
+        account: mockAccount,
         logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
         fetchFn: mockFetch,
         approvePayment: async () => true,
@@ -523,14 +549,13 @@ describe('MPPProtocolHandler', () => {
       expect(result).not.toBeNull();
       expect(result!.status).toBe(200);
 
-      // Verify /authorize/mpp was called
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://accounts.test.com/authorize/mpp',
-        expect.objectContaining({ method: 'POST' })
+      // Verify account.authorize was called with mpp protocol
+      expect(mockAccount.authorize).toHaveBeenCalledWith(
+        expect.objectContaining({ protocol: 'mpp' })
       );
 
       // Verify retry included Authorization: Payment header
-      const retryCall = mockFetch.mock.calls[1];
+      const retryCall = mockFetch.mock.calls[0];
       const retryHeaders = retryCall[1].headers as Headers;
       expect(retryHeaders.get('Authorization')).toBe('Payment mpp-credential-base64');
 
@@ -569,15 +594,17 @@ describe('MPPProtocolHandler', () => {
       );
     });
 
-    it('should handle graceful fallback when /authorize/mpp fails', async () => {
+    it('should handle graceful fallback when account.authorize fails', async () => {
       const mockFetch = vi.fn();
-      // /authorize/mpp returns error
-      mockFetch.mockResolvedValueOnce(
-        new Response('Not Found', { status: 404 })
+
+      const mockAccount = createMockAccount();
+      // account.authorize throws an error containing '/authorize/mpp failed'
+      (mockAccount.authorize as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('ATXPAccount: /authorize/mpp failed (404): Not Found')
       );
 
       const config: ProtocolConfig = {
-        account: createMockAccount(),
+        account: mockAccount,
         logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
         fetchFn: mockFetch,
         approvePayment: async () => true,
@@ -600,8 +627,8 @@ describe('MPPProtocolHandler', () => {
       expect(result).not.toBeNull();
       expect(result!.status).toBe(402);
 
-      // Should NOT have retried with payment header (only 1 call: /authorize/mpp)
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // Should NOT have called fetchFn for retry
+      expect(mockFetch).toHaveBeenCalledTimes(0);
     });
 
     it('should preserve original response headers and statusText in reconstructed response', async () => {
@@ -638,14 +665,16 @@ describe('MPPProtocolHandler', () => {
 
     it('should handle invalid /authorize/mpp response (missing credential)', async () => {
       const mockFetch = vi.fn();
-      // /authorize/mpp returns response without credential field
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ somethingElse: 'value' }), { status: 200 })
+
+      const mockAccount = createMockAccount();
+      // account.authorize throws when the server response is missing credential
+      (mockAccount.authorize as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('ATXPAccount: /authorize/mpp response missing or invalid credential')
       );
 
       const mockOnPaymentFailure = vi.fn();
       const config: ProtocolConfig = {
-        account: createMockAccount(),
+        account: mockAccount,
         logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
         fetchFn: mockFetch,
         approvePayment: async () => true,
@@ -681,10 +710,15 @@ describe('MPPProtocolHandler', () => {
 
     it('should preserve headers/statusText on authorize fallback', async () => {
       const mockFetch = vi.fn();
-      mockFetch.mockResolvedValueOnce(new Response('Not Found', { status: 404 }));
+
+      const mockAccount = createMockAccount();
+      // account.authorize throws to trigger fallback
+      (mockAccount.authorize as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('ATXPAccount: /authorize/mpp failed (404): Not Found')
+      );
 
       const config: ProtocolConfig = {
-        account: createMockAccount(),
+        account: mockAccount,
         logger: new ConsoleLogger({ prefix: '[Test]', level: LogLevel.ERROR }),
         fetchFn: mockFetch,
         approvePayment: async () => true,
@@ -759,27 +793,35 @@ describe('ATXPFetcher with MPP handler', () => {
         headers: { 'WWW-Authenticate': createMPPWWWAuthenticateHeader() },
       })
     );
-    // /authorize/mpp response
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ credential: 'mpp-cred', expiresAt: '2026-12-31T00:00:00Z' }), { status: 200 })
-    );
-    // Retry response
+    // Retry response (account.authorize handles /authorize/mpp now)
     mockFetch.mockResolvedValueOnce(new Response('MPP Success', { status: 200 }));
 
-    const fetcher = createFetcherWithMPP(
-      mockFetch,
-      [x402Handler, mppHandler],
-      (_userId: string, _destination: string) => 'mpp'
-    );
+    const account = createMockAccount();
+    (account.authorize as ReturnType<typeof vi.fn>).mockResolvedValue({
+      protocol: 'mpp',
+      credential: 'mpp-cred',
+    });
+
+    const destinationMakers = new Map();
+    destinationMakers.set('solana', new PassthroughDestinationMaker('solana'));
+    const fetcher = new ATXPFetcher({
+      account,
+      db: new MemoryOAuthDb(),
+      destinationMakers,
+      fetchFn: mockFetch,
+      protocolHandlers: [x402Handler, mppHandler],
+      protocolFlag: (_userId: string, _destination: string) => 'mpp',
+      onPayment: mockOnPayment,
+      onPaymentFailure: mockOnPaymentFailure,
+    });
 
     const result = await fetcher.fetch('https://example.com/api');
     expect(result.status).toBe(200);
     expect(await result.text()).toBe('MPP Success');
 
-    // Verify /authorize/mpp was called (MPP handler was used, not X402)
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.test.com/authorize/mpp',
-      expect.objectContaining({ method: 'POST' })
+    // Verify account.authorize was called (MPP handler was used, not X402)
+    expect(account.authorize).toHaveBeenCalledWith(
+      expect.objectContaining({ protocol: 'mpp' })
     );
   });
 
@@ -854,24 +896,35 @@ describe('ATXPFetcher with MPP handler', () => {
         headers: { 'WWW-Authenticate': createMPPWWWAuthenticateHeader() },
       })
     );
-    // /authorize/mpp response
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ credential: 'auto-cred', expiresAt: '2026-12-31T00:00:00Z' }), { status: 200 })
-    );
-    // Retry response
+    // Retry response (account.authorize handles /authorize/mpp now)
     mockFetch.mockResolvedValueOnce(new Response('Auto-detected MPP', { status: 200 }));
 
+    const account = createMockAccount();
+    (account.authorize as ReturnType<typeof vi.fn>).mockResolvedValue({
+      protocol: 'mpp',
+      credential: 'auto-cred',
+    });
+
+    const destinationMakers = new Map();
+    destinationMakers.set('solana', new PassthroughDestinationMaker('solana'));
     // No protocolFlag — auto-detect
-    const fetcher = createFetcherWithMPP(mockFetch, [mppHandler]);
+    const fetcher = new ATXPFetcher({
+      account,
+      db: new MemoryOAuthDb(),
+      destinationMakers,
+      fetchFn: mockFetch,
+      protocolHandlers: [mppHandler],
+      onPayment: mockOnPayment,
+      onPaymentFailure: mockOnPaymentFailure,
+    });
 
     const result = await fetcher.fetch('https://external.example.com/api');
     expect(result.status).toBe(200);
     expect(await result.text()).toBe('Auto-detected MPP');
 
-    // Verify /authorize/mpp was called
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://accounts.test.com/authorize/mpp',
-      expect.objectContaining({ method: 'POST' })
+    // Verify account.authorize was called
+    expect(account.authorize).toHaveBeenCalledWith(
+      expect.objectContaining({ protocol: 'mpp' })
     );
   });
 });

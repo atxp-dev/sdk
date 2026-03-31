@@ -1,5 +1,6 @@
-import type { Account, PaymentMaker, AccountId, Source } from '@atxp/common';
+import type { Account, PaymentMaker, AccountId, Source, AuthorizeParams, AuthorizeResult, Destination } from '@atxp/common';
 import { WalletTypeEnum, ChainEnum } from '@atxp/common';
+import { BigNumber } from 'bignumber.js';
 import {
   getWorldChainUSDCAddress,
   WORLD_CHAIN_MAINNET
@@ -225,5 +226,35 @@ export class WorldchainAccount implements Account {
    */
   async createSpendPermission(_resourceUrl: string): Promise<string | null> {
     return null;
+  }
+
+  /**
+   * Authorize a payment through the appropriate channel for World Chain accounts.
+   */
+  async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
+    const { protocol } = params;
+
+    switch (protocol) {
+      case 'atxp': {
+        const chain = this.chainId === 11155420 ? ChainEnum.WorldSepolia : ChainEnum.World;
+        const destination: Destination = {
+          chain,
+          currency: 'USDC',
+          address: params.destination,
+          amount: new BigNumber(params.amount),
+        };
+        const result = await this.paymentMakers[0].makePayment([destination], params.memo || '');
+        if (!result) {
+          throw new Error('WorldchainAccount: payment execution returned no result');
+        }
+        return { protocol, credential: JSON.stringify(result) };
+      }
+      case 'x402':
+        throw new Error('WorldchainAccount does not support x402 protocol');
+      case 'mpp':
+        throw new Error('WorldchainAccount does not support MPP protocol');
+      default:
+        throw new Error(`WorldchainAccount: unsupported protocol '${protocol}'`);
+    }
   }
 }

@@ -196,6 +196,23 @@ export interface PaymentDestination {
   getSources: () => Promise<Source[]>;
 }
 
+export interface AuthorizeParams {
+  protocol: PaymentProtocol;
+  amount: BigNumber;
+  destination: string;
+  memo?: string;
+  /** X402: payment requirements from server challenge */
+  paymentRequirements?: unknown;
+  /** MPP: challenge object from server */
+  challenge?: unknown;
+}
+
+export interface AuthorizeResult {
+  protocol: PaymentProtocol;
+  /** Opaque credential string - pass to ProtocolSettlement.settle() */
+  credential: string;
+}
+
 /**
  * Full account interface that can both receive and make payments.
  * Extends PaymentDestination so any Account can be used as a destination.
@@ -210,6 +227,15 @@ export type Account = PaymentDestination & {
    * @returns The spend permission token, or null if this account type doesn't support spend permissions
    */
   createSpendPermission: (resourceUrl: string) => Promise<string | null>;
+  /**
+   * Authorize a payment through the appropriate channel for this account type.
+   *
+   * For ATXPAccount: calls /authorize/{protocol} on the accounts service (pre-check only, no payment execution).
+   * For local-key accounts (Base, Solana, etc.): signs locally and/or executes the payment, returning evidence.
+   *
+   * Returns an opaque credential that can be passed to ProtocolSettlement.settle().
+   */
+  authorize: (params: AuthorizeParams) => Promise<AuthorizeResult>;
 }
 
 /**

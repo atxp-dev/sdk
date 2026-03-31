@@ -74,6 +74,8 @@ export {
   type DestinationMaker,
   type PaymentDestination,
   type Account,
+  type AuthorizeParams,
+  type AuthorizeResult,
   type MeResponse,
   type Source,
   extractAddressFromAccountId,
