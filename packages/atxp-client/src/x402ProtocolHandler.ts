@@ -1,8 +1,8 @@
-import type { FetchLike, Logger } from '@atxp/common';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import type { ProspectivePayment } from './types.js';
 import { ATXPPaymentError } from './errors.js';
 import { BigNumber } from 'bignumber.js';
+import { PaymentClient, buildPaymentHeaders } from './paymentClient.js';
 
 /**
  * Type guard for X402 challenge body.
@@ -25,36 +25,6 @@ function isX402Challenge(obj: unknown): obj is X402Challenge {
     typeof candidate.x402Version !== 'undefined' &&
     Array.isArray(candidate.accepts)
   );
-}
-
-/**
- * Configuration for X402 protocol handler.
- * accountsServer is the base URL for the accounts service (for /authorize/x402).
- */
-/**
- * Type guard for accounts with origin and token properties (e.g., ATXPLocalAccount).
- */
-interface AccountWithOrigin {
-  origin: string;
-  token: string;
-  fetchFn?: FetchLike;
-}
-
-function hasOriginAndToken(account: unknown): account is AccountWithOrigin {
-  const candidate = account as Record<string, unknown>;
-  return typeof candidate?.origin === 'string' && typeof candidate?.token === 'string';
-}
-
-/**
- * Type guard for accounts with a getLocalAccount method.
- */
-interface AccountWithLocalAccount {
-  getLocalAccount: () => unknown;
-}
-
-function hasGetLocalAccount(account: unknown): account is AccountWithLocalAccount {
-  const candidate = account as Record<string, unknown>;
-  return typeof candidate?.getLocalAccount === 'function';
 }
 
 export interface X402ProtocolHandlerConfig {
@@ -110,7 +80,7 @@ export class X402ProtocolHandler implements ProtocolHandler {
     }
 
     try {
-      const { selectPaymentRequirements, createPaymentHeader } = await import('x402/client');
+      const { selectPaymentRequirements } = await import('x402/client');
 
       const selectedPaymentRequirements = selectPaymentRequirements(
         paymentChallenge.accepts,
@@ -153,56 +123,29 @@ export class X402ProtocolHandler implements ProtocolHandler {
         return this.reconstructResponse(responseBody, response);
       }
 
-      // Try /authorize/x402 on accounts service first
-      logger.debug('X402: calling /authorize/x402 on accounts service');
-      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-      const atxpAcct = account as { token?: string };
-      if (atxpAcct.token) {
-        authHeaders['Authorization'] = `Basic ${Buffer.from(`${atxpAcct.token}:`).toString('base64')}`;
-      }
-      const authorizeController = new AbortController();
-      const authorizeTimeout = setTimeout(() => authorizeController.abort(), 30000);
-      let authorizeResponse: Response;
-      try {
-        authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/x402`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            paymentRequirements: selectedPaymentRequirements
-          }),
-          signal: authorizeController.signal,
-        });
-      } finally {
-        clearTimeout(authorizeTimeout);
-      }
+      // Authorize via account.authorize() — ATXPAccount calls the accounts
+      // service, BaseAccount signs locally. No fallback — each account type
+      // handles authorization according to its capabilities.
+      const client = new PaymentClient({
+        accountsServer: this.accountsServer,
+        logger,
+        fetchFn,
+      });
 
-      let paymentHeader: string;
-
-      if (authorizeResponse.ok) {
-        const authorizeResult = await authorizeResponse.json() as Record<string, unknown>;
-        if (!authorizeResult.paymentHeader || typeof authorizeResult.paymentHeader !== 'string') {
-          throw new Error('X402: /authorize/x402 response missing or invalid paymentHeader');
-        }
-        paymentHeader = authorizeResult.paymentHeader;
-      } else {
-        // Fallback: use local signer
-        logger.debug('X402: /authorize/x402 not available, falling back to local signing');
-        const signer = await this.getLocalSigner(account);
-        if (!signer) {
-          throw new Error('Could not get signer for X402 payment');
-        }
-
-        await this.ensureCurrencyIfNeeded(account, amountInUsdc, fetchFn, logger);
-
-        paymentHeader = await createPaymentHeader(
-          signer,
-          paymentChallenge.x402Version,
-          selectedPaymentRequirements
-        );
-      }
+      const authorizeResult = await client.authorize({
+        account,
+        userId: accountId,
+        destination: url,
+        protocol: 'x402',
+        paymentRequirements: selectedPaymentRequirements,
+      });
+      const paymentHeader = authorizeResult.credential;
 
       // Retry with X-PAYMENT header
-      const retryHeaders = this.buildRetryHeaders(originalRequest.init?.headers, paymentHeader);
+      const retryHeaders = buildPaymentHeaders(
+        { protocol: 'x402', credential: paymentHeader },
+        originalRequest.init?.headers
+      );
       const retryInit: RequestInit = { ...originalRequest.init, headers: retryHeaders };
 
       logger.info('X402: retrying request with X-PAYMENT header');
@@ -269,67 +212,4 @@ export class X402ProtocolHandler implements ProtocolHandler {
     });
   }
 
-  private buildRetryHeaders(originalHeaders: HeadersInit | undefined, paymentHeader: string): Headers {
-    let retryHeaders: Headers;
-    if (originalHeaders instanceof Headers) {
-      retryHeaders = new Headers(originalHeaders);
-    } else if (originalHeaders) {
-      retryHeaders = new Headers(originalHeaders as HeadersInit);
-    } else {
-      retryHeaders = new Headers();
-    }
-    retryHeaders.set('X-PAYMENT', paymentHeader);
-    retryHeaders.set('Access-Control-Expose-Headers', 'X-PAYMENT-RESPONSE');
-    return retryHeaders;
-  }
-
-  private async getLocalSigner(account: unknown): Promise<unknown | null> {
-    try {
-      const { ATXPLocalAccount } = await import('./atxpLocalAccount.js');
-
-      if (hasOriginAndToken(account)) {
-        return ATXPLocalAccount.create(account.origin, account.token, account.fetchFn);
-      }
-
-      if (hasGetLocalAccount(account)) {
-        return account.getLocalAccount();
-      }
-
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  private async ensureCurrencyIfNeeded(
-    account: unknown,
-    amountInUsdc: number,
-    fetchFn: FetchLike,
-    logger: Logger
-  ): Promise<void> {
-    if (!hasOriginAndToken(account)) return;
-    const atxpAccount = account;
-
-    logger.debug('X402: ensuring sufficient on-chain USDC');
-    const ensureResponse = await (atxpAccount.fetchFn || fetchFn)(`${atxpAccount.origin}/ensure-currency`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${Buffer.from(`${atxpAccount.token}:`).toString('base64')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: amountInUsdc.toString(),
-        currency: 'USDC',
-        chainType: 'ethereum'
-      })
-    });
-
-    if (!ensureResponse.ok) {
-      const errorText = await ensureResponse.text();
-      throw new Error(`Failed to ensure sufficient USDC: ${errorText}`);
-    }
-
-    const result = await ensureResponse.json() as { message?: string };
-    logger.info(`X402: currency ensured: ${result.message}`);
-  }
 }

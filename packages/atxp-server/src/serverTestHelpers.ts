@@ -22,6 +22,7 @@ export function mockAccount(accountId: string): Account {
     paymentMakers: [],
     getSources: async () => [],
     createSpendPermission: async () => null,
+    authorize: async () => ({ protocol: 'atxp' as const, credential: '' }),
   };
 }
 

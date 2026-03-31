@@ -1,6 +1,7 @@
-import type { Account, PaymentMaker, Source } from '@atxp/common';
+import type { Account, PaymentMaker, Source, AuthorizeParams, AuthorizeResult, Destination } from '@atxp/common';
 import type { AccountId } from '@atxp/common';
 import { ChainEnum, WalletTypeEnum } from '@atxp/common';
+import { BigNumber } from 'bignumber.js';
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { ServerPaymentMaker } from './serverPaymentMaker.js';
 import { createWalletClient, http, type WalletClient, type Hex } from 'viem';
@@ -103,5 +104,35 @@ export class PolygonServerAccount implements Account {
    */
   async createSpendPermission(_resourceUrl: string): Promise<string | null> {
     return null;
+  }
+
+  /**
+   * Authorize a payment through the appropriate channel for Polygon server accounts.
+   */
+  async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
+    const { protocol } = params;
+
+    switch (protocol) {
+      case 'atxp': {
+        const chain = this.chainId === 137 ? ChainEnum.Polygon : ChainEnum.PolygonAmoy;
+        const destination: Destination = {
+          chain,
+          currency: 'USDC',
+          address: params.destination,
+          amount: new BigNumber(params.amount),
+        };
+        const result = await this.paymentMakers[0].makePayment([destination], params.memo || '');
+        if (!result) {
+          throw new Error('PolygonServerAccount: payment execution returned no result');
+        }
+        return { protocol, credential: JSON.stringify(result) };
+      }
+      case 'x402':
+        throw new Error('PolygonServerAccount does not support x402 protocol');
+      case 'mpp':
+        throw new Error('PolygonServerAccount does not support MPP protocol');
+      default:
+        throw new Error(`PolygonServerAccount: unsupported protocol '${protocol}'`);
+    }
   }
 }

@@ -1,5 +1,6 @@
 import type { Account, PaymentMaker, Hex } from '@atxp/client';
-import type { AccountId, Source } from '@atxp/common';
+import type { AccountId, Source, AuthorizeParams, AuthorizeResult, Destination } from '@atxp/common';
+import { BigNumber } from 'bignumber.js';
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { TempoPaymentMaker } from './tempoPaymentMaker.js';
 import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
@@ -69,5 +70,34 @@ export class TempoAccount implements Account {
    */
   async createSpendPermission(_resourceUrl: string): Promise<string | null> {
     return null;
+  }
+
+  /**
+   * Authorize a payment through the appropriate channel for Tempo accounts.
+   */
+  async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
+    const { protocol } = params;
+
+    switch (protocol) {
+      case 'mpp': {
+        const destination: Destination = {
+          chain: 'tempo',
+          currency: 'USDC',
+          address: params.destination,
+          amount: new BigNumber(params.amount),
+        };
+        const result = await this.paymentMakers[0].makePayment([destination], params.memo || '');
+        if (!result) {
+          throw new Error('TempoAccount: payment execution returned no result');
+        }
+        return { protocol, credential: JSON.stringify(result) };
+      }
+      case 'atxp':
+        throw new Error('TempoAccount does not support ATXP protocol');
+      case 'x402':
+        throw new Error('TempoAccount does not support x402 protocol');
+      default:
+        throw new Error(`TempoAccount: unsupported protocol '${protocol}'`);
+    }
   }
 }
