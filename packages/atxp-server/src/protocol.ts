@@ -1,11 +1,6 @@
-import { AuthorizationServerUrl, FetchLike, Logger } from "@atxp/common";
-
-/**
- * Payment protocol types supported by the omni-challenge system.
- * - 'atxp': ATXP-MCP protocol (JWT-based, existing flow)
- * - 'x402': X402 protocol (Permit2 / X-PAYMENT header)
- */
-export type PaymentProtocol = 'atxp' | 'x402';
+import { AuthorizationServerUrl, FetchLike, Logger, type PaymentProtocol } from "@atxp/common";
+// Re-export from common so consumers of @atxp/server get the same type
+export type { PaymentProtocol } from "@atxp/common";
 
 /**
  * Result of detecting which protocol a client used from its credential.
