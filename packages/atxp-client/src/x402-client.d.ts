@@ -13,8 +13,8 @@ declare module 'x402/client' {
 
   export function selectPaymentRequirements(
     accepts: unknown[],
-    preferredNetwork: string,
-    preferredScheme: string
+    preferredNetwork?: string,
+    preferredScheme?: string
   ): PaymentRequirements | null;
 
   export function createPaymentHeader(

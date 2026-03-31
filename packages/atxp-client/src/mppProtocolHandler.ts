@@ -98,7 +98,7 @@ export class MPPProtocolHandler implements ProtocolHandler {
       }
     }
 
-    // Try MCP error body
+    // Try MCP error body (use clone since response body may have been consumed above)
     try {
       const parsed = JSON.parse(bodyText);
 
@@ -168,17 +168,22 @@ export class MPPProtocolHandler implements ProtocolHandler {
     bodyText: string,
     originalResponse: Response
   ): Promise<Response> {
-    const { logger, fetchFn, onPayment } = config;
+    const { account, logger, fetchFn, onPayment } = config;
 
     try {
       logger.debug('MPP: calling /authorize/mpp on accounts service');
+      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      const atxpAcct = account as { token?: string };
+      if (atxpAcct.token) {
+        authHeaders['Authorization'] = `Basic ${Buffer.from(`${atxpAcct.token}:`).toString('base64')}`;
+      }
       const authorizeController = new AbortController();
       const authorizeTimeout = setTimeout(() => authorizeController.abort(), 30000);
       let authorizeResponse: Response;
       try {
         authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/mpp`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({ challenge }),
           signal: authorizeController.signal,
         });

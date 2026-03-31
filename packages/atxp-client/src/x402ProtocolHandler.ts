@@ -114,7 +114,7 @@ export class X402ProtocolHandler implements ProtocolHandler {
 
       const selectedPaymentRequirements = selectPaymentRequirements(
         paymentChallenge.accepts,
-        'base',
+        undefined,
         'exact'
       );
 
@@ -155,16 +155,20 @@ export class X402ProtocolHandler implements ProtocolHandler {
 
       // Try /authorize/x402 on accounts service first
       logger.debug('X402: calling /authorize/x402 on accounts service');
+      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      const atxpAcct = account as { token?: string };
+      if (atxpAcct.token) {
+        authHeaders['Authorization'] = `Basic ${Buffer.from(`${atxpAcct.token}:`).toString('base64')}`;
+      }
       const authorizeController = new AbortController();
       const authorizeTimeout = setTimeout(() => authorizeController.abort(), 30000);
       let authorizeResponse: Response;
       try {
         authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/x402`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
-            paymentRequirements: paymentChallenge.accepts,
-            selectedRequirement: selectedPaymentRequirements
+            paymentRequirements: selectedPaymentRequirements
           }),
           signal: authorizeController.signal,
         });

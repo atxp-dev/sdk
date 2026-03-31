@@ -13,7 +13,8 @@ const DEFAULT_AUTHORIZATION_SERVER = 'https://auth.atxp.ai';
 // Mock x402/client for X402ProtocolHandler tests
 vi.mock('x402/client', () => ({
   createPaymentHeader: vi.fn().mockResolvedValue('mocked-x402-payment-header'),
-  selectPaymentRequirements: vi.fn((accepts: any[], network: string) => {
+  selectPaymentRequirements: vi.fn((accepts: any[], network?: string) => {
+    if (!network) return accepts[0] || null;
     return accepts.find((a: any) => a.network === network) || null;
   })
 }));
