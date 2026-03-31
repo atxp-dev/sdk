@@ -93,6 +93,8 @@ jobs:
           npm version $VERSION --no-git-tag-version -w packages/atxp-express
           npm version $VERSION --no-git-tag-version -w packages/atxp-cloudflare
           npm version $VERSION --no-git-tag-version -w packages/atxp-x402
+          npm version $VERSION --no-git-tag-version -w packages/atxp-mpp
+          npm version $VERSION --no-git-tag-version -w packages/atxp-tempo
 
           # Update cross-package dependencies to match new version
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-client
@@ -132,16 +134,20 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          # Publish all workspace packages (order matters for dependencies)
-          npm publish -w packages/atxp-common --provenance --access public
-          npm publish -w packages/atxp-sqlite --provenance --access public
-          npm publish -w packages/atxp-redis --provenance --access public
-          npm publish -w packages/atxp-server --provenance --access public
-          npm publish -w packages/atxp-client --provenance --access public
-          npm publish -w packages/atxp-base --provenance --access public
-          npm publish -w packages/atxp-solana --provenance --access public
-          npm publish -w packages/atxp-worldchain --provenance --access public
-          npm publish -w packages/atxp-polygon --provenance --access public
-          npm publish -w packages/atxp-express --provenance --access public
-          npm publish -w packages/atxp-cloudflare --provenance --access public
-          npm publish -w packages/atxp-x402 --provenance --access public
+          # Publish all workspace packages (order matters for dependencies).
+          # --ignore-existing skips already-published versions so re-runs are safe.
+          PUBLISH_FLAGS="--provenance --access public --ignore-existing"
+          npm publish -w packages/atxp-common $PUBLISH_FLAGS
+          npm publish -w packages/atxp-sqlite $PUBLISH_FLAGS
+          npm publish -w packages/atxp-redis $PUBLISH_FLAGS
+          npm publish -w packages/atxp-mpp $PUBLISH_FLAGS
+          npm publish -w packages/atxp-server $PUBLISH_FLAGS
+          npm publish -w packages/atxp-client $PUBLISH_FLAGS
+          npm publish -w packages/atxp-base $PUBLISH_FLAGS
+          npm publish -w packages/atxp-solana $PUBLISH_FLAGS
+          npm publish -w packages/atxp-worldchain $PUBLISH_FLAGS
+          npm publish -w packages/atxp-polygon $PUBLISH_FLAGS
+          npm publish -w packages/atxp-tempo $PUBLISH_FLAGS
+          npm publish -w packages/atxp-express $PUBLISH_FLAGS
+          npm publish -w packages/atxp-cloudflare $PUBLISH_FLAGS
+          npm publish -w packages/atxp-x402 $PUBLISH_FLAGS
