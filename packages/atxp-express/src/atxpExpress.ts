@@ -115,13 +115,17 @@ async function handleProtocolCredential(
 
   logger.info(`${protocol} credential verified successfully`);
 
-  // Listen for response finish to settle at request END
+  // Listen for response finish to settle at request END (only on success)
   res.on('finish', async () => {
-    try {
-      logger.debug(`Request finished, settling ${protocol} payment`);
-      await settlement.settle(protocol, credential);
-    } catch (error) {
-      logger.error(`Failed to settle ${protocol} payment: ${error instanceof Error ? error.message : String(error)}`);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      try {
+        logger.debug(`Request finished successfully (${res.statusCode}), settling ${protocol} payment`);
+        await settlement.settle(protocol, credential);
+      } catch (error) {
+        logger.error(`Failed to settle ${protocol} payment: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } else {
+      logger.info(`Request finished with status ${res.statusCode}, skipping ${protocol} settlement`);
     }
   });
 

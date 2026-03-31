@@ -87,20 +87,15 @@ describe('Omni-challenge Express middleware', () => {
     });
   });
 
-  describe('ATXP JWT credential detection and routing', () => {
-    it('should detect ATXP JWT credential and call /verify/atxp then /settle/atxp', async () => {
+  describe('Bearer JWT is NOT treated as ATXP payment credential', () => {
+    it('should pass Bearer JWT through as normal OAuth token, not call verify/settle', async () => {
       const verifyCall = vi.fn();
-      const settleCall = vi.fn();
 
       mockFetch.mockImplementation(async (url: string | URL) => {
         const urlStr = url.toString();
         if (urlStr.includes('/verify/atxp')) {
           verifyCall();
           return { ok: true, json: async () => ({ valid: true }) };
-        }
-        if (urlStr.includes('/settle/atxp')) {
-          settleCall();
-          return { ok: true, json: async () => ({ txHash: '0xdef', settledAmount: '5000' }) };
         }
         return { ok: false, status: 404, text: async () => 'Not found' };
       });
@@ -116,22 +111,18 @@ describe('Omni-challenge Express middleware', () => {
         res.json({ data: 'protected resource' });
       });
 
-      // ATXP JWT is a 3-part dot-separated token
-      const atxpJwt = 'eyJhbGciOiJFUzI1NksifQ.eyJzdWIiOiJ0ZXN0LXVzZXIifQ.signaturepart';
+      // Bearer JWT should be treated as OAuth token, not ATXP payment credential
+      const oauthJwt = 'eyJhbGciOiJFUzI1NksifQ.eyJzdWIiOiJ0ZXN0LXVzZXIifQ.signaturepart';
 
       const response = await request(app)
         .get('/resource')
-        .set('Authorization', `Bearer ${atxpJwt}`);
+        .set('Authorization', `Bearer ${oauthJwt}`);
 
+      // Request should succeed through normal middleware path (MCP token check)
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ data: 'protected resource' });
 
-      // Verify was called at request start
-      expect(verifyCall).toHaveBeenCalledTimes(1);
-
-      // Wait for settle (it happens on response finish)
-      await new Promise(resolve => setTimeout(resolve, 50));
-      expect(settleCall).toHaveBeenCalledTimes(1);
+      // verify/settle should NOT have been called — JWT is OAuth, not payment
+      expect(verifyCall).not.toHaveBeenCalled();
     });
   });
 

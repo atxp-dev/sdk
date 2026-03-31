@@ -12,18 +12,15 @@ describe('detectProtocol', () => {
     });
   });
 
-  it('should detect ATXP-MCP from Bearer JWT token', () => {
+  it('should NOT detect Bearer JWT as ATXP (could be OAuth token)', () => {
     const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature123';
     const result = detectProtocol({
       'authorization': `Bearer ${jwt}`,
     });
-    expect(result).toEqual({
-      protocol: 'atxp',
-      credential: jwt,
-    });
+    expect(result).toBeNull();
   });
 
-  it('should prefer X-PAYMENT over Bearer token when both present', () => {
+  it('should detect X-PAYMENT even when Bearer token is also present', () => {
     const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature123';
     const result = detectProtocol({
       'x-payment': 'x402-credential',
@@ -76,38 +73,45 @@ describe('ProtocolSettlement', () => {
   });
 
   describe('verify', () => {
-    it('should call /verify/x402 for X402 credentials', async () => {
+    it('should call /verify/x402 with payload from decoded credential', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ valid: true }),
       });
 
-      const result = await settlement.verify('x402', 'x402-credential');
+      // X402 credential is base64-encoded JSON payload
+      const payload = { signature: '0xabc', nonce: 1 };
+      const credential = Buffer.from(JSON.stringify(payload)).toString('base64');
+      const result = await settlement.verify('x402', credential, { paymentRequirements: { network: 'base' } });
 
       expect(result).toEqual({ valid: true });
       expect(mockFetch).toHaveBeenCalledWith(
         'https://auth.atxp.ai/verify/x402',
         expect.objectContaining({
           method: 'POST',
-          body: expect.stringContaining('"credential":"x402-credential"'),
+          body: expect.stringContaining('"payload"'),
         }),
       );
     });
 
-    it('should call /verify/atxp for ATXP credentials', async () => {
+    it('should call /verify/atxp with sourceAccountToken from credential', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ valid: true }),
       });
 
-      const result = await settlement.verify('atxp', 'atxp-jwt-token');
+      const result = await settlement.verify('atxp', 'atxp-jwt-token', {
+        sourceAccountId: 'atxp:acct_123',
+        destinationAccountId: 'atxp:acct_456',
+        options: [{ network: 'base', currency: 'USDC', address: '0x123', amount: '1000000' }],
+      });
 
       expect(result).toEqual({ valid: true });
       expect(mockFetch).toHaveBeenCalledWith(
         'https://auth.atxp.ai/verify/atxp',
         expect.objectContaining({
           method: 'POST',
-          body: expect.stringContaining('"credential":"atxp-jwt-token"'),
+          body: expect.stringContaining('"sourceAccountToken":"atxp-jwt-token"'),
         }),
       );
     });
@@ -124,37 +128,44 @@ describe('ProtocolSettlement', () => {
   });
 
   describe('settle', () => {
-    it('should call /settle/x402 for X402 credentials', async () => {
+    it('should call /settle/x402 with decoded payload', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ txHash: '0xabc', settledAmount: '100000' }),
       });
 
-      const result = await settlement.settle('x402', 'x402-credential', '0.01');
+      const payload = { signature: '0xabc' };
+      const credential = Buffer.from(JSON.stringify(payload)).toString('base64');
+      const result = await settlement.settle('x402', credential, { paymentRequirements: { network: 'base' } });
 
       expect(result).toEqual({ txHash: '0xabc', settledAmount: '100000' });
       expect(mockFetch).toHaveBeenCalledWith(
         'https://auth.atxp.ai/settle/x402',
         expect.objectContaining({
           method: 'POST',
-          body: expect.stringContaining('"credential":"x402-credential"'),
+          body: expect.stringContaining('"payload"'),
         }),
       );
     });
 
-    it('should call /settle/atxp for ATXP credentials', async () => {
+    it('should call /settle/atxp with sourceAccountToken', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ txHash: '0xdef', settledAmount: '50000' }),
       });
 
-      const result = await settlement.settle('atxp', 'atxp-jwt-token');
+      const result = await settlement.settle('atxp', 'atxp-jwt-token', {
+        sourceAccountId: 'atxp:acct_123',
+        destinationAccountId: 'atxp:acct_456',
+        options: [{ network: 'base', currency: 'USDC', address: '0x123', amount: '1000000' }],
+      });
 
       expect(result).toEqual({ txHash: '0xdef', settledAmount: '50000' });
       expect(mockFetch).toHaveBeenCalledWith(
         'https://auth.atxp.ai/settle/atxp',
         expect.objectContaining({
           method: 'POST',
+          body: expect.stringContaining('"sourceAccountToken":"atxp-jwt-token"'),
         }),
       );
     });

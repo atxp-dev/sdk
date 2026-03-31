@@ -55,6 +55,20 @@ export type OmniChallenge = {
 };
 
 /**
+ * Context data needed by verify/settle to build protocol-specific request bodies.
+ */
+export type SettlementContext = {
+  /** X402: the original payment requirements from the challenge */
+  paymentRequirements?: unknown;
+  /** ATXP: source account identifier */
+  sourceAccountId?: string;
+  /** ATXP: destination account identifier */
+  destinationAccountId?: string;
+  /** ATXP: payment options with network, currency, address, amount */
+  options?: unknown[];
+};
+
+/**
  * Result of verifying a payment credential.
  */
 export type VerifyResult = {
@@ -72,8 +86,10 @@ export type SettleResult = {
 /**
  * Detect the payment protocol from inbound credentials on a retry request.
  *
- * - X-PAYMENT header → X402 protocol
- * - Bearer token with ATXP JWT characteristics → ATXP-MCP protocol
+ * Only detects X402 via the X-PAYMENT header. ATXP-MCP payments flow through
+ * the MCP token check + requirePayment() path, not through HTTP header
+ * detection. Bearer JWTs in non-MCP requests are OAuth access tokens, not
+ * payment credentials — detecting them here would misidentify normal auth.
  *
  * Returns null if no payment credential is detected.
  */
@@ -85,16 +101,6 @@ export function detectProtocol(headers: {
   const xPayment = headers['x-payment'];
   if (xPayment) {
     return { protocol: 'x402', credential: xPayment };
-  }
-
-  // Bearer token with ATXP JWT format indicates ATXP-MCP
-  const auth = headers['authorization'];
-  if (auth && auth.startsWith('Bearer ')) {
-    const token = auth.substring(7);
-    // ATXP JWTs are base64-encoded with dots (header.payload.signature)
-    if (token.includes('.') && token.split('.').length === 3) {
-      return { protocol: 'atxp', credential: token };
-    }
   }
 
   return null;
@@ -114,15 +120,20 @@ export class ProtocolSettlement {
   /**
    * Verify a payment credential at request start.
    * Calls auth `/verify/{protocol}` to check if the credential is valid.
+   *
+   * For X402: sends { payload, paymentRequirements } (credential is the X-PAYMENT header).
+   * For ATXP: sends { sourceAccountId, destinationAccountId, sourceAccountToken, options }.
    */
-  async verify(protocol: PaymentProtocol, credential: string, paymentRequirements?: unknown): Promise<VerifyResult> {
+  async verify(protocol: PaymentProtocol, credential: string, context?: SettlementContext): Promise<VerifyResult> {
     const url = new URL(`/verify/${protocol}`, this.authServer);
     this.logger.debug(`Verifying ${protocol} credential at ${url}`);
+
+    const body = this.buildRequestBody(protocol, credential, context);
 
     const response = await this.fetchFn(url.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential, paymentRequirements }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -139,14 +150,16 @@ export class ProtocolSettlement {
    * Settle a payment at request end.
    * Calls auth `/settle/{protocol}` to finalize the payment.
    */
-  async settle(protocol: PaymentProtocol, credential: string, amount?: string): Promise<SettleResult> {
+  async settle(protocol: PaymentProtocol, credential: string, context?: SettlementContext): Promise<SettleResult> {
     const url = new URL(`/settle/${protocol}`, this.authServer);
     this.logger.debug(`Settling ${protocol} credential at ${url}`);
+
+    const body = this.buildRequestBody(protocol, credential, context);
 
     const response = await this.fetchFn(url.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential, amount }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -158,5 +171,31 @@ export class ProtocolSettlement {
     const result = await response.json() as SettleResult;
     this.logger.info(`Settled ${protocol}: txHash=${result.txHash}, amount=${result.settledAmount}`);
     return result;
+  }
+
+  /**
+   * Build the protocol-specific request body for verify/settle calls.
+   */
+  private buildRequestBody(protocol: PaymentProtocol, credential: string, context?: SettlementContext): unknown {
+    if (protocol === 'x402') {
+      // X402: auth expects { payload, paymentRequirements }
+      // The credential is the base64-encoded X-PAYMENT header containing the payload
+      let payload: unknown;
+      try {
+        payload = JSON.parse(Buffer.from(credential, 'base64').toString());
+      } catch {
+        // If not valid base64 JSON, pass as-is (auth will validate)
+        payload = { raw: credential };
+      }
+      return { payload, paymentRequirements: context?.paymentRequirements };
+    }
+
+    // ATXP: auth expects { sourceAccountId, destinationAccountId, sourceAccountToken, options }
+    return {
+      sourceAccountId: context?.sourceAccountId,
+      destinationAccountId: context?.destinationAccountId,
+      sourceAccountToken: credential,
+      options: context?.options ?? [],
+    };
   }
 }

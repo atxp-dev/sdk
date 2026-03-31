@@ -84,6 +84,7 @@ export {
   type X402PaymentOption,
   type AtxpMcpChallengeData,
   type OmniChallenge,
+  type SettlementContext,
   type VerifyResult,
   type SettleResult,
   detectProtocol,
