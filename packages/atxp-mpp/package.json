@@ -1,6 +1,6 @@
 {
   "name": "@atxp/mpp",
-  "version": "0.10.7",
+  "version": "0.10.10",
   "description": "ATXP MPP (Machine Payments Protocol) support",
   "license": "MIT",
   "repository": {
@@ -20,7 +20,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "rollup -c",
     "typecheck": "tsc --noEmit",
