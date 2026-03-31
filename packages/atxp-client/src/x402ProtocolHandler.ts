@@ -3,6 +3,7 @@ import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import type { ProspectivePayment } from './types.js';
 import { ATXPPaymentError } from './errors.js';
 import { BigNumber } from 'bignumber.js';
+import { PaymentClient, buildPaymentHeaders } from './paymentClient.js';
 
 /**
  * Type guard for X402 challenge body.
@@ -155,36 +156,25 @@ export class X402ProtocolHandler implements ProtocolHandler {
 
       // Try /authorize/x402 on accounts service first
       logger.debug('X402: calling /authorize/x402 on accounts service');
-      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-      const atxpAcct = account as { token?: string };
-      if (atxpAcct.token) {
-        authHeaders['Authorization'] = `Basic ${Buffer.from(`${atxpAcct.token}:`).toString('base64')}`;
-      }
-      const authorizeController = new AbortController();
-      const authorizeTimeout = setTimeout(() => authorizeController.abort(), 30000);
-      let authorizeResponse: Response;
-      try {
-        authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/x402`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            paymentRequirements: selectedPaymentRequirements
-          }),
-          signal: authorizeController.signal,
-        });
-      } finally {
-        clearTimeout(authorizeTimeout);
-      }
+      const client = new PaymentClient({
+        accountsServer: this.accountsServer,
+        logger,
+        fetchFn,
+      });
 
       let paymentHeader: string;
 
-      if (authorizeResponse.ok) {
-        const authorizeResult = await authorizeResponse.json() as Record<string, unknown>;
-        if (!authorizeResult.paymentHeader || typeof authorizeResult.paymentHeader !== 'string') {
-          throw new Error('X402: /authorize/x402 response missing or invalid paymentHeader');
-        }
-        paymentHeader = authorizeResult.paymentHeader;
-      } else {
+      try {
+        const accountId = await account.getAccountId();
+        const authorizeResult = await client.authorize({
+          account,
+          userId: accountId,
+          destination: url,
+          protocol: 'x402',
+          paymentRequirements: selectedPaymentRequirements,
+        });
+        paymentHeader = authorizeResult.credential;
+      } catch {
         // Fallback: use local signer
         logger.debug('X402: /authorize/x402 not available, falling back to local signing');
         const signer = await this.getLocalSigner(account);
@@ -202,7 +192,10 @@ export class X402ProtocolHandler implements ProtocolHandler {
       }
 
       // Retry with X-PAYMENT header
-      const retryHeaders = this.buildRetryHeaders(originalRequest.init?.headers, paymentHeader);
+      const retryHeaders = buildPaymentHeaders(
+        { protocol: 'x402', credential: paymentHeader },
+        originalRequest.init?.headers
+      );
       const retryInit: RequestInit = { ...originalRequest.init, headers: retryHeaders };
 
       logger.info('X402: retrying request with X-PAYMENT header');
@@ -267,20 +260,6 @@ export class X402ProtocolHandler implements ProtocolHandler {
       statusText: original.statusText,
       headers: original.headers
     });
-  }
-
-  private buildRetryHeaders(originalHeaders: HeadersInit | undefined, paymentHeader: string): Headers {
-    let retryHeaders: Headers;
-    if (originalHeaders instanceof Headers) {
-      retryHeaders = new Headers(originalHeaders);
-    } else if (originalHeaders) {
-      retryHeaders = new Headers(originalHeaders as HeadersInit);
-    } else {
-      retryHeaders = new Headers();
-    }
-    retryHeaders.set('X-PAYMENT', paymentHeader);
-    retryHeaders.set('Access-Control-Expose-Headers', 'X-PAYMENT-RESPONSE');
-    return retryHeaders;
   }
 
   private async getLocalSigner(account: unknown): Promise<unknown | null> {

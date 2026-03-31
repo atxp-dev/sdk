@@ -105,3 +105,10 @@ export {
   MPPProtocolHandler
 } from './mppProtocolHandler.js';
 
+// Payment client for centralized authorize flow
+export {
+  PaymentClient,
+  buildPaymentHeaders,
+  type AuthorizeResult
+} from './paymentClient.js';
+

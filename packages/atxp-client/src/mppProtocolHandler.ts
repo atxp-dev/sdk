@@ -10,6 +10,7 @@ import {
   hasMPPMCPError,
 } from '@atxp/mpp';
 import { BigNumber } from 'bignumber.js';
+import { PaymentClient, buildPaymentHeaders } from './paymentClient.js';
 
 /**
  * Configuration for MPP protocol handler.
@@ -172,35 +173,35 @@ export class MPPProtocolHandler implements ProtocolHandler {
 
     try {
       logger.debug('MPP: calling /authorize/mpp on accounts service');
-      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-      const atxpAcct = account as { token?: string };
-      if (atxpAcct.token) {
-        authHeaders['Authorization'] = `Basic ${Buffer.from(`${atxpAcct.token}:`).toString('base64')}`;
-      }
-      const authorizeController = new AbortController();
-      const authorizeTimeout = setTimeout(() => authorizeController.abort(), 30000);
-      let authorizeResponse: Response;
+      const client = new PaymentClient({
+        accountsServer: this.accountsServer,
+        logger,
+        fetchFn,
+      });
+
+      const accountId = await account.getAccountId();
+      let authorizeResult;
       try {
-        authorizeResponse = await fetchFn(`${this.accountsServer}/authorize/mpp`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({ challenge }),
-          signal: authorizeController.signal,
+        authorizeResult = await client.authorize({
+          account,
+          userId: accountId,
+          destination: typeof originalRequest.url === 'string' ? originalRequest.url : originalRequest.url.toString(),
+          protocol: 'mpp',
+          challenge,
         });
-      } finally {
-        clearTimeout(authorizeTimeout);
+      } catch (authorizeError) {
+        // Distinguish between server unavailable (HTTP error) and bad response data
+        const msg = authorizeError instanceof Error ? authorizeError.message : String(authorizeError);
+        if (msg.includes('/authorize/mpp failed')) {
+          // Server returned non-OK status -- graceful fallback
+          logger.debug('MPP: /authorize/mpp not available, returning original response');
+          return this.reconstructResponse(bodyText, originalResponse);
+        }
+        // Data validation error (e.g. missing credential) -- let it propagate
+        throw authorizeError;
       }
 
-      if (!authorizeResponse.ok) {
-        logger.debug('MPP: /authorize/mpp not available, returning original response');
-        return this.reconstructResponse(bodyText, originalResponse);
-      }
-
-      const authorizeResult = await authorizeResponse.json() as Record<string, unknown>;
-      if (!authorizeResult.credential || typeof authorizeResult.credential !== 'string') {
-        throw new Error('MPP: /authorize/mpp response missing or invalid credential');
-      }
-      const retryHeaders = this.buildRetryHeaders(originalRequest.init?.headers, authorizeResult.credential);
+      const retryHeaders = buildPaymentHeaders(authorizeResult, originalRequest.init?.headers);
       const retryInit: RequestInit = { ...originalRequest.init, headers: retryHeaders };
 
       logger.info('MPP: retrying request with Authorization: Payment header');
@@ -231,16 +232,4 @@ export class MPPProtocolHandler implements ProtocolHandler {
     });
   }
 
-  private buildRetryHeaders(originalHeaders: HeadersInit | undefined, credential: string): Headers {
-    let retryHeaders: Headers;
-    if (originalHeaders instanceof Headers) {
-      retryHeaders = new Headers(originalHeaders);
-    } else if (originalHeaders) {
-      retryHeaders = new Headers(originalHeaders as HeadersInit);
-    } else {
-      retryHeaders = new Headers();
-    }
-    retryHeaders.set('Authorization', `Payment ${credential}`);
-    return retryHeaders;
-  }
 }
