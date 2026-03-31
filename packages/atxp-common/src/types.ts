@@ -32,9 +32,11 @@ export enum NetworkEnum {
   Base = 'base',
   World = 'world',
   Polygon = 'polygon',
+  Tempo = 'tempo',
   BaseSepolia = 'base_sepolia',
   WorldSepolia = 'world_sepolia',
   PolygonAmoy = 'polygon_amoy',
+  TempoModerato = 'tempo_moderato',
   ATXP = 'atxp'
 }
 export type Network = `${NetworkEnum}`;
@@ -44,11 +46,36 @@ export enum ChainEnum {
   Base = 'base',
   World = 'world',
   Polygon = 'polygon',
+  Tempo = 'tempo',
   BaseSepolia = 'base_sepolia',
   WorldSepolia = 'world_sepolia',
-  PolygonAmoy = 'polygon_amoy'
+  PolygonAmoy = 'polygon_amoy',
+  TempoModerato = 'tempo_moderato'
 }
 export type Chain = `${ChainEnum}`;
+
+// Payment protocol types for multi-protocol support
+export enum PaymentProtocolEnum {
+  ATXP = 'atxp',
+  X402 = 'x402',
+  MPP = 'mpp'
+}
+export type PaymentProtocol = `${PaymentProtocolEnum}`;
+
+/**
+ * Feature flag function that determines which payment protocol to use
+ * for a given user and destination combination.
+ */
+export type ProtocolFlag = (userId: string, destination: string) => PaymentProtocol;
+
+/**
+ * Feature flag function that determines which chain to use
+ * for a given user and destination combination.
+ *
+ * Constraint: If the corresponding protocolFlag returns 'mpp', chainFlag must return 'tempo'.
+ * X402 and ATXP can use 'base' or 'solana'.
+ */
+export type ChainFlag = (userId: string, destination: string) => Chain;
 
 export enum WalletTypeEnum {
   EOA = 'eoa',

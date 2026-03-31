@@ -1,7 +1,8 @@
 import { BigNumber } from "bignumber.js";
-import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike, Account, PaymentMaker, AccountId, DestinationMaker } from "@atxp/common";
+import { AuthorizationServerUrl, Currency, Logger, Network, OAuthDb, FetchLike, Account, PaymentMaker, AccountId, DestinationMaker, type ProtocolFlag } from "@atxp/common";
 import { ClientOptions } from "@modelcontextprotocol/sdk/client/index.js";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
+import type { ProtocolHandler } from "./protocolHandler.js";
 
 // Type definitions for hex strings
 export type Hex = `0x${string}`;
@@ -56,6 +57,10 @@ export type ClientConfig = {
   onPaymentFailure: (context: PaymentFailureContext) => Promise<void>;
   /** Optional callback when a single payment attempt fails (before trying other networks) */
   onPaymentAttemptFailed?: (args: { network: string, error: Error, remainingNetworks: string[] }) => Promise<void>;
+  /** Optional protocol handlers for multi-protocol support (strategy pattern) */
+  protocolHandlers?: ProtocolHandler[];
+  /** Optional protocol flag function to select protocol for omni-challenges */
+  protocolFlag?: ProtocolFlag;
 }
 
 // ClientArgs for creating clients - required fields plus optional overrides

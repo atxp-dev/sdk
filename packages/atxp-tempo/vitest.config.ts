@@ -5,10 +5,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    setupFiles: ['./src/setup.expo.ts'],
   },
   resolve: {
     alias: {
+      '@atxp/common': path.resolve(__dirname, '../atxp-common/src/index.ts'),
+      '@atxp/client': path.resolve(__dirname, '../atxp-client/src/index.ts'),
       '@atxp/mpp': path.resolve(__dirname, '../atxp-mpp/src/index.ts'),
     },
   },

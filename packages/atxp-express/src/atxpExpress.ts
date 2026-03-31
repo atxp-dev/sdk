@@ -11,6 +11,10 @@ import {
   getOAuthMetadata,
   sendProtectedResourceMetadataNode,
   sendOAuthMetadataNode,
+  detectProtocol,
+  ProtocolSettlement,
+  type PaymentProtocol,
+  type ATXPConfig,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
@@ -40,6 +44,18 @@ export function atxpExpress(args: ATXPArgs): Router {
       logger.debug(`${mcpRequests.length} MCP requests found in request`);
 
       if(mcpRequests.length === 0) {
+        // For non-MCP requests: check for payment credentials (X402 or ATXP)
+        const detected = detectProtocol({
+          'x-payment': req.headers['x-payment'] as string | undefined,
+          'authorization': req.headers['authorization'] as string | undefined,
+        });
+
+        if (detected) {
+          // This is a retry with payment credentials — verify and settle
+          await handleProtocolCredential(config, req, res, next, detected.protocol, detected.credential);
+          return;
+        }
+
         next();
         return;
       }
@@ -70,4 +86,49 @@ export function atxpExpress(args: ATXPArgs): Router {
   router.use(atxpMiddleware);
 
   return router;
+}
+
+/**
+ * Handle a request that includes payment credentials (retry after challenge).
+ * Verifies the credential at request start, serves the request, then settles at request end.
+ */
+async function handleProtocolCredential(
+  config: ATXPConfig,
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  protocol: PaymentProtocol,
+  credential: string,
+): Promise<void> {
+  const logger = config.logger;
+  const settlement = new ProtocolSettlement(config.server, logger);
+
+  logger.info(`Detected ${protocol} credential on retry request`);
+
+  // Verify at request START
+  const verifyResult = await settlement.verify(protocol, credential);
+  if (!verifyResult.valid) {
+    logger.warn(`${protocol} credential verification failed`);
+    res.status(402).json({ error: 'invalid_payment', error_description: `${protocol} credential verification failed` });
+    return;
+  }
+
+  logger.info(`${protocol} credential verified successfully`);
+
+  // Listen for response finish to settle at request END (only on success)
+  res.on('finish', async () => {
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      try {
+        logger.debug(`Request finished successfully (${res.statusCode}), settling ${protocol} payment`);
+        await settlement.settle(protocol, credential);
+      } catch (error) {
+        logger.error(`Failed to settle ${protocol} payment: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } else {
+      logger.info(`Request finished with status ${res.statusCode}, skipping ${protocol} settlement`);
+    }
+  });
+
+  // Proceed with the request
+  next();
 }
