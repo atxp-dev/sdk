@@ -1,4 +1,3 @@
-import type { FetchLike, Logger } from '@atxp/common';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import type { ProspectivePayment } from './types.js';
 import { ATXPPaymentError } from './errors.js';
@@ -81,7 +80,7 @@ export class X402ProtocolHandler implements ProtocolHandler {
     }
 
     try {
-      const { selectPaymentRequirements, createPaymentHeader } = await import('x402/client');
+      const { selectPaymentRequirements } = await import('x402/client');
 
       const selectedPaymentRequirements = selectPaymentRequirements(
         paymentChallenge.accepts,
