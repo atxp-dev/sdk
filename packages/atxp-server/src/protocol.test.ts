@@ -137,6 +137,29 @@ describe('ProtocolSettlement', () => {
       );
     });
 
+    it('should call /verify/mpp with parsed credential', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ valid: true }),
+      });
+
+      const mppCredential = {
+        challenge: 'ch_456',
+        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
+        payload: { signature: 'def', amount: '2.50', payTo: '0xDst' },
+      };
+      const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
+      const result = await settlement.verify('mpp', credential);
+
+      expect(result).toEqual({ valid: true });
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.atxp.ai/verify/mpp',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.credential).toEqual(mppCredential);
+    });
+
     it('should return invalid on non-ok response', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -209,29 +232,6 @@ describe('ProtocolSettlement', () => {
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.credential).toEqual(mppCredential);
       expect(body.amount).toBe('1.00');
-    });
-
-    it('should call /verify/mpp with parsed credential', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ valid: true }),
-      });
-
-      const mppCredential = {
-        challenge: 'ch_456',
-        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
-        payload: { signature: 'def', amount: '2.50', payTo: '0xDst' },
-      };
-      const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
-      const result = await settlement.verify('mpp', credential);
-
-      expect(result).toEqual({ valid: true });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://auth.atxp.ai/verify/mpp',
-        expect.objectContaining({ method: 'POST' }),
-      );
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.credential).toEqual(mppCredential);
     });
 
     it('should handle raw JSON MPP credential (not base64)', async () => {

@@ -10,6 +10,7 @@ import {
   buildOmniChallenge,
 } from './omniChallenge.js';
 import { PAYMENT_REQUIRED_ERROR_CODE, PAYMENT_REQUIRED_PREAMBLE } from '@atxp/common';
+import { parseMPPHeader } from '@atxp/mpp';
 
 describe('omniChallenge', () => {
   const defaultOptions = [
@@ -162,6 +163,17 @@ describe('omniChallenge', () => {
       });
     });
 
+    it('should accept tempo_moderato (testnet) as a Tempo option', () => {
+      const options = [
+        { network: 'tempo_moderato', currency: 'pathUSD', address: '0xTestnet', amount: new BigNumber('0.05') },
+      ];
+
+      const result = buildMppChallenge({ id: 'ch_testnet', options });
+      expect(result).not.toBeNull();
+      expect(result!.network).toBe('tempo_moderato');
+      expect(result!.recipient).toBe('0xTestnet');
+    });
+
     it('should return null when no Tempo option is available', () => {
       const result = buildMppChallenge({ id: 'ch_456', options: defaultOptions });
       expect(result).toBeNull();
@@ -186,6 +198,22 @@ describe('omniChallenge', () => {
       expect(header).toContain('id="ch_789"');
       expect(header).toContain('amount="10000"');
       expect(header).toContain('recipient="0xRecipient"');
+    });
+
+    it('should round-trip through parseMPPHeader', () => {
+      const original = {
+        id: 'ch_roundtrip',
+        method: 'tempo',
+        intent: 'charge',
+        amount: '50000',
+        currency: 'pathUSD',
+        network: 'tempo',
+        recipient: '0xABCDEF1234567890',
+      };
+
+      const header = serializeMppHeader(original);
+      const parsed = parseMPPHeader(header);
+      expect(parsed).toEqual(original);
     });
   });
 

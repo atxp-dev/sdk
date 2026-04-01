@@ -3,6 +3,10 @@ import { PAYMENT_REQUIRED_ERROR_CODE, PAYMENT_REQUIRED_PREAMBLE, AuthorizationSe
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
 
+// pathUSD uses 6 decimals, same as USDC. If a new Tempo stablecoin uses
+// different decimals, this constant and buildMppChallenge need updating.
+const PATHUSD_DECIMALS = 6;
+
 /**
  * Build X402 payment requirements from charge options.
  */
@@ -62,7 +66,7 @@ export function buildMppChallenge(args: {
     id: args.id,
     method: 'tempo',
     intent: 'charge',
-    amount: tempoOption.amount.times(1e6).toFixed(0),
+    amount: tempoOption.amount.times(10 ** PATHUSD_DECIMALS).toFixed(0),
     currency: tempoOption.currency || 'pathUSD',
     network: tempoOption.network,
     recipient: tempoOption.address,
@@ -71,9 +75,11 @@ export function buildMppChallenge(args: {
 
 /**
  * Serialize MPP challenge data into a WWW-Authenticate: Payment header value.
+ * Values are escaped to prevent header injection via double-quote characters.
  */
 export function serializeMppHeader(challenge: MppChallengeData): string {
-  return `Payment method="${challenge.method}", intent="${challenge.intent}", id="${challenge.id}", amount="${challenge.amount}", currency="${challenge.currency}", network="${challenge.network}", recipient="${challenge.recipient}"`;
+  const esc = (v: string) => v.replace(/"/g, '\\"');
+  return `Payment method="${esc(challenge.method)}", intent="${esc(challenge.intent)}", id="${esc(challenge.id)}", amount="${esc(challenge.amount)}", currency="${esc(challenge.currency)}", network="${esc(challenge.network)}", recipient="${esc(challenge.recipient)}"`;
 }
 
 /**

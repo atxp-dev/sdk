@@ -1,6 +1,9 @@
 import { AuthorizationServerUrl, FetchLike, Logger, type PaymentProtocol } from "@atxp/common";
-// Re-export from common so consumers of @atxp/server get the same type
+import type { MPPChallenge } from "@atxp/mpp";
+// Re-export from common/mpp so consumers of @atxp/server get the same types
 export type { PaymentProtocol } from "@atxp/common";
+// Re-export MPPChallenge as MppChallengeData — single source of truth for the challenge shape
+export type MppChallengeData = MPPChallenge;
 
 /**
  * Result of detecting which protocol a client used from its credential.
@@ -40,19 +43,6 @@ export type AtxpMcpChallengeData = {
   chargeAmount?: string;
 };
 
-/**
- * MPP challenge data included in omni-challenge.
- * Follows the Tempo MPP spec for WWW-Authenticate: Payment header.
- */
-export type MppChallengeData = {
-  id: string;
-  method: string;
-  intent: string;
-  amount: string;
-  currency: string;
-  network: string;
-  recipient: string;
-};
 
 /**
  * Omni-challenge data combining all three protocols.
@@ -96,10 +86,13 @@ export type SettleResult = {
 /**
  * Detect the payment protocol from inbound credentials on a retry request.
  *
- * Only detects X402 via the X-PAYMENT header. ATXP-MCP payments flow through
- * the MCP token check + requirePayment() path, not through HTTP header
- * detection. Bearer JWTs in non-MCP requests are OAuth access tokens, not
- * payment credentials — detecting them here would misidentify normal auth.
+ * Detects:
+ * - X402 via `X-PAYMENT` header (highest priority)
+ * - MPP via `Authorization: Payment <credential>` header
+ *
+ * Does NOT detect ATXP-MCP — those payments flow through the MCP token
+ * check + requirePayment() path, not HTTP header detection. Bearer JWTs
+ * in non-MCP requests are OAuth access tokens, not payment credentials.
  *
  * Returns null if no payment credential is detected.
  */
@@ -212,21 +205,17 @@ export class ProtocolSettlement {
       // MPP: auth expects { credential: MppCredential } for verify,
       // and { credential: MppCredential, amount: string } for settle.
       // The credential is base64-encoded or raw JSON MppCredential.
-      // Settle Zod schema strips unknown keys, so always including amount is safe for verify.
       let parsedCredential: unknown;
       try {
         parsedCredential = JSON.parse(Buffer.from(credential, 'base64').toString());
       } catch {
-        try {
-          parsedCredential = JSON.parse(credential);
-        } catch {
-          this.logger.warn('ProtocolSettlement: MPP credential is not valid JSON');
-          parsedCredential = { raw: credential };
-        }
+        parsedCredential = JSON.parse(credential);
+        // If this throws, the credential is genuinely malformed — let it propagate.
+        // Auth would reject it anyway, but a clear error here is better than
+        // a confusing "unexpected field" from auth's Zod validation.
       }
-      const amount = (parsedCredential as Record<string, unknown>)?.payload
-        ? ((parsedCredential as Record<string, Record<string, string>>).payload.amount)
-        : undefined;
+      const payload = (parsedCredential as Record<string, unknown>)?.payload as Record<string, unknown> | undefined;
+      const amount = payload?.amount != null ? String(payload.amount) : undefined;
       return { credential: parsedCredential, ...(amount && { amount }) };
     }
 

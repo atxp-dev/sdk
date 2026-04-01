@@ -44,7 +44,7 @@ export function atxpExpress(args: ATXPArgs): Router {
       logger.debug(`${mcpRequests.length} MCP requests found in request`);
 
       if(mcpRequests.length === 0) {
-        // For non-MCP requests: check for payment credentials (X402 or ATXP)
+        // For non-MCP requests: check for payment credentials (X402 or MPP)
         const detected = detectProtocol({
           'x-payment': req.headers['x-payment'] as string | undefined,
           'authorization': req.headers['authorization'] as string | undefined,
