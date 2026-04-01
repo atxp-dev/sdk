@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker, MeResponse, AuthorizeParams, AuthorizeResult } from './types.js';
+import type { Account, PaymentMaker, MeResponse, AuthorizeParams, AuthorizeResult, PaymentProtocol } from './types.js';
 import type { FetchLike, Currency, AccountId, PaymentIdentifier, Destination, Chain, Source } from './types.js';
 import { AuthorizationError } from './types.js';
 import BigNumber from 'bignumber.js';
@@ -313,40 +313,36 @@ export class ATXPAccount implements Account {
 
   /**
    * Authorize a payment through the accounts service.
-   * Calls /authorize/{protocol} and returns an opaque credential.
+   * Calls /authorize/auto and returns an opaque credential.
    */
   async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
-    const { protocol } = params;
+    if (!params.protocols || params.protocols.length === 0) {
+      throw new Error('ATXPAccount: protocols array must not be empty');
+    }
+
     const authHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': toBasicAuth(this.token),
     };
 
-    let body: Record<string, unknown>;
-    switch (protocol) {
-      case 'atxp':
-        body = {
-          amount: params.amount.toString(),
-          currency: 'USDC',
-          receiver: params.destination,
-          memo: params.memo,
-        };
-        break;
-      case 'x402':
-        body = { paymentRequirements: params.paymentRequirements };
-        break;
-      case 'mpp':
-        body = { challenge: params.challenge };
-        break;
-      default:
-        throw new Error(`ATXPAccount: unsupported protocol '${protocol}'`);
-    }
+    const body: Record<string, unknown> = {
+      protocols: params.protocols,
+    };
+    // ATXP fields
+    if (params.amount) body.amount = params.amount.toString();
+    if (params.destination) body.receiver = params.destination;
+    if (params.memo) body.memo = params.memo;
+    body.currency = 'USDC';
+    // X402 fields
+    if (params.paymentRequirements) body.paymentRequirements = params.paymentRequirements;
+    // MPP fields
+    if (params.challenge) body.challenge = params.challenge;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     let response: Response;
     try {
-      response = await this.fetchFn(`${this.origin}/authorize/${protocol}`, {
+      response = await this.fetchFn(`${this.origin}/authorize/auto`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify(body),
@@ -364,36 +360,31 @@ export class ATXPAccount implements Account {
         errorCode = parsed.error || errorCode;
       } catch { /* not JSON */ }
       throw new AuthorizationError(
-        `ATXPAccount: /authorize/${protocol} failed (${response.status}): ${errorText}`,
+        `ATXPAccount: /authorize/auto failed (${response.status}): ${errorText}`,
         response.status,
         errorCode,
       );
     }
 
-    const responseBody = await response.json() as Record<string, unknown>;
+    const responseBody = await response.json() as { protocol: string; credential: string };
+
+    if (!responseBody || typeof responseBody.protocol !== 'string' || typeof responseBody.credential !== 'string') {
+      throw new AuthorizationError(
+        'ATXPAccount: /authorize/auto response missing protocol or credential',
+        500, 'malformed_response'
+      );
+    }
+
+    const protocol = responseBody.protocol as PaymentProtocol;
 
     let credential: string;
-    switch (protocol) {
-      case 'atxp': {
-        // Inject the connection token so the credential is self-contained
-        responseBody.sourceAccountToken = this.token;
-        credential = JSON.stringify(responseBody);
-        break;
-      }
-      case 'x402':
-        if (!responseBody.paymentHeader || typeof responseBody.paymentHeader !== 'string') {
-          throw new Error('ATXPAccount: /authorize/x402 response missing or invalid paymentHeader');
-        }
-        credential = responseBody.paymentHeader;
-        break;
-      case 'mpp':
-        if (!responseBody.credential || typeof responseBody.credential !== 'string') {
-          throw new Error('ATXPAccount: /authorize/mpp response missing or invalid credential');
-        }
-        credential = responseBody.credential;
-        break;
-      default:
-        throw new Error(`ATXPAccount: unsupported protocol '${protocol}'`);
+    if (protocol === 'atxp') {
+      // Inject the connection token so the credential is self-contained
+      const credentialObj = JSON.parse(responseBody.credential);
+      credentialObj.sourceAccountToken = this.token;
+      credential = JSON.stringify(credentialObj);
+    } else {
+      credential = responseBody.credential;
     }
 
     return { protocol, credential };

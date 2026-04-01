@@ -11,14 +11,7 @@ import {
   hasMPPMCPError,
 } from '@atxp/mpp';
 import { BigNumber } from 'bignumber.js';
-import { PaymentClient, buildPaymentHeaders } from './paymentClient.js';
-
-/**
- * Configuration for MPP protocol handler.
- */
-export interface MPPProtocolHandlerConfig {
-  accountsServer?: string;
-}
+import { buildPaymentHeaders } from './paymentHeaders.js';
 
 /**
  * Protocol handler for MPP (Machine Payments Protocol) payment challenges.
@@ -27,16 +20,11 @@ export interface MPPProtocolHandlerConfig {
  * 1. HTTP level: HTTP 402 with WWW-Authenticate: Payment header
  * 2. MCP level: JSON-RPC error with code -32042 containing MPP data
  *
- * Handles the challenge by calling /authorize/mpp on the accounts service
+ * Handles the challenge by calling /authorize/auto on the accounts service
  * and retrying with an Authorization: Payment header.
  */
 export class MPPProtocolHandler implements ProtocolHandler {
   readonly protocol = 'mpp';
-  private accountsServer: string;
-
-  constructor(config?: MPPProtocolHandlerConfig) {
-    this.accountsServer = config?.accountsServer ?? 'https://accounts.atxp.ai';
-  }
 
   async canHandle(response: Response): Promise<boolean> {
     if (hasMPPChallenge(response)) return true;
@@ -173,28 +161,20 @@ export class MPPProtocolHandler implements ProtocolHandler {
     const { account, logger, fetchFn, onPayment } = config;
 
     try {
-      logger.debug('MPP: calling /authorize/mpp on accounts service');
-      const client = new PaymentClient({
-        accountsServer: this.accountsServer,
-        logger,
-        fetchFn,
-      });
+      logger.debug('MPP: calling /authorize/auto on accounts service');
 
-      const accountId = await account.getAccountId();
       let authorizeResult;
       try {
-        authorizeResult = await client.authorize({
-          account,
-          userId: accountId,
+        authorizeResult = await account.authorize({
+          protocols: ['mpp'],
           destination: typeof originalRequest.url === 'string' ? originalRequest.url : originalRequest.url.toString(),
-          protocol: 'mpp',
           challenge,
         });
       } catch (authorizeError) {
         // AuthorizationError = server rejected the request (HTTP error from accounts)
         // Other errors = data validation or network failure
         if (authorizeError instanceof AuthorizationError) {
-          logger.debug(`MPP: /authorize/mpp rejected (${authorizeError.statusCode}), returning original response`);
+          logger.debug(`MPP: authorize rejected (${authorizeError.statusCode}), returning original response`);
           return this.reconstructResponse(bodyText, originalResponse);
         }
         throw authorizeError;

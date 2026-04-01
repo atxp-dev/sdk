@@ -188,7 +188,7 @@ export class ProtocolSettlement {
     }
 
     // ATXP: auth expects { sourceAccountId, destinationAccountId, sourceAccountToken, options }
-    // The credential is a self-contained JSON string from PaymentClient/ATXPAccount.authorize()
+    // The credential is a self-contained JSON string from ATXPAccount.authorize()
     // containing sourceAccountId, sourceAccountToken, and options.
     // destinationAccountId comes from this instance's config (it's the server's own account).
     let parsed: Record<string, unknown> = {};

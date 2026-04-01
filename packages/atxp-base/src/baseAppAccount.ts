@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker, AccountId, Source, AuthorizeParams, AuthorizeResult, Destination } from '@atxp/common';
+import type { Account, PaymentMaker, AccountId, Source, AuthorizeParams, AuthorizeResult, Destination, PaymentProtocol } from '@atxp/common';
 import { WalletTypeEnum, ChainEnum } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { getBaseUSDCAddress } from './baseConstants.js';
@@ -229,29 +229,32 @@ export class BaseAppAccount implements Account {
    * Authorize a payment through the appropriate channel for Base browser accounts.
    */
   async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
-    const { protocol } = params;
-
-    switch (protocol) {
-      case 'atxp': {
-        const chain = this.chainId === 84532 ? ChainEnum.BaseSepolia : ChainEnum.Base;
-        const destination: Destination = {
-          chain,
-          currency: 'USDC',
-          address: params.destination,
-          amount: new BigNumber(params.amount),
-        };
-        const result = await this.paymentMakers[0].makePayment([destination], params.memo || '');
-        if (!result) {
-          throw new Error('BaseAppAccount: payment execution returned no result');
-        }
-        return { protocol, credential: JSON.stringify(result) };
-      }
-      case 'x402':
-        throw new Error('BaseAppAccount does not support x402 protocol');
-      case 'mpp':
-        throw new Error('BaseAppAccount does not support MPP protocol');
-      default:
-        throw new Error(`BaseAppAccount: unsupported protocol '${protocol}'`);
+    if (!params.protocols || params.protocols.length === 0) {
+      throw new Error('BaseAppAccount: protocols array must not be empty');
     }
+    const supported: PaymentProtocol[] = ['atxp'];
+    const protocol = params.protocols.find(p => supported.includes(p));
+    if (!protocol) {
+      throw new Error(`BaseAppAccount does not support any of: ${params.protocols.join(', ')}`);
+    }
+
+    if (!params.amount) {
+      throw new Error('BaseAppAccount: amount is required for atxp authorize');
+    }
+    if (!params.destination) {
+      throw new Error('BaseAppAccount: destination is required for atxp authorize');
+    }
+    const chain = this.chainId === 84532 ? ChainEnum.BaseSepolia : ChainEnum.Base;
+    const destination: Destination = {
+      chain,
+      currency: 'USDC',
+      address: params.destination,
+      amount: new BigNumber(params.amount),
+    };
+    const result = await this.paymentMakers[0].makePayment([destination], params.memo || '');
+    if (!result) {
+      throw new Error('BaseAppAccount: payment execution returned no result');
+    }
+    return { protocol, credential: JSON.stringify(result) };
   }
 }
