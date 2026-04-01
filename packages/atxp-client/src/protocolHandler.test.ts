@@ -92,7 +92,7 @@ describe('X402ProtocolHandler', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    handler = new X402ProtocolHandler({ accountsServer: 'https://accounts.test.com' });
+    handler = new X402ProtocolHandler();
   });
 
   describe('canHandle', () => {
@@ -331,7 +331,7 @@ describe('ATXPFetcher with protocol handlers', () => {
   }
 
   it('should use X402 handler when protocolFlag returns x402 for omni-challenge', async () => {
-    const x402Handler = new X402ProtocolHandler({ accountsServer: 'https://accounts.test.com' });
+    const x402Handler = new X402ProtocolHandler();
     const atxpHandler = new ATXPProtocolHandler();
 
     const mockFetch = vi.fn();
@@ -406,7 +406,7 @@ describe('ATXPFetcher with protocol handlers', () => {
   });
 
   it('should auto-detect protocol when only one handler matches', async () => {
-    const x402Handler = new X402ProtocolHandler({ accountsServer: 'https://accounts.test.com' });
+    const x402Handler = new X402ProtocolHandler();
 
     const mockFetch = vi.fn();
     // Initial request returns X402 challenge
@@ -475,7 +475,7 @@ describe('MPPProtocolHandler', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    handler = new MPPProtocolHandler({ accountsServer: 'https://accounts.test.com' });
+    handler = new MPPProtocolHandler();
   });
 
   describe('canHandle', () => {
@@ -780,8 +780,8 @@ describe('ATXPFetcher with MPP handler', () => {
   }
 
   it('should use MPP handler when protocolFlag returns mpp for omni-challenge', async () => {
-    const mppHandler = new MPPProtocolHandler({ accountsServer: 'https://accounts.test.com' });
-    const x402Handler = new X402ProtocolHandler({ accountsServer: 'https://accounts.test.com' });
+    const mppHandler = new MPPProtocolHandler();
+    const x402Handler = new X402ProtocolHandler();
 
     const mockFetch = vi.fn();
 
@@ -886,7 +886,7 @@ describe('ATXPFetcher with MPP handler', () => {
   });
 
   it('should auto-detect MPP from external server (WWW-Authenticate header)', async () => {
-    const mppHandler = new MPPProtocolHandler({ accountsServer: 'https://accounts.test.com' });
+    const mppHandler = new MPPProtocolHandler();
 
     const mockFetch = vi.fn();
     // External server returns 402 with MPP header

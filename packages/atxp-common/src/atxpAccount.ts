@@ -316,6 +316,10 @@ export class ATXPAccount implements Account {
    * Calls /authorize/auto and returns an opaque credential.
    */
   async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
+    if (!params.protocols || params.protocols.length === 0) {
+      throw new Error('ATXPAccount: protocols array must not be empty');
+    }
+
     const authHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': toBasicAuth(this.token),
@@ -323,13 +327,16 @@ export class ATXPAccount implements Account {
 
     const body: Record<string, unknown> = {
       protocols: params.protocols,
-      amount: params.amount.toString(),
-      currency: 'USDC',
-      receiver: params.destination,
-      memo: params.memo,
-      paymentRequirements: params.paymentRequirements,
-      challenge: params.challenge,
     };
+    // ATXP fields
+    if (params.amount) body.amount = params.amount.toString();
+    if (params.destination) body.receiver = params.destination;
+    if (params.memo) body.memo = params.memo;
+    body.currency = 'USDC';
+    // X402 fields
+    if (params.paymentRequirements) body.paymentRequirements = params.paymentRequirements;
+    // MPP fields
+    if (params.challenge) body.challenge = params.challenge;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
@@ -360,6 +367,14 @@ export class ATXPAccount implements Account {
     }
 
     const responseBody = await response.json() as { protocol: string; credential: string };
+
+    if (!responseBody || typeof responseBody.protocol !== 'string' || typeof responseBody.credential !== 'string') {
+      throw new AuthorizationError(
+        'ATXPAccount: /authorize/auto response missing protocol or credential',
+        500, 'malformed_response'
+      );
+    }
+
     const protocol = responseBody.protocol as PaymentProtocol;
 
     let credential: string;

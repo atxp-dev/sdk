@@ -11,15 +11,7 @@ import {
   hasMPPMCPError,
 } from '@atxp/mpp';
 import { BigNumber } from 'bignumber.js';
-import { PaymentClient, buildPaymentHeaders } from './paymentClient.js';
-
-/**
- * Configuration for MPP protocol handler.
- */
-export interface MPPProtocolHandlerConfig {
-  /** @deprecated No longer used */
-  accountsServer?: string;
-}
+import { buildPaymentHeaders } from './paymentHeaders.js';
 
 /**
  * Protocol handler for MPP (Machine Payments Protocol) payment challenges.
@@ -33,9 +25,6 @@ export interface MPPProtocolHandlerConfig {
  */
 export class MPPProtocolHandler implements ProtocolHandler {
   readonly protocol = 'mpp';
-
-  constructor(_config?: MPPProtocolHandlerConfig) {
-  }
 
   async canHandle(response: Response): Promise<boolean> {
     if (hasMPPChallenge(response)) return true;
@@ -173,14 +162,10 @@ export class MPPProtocolHandler implements ProtocolHandler {
 
     try {
       logger.debug('MPP: calling /authorize/auto on accounts service');
-      const client = new PaymentClient({
-        logger,
-      });
 
       let authorizeResult;
       try {
-        authorizeResult = await client.authorize({
-          account,
+        authorizeResult = await account.authorize({
           protocols: ['mpp'],
           destination: typeof originalRequest.url === 'string' ? originalRequest.url : originalRequest.url.toString(),
           challenge,

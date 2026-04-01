@@ -2,7 +2,7 @@ import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import type { ProspectivePayment } from './types.js';
 import { ATXPPaymentError } from './errors.js';
 import { BigNumber } from 'bignumber.js';
-import { PaymentClient, buildPaymentHeaders } from './paymentClient.js';
+import { buildPaymentHeaders } from './paymentHeaders.js';
 
 /**
  * Type guard for X402 challenge body.
@@ -27,11 +27,6 @@ function isX402Challenge(obj: unknown): obj is X402Challenge {
   );
 }
 
-export interface X402ProtocolHandlerConfig {
-  /** @deprecated No longer used */
-  accountsServer?: string;
-}
-
 /**
  * Protocol handler for X402 payment challenges.
  *
@@ -40,9 +35,6 @@ export interface X402ProtocolHandlerConfig {
  */
 export class X402ProtocolHandler implements ProtocolHandler {
   readonly protocol = 'x402';
-
-  constructor(_config?: X402ProtocolHandlerConfig) {
-  }
 
   async canHandle(response: Response): Promise<boolean> {
     if (response.status !== 402) return false;
@@ -125,12 +117,7 @@ export class X402ProtocolHandler implements ProtocolHandler {
       // Authorize via account.authorize() — ATXPAccount calls the accounts
       // service, BaseAccount signs locally. No fallback — each account type
       // handles authorization according to its capabilities.
-      const client = new PaymentClient({
-        logger,
-      });
-
-      const authorizeResult = await client.authorize({
-        account,
+      const authorizeResult = await account.authorize({
         protocols: ['x402'],
         destination: url,
         paymentRequirements: selectedPaymentRequirements,

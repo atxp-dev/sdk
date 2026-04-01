@@ -1,4 +1,4 @@
-import type { Account, PaymentMaker, AccountId, Source, AuthorizeParams, AuthorizeResult, Destination } from '@atxp/common';
+import type { Account, PaymentMaker, AccountId, Source, AuthorizeParams, AuthorizeResult, Destination, PaymentProtocol } from '@atxp/common';
 import { WalletTypeEnum, ChainEnum } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import {
@@ -232,7 +232,10 @@ export class WorldchainAccount implements Account {
    * Authorize a payment through the appropriate channel for World Chain accounts.
    */
   async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
-    const supported: string[] = ['atxp'];
+    if (!params.protocols || params.protocols.length === 0) {
+      throw new Error('WorldchainAccount: protocols array must not be empty');
+    }
+    const supported: PaymentProtocol[] = ['atxp'];
     const protocol = params.protocols.find(p => supported.includes(p));
     if (!protocol) {
       throw new Error(`WorldchainAccount does not support any of: ${params.protocols.join(', ')}`);

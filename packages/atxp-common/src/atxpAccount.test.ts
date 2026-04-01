@@ -267,11 +267,9 @@ describe('ATXPAccount', () => {
           body: JSON.stringify({
             protocols: ['atxp'],
             amount: '2.5',
-            currency: 'USDC',
             receiver: '0xrecipient',
             memo: 'test memo',
-            paymentRequirements: undefined,
-            challenge: undefined,
+            currency: 'USDC',
           }),
         })
       );
@@ -370,6 +368,83 @@ describe('ATXPAccount', () => {
 
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(sentBody.protocols).toEqual(['x402', 'atxp']);
+    });
+
+    it('should not include amount in body when undefined (x402/mpp paths)', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ protocol: 'x402', credential: 'x402-cred' }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      await account.authorize({
+        protocols: ['x402'],
+        paymentRequirements: { network: 'base' },
+      });
+
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody.amount).toBeUndefined();
+      expect(sentBody.receiver).toBeUndefined();
+      expect(sentBody.currency).toBe('USDC');
+      expect(sentBody.paymentRequirements).toEqual({ network: 'base' });
+    });
+
+    it('should throw when protocols array is empty', async () => {
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      await expect(
+        account.authorize({
+          protocols: [],
+          destination: '0xrecipient',
+        })
+      ).rejects.toThrow('protocols array must not be empty');
+    });
+
+    it('should throw AuthorizationError when response is missing protocol field', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ credential: 'some-credential' }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      await expect(
+        account.authorize({
+          protocols: ['atxp'],
+          amount: new BigNumber('1'),
+          destination: '0xrecipient',
+        })
+      ).rejects.toThrow('response missing protocol or credential');
+    });
+
+    it('should throw AuthorizationError when response is missing credential field', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ protocol: 'atxp' }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      await expect(
+        account.authorize({
+          protocols: ['atxp'],
+          amount: new BigNumber('1'),
+          destination: '0xrecipient',
+        })
+      ).rejects.toThrow('response missing protocol or credential');
     });
   });
 });

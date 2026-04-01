@@ -1,5 +1,5 @@
 import type { Account, PaymentMaker, Hex } from '@atxp/client';
-import type { AccountId, Source, AuthorizeParams, AuthorizeResult, Destination } from '@atxp/common';
+import type { AccountId, Source, AuthorizeParams, AuthorizeResult, Destination, PaymentProtocol } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { TempoPaymentMaker } from './tempoPaymentMaker.js';
@@ -76,7 +76,10 @@ export class TempoAccount implements Account {
    * Authorize a payment through the appropriate channel for Tempo accounts.
    */
   async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
-    const supported: string[] = ['mpp'];
+    if (!params.protocols || params.protocols.length === 0) {
+      throw new Error('TempoAccount: protocols array must not be empty');
+    }
+    const supported: PaymentProtocol[] = ['mpp'];
     const protocol = params.protocols.find(p => supported.includes(p));
     if (!protocol) {
       throw new Error(`TempoAccount does not support any of: ${params.protocols.join(', ')}`);

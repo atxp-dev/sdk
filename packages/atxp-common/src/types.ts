@@ -198,8 +198,8 @@ export interface PaymentDestination {
 
 export interface AuthorizeParams {
   protocols: PaymentProtocol[];
-  amount: BigNumber;
-  destination: string;
+  amount?: BigNumber;
+  destination?: string;
   memo?: string;
   /** X402: payment requirements from server challenge */
   paymentRequirements?: unknown;
