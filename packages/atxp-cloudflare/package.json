@@ -1,6 +1,6 @@
 {
   "name": "@atxp/cloudflare",
-  "version": "0.10.11",
+  "version": "0.10.12",
   "description": "ATXP Cloudflare - Cloudflare Workers integration for Authorization Token Exchange Protocol",
   "license": "MIT",
   "repository": {
@@ -33,8 +33,8 @@
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/common": "0.10.11",
-    "@atxp/server": "0.10.11"
+    "@atxp/common": "0.10.12",
+    "@atxp/server": "0.10.12"
   },
   "peerDependencies": {
     "agents": "^0.3.3"

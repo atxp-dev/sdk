@@ -1,6 +1,6 @@
 {
   "name": "@atxp/mpp",
-  "version": "0.10.11",
+  "version": "0.10.12",
   "description": "ATXP MPP (Machine Payments Protocol) support",
   "license": "MIT",
   "repository": {
