@@ -68,32 +68,24 @@ describe('buildPaymentHeaders', () => {
 });
 
 describe('PaymentClient', () => {
-  let mockFetch: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch = vi.fn();
   });
 
   describe('authorize', () => {
-    it('should delegate to account.authorize with x402 protocol', async () => {
+    it('should delegate to account.authorize with protocols array', async () => {
       const mockAuthorize = vi.fn().mockResolvedValue({
         protocol: 'x402',
         credential: 'x402-payment-header',
       });
       const account = createMockAccount(mockAuthorize);
 
-      const client = new PaymentClient({
-        accountsServer: 'https://accounts.test.com',
-        logger,
-        fetchFn: mockFetch,
-      });
+      const client = new PaymentClient({ logger });
 
       const result = await client.authorize({
         account,
-        userId: 'base:0xtest',
+        protocols: ['x402'],
         destination: 'https://example.com/api',
-        protocol: 'x402',
         paymentRequirements: { network: 'base', scheme: 'exact' },
       });
 
@@ -102,7 +94,7 @@ describe('PaymentClient', () => {
 
       // Verify account.authorize was called with correct params
       expect(mockAuthorize).toHaveBeenCalledWith({
-        protocol: 'x402',
+        protocols: ['x402'],
         amount: undefined,
         destination: 'https://example.com/api',
         memo: undefined,
@@ -118,18 +110,13 @@ describe('PaymentClient', () => {
       });
       const account = createMockAccount(mockAuthorize);
 
-      const client = new PaymentClient({
-        accountsServer: 'https://accounts.test.com',
-        logger,
-        fetchFn: mockFetch,
-      });
+      const client = new PaymentClient({ logger });
 
       const challenge = { id: 'ch_1', method: 'tempo', amount: '1000000' };
       const result = await client.authorize({
         account,
-        userId: 'base:0xtest',
+        protocols: ['mpp'],
         destination: 'https://example.com/api',
-        protocol: 'mpp',
         challenge,
       });
 
@@ -137,7 +124,7 @@ describe('PaymentClient', () => {
       expect(result.credential).toBe('mpp-credential-value');
 
       expect(mockAuthorize).toHaveBeenCalledWith(
-        expect.objectContaining({ protocol: 'mpp', challenge })
+        expect.objectContaining({ protocols: ['mpp'], challenge })
       );
     });
 
@@ -149,17 +136,12 @@ describe('PaymentClient', () => {
       });
       const account = createMockAccount(mockAuthorize);
 
-      const client = new PaymentClient({
-        accountsServer: 'https://accounts.test.com',
-        logger,
-        fetchFn: mockFetch,
-      });
+      const client = new PaymentClient({ logger });
 
       const result = await client.authorize({
         account,
-        userId: 'base:0xtest',
+        protocols: ['atxp'],
         destination: '0xrecipient',
-        protocol: 'atxp',
         amount: new BigNumber('1.5'),
         memo: 'test payment',
       });
@@ -168,7 +150,7 @@ describe('PaymentClient', () => {
       expect(result.credential).toBe(JSON.stringify(responseBody));
 
       expect(mockAuthorize).toHaveBeenCalledWith({
-        protocol: 'atxp',
+        protocols: ['atxp'],
         amount: new BigNumber('1.5'),
         destination: '0xrecipient',
         memo: 'test payment',
@@ -177,126 +159,44 @@ describe('PaymentClient', () => {
       });
     });
 
-    it('should use protocolFlag when no explicit protocol is provided', async () => {
+    it('should pass multiple protocols through to account.authorize', async () => {
       const mockAuthorize = vi.fn().mockResolvedValue({
-        protocol: 'mpp',
-        credential: 'flag-cred',
+        protocol: 'x402',
+        credential: 'multi-cred',
       });
       const account = createMockAccount(mockAuthorize);
 
-      const client = new PaymentClient({
-        accountsServer: 'https://accounts.test.com',
-        protocolFlag: (_userId, _dest) => 'mpp',
-        logger,
-        fetchFn: mockFetch,
-      });
+      const client = new PaymentClient({ logger });
 
       const result = await client.authorize({
         account,
-        userId: 'base:0xtest',
+        protocols: ['x402', 'atxp'],
         destination: 'https://example.com/api',
-        challenge: { id: 'ch_1' },
+        paymentRequirements: { network: 'base' },
       });
 
-      expect(result.protocol).toBe('mpp');
+      expect(result.protocol).toBe('x402');
       expect(mockAuthorize).toHaveBeenCalledWith(
-        expect.objectContaining({ protocol: 'mpp' })
-      );
-    });
-
-    it('should default to atxp when no protocol or protocolFlag', async () => {
-      const mockAuthorize = vi.fn().mockResolvedValue({
-        protocol: 'atxp',
-        credential: '{"status":"ok"}',
-      });
-      const account = createMockAccount(mockAuthorize);
-
-      const client = new PaymentClient({
-        accountsServer: 'https://accounts.test.com',
-        logger,
-        fetchFn: mockFetch,
-      });
-
-      const result = await client.authorize({
-        account,
-        userId: 'base:0xtest',
-        destination: '0xrecipient',
-        amount: new BigNumber('1'),
-      });
-
-      expect(result.protocol).toBe('atxp');
-      expect(mockAuthorize).toHaveBeenCalledWith(
-        expect.objectContaining({ protocol: 'atxp' })
+        expect.objectContaining({ protocols: ['x402', 'atxp'] })
       );
     });
 
     it('should propagate errors from account.authorize', async () => {
       const mockAuthorize = vi.fn().mockRejectedValue(
-        new Error('ATXPAccount: /authorize/x402 failed (404): Not Found')
+        new Error('ATXPAccount: /authorize/auto failed (404): Not Found')
       );
       const account = createMockAccount(mockAuthorize);
 
-      const client = new PaymentClient({
-        accountsServer: 'https://accounts.test.com',
-        logger,
-        fetchFn: mockFetch,
-      });
+      const client = new PaymentClient({ logger });
 
       await expect(
         client.authorize({
           account,
-          userId: 'base:0xtest',
+          protocols: ['x402'],
           destination: 'https://example.com/api',
-          protocol: 'x402',
           paymentRequirements: {},
         })
-      ).rejects.toThrow('/authorize/x402 failed (404)');
-    });
-
-    it('should propagate missing paymentHeader errors from account.authorize', async () => {
-      const mockAuthorize = vi.fn().mockRejectedValue(
-        new Error('ATXPAccount: /authorize/x402 response missing or invalid paymentHeader')
-      );
-      const account = createMockAccount(mockAuthorize);
-
-      const client = new PaymentClient({
-        accountsServer: 'https://accounts.test.com',
-        logger,
-        fetchFn: mockFetch,
-      });
-
-      await expect(
-        client.authorize({
-          account,
-          userId: 'base:0xtest',
-          destination: 'https://example.com/api',
-          protocol: 'x402',
-          paymentRequirements: {},
-        })
-      ).rejects.toThrow('missing or invalid paymentHeader');
-    });
-
-    it('should propagate missing credential errors from account.authorize', async () => {
-      const mockAuthorize = vi.fn().mockRejectedValue(
-        new Error('ATXPAccount: /authorize/mpp response missing or invalid credential')
-      );
-      const account = createMockAccount(mockAuthorize);
-
-      const client = new PaymentClient({
-        accountsServer: 'https://accounts.test.com',
-        logger,
-        fetchFn: mockFetch,
-      });
-
-      await expect(
-        client.authorize({
-          account,
-          userId: 'base:0xtest',
-          destination: 'https://example.com/api',
-          protocol: 'mpp',
-          challenge: {},
-        })
-      ).rejects.toThrow('missing or invalid credential');
+      ).rejects.toThrow('/authorize/auto failed (404)');
     });
 
     it('should work with accounts that have no token property', async () => {
@@ -313,17 +213,12 @@ describe('PaymentClient', () => {
         authorize: mockAuthorize,
       };
 
-      const client = new PaymentClient({
-        accountsServer: 'https://accounts.test.com',
-        logger,
-        fetchFn: mockFetch,
-      });
+      const client = new PaymentClient({ logger });
 
       const result = await client.authorize({
         account: accountNoToken,
-        userId: 'base:0xtest',
+        protocols: ['x402'],
         destination: 'https://example.com/api',
-        protocol: 'x402',
         paymentRequirements: {},
       });
 

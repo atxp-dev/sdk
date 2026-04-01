@@ -57,28 +57,22 @@ export class SolanaAccount implements Account {
    * Authorize a payment through the appropriate channel for Solana accounts.
    */
   async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
-    const { protocol } = params;
-
-    switch (protocol) {
-      case 'atxp': {
-        const destination: Destination = {
-          chain: 'solana',
-          currency: 'USDC',
-          address: params.destination,
-          amount: new BigNumber(params.amount),
-        };
-        const result = await this.paymentMakers[0].makePayment([destination], params.memo || '');
-        if (!result) {
-          throw new Error('SolanaAccount: payment execution returned no result');
-        }
-        return { protocol, credential: JSON.stringify(result) };
-      }
-      case 'x402':
-        throw new Error('SolanaAccount does not support x402 protocol');
-      case 'mpp':
-        throw new Error('SolanaAccount does not support MPP protocol');
-      default:
-        throw new Error(`SolanaAccount: unsupported protocol '${protocol}'`);
+    const supported: string[] = ['atxp'];
+    const protocol = params.protocols.find(p => supported.includes(p));
+    if (!protocol) {
+      throw new Error(`SolanaAccount does not support any of: ${params.protocols.join(', ')}`);
     }
+
+    const destination: Destination = {
+      chain: 'solana',
+      currency: 'USDC',
+      address: params.destination,
+      amount: new BigNumber(params.amount),
+    };
+    const result = await this.paymentMakers[0].makePayment([destination], params.memo || '');
+    if (!result) {
+      throw new Error('SolanaAccount: payment execution returned no result');
+    }
+    return { protocol, credential: JSON.stringify(result) };
   }
 }

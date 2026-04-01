@@ -197,7 +197,7 @@ export interface PaymentDestination {
 }
 
 export interface AuthorizeParams {
-  protocol: PaymentProtocol;
+  protocols: PaymentProtocol[];
   amount: BigNumber;
   destination: string;
   memo?: string;
@@ -246,8 +246,9 @@ export type Account = PaymentDestination & {
   /**
    * Authorize a payment through the appropriate channel for this account type.
    *
-   * For ATXPAccount: calls /authorize/{protocol} on the accounts service (pre-check only, no payment execution).
-   * For local-key accounts (Base, Solana, etc.): signs locally and/or executes the payment, returning evidence.
+   * For ATXPAccount: calls /authorize/auto on the accounts service (pre-check only, no payment execution).
+   * For local-key accounts (Base, Solana, etc.): picks the first supported protocol from
+   * params.protocols and signs locally and/or executes the payment, returning evidence.
    *
    * Returns an opaque credential that can be passed to ProtocolSettlement.settle().
    */

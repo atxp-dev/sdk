@@ -151,7 +151,7 @@ describe('X402ProtocolHandler', () => {
 
       // Verify account.authorize was called with x402 protocol
       expect(mockAccount.authorize).toHaveBeenCalledWith(
-        expect.objectContaining({ protocol: 'x402' })
+        expect.objectContaining({ protocols: ['x402'] })
       );
 
       // Verify retry included X-PAYMENT header
@@ -368,7 +368,7 @@ describe('ATXPFetcher with protocol handlers', () => {
 
     // Verify account.authorize was called (X402 handler was used)
     expect(account.authorize).toHaveBeenCalledWith(
-      expect.objectContaining({ protocol: 'x402' })
+      expect.objectContaining({ protocols: ['x402'] })
     );
   });
 
@@ -551,7 +551,7 @@ describe('MPPProtocolHandler', () => {
 
       // Verify account.authorize was called with mpp protocol
       expect(mockAccount.authorize).toHaveBeenCalledWith(
-        expect.objectContaining({ protocol: 'mpp' })
+        expect.objectContaining({ protocols: ['mpp'] })
       );
 
       // Verify retry included Authorization: Payment header
@@ -821,7 +821,7 @@ describe('ATXPFetcher with MPP handler', () => {
 
     // Verify account.authorize was called (MPP handler was used, not X402)
     expect(account.authorize).toHaveBeenCalledWith(
-      expect.objectContaining({ protocol: 'mpp' })
+      expect.objectContaining({ protocols: ['mpp'] })
     );
   });
 
@@ -924,7 +924,7 @@ describe('ATXPFetcher with MPP handler', () => {
 
     // Verify account.authorize was called
     expect(account.authorize).toHaveBeenCalledWith(
-      expect.objectContaining({ protocol: 'mpp' })
+      expect.objectContaining({ protocols: ['mpp'] })
     );
   });
 });

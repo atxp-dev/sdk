@@ -17,6 +17,7 @@ import { PaymentClient, buildPaymentHeaders } from './paymentClient.js';
  * Configuration for MPP protocol handler.
  */
 export interface MPPProtocolHandlerConfig {
+  /** @deprecated No longer used */
   accountsServer?: string;
 }
 
@@ -27,15 +28,13 @@ export interface MPPProtocolHandlerConfig {
  * 1. HTTP level: HTTP 402 with WWW-Authenticate: Payment header
  * 2. MCP level: JSON-RPC error with code -32042 containing MPP data
  *
- * Handles the challenge by calling /authorize/mpp on the accounts service
+ * Handles the challenge by calling /authorize/auto on the accounts service
  * and retrying with an Authorization: Payment header.
  */
 export class MPPProtocolHandler implements ProtocolHandler {
   readonly protocol = 'mpp';
-  private accountsServer: string;
 
-  constructor(config?: MPPProtocolHandlerConfig) {
-    this.accountsServer = config?.accountsServer ?? 'https://accounts.atxp.ai';
+  constructor(_config?: MPPProtocolHandlerConfig) {
   }
 
   async canHandle(response: Response): Promise<boolean> {
@@ -173,21 +172,17 @@ export class MPPProtocolHandler implements ProtocolHandler {
     const { account, logger, fetchFn, onPayment } = config;
 
     try {
-      logger.debug('MPP: calling /authorize/mpp on accounts service');
+      logger.debug('MPP: calling /authorize/auto on accounts service');
       const client = new PaymentClient({
-        accountsServer: this.accountsServer,
         logger,
-        fetchFn,
       });
 
-      const accountId = await account.getAccountId();
       let authorizeResult;
       try {
         authorizeResult = await client.authorize({
           account,
-          userId: accountId,
+          protocols: ['mpp'],
           destination: typeof originalRequest.url === 'string' ? originalRequest.url : originalRequest.url.toString(),
-          protocol: 'mpp',
           challenge,
         });
       } catch (authorizeError) {

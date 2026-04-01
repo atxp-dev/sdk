@@ -236,11 +236,11 @@ describe('ATXPAccount', () => {
       mockFetch = vi.fn();
     });
 
-    it('should call /authorize/atxp with correct body and inject sourceAccountToken', async () => {
-      const responseBody = { authorized: true, sourceAccountId: 'acct_123', options: {} };
+    it('should call /authorize/auto with correct body and inject sourceAccountToken for atxp', async () => {
+      const credentialObj = { authorized: true, sourceAccountId: 'acct_123', options: {} };
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ ...responseBody }),
+        json: async () => ({ protocol: 'atxp', credential: JSON.stringify(credentialObj) }),
       });
 
       const account = new ATXPAccount(
@@ -249,7 +249,7 @@ describe('ATXPAccount', () => {
       );
 
       const result = await account.authorize({
-        protocol: 'atxp',
+        protocols: ['atxp'],
         amount: new BigNumber('2.5'),
         destination: '0xrecipient',
         memo: 'test memo',
@@ -261,14 +261,17 @@ describe('ATXPAccount', () => {
       expect(parsed.sourceAccountToken).toBe('ct_abc123');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://accounts.example.com/authorize/atxp',
+        'https://accounts.example.com/authorize/auto',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
+            protocols: ['atxp'],
             amount: '2.5',
             currency: 'USDC',
             receiver: '0xrecipient',
             memo: 'test memo',
+            paymentRequirements: undefined,
+            challenge: undefined,
           }),
         })
       );
@@ -279,10 +282,10 @@ describe('ATXPAccount', () => {
       expect(callHeaders['Authorization']).toBe(expectedAuth);
     });
 
-    it('should call /authorize/x402 and return paymentHeader as credential', async () => {
+    it('should call /authorize/auto and return x402 credential as-is', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ paymentHeader: 'x402-header-value' }),
+        json: async () => ({ protocol: 'x402', credential: 'x402-header-value' }),
       });
 
       const account = new ATXPAccount(
@@ -291,7 +294,7 @@ describe('ATXPAccount', () => {
       );
 
       const result = await account.authorize({
-        protocol: 'x402',
+        protocols: ['x402'],
         amount: new BigNumber('1'),
         destination: 'https://example.com',
         paymentRequirements: { network: 'base' },
@@ -301,10 +304,10 @@ describe('ATXPAccount', () => {
       expect(result.credential).toBe('x402-header-value');
     });
 
-    it('should call /authorize/mpp and return credential', async () => {
+    it('should call /authorize/auto and return mpp credential as-is', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ credential: 'mpp-cred-value' }),
+        json: async () => ({ protocol: 'mpp', credential: 'mpp-cred-value' }),
       });
 
       const account = new ATXPAccount(
@@ -313,7 +316,7 @@ describe('ATXPAccount', () => {
       );
 
       const result = await account.authorize({
-        protocol: 'mpp',
+        protocols: ['mpp'],
         amount: new BigNumber('1'),
         destination: 'https://example.com',
         challenge: { id: 'ch_1' },
@@ -337,17 +340,17 @@ describe('ATXPAccount', () => {
 
       await expect(
         account.authorize({
-          protocol: 'atxp',
+          protocols: ['atxp'],
           amount: new BigNumber('1'),
           destination: '0xrecipient',
         })
-      ).rejects.toThrow('/authorize/atxp failed (500)');
+      ).rejects.toThrow('/authorize/auto failed (500)');
     });
 
-    it('should throw when x402 response missing paymentHeader', async () => {
+    it('should send multiple protocols in the request', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ invalid: 'response' }),
+        json: async () => ({ protocol: 'x402', credential: 'x402-header' }),
       });
 
       const account = new ATXPAccount(
@@ -355,35 +358,18 @@ describe('ATXPAccount', () => {
         { fetchFn: mockFetch }
       );
 
-      await expect(
-        account.authorize({
-          protocol: 'x402',
-          amount: new BigNumber('1'),
-          destination: 'https://example.com',
-          paymentRequirements: {},
-        })
-      ).rejects.toThrow('missing or invalid paymentHeader');
-    });
-
-    it('should throw when mpp response missing credential', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ somethingElse: 'value' }),
+      const result = await account.authorize({
+        protocols: ['x402', 'atxp'],
+        amount: new BigNumber('1'),
+        destination: 'https://example.com',
+        paymentRequirements: { network: 'base' },
       });
 
-      const account = new ATXPAccount(
-        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
-        { fetchFn: mockFetch }
-      );
+      expect(result.protocol).toBe('x402');
+      expect(result.credential).toBe('x402-header');
 
-      await expect(
-        account.authorize({
-          protocol: 'mpp',
-          amount: new BigNumber('1'),
-          destination: 'https://example.com',
-          challenge: {},
-        })
-      ).rejects.toThrow('missing or invalid credential');
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody.protocols).toEqual(['x402', 'atxp']);
     });
   });
 });

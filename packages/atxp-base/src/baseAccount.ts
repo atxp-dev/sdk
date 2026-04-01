@@ -72,7 +72,11 @@ export class BaseAccount implements Account {
    * Authorize a payment through the appropriate channel for Base accounts.
    */
   async authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
-    const { protocol } = params;
+    const supported: string[] = ['x402', 'atxp'];
+    const protocol = params.protocols.find(p => supported.includes(p));
+    if (!protocol) {
+      throw new Error(`BaseAccount does not support any of: ${params.protocols.join(', ')}`);
+    }
 
     switch (protocol) {
       case 'x402': {
@@ -103,8 +107,6 @@ export class BaseAccount implements Account {
         }
         return { protocol, credential: JSON.stringify({ transactionId: result.transactionId, chain: result.chain, currency: result.currency }) };
       }
-      case 'mpp':
-        throw new Error('BaseAccount does not support MPP protocol');
       default:
         throw new Error(`BaseAccount: unsupported protocol '${protocol}'`);
     }

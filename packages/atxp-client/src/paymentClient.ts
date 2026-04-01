@@ -1,4 +1,4 @@
-import type { PaymentProtocol, ProtocolFlag, FetchLike, Logger, Account, AuthorizeResult } from '@atxp/common';
+import type { PaymentProtocol, Logger, Account, AuthorizeResult } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 
 // Re-export AuthorizeResult from common so existing imports keep working
@@ -40,35 +40,27 @@ export function buildPaymentHeaders(result: AuthorizeResult, originalHeaders?: H
 /**
  * Client for authorizing payments.
  *
- * Resolves the payment protocol via protocolFlag, then delegates to
- * account.authorize() for the actual authorization logic.
+ * Passes protocols through to account.authorize() which handles
+ * protocol selection and authorization logic.
  */
 export class PaymentClient {
-  private protocolFlag?: ProtocolFlag;
   private logger: Logger;
 
   constructor(config: {
-    protocolFlag?: ProtocolFlag;
     logger: Logger;
-    /** @deprecated No longer used — authorization delegates to account.authorize() */
-    accountsServer?: string;
-    /** @deprecated No longer used — authorization delegates to account.authorize() */
-    fetchFn?: FetchLike;
   }) {
-    this.protocolFlag = config.protocolFlag;
     this.logger = config.logger;
   }
 
   /**
    * Authorize a payment by delegating to the account's authorize method.
    *
-   * PaymentClient resolves the protocol (via explicit param or protocolFlag),
-   * then delegates all protocol-specific logic to account.authorize().
+   * PaymentClient passes the protocols array through to account.authorize(),
+   * which selects the appropriate protocol and handles authorization.
    *
    * @param params.account - The account to authorize the payment through
-   * @param params.userId - Passed to protocolFlag for protocol selection
+   * @param params.protocols - Payment protocols the server/caller supports
    * @param params.destination - Payment destination address
-   * @param params.protocol - Explicit protocol override (skips protocolFlag)
    * @param params.amount - Payment amount
    * @param params.memo - Payment memo
    * @param params.paymentRequirements - X402 payment requirements
@@ -77,25 +69,17 @@ export class PaymentClient {
    */
   async authorize(params: {
     account: Account;
-    userId: string;
-    destination: string;
-    protocol?: PaymentProtocol;
+    protocols: PaymentProtocol[];
     amount?: BigNumber;
+    destination: string;
     memo?: string;
     paymentRequirements?: unknown;
     challenge?: unknown;
   }): Promise<AuthorizeResult> {
-    const { account, userId, destination } = params;
-
-    // Determine protocol
-    const protocol: PaymentProtocol = params.protocol
-      ?? (this.protocolFlag ? this.protocolFlag(userId, destination) : 'atxp');
-
-    // Delegate to the account's authorize method
-    return account.authorize({
-      protocol,
+    return params.account.authorize({
+      protocols: params.protocols,
       amount: params.amount!,
-      destination,
+      destination: params.destination,
       memo: params.memo,
       paymentRequirements: params.paymentRequirements,
       challenge: params.challenge,
