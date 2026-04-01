@@ -1,7 +1,7 @@
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { PAYMENT_REQUIRED_ERROR_CODE, PAYMENT_REQUIRED_PREAMBLE, AuthorizationServerUrl } from "@atxp/common";
 import { BigNumber } from "bignumber.js";
-import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, X402PaymentOption } from "./protocol.js";
+import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
 
 /**
  * Build X402 payment requirements from charge options.
@@ -47,6 +47,36 @@ export function buildAtxpMcpChallenge(
 }
 
 /**
+ * Build MPP challenge data from charge options.
+ * Uses the first Tempo-compatible option (MPP requires Tempo chain).
+ * Returns null if no suitable option is available.
+ */
+export function buildMppChallenge(args: {
+  id: string;
+  options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
+}): MppChallengeData | null {
+  const tempoOption = args.options.find(o => o.network === 'tempo' || o.network === 'tempo_moderato');
+  if (!tempoOption) return null;
+
+  return {
+    id: args.id,
+    method: 'tempo',
+    intent: 'charge',
+    amount: tempoOption.amount.times(1e6).toFixed(0),
+    currency: tempoOption.currency || 'pathUSD',
+    network: tempoOption.network,
+    recipient: tempoOption.address,
+  };
+}
+
+/**
+ * Serialize MPP challenge data into a WWW-Authenticate: Payment header value.
+ */
+export function serializeMppHeader(challenge: MppChallengeData): string {
+  return `Payment method="${challenge.method}", intent="${challenge.intent}", id="${challenge.id}", amount="${challenge.amount}", currency="${challenge.currency}", network="${challenge.network}", recipient="${challenge.recipient}"`;
+}
+
+/**
  * Create an omni-challenge MCP error (for MCP SSE transport).
  * Contains both ATXP-MCP challenge data in a single JSON-RPC error.
  */
@@ -55,17 +85,23 @@ export function omniChallengeMcpError(
   paymentRequestId: string,
   chargeAmount: BigNumber | undefined,
   x402Requirements: X402PaymentRequirements,
+  mppChallenge?: MppChallengeData | null,
 ): McpError {
   const atxpMcp = buildAtxpMcpChallenge(server, paymentRequestId, chargeAmount);
 
-  const data = {
+  const data: Record<string, unknown> = {
     // ATXP-MCP fields (existing, preserved for backwards compatibility)
     paymentRequestId: atxpMcp.paymentRequestId,
     paymentRequestUrl: atxpMcp.paymentRequestUrl,
     chargeAmount: atxpMcp.chargeAmount,
-    // X402 fields (new, added for omni-challenge)
+    // X402 fields
     x402: x402Requirements,
   };
+
+  // MPP fields (JSON-RPC error code -32042 with mpp object)
+  if (mppChallenge) {
+    data.mpp = mppChallenge;
+  }
 
   const amountText = chargeAmount ? ` You will be charged ${chargeAmount.toString()}.` : '';
   return new McpError(
@@ -88,6 +124,7 @@ export function omniChallengeHttpResponse(
   paymentRequestId: string,
   chargeAmount: BigNumber | undefined,
   x402Requirements: X402PaymentRequirements,
+  mppChallenge?: MppChallengeData | null,
 ): {
   status: 402;
   headers: Record<string, string>;
@@ -95,12 +132,18 @@ export function omniChallengeHttpResponse(
 } {
   const atxpMcp = buildAtxpMcpChallenge(server, paymentRequestId, chargeAmount);
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-ATXP-Payment-Request': JSON.stringify(atxpMcp),
+  };
+
+  if (mppChallenge) {
+    headers['WWW-Authenticate'] = serializeMppHeader(mppChallenge);
+  }
+
   return {
     status: 402,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-ATXP-Payment-Request': JSON.stringify(atxpMcp),
-    },
+    headers,
     body: JSON.stringify(x402Requirements),
   };
 }
@@ -115,7 +158,13 @@ export function buildOmniChallenge(args: {
   options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
   resource: string;
   payeeName: string;
+  /** Unique challenge ID for MPP (e.g. payment request ID) */
+  mppChallengeId?: string;
 }): OmniChallenge {
+  const mpp = args.mppChallengeId
+    ? buildMppChallenge({ id: args.mppChallengeId, options: args.options })
+    : null;
+
   return {
     atxpMcp: buildAtxpMcpChallenge(args.server, args.paymentRequestId, args.chargeAmount),
     x402: buildX402Requirements({
@@ -123,5 +172,6 @@ export function buildOmniChallenge(args: {
       resource: args.resource,
       payeeName: args.payeeName,
     }),
+    ...(mpp && { mpp }),
   };
 }

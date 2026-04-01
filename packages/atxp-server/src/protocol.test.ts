@@ -37,6 +37,27 @@ describe('detectProtocol', () => {
     expect(result).toBeNull();
   });
 
+  it('should detect MPP from Authorization: Payment header', () => {
+    const result = detectProtocol({
+      'authorization': 'Payment eyJjaGFsbGVuZ2UiOiJjaF8xMjMifQ==',
+    });
+    expect(result).toEqual({
+      protocol: 'mpp',
+      credential: 'eyJjaGFsbGVuZ2UiOiJjaF8xMjMifQ==',
+    });
+  });
+
+  it('should prefer X-PAYMENT (X402) over Authorization: Payment (MPP)', () => {
+    const result = detectProtocol({
+      'x-payment': 'x402-credential',
+      'authorization': 'Payment mpp-credential',
+    });
+    expect(result).toEqual({
+      protocol: 'x402',
+      credential: 'x402-credential',
+    });
+  });
+
   it('should return null for non-Bearer authorization', () => {
     const result = detectProtocol({
       'authorization': 'Basic dXNlcjpwYXNz',
@@ -168,6 +189,68 @@ describe('ProtocolSettlement', () => {
           body: expect.stringContaining('"sourceAccountToken":"atxp-jwt-token"'),
         }),
       );
+    });
+
+    it('should call /settle/mpp with parsed credential and amount', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xmpp', settledAmount: '1.00' }),
+      });
+
+      const mppCredential = {
+        challenge: 'ch_123',
+        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
+        payload: { signature: 'abc', amount: '1.00', payTo: '0xDst', memo: 'test' },
+      };
+      const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
+      const result = await settlement.settle('mpp', credential);
+
+      expect(result).toEqual({ txHash: '0xmpp', settledAmount: '1.00' });
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.credential).toEqual(mppCredential);
+      expect(body.amount).toBe('1.00');
+    });
+
+    it('should call /verify/mpp with parsed credential', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ valid: true }),
+      });
+
+      const mppCredential = {
+        challenge: 'ch_456',
+        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
+        payload: { signature: 'def', amount: '2.50', payTo: '0xDst' },
+      };
+      const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
+      const result = await settlement.verify('mpp', credential);
+
+      expect(result).toEqual({ valid: true });
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.atxp.ai/verify/mpp',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.credential).toEqual(mppCredential);
+    });
+
+    it('should handle raw JSON MPP credential (not base64)', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xraw', settledAmount: '0.50' }),
+      });
+
+      const mppCredential = {
+        challenge: 'ch_789',
+        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
+        payload: { signature: 'ghi', amount: '0.50', payTo: '0xDst' },
+      };
+      const result = await settlement.settle('mpp', JSON.stringify(mppCredential));
+
+      expect(result).toEqual({ txHash: '0xraw', settledAmount: '0.50' });
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.credential).toEqual(mppCredential);
+      expect(body.amount).toBe('0.50');
     });
 
     it('should throw on non-ok settle response', async () => {

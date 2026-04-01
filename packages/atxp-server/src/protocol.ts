@@ -41,12 +41,27 @@ export type AtxpMcpChallengeData = {
 };
 
 /**
- * Omni-challenge data combining both protocols.
+ * MPP challenge data included in omni-challenge.
+ * Follows the Tempo MPP spec for WWW-Authenticate: Payment header.
+ */
+export type MppChallengeData = {
+  id: string;
+  method: string;
+  intent: string;
+  amount: string;
+  currency: string;
+  network: string;
+  recipient: string;
+};
+
+/**
+ * Omni-challenge data combining all three protocols.
  * Used to build responses across different transports.
  */
 export type OmniChallenge = {
   atxpMcp: AtxpMcpChallengeData;
   x402: X402PaymentRequirements;
+  mpp?: MppChallengeData;
 };
 
 /**
@@ -96,6 +111,12 @@ export function detectProtocol(headers: {
   const xPayment = headers['x-payment'];
   if (xPayment) {
     return { protocol: 'x402', credential: xPayment };
+  }
+
+  // Authorization: Payment <credential> indicates MPP protocol
+  const authHeader = headers['authorization'];
+  if (authHeader?.startsWith('Payment ')) {
+    return { protocol: 'mpp', credential: authHeader.slice('Payment '.length) };
   }
 
   return null;
@@ -185,6 +206,28 @@ export class ProtocolSettlement {
         payload = { raw: credential };
       }
       return { payload, paymentRequirements: context?.paymentRequirements };
+    }
+
+    if (protocol === 'mpp') {
+      // MPP: auth expects { credential: MppCredential } for verify,
+      // and { credential: MppCredential, amount: string } for settle.
+      // The credential is base64-encoded or raw JSON MppCredential.
+      // Settle Zod schema strips unknown keys, so always including amount is safe for verify.
+      let parsedCredential: unknown;
+      try {
+        parsedCredential = JSON.parse(Buffer.from(credential, 'base64').toString());
+      } catch {
+        try {
+          parsedCredential = JSON.parse(credential);
+        } catch {
+          this.logger.warn('ProtocolSettlement: MPP credential is not valid JSON');
+          parsedCredential = { raw: credential };
+        }
+      }
+      const amount = (parsedCredential as Record<string, unknown>)?.payload
+        ? ((parsedCredential as Record<string, Record<string, string>>).payload.amount)
+        : undefined;
+      return { credential: parsedCredential, ...(amount && { amount }) };
     }
 
     // ATXP: auth expects { sourceAccountId, destinationAccountId, sourceAccountToken, options }
