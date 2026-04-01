@@ -133,6 +133,12 @@ export class PolygonBrowserAccount implements Account {
       throw new Error(`PolygonBrowserAccount does not support any of: ${params.protocols.join(', ')}`);
     }
 
+    if (!params.amount) {
+      throw new Error('PolygonBrowserAccount: amount is required for atxp authorize');
+    }
+    if (!params.destination) {
+      throw new Error('PolygonBrowserAccount: destination is required for atxp authorize');
+    }
     const destination: Destination = {
       chain: ChainEnum.Polygon,
       currency: 'USDC',

@@ -241,6 +241,12 @@ export class WorldchainAccount implements Account {
       throw new Error(`WorldchainAccount does not support any of: ${params.protocols.join(', ')}`);
     }
 
+    if (!params.amount) {
+      throw new Error('WorldchainAccount: amount is required for atxp authorize');
+    }
+    if (!params.destination) {
+      throw new Error('WorldchainAccount: destination is required for atxp authorize');
+    }
     const chain = this.chainId === 11155420 ? ChainEnum.WorldSepolia : ChainEnum.World;
     const destination: Destination = {
       chain,

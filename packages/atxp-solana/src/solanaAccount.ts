@@ -66,6 +66,12 @@ export class SolanaAccount implements Account {
       throw new Error(`SolanaAccount does not support any of: ${params.protocols.join(', ')}`);
     }
 
+    if (!params.amount) {
+      throw new Error('SolanaAccount: amount is required for atxp authorize');
+    }
+    if (!params.destination) {
+      throw new Error('SolanaAccount: destination is required for atxp authorize');
+    }
     const destination: Destination = {
       chain: 'solana',
       currency: 'USDC',

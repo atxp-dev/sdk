@@ -238,6 +238,12 @@ export class BaseAppAccount implements Account {
       throw new Error(`BaseAppAccount does not support any of: ${params.protocols.join(', ')}`);
     }
 
+    if (!params.amount) {
+      throw new Error('BaseAppAccount: amount is required for atxp authorize');
+    }
+    if (!params.destination) {
+      throw new Error('BaseAppAccount: destination is required for atxp authorize');
+    }
     const chain = this.chainId === 84532 ? ChainEnum.BaseSepolia : ChainEnum.Base;
     const destination: Destination = {
       chain,

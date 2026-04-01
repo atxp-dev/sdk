@@ -98,6 +98,12 @@ export class BaseAccount implements Account {
         return { protocol, credential: paymentHeader as string };
       }
       case 'atxp': {
+        if (!params.amount) {
+          throw new Error('BaseAccount: amount is required for atxp authorize');
+        }
+        if (!params.destination) {
+          throw new Error('BaseAccount: destination is required for atxp authorize');
+        }
         const destination: Destination = {
           chain: 'base',
           currency: 'USDC',

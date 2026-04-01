@@ -174,7 +174,7 @@ export class MPPProtocolHandler implements ProtocolHandler {
         // AuthorizationError = server rejected the request (HTTP error from accounts)
         // Other errors = data validation or network failure
         if (authorizeError instanceof AuthorizationError) {
-          logger.debug(`MPP: /authorize/mpp rejected (${authorizeError.statusCode}), returning original response`);
+          logger.debug(`MPP: authorize rejected (${authorizeError.statusCode}), returning original response`);
           return this.reconstructResponse(bodyText, originalResponse);
         }
         throw authorizeError;

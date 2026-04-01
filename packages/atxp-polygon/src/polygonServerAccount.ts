@@ -119,6 +119,12 @@ export class PolygonServerAccount implements Account {
       throw new Error(`PolygonServerAccount does not support any of: ${params.protocols.join(', ')}`);
     }
 
+    if (!params.amount) {
+      throw new Error('PolygonServerAccount: amount is required for atxp authorize');
+    }
+    if (!params.destination) {
+      throw new Error('PolygonServerAccount: destination is required for atxp authorize');
+    }
     const chain = this.chainId === 137 ? ChainEnum.Polygon : ChainEnum.PolygonAmoy;
     const destination: Destination = {
       chain,

@@ -85,6 +85,12 @@ export class TempoAccount implements Account {
       throw new Error(`TempoAccount does not support any of: ${params.protocols.join(', ')}`);
     }
 
+    if (!params.amount) {
+      throw new Error('TempoAccount: amount is required for mpp authorize');
+    }
+    if (!params.destination) {
+      throw new Error('TempoAccount: destination is required for mpp authorize');
+    }
     const destination: Destination = {
       chain: 'tempo',
       currency: 'USDC',
