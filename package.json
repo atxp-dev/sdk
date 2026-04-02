@@ -6,6 +6,7 @@
   "type": "module",
   "workspaces": [
     "packages/atxp-common",
+    "packages/atxp-mpp",
     "packages/atxp-sqlite",
     "packages/atxp-redis",
     "packages/atxp-server",
@@ -16,7 +17,6 @@
     "packages/atxp-polygon",
     "packages/atxp-express",
     "packages/atxp-cloudflare",
-    "packages/atxp-mpp",
     "packages/atxp-tempo",
     "packages/atxp-x402"
   ],
