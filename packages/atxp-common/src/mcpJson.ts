@@ -1,4 +1,4 @@
-import { PAYMENT_REQUIRED_ERROR_CODE, PAYMENT_REQUIRED_PREAMBLE } from './paymentRequiredError.js';
+import { PAYMENT_REQUIRED_ERROR_CODE, PAYMENT_REQUIRED_PREAMBLE, OMNI_PAYMENT_ERROR_CODE } from './paymentRequiredError.js';
 import { AuthorizationServerUrl } from './types.js';
 import { CallToolResult, isJSONRPCError, isJSONRPCResponse, JSONRPCError, JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from './types.js';
@@ -11,7 +11,7 @@ export function parsePaymentRequests(message: JSONRPCMessage): {url: Authorizati
   if (isJSONRPCError(message)){
     // Explicitly throw payment required errors that result in MCP protocol-level errors
     const rpcError = message as JSONRPCError;
-    if (rpcError.error.code === PAYMENT_REQUIRED_ERROR_CODE) {
+    if (rpcError.error.code === PAYMENT_REQUIRED_ERROR_CODE || rpcError.error.code === OMNI_PAYMENT_ERROR_CODE) {
       const paymentRequestUrl = (rpcError.error.data as {paymentRequestUrl: string})?.paymentRequestUrl;
       const dataPr = _parsePaymentRequestFromString(paymentRequestUrl);
       if(dataPr) {

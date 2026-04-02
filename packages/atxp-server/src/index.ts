@@ -83,6 +83,7 @@ export {
   type X402PaymentRequirements,
   type X402PaymentOption,
   type AtxpMcpChallengeData,
+  type MppChallengeData,
   type OmniChallenge,
   type SettlementContext,
   type VerifyResult,
@@ -95,6 +96,8 @@ export {
 export {
   buildX402Requirements,
   buildAtxpMcpChallenge,
+  buildMppChallenge,
+  serializeMppHeader,
   omniChallengeMcpError,
   omniChallengeHttpResponse,
   buildOmniChallenge,

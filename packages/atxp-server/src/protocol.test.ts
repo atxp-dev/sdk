@@ -37,6 +37,27 @@ describe('detectProtocol', () => {
     expect(result).toBeNull();
   });
 
+  it('should detect MPP from Authorization: Payment header', () => {
+    const result = detectProtocol({
+      'authorization': 'Payment eyJjaGFsbGVuZ2UiOiJjaF8xMjMifQ==',
+    });
+    expect(result).toEqual({
+      protocol: 'mpp',
+      credential: 'eyJjaGFsbGVuZ2UiOiJjaF8xMjMifQ==',
+    });
+  });
+
+  it('should prefer X-PAYMENT (X402) over Authorization: Payment (MPP)', () => {
+    const result = detectProtocol({
+      'x-payment': 'x402-credential',
+      'authorization': 'Payment mpp-credential',
+    });
+    expect(result).toEqual({
+      protocol: 'x402',
+      credential: 'x402-credential',
+    });
+  });
+
   it('should return null for non-Bearer authorization', () => {
     const result = detectProtocol({
       'authorization': 'Basic dXNlcjpwYXNz',
@@ -116,6 +137,29 @@ describe('ProtocolSettlement', () => {
       );
     });
 
+    it('should call /verify/mpp with standard MPP credential', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ valid: true }),
+      });
+
+      const mppCredential = {
+        challenge: { id: 'ch_456', method: 'tempo', intent: 'charge', request: { amount: '25000' } },
+        payload: { type: 'hash', hash: '0xabc' },
+        source: 'did:pkh:eip155:4217:0xSrc',
+      };
+      const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
+      const result = await settlement.verify('mpp', credential);
+
+      expect(result).toEqual({ valid: true });
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.atxp.ai/verify/mpp',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.credential).toEqual(mppCredential);
+    });
+
     it('should return invalid on non-ok response', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -168,6 +212,80 @@ describe('ProtocolSettlement', () => {
           body: expect.stringContaining('"sourceAccountToken":"atxp-jwt-token"'),
         }),
       );
+    });
+
+    it('should call /settle/mpp with standard MPP credential', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xmpp', settledAmount: '10000' }),
+      });
+
+      const mppCredential = {
+        challenge: { id: 'ch_123', method: 'tempo', intent: 'charge', request: { amount: '10000' } },
+        payload: { type: 'transaction', signature: '0xsignedtx' },
+        source: 'did:pkh:eip155:4217:0xSrc',
+      };
+      const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
+      const result = await settlement.settle('mpp', credential);
+
+      expect(result).toEqual({ txHash: '0xmpp', settledAmount: '10000' });
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.credential).toEqual(mppCredential);
+      expect(body.amount).toBeUndefined();
+    });
+
+    it('should include sourceAccountId in MPP settle when context provides it', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xid', settledAmount: '10000' }),
+      });
+
+      const mppCredential = {
+        challenge: { id: 'ch_id', method: 'tempo', intent: 'charge', request: { amount: '10000' } },
+        payload: { type: 'transaction', signature: '0xsigned' },
+        source: 'did:pkh:eip155:4217:0xSrc',
+      };
+      const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
+      await settlement.settle('mpp', credential, { sourceAccountId: 'tempo:0xTestUser' });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.sourceAccountId).toBe('tempo:0xTestUser');
+    });
+
+    it('should include sourceAccountId in X402 settle when context provides it', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xid', settledAmount: '10000' }),
+      });
+
+      const payload = { signature: '0xabc' };
+      const credential = Buffer.from(JSON.stringify(payload)).toString('base64');
+      await settlement.settle('x402', credential, {
+        paymentRequirements: { network: 'base' },
+        sourceAccountId: 'base:0xTestUser',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.sourceAccountId).toBe('base:0xTestUser');
+    });
+
+    it('should handle raw JSON MPP credential (not base64)', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xraw', settledAmount: '5000' }),
+      });
+
+      const mppCredential = {
+        challenge: { id: 'ch_789', method: 'tempo', intent: 'charge', request: { amount: '5000' } },
+        payload: { type: 'hash', hash: '0xabc' },
+        source: 'did:pkh:eip155:4217:0xSrc',
+      };
+      const result = await settlement.settle('mpp', JSON.stringify(mppCredential));
+
+      expect(result).toEqual({ txHash: '0xraw', settledAmount: '5000' });
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.credential).toEqual(mppCredential);
+      expect(body.amount).toBeUndefined();
     });
 
     it('should throw on non-ok settle response', async () => {

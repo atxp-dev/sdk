@@ -3,11 +3,14 @@ import { BigNumber } from 'bignumber.js';
 import {
   buildX402Requirements,
   buildAtxpMcpChallenge,
+  buildMppChallenge,
+  serializeMppHeader,
   omniChallengeMcpError,
   omniChallengeHttpResponse,
   buildOmniChallenge,
 } from './omniChallenge.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, PAYMENT_REQUIRED_PREAMBLE } from '@atxp/common';
+import { PAYMENT_REQUIRED_PREAMBLE } from '@atxp/common';
+import { parseMPPHeader, MPP_ERROR_CODE } from '@atxp/mpp';
 
 describe('omniChallenge', () => {
   const defaultOptions = [
@@ -92,7 +95,7 @@ describe('omniChallenge', () => {
         x402,
       );
 
-      expect(error.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
+      expect(error.code).toBe(MPP_ERROR_CODE);
       expect(error.message).toContain(PAYMENT_REQUIRED_PREAMBLE);
       expect(error.message).toContain('pr_789');
 
@@ -141,6 +144,160 @@ describe('omniChallenge', () => {
     });
   });
 
+  describe('buildMppChallenge', () => {
+    it('should build MPP challenge from Tempo option', () => {
+      const options = [
+        { network: 'base', currency: 'USDC', address: '0xBase', amount: new BigNumber('0.01') },
+        { network: 'tempo', currency: 'pathUSD', address: '0xTempo', amount: new BigNumber('0.01') },
+      ];
+
+      const result = buildMppChallenge({ id: 'ch_123', options });
+      expect(result).toEqual({
+        id: 'ch_123',
+        method: 'tempo',
+        intent: 'charge',
+        amount: '10000',
+        currency: 'pathUSD',
+        network: 'tempo',
+        recipient: '0xTempo',
+      });
+    });
+
+    it('should accept tempo_moderato (testnet) as a Tempo option', () => {
+      const options = [
+        { network: 'tempo_moderato', currency: 'pathUSD', address: '0xTestnet', amount: new BigNumber('0.05') },
+      ];
+
+      const result = buildMppChallenge({ id: 'ch_testnet', options });
+      expect(result).not.toBeNull();
+      expect(result!.network).toBe('tempo_moderato');
+      expect(result!.recipient).toBe('0xTestnet');
+    });
+
+    it('should return null when no Tempo option is available', () => {
+      const result = buildMppChallenge({ id: 'ch_456', options: defaultOptions });
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('serializeMppHeader', () => {
+    it('should serialize MPP challenge to WWW-Authenticate header value', () => {
+      const challenge = {
+        id: 'ch_789',
+        method: 'tempo',
+        intent: 'charge',
+        amount: '10000',
+        currency: 'pathUSD',
+        network: 'tempo',
+        recipient: '0xRecipient',
+      };
+
+      const header = serializeMppHeader(challenge);
+      expect(header).toContain('Payment');
+      expect(header).toContain('method="tempo"');
+      expect(header).toContain('id="ch_789"');
+      expect(header).toContain('amount="10000"');
+      expect(header).toContain('recipient="0xRecipient"');
+    });
+
+    it('should round-trip through parseMPPHeader', () => {
+      const original = {
+        id: 'ch_roundtrip',
+        method: 'tempo',
+        intent: 'charge',
+        amount: '50000',
+        currency: 'pathUSD',
+        network: 'tempo',
+        recipient: '0xABCDEF1234567890',
+      };
+
+      const header = serializeMppHeader(original);
+      const parsed = parseMPPHeader(header);
+      expect(parsed).toEqual(original);
+    });
+  });
+
+  describe('omniChallengeMcpError with MPP', () => {
+    it('should include MPP data in MCP error when provided', () => {
+      const x402 = buildX402Requirements({
+        options: defaultOptions,
+        resource: 'https://example.com',
+        payeeName: 'Test',
+      });
+      const mpp = { id: 'ch_mcp', method: 'tempo', intent: 'charge', amount: '10000', currency: 'pathUSD', network: 'tempo', recipient: '0xR' };
+
+      const error = omniChallengeMcpError(
+        'https://auth.atxp.ai' as any,
+        'pr_mpp',
+        new BigNumber('0.01'),
+        x402,
+        mpp,
+      );
+
+      const data = error.data as any;
+      expect(data.mpp).toEqual(mpp);
+      expect(data.x402).toBeDefined();
+      expect(data.paymentRequestId).toBe('pr_mpp');
+    });
+
+    it('should not include MPP data when not provided', () => {
+      const x402 = buildX402Requirements({
+        options: defaultOptions,
+        resource: 'https://example.com',
+        payeeName: 'Test',
+      });
+
+      const error = omniChallengeMcpError(
+        'https://auth.atxp.ai' as any,
+        'pr_no_mpp',
+        new BigNumber('0.01'),
+        x402,
+      );
+
+      const data = error.data as any;
+      expect(data.mpp).toBeUndefined();
+    });
+  });
+
+  describe('omniChallengeHttpResponse with MPP', () => {
+    it('should include WWW-Authenticate: Payment header when MPP provided', () => {
+      const x402 = buildX402Requirements({
+        options: defaultOptions,
+        resource: 'https://example.com',
+        payeeName: 'Test',
+      });
+      const mpp = { id: 'ch_http', method: 'tempo', intent: 'charge', amount: '10000', currency: 'pathUSD', network: 'tempo', recipient: '0xR' };
+
+      const response = omniChallengeHttpResponse(
+        'https://auth.atxp.ai' as any,
+        'pr_http_mpp',
+        new BigNumber('0.01'),
+        x402,
+        mpp,
+      );
+
+      expect(response.headers['WWW-Authenticate']).toContain('Payment');
+      expect(response.headers['WWW-Authenticate']).toContain('method="tempo"');
+    });
+
+    it('should not include WWW-Authenticate header when no MPP', () => {
+      const x402 = buildX402Requirements({
+        options: defaultOptions,
+        resource: 'https://example.com',
+        payeeName: 'Test',
+      });
+
+      const response = omniChallengeHttpResponse(
+        'https://auth.atxp.ai' as any,
+        'pr_no_mpp',
+        new BigNumber('0.01'),
+        x402,
+      );
+
+      expect(response.headers['WWW-Authenticate']).toBeUndefined();
+    });
+  });
+
   describe('buildOmniChallenge', () => {
     it('should build a complete omni-challenge with both protocol data', () => {
       const challenge = buildOmniChallenge({
@@ -160,6 +317,30 @@ describe('omniChallenge', () => {
       // X402 data
       expect(challenge.x402.x402Version).toBe(1);
       expect(challenge.x402.accepts).toHaveLength(1);
+
+      // No MPP without mppChallengeId
+      expect(challenge.mpp).toBeUndefined();
+    });
+
+    it('should include MPP when mppChallengeId provided and Tempo option available', () => {
+      const options = [
+        ...defaultOptions,
+        { network: 'tempo', currency: 'pathUSD', address: '0xTempo', amount: new BigNumber('0.01') },
+      ];
+
+      const challenge = buildOmniChallenge({
+        server: 'https://auth.atxp.ai' as any,
+        paymentRequestId: 'pr_with_mpp',
+        chargeAmount: new BigNumber('0.10'),
+        options,
+        resource: 'https://example.com/resource',
+        payeeName: 'MPP Test',
+        mppChallengeId: 'ch_omni',
+      });
+
+      expect(challenge.mpp).toBeDefined();
+      expect(challenge.mpp!.id).toBe('ch_omni');
+      expect(challenge.mpp!.network).toBe('tempo');
     });
   });
 });

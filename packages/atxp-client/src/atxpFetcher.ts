@@ -1,6 +1,7 @@
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
 import {
   PAYMENT_REQUIRED_ERROR_CODE,
+  OMNI_PAYMENT_ERROR_CODE,
   paymentRequiredError,
   AccessToken,
   AuthorizationServerUrl,
@@ -21,6 +22,17 @@ import {
 } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig, PaymentFailureContext } from './types.js';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
+import { X402ProtocolHandler } from './x402ProtocolHandler.js';
+import { MPPProtocolHandler } from './mppProtocolHandler.js';
+
+/** Default protocol handlers — all supported protocols enabled out of the box.
+ *  TODO: Extract ATXP-MCP into an ATXPProtocolHandler so all three protocols use
+ *  the same ProtocolHandler interface. Currently ATXP-MCP is special-cased in
+ *  handlePaymentRequestError and runs as the fallback when no handler matches. */
+const DEFAULT_PROTOCOL_HANDLERS: ProtocolHandler[] = [
+  new X402ProtocolHandler(),
+  new MPPProtocolHandler(),
+];
 import { InsufficientFundsError, ATXPPaymentError } from './errors.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -109,7 +121,7 @@ export class ATXPFetcher {
       onPayment = async () => {},
       onPaymentFailure,
       onPaymentAttemptFailed,
-      protocolHandlers = [],
+      protocolHandlers,
       protocolFlag
     } = config;
     // Use React Native safe fetch if in React Native environment
@@ -131,7 +143,7 @@ export class ATXPFetcher {
     this.onPayment = onPayment;
     this.onPaymentFailure = onPaymentFailure || this.defaultPaymentFailureHandler;
     this.onPaymentAttemptFailed = onPaymentAttemptFailed;
-    this.protocolHandlers = protocolHandlers;
+    this.protocolHandlers = protocolHandlers ?? DEFAULT_PROTOCOL_HANDLERS;
     this.protocolFlag = protocolFlag;
   }
 
@@ -357,8 +369,9 @@ export class ATXPFetcher {
   }
 
   protected handlePaymentRequestError = async (paymentRequestError: McpError): Promise<boolean> => {
-    if (paymentRequestError.code !== PAYMENT_REQUIRED_ERROR_CODE) {
-      throw new Error(`ATXP: expected payment required error (code ${PAYMENT_REQUIRED_ERROR_CODE}); got code ${paymentRequestError.code}`);
+    // Accept both legacy -30402 (PAYMENT_REQUIRED_ERROR_CODE) and new -32042 (OMNI_PAYMENT_ERROR_CODE)
+    if (paymentRequestError.code !== PAYMENT_REQUIRED_ERROR_CODE && paymentRequestError.code !== OMNI_PAYMENT_ERROR_CODE) {
+      throw new Error(`ATXP: expected payment required error (code ${PAYMENT_REQUIRED_ERROR_CODE} or ${OMNI_PAYMENT_ERROR_CODE}); got code ${paymentRequestError.code}`);
     }
     const paymentRequestUrl = (paymentRequestError.data as {paymentRequestUrl: string}|undefined)?.paymentRequestUrl;
     if (!paymentRequestUrl) {
@@ -606,6 +619,36 @@ export class ATXPFetcher {
   }
 
   /**
+   * Build a synthetic HTTP 402 Response from MCP error data so protocol handlers
+   * can detect and handle X402/MPP challenges that arrived via MCP JSON-RPC.
+   *
+   * The response mimics what an HTTP omni-challenge would look like:
+   * - Status: 402
+   * - Body: X402 payment requirements JSON (if data.x402 present)
+   * - WWW-Authenticate header: MPP challenge (if data.mpp present)
+   */
+  protected buildSyntheticResponseFromMcpError(errorData: Record<string, unknown>): Response | null {
+    const x402Data = errorData.x402;
+    const mppData = errorData.mpp;
+
+    if (!x402Data && !mppData) return null;
+
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+
+    // Add MPP challenge as WWW-Authenticate header (standard MPP detection)
+    if (mppData && typeof mppData === 'object') {
+      const mpp = mppData as Record<string, string>;
+      const parts = Object.entries(mpp).map(([k, v]) => `${k}="${v}"`).join(', ');
+      headers.set('WWW-Authenticate', `Payment ${parts}`);
+    }
+
+    // Body is X402 requirements (standard X402 detection looks for x402Version in body)
+    const body = x402Data ? JSON.stringify(x402Data) : '{}';
+
+    return new Response(body, { status: 402, headers });
+  }
+
+  /**
    * Try to handle an HTTP-level payment challenge using registered protocol handlers.
    * For omni-challenges, uses protocolFlag to select the preferred handler.
    * For single-protocol challenges, auto-detects from response format.
@@ -691,11 +734,29 @@ export class ATXPFetcher {
         }
       }
 
-      // Check for MCP error with payment required code - use duck typing since instanceof may fail with bundling
-      const mcpError = (fetchError as Error & { code?: number })?.code === PAYMENT_REQUIRED_ERROR_CODE ? fetchError as McpError : null;
+      // Check for MCP error with payment required code - accept both legacy -30402 and new omni -32042
+      const errorCode = (fetchError as Error & { code?: number })?.code;
+      const mcpError = (errorCode === PAYMENT_REQUIRED_ERROR_CODE || errorCode === OMNI_PAYMENT_ERROR_CODE) ? fetchError as McpError : null;
 
       if (mcpError) {
-        this.logger.info(`Payment required - ATXP client starting payment flow ${(mcpError?.data as {paymentRequestUrl: string}|undefined)?.paymentRequestUrl}`);
+        const errorData = mcpError.data as Record<string, unknown> | undefined;
+
+        // Check if protocol handlers can handle the omni-challenge data.
+        // For X402: error.data.x402 contains payment requirements.
+        // For MPP: error.data.mpp contains the MPP challenge.
+        // If a protocol handler matches, use it instead of the ATXP-MCP flow.
+        if (this.protocolHandlers.length > 0 && errorData) {
+          const syntheticResponse = this.buildSyntheticResponseFromMcpError(errorData);
+          if (syntheticResponse) {
+            const protocolResult = await this.tryProtocolHandlers(syntheticResponse, url, init);
+            if (protocolResult) {
+              return protocolResult;
+            }
+          }
+        }
+
+        // Fall back to ATXP-MCP flow (payment request URL)
+        this.logger.info(`Payment required - ATXP client starting payment flow ${(errorData as {paymentRequestUrl: string}|undefined)?.paymentRequestUrl}`);
         if(await this.handlePaymentRequestError(mcpError)) {
           // Retry the request once - we should be auth'd now
           response = await oauthClient.fetch(url, init);

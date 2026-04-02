@@ -15,11 +15,14 @@ import {
   ProtocolSettlement,
   type PaymentProtocol,
   type ATXPConfig,
+  type SettlementContext,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
   const config = buildServerConfig(args);
   const router = Router();
+  // Single ProtocolSettlement instance shared across all requests (stateless, just holds config)
+  const settlement = new ProtocolSettlement(config.server, config.logger);
 
   // Regular middleware
   const atxpMiddleware = async (req: Request, res: Response, next: NextFunction) => {
@@ -44,7 +47,7 @@ export function atxpExpress(args: ATXPArgs): Router {
       logger.debug(`${mcpRequests.length} MCP requests found in request`);
 
       if(mcpRequests.length === 0) {
-        // For non-MCP requests: check for payment credentials (X402 or ATXP)
+        // For non-MCP requests: check for payment credentials (X402 or MPP)
         const detected = detectProtocol({
           'x-payment': req.headers['x-payment'] as string | undefined,
           'authorization': req.headers['authorization'] as string | undefined,
@@ -52,7 +55,7 @@ export function atxpExpress(args: ATXPArgs): Router {
 
         if (detected) {
           // This is a retry with payment credentials — verify and settle
-          await handleProtocolCredential(config, req, res, next, detected.protocol, detected.credential);
+          await handleProtocolCredential(config, settlement, req, res, next, detected.protocol, detected.credential);
           return;
         }
 
@@ -89,11 +92,89 @@ export function atxpExpress(args: ATXPArgs): Router {
 }
 
 /**
+ * Resolve the user's identity from the request.
+ *
+ * Priority:
+ * 1. OAuth Bearer token → extract `sub` claim (preferred — works for all requests)
+ * 2. Wallet address from payment credential (fallback for non-OAuth clients)
+ *
+ * For X402: Authorization: Bearer coexists with X-PAYMENT, so OAuth is available.
+ * For MPP: Authorization: Payment replaces Authorization: Bearer. In MCP transport,
+ *   identity is maintained via the session. In HTTP transport, the server embeds a
+ *   session reference in the MPP challenge `id` field (opaque to the client).
+ */
+async function resolveIdentity(
+  config: ATXPConfig,
+  req: Request,
+  protocol: PaymentProtocol,
+  credential: string,
+): Promise<string | undefined> {
+  const logger = config.logger;
+
+  // Try OAuth Bearer token first (works when Authorization header isn't used by the payment protocol)
+  const authHeader = req.headers['authorization'];
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const resource = getResource(config, new URL(req.url, req.protocol + '://' + req.host), req.headers);
+      const tokenCheck = await checkTokenNode(config, resource, req);
+      if (tokenCheck.data?.sub) {
+        logger.debug(`Resolved identity from OAuth token: ${tokenCheck.data.sub}`);
+        return tokenCheck.data.sub;
+      }
+    } catch (error) {
+      // Bearer token present but check failed — likely a config problem (wrong issuer, JWKS
+      // unreachable, etc.), not just a missing token. Log at warn to surface it.
+      logger.warn(`Failed to resolve identity from OAuth token, falling back to credential: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // Fallback: extract identity from the MPP credential's source field.
+  // Standard MPP uses a DID string: "did:pkh:eip155:<chainId>:<address>"
+  if (protocol === 'mpp') {
+    try {
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
+      } catch {
+        parsed = JSON.parse(credential);
+      }
+      const source = parsed.source;
+      if (typeof source === 'string' && source.startsWith('did:pkh:eip155:')) {
+        // Extract chain ID and address from DID: did:pkh:eip155:<chainId>:<address>
+        const parts = source.split(':');
+        const chainId = parts[3];
+        const address = parts[4];
+        if (chainId && address) {
+          // Map chainId to network name for our AccountId format
+          const network = chainId === '4217' ? 'tempo' : chainId === '42431' ? 'tempo_moderato' : `eip155:${chainId}`;
+          const identity = `${network}:${address}`;
+          logger.debug(`Resolved identity from MPP credential source DID: ${identity}`);
+          return identity;
+        }
+      }
+    } catch {
+      // Not parseable — no identity
+    }
+  }
+
+  // X402: payer address is only available after settlement (facilitator returns it).
+  // We can't extract it from the credential pre-settlement. Identity will be
+  // resolved by auth from the Permit2 signature if no sourceAccountId is provided.
+
+  return undefined;
+}
+
+/**
  * Handle a request that includes payment credentials (retry after challenge).
  * Verifies the credential at request start, serves the request, then settles at request end.
+ *
+ * Identity resolution: extracts user identity from OAuth token (preferred) or
+ * wallet address in payment credential (fallback), and passes it to auth as
+ * sourceAccountId for payment recording/reconciliation.
  */
 async function handleProtocolCredential(
   config: ATXPConfig,
+  settlement: ProtocolSettlement,
   req: Request,
   res: Response,
   next: NextFunction,
@@ -101,12 +182,35 @@ async function handleProtocolCredential(
   credential: string,
 ): Promise<void> {
   const logger = config.logger;
-  const settlement = new ProtocolSettlement(config.server, logger);
 
   logger.info(`Detected ${protocol} credential on retry request`);
 
-  // Verify at request START
-  const verifyResult = await settlement.verify(protocol, credential);
+  // Resolve user identity before verification
+  const sourceAccountId = await resolveIdentity(config, req, protocol, credential);
+  if (sourceAccountId) {
+    logger.debug(`Resolved identity for ${protocol} payment: ${sourceAccountId}`);
+  }
+
+  // Build context with identity — passed to both verify and settle so auth
+  // can use sourceAccountId for account-level checks (rate limiting, spend limits)
+  // during verification, and for payment recording during settlement.
+  const context: SettlementContext = {
+    ...(sourceAccountId && { sourceAccountId }),
+  };
+
+  // Verify at request START.
+  // Note: for X402, context.paymentRequirements is not available here because the
+  // middleware doesn't have the original 402 challenge data from the previous request.
+  // Auth handles undefined paymentRequirements gracefully (Coinbase facilitator can
+  // verify Permit2 signatures without them).
+  let verifyResult;
+  try {
+    verifyResult = await settlement.verify(protocol, credential, context);
+  } catch (error) {
+    logger.warn(`${protocol} credential parsing/verification error: ${error instanceof Error ? error.message : String(error)}`);
+    res.status(400).json({ error: 'invalid_payment', error_description: `Malformed ${protocol} credential` });
+    return;
+  }
   if (!verifyResult.valid) {
     logger.warn(`${protocol} credential verification failed`);
     res.status(402).json({ error: 'invalid_payment', error_description: `${protocol} credential verification failed` });
@@ -115,12 +219,15 @@ async function handleProtocolCredential(
 
   logger.info(`${protocol} credential verified successfully`);
 
-  // Listen for response finish to settle at request END (only on success)
+  // Listen for response finish to settle at request END (only on success).
+  // TODO: If settlement fails after a 200, the client received the resource for free.
+  // This needs a retry queue or dead-letter mechanism for production reliability.
+  // For now, failures are logged and the payment is lost.
   res.on('finish', async () => {
     if (res.statusCode >= 200 && res.statusCode < 300) {
       try {
         logger.debug(`Request finished successfully (${res.statusCode}), settling ${protocol} payment`);
-        await settlement.settle(protocol, credential);
+        await settlement.settle(protocol, credential, context);
       } catch (error) {
         logger.error(`Failed to settle ${protocol} payment: ${error instanceof Error ? error.message : String(error)}`);
       }

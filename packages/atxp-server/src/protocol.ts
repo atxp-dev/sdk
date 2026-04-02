@@ -3,6 +3,21 @@ import { AuthorizationServerUrl, FetchLike, Logger, type PaymentProtocol } from 
 export type { PaymentProtocol } from "@atxp/common";
 
 /**
+ * MPP challenge data included in omni-challenge.
+ * Mirrors the MPPChallenge interface from @atxp/mpp to avoid cross-package
+ * type resolution issues in CI (rollup dts + tsc project references).
+ */
+export type MppChallengeData = {
+  id: string;
+  method: string;
+  intent: string;
+  amount: string;
+  currency: string;
+  network: string;
+  recipient: string;
+};
+
+/**
  * Result of detecting which protocol a client used from its credential.
  */
 export type CredentialDetection = {
@@ -40,13 +55,15 @@ export type AtxpMcpChallengeData = {
   chargeAmount?: string;
 };
 
+
 /**
- * Omni-challenge data combining both protocols.
+ * Omni-challenge data combining all three protocols.
  * Used to build responses across different transports.
  */
 export type OmniChallenge = {
   atxpMcp: AtxpMcpChallengeData;
   x402: X402PaymentRequirements;
+  mpp?: MppChallengeData;
 };
 
 /**
@@ -55,7 +72,8 @@ export type OmniChallenge = {
 export type SettlementContext = {
   /** X402: the original payment requirements from the challenge */
   paymentRequirements?: unknown;
-  /** ATXP: source account identifier */
+  /** Source account identifier (e.g., "base:0xABC..." from OAuth sub or wallet address).
+   *  When present, auth records the payment for this identity. */
   sourceAccountId?: string;
   /** ATXP: destination account identifier */
   destinationAccountId?: string;
@@ -81,10 +99,13 @@ export type SettleResult = {
 /**
  * Detect the payment protocol from inbound credentials on a retry request.
  *
- * Only detects X402 via the X-PAYMENT header. ATXP-MCP payments flow through
- * the MCP token check + requirePayment() path, not through HTTP header
- * detection. Bearer JWTs in non-MCP requests are OAuth access tokens, not
- * payment credentials — detecting them here would misidentify normal auth.
+ * Detects:
+ * - X402 via `X-PAYMENT` header (highest priority)
+ * - MPP via `Authorization: Payment <credential>` header
+ *
+ * Does NOT detect ATXP-MCP — those payments flow through the MCP token
+ * check + requirePayment() path, not HTTP header detection. Bearer JWTs
+ * in non-MCP requests are OAuth access tokens, not payment credentials.
  *
  * Returns null if no payment credential is detected.
  */
@@ -96,6 +117,12 @@ export function detectProtocol(headers: {
   const xPayment = headers['x-payment'];
   if (xPayment) {
     return { protocol: 'x402', credential: xPayment };
+  }
+
+  // Authorization: Payment <credential> indicates MPP protocol
+  const authHeader = headers['authorization'];
+  if (authHeader?.startsWith('Payment ')) {
+    return { protocol: 'mpp', credential: authHeader.slice('Payment '.length) };
   }
 
   return null;
@@ -184,7 +211,28 @@ export class ProtocolSettlement {
         // If not valid base64 JSON, pass as-is (auth will validate)
         payload = { raw: credential };
       }
-      return { payload, paymentRequirements: context?.paymentRequirements };
+      return {
+        payload,
+        paymentRequirements: context?.paymentRequirements,
+        ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
+      };
+    }
+
+    if (protocol === 'mpp') {
+      // MPP: auth expects { credential: <standard MPP credential>, sourceAccountId? }.
+      // The credential is base64url-encoded JSON containing { challenge, payload, source }.
+      // Auth uses mppx internally to verify + settle (broadcast pre-signed tx or check txHash).
+      let parsedCredential: unknown;
+      try {
+        parsedCredential = JSON.parse(Buffer.from(credential, 'base64').toString());
+      } catch {
+        parsedCredential = JSON.parse(credential);
+        // If this throws, the credential is genuinely malformed — let it propagate.
+      }
+      return {
+        credential: parsedCredential,
+        ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
+      };
     }
 
     // ATXP: auth expects { sourceAccountId, destinationAccountId, sourceAccountToken, options }

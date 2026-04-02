@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@atxp/common": "0.10.13",
+    "@atxp/mpp": "0.10.13",
     "@modelcontextprotocol/sdk": "^1.15.0",
     "bignumber.js": "^9.3.0",
     "oauth4webapi": "^3.8.3"
