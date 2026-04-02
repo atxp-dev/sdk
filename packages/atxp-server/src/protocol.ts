@@ -60,7 +60,8 @@ export type OmniChallenge = {
 export type SettlementContext = {
   /** X402: the original payment requirements from the challenge */
   paymentRequirements?: unknown;
-  /** ATXP: source account identifier */
+  /** Source account identifier (e.g., "base:0xABC..." from OAuth sub or wallet address).
+   *  When present, auth records the payment for this identity. */
   sourceAccountId?: string;
   /** ATXP: destination account identifier */
   destinationAccountId?: string;
@@ -198,7 +199,11 @@ export class ProtocolSettlement {
         // If not valid base64 JSON, pass as-is (auth will validate)
         payload = { raw: credential };
       }
-      return { payload, paymentRequirements: context?.paymentRequirements };
+      return {
+        payload,
+        paymentRequirements: context?.paymentRequirements,
+        ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
+      };
     }
 
     if (protocol === 'mpp') {
@@ -216,7 +221,11 @@ export class ProtocolSettlement {
       }
       const payload = (parsedCredential as Record<string, unknown>)?.payload as Record<string, unknown> | undefined;
       const amount = payload?.amount != null ? String(payload.amount) : undefined;
-      return { credential: parsedCredential, ...(amount && { amount }) };
+      return {
+        credential: parsedCredential,
+        ...(amount && { amount }),
+        ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
+      };
     }
 
     // ATXP: auth expects { sourceAccountId, destinationAccountId, sourceAccountToken, options }

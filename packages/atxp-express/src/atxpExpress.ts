@@ -15,6 +15,7 @@ import {
   ProtocolSettlement,
   type PaymentProtocol,
   type ATXPConfig,
+  type SettlementContext,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
@@ -89,8 +90,74 @@ export function atxpExpress(args: ATXPArgs): Router {
 }
 
 /**
+ * Resolve the user's identity from the request.
+ *
+ * Priority:
+ * 1. OAuth Bearer token → extract `sub` claim (preferred — works for all requests)
+ * 2. Wallet address from payment credential (fallback for non-OAuth clients)
+ *
+ * For X402: Authorization: Bearer coexists with X-PAYMENT, so OAuth is available.
+ * For MPP: Authorization: Payment replaces Authorization: Bearer. In MCP transport,
+ *   identity is maintained via the session. In HTTP transport, the server embeds a
+ *   session reference in the MPP challenge `id` field (opaque to the client).
+ */
+async function resolveIdentity(
+  config: ATXPConfig,
+  req: Request,
+  protocol: PaymentProtocol,
+  credential: string,
+): Promise<string | undefined> {
+  const logger = config.logger;
+
+  // Try OAuth Bearer token first (works when Authorization header isn't used by the payment protocol)
+  const authHeader = req.headers['authorization'];
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const resource = getResource(config, new URL(req.url, req.protocol + '://' + req.host), req.headers);
+      const tokenCheck = await checkTokenNode(config, resource, req);
+      if (tokenCheck.data?.sub) {
+        logger.debug(`Resolved identity from OAuth token: ${tokenCheck.data.sub}`);
+        return tokenCheck.data.sub;
+      }
+    } catch {
+      logger.debug('Failed to resolve identity from OAuth token, falling back to credential');
+    }
+  }
+
+  // Fallback: extract wallet address from the payment credential
+  if (protocol === 'mpp') {
+    try {
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
+      } catch {
+        parsed = JSON.parse(credential);
+      }
+      const source = parsed.source as Record<string, string> | undefined;
+      if (source?.chain && source?.address) {
+        const identity = `${source.chain}:${source.address}`;
+        logger.debug(`Resolved identity from MPP credential wallet: ${identity}`);
+        return identity;
+      }
+    } catch {
+      // Not parseable — no identity
+    }
+  }
+
+  // X402: payer address is only available after settlement (facilitator returns it).
+  // We can't extract it from the credential pre-settlement. Identity will be
+  // resolved by auth from the Permit2 signature if no sourceAccountId is provided.
+
+  return undefined;
+}
+
+/**
  * Handle a request that includes payment credentials (retry after challenge).
  * Verifies the credential at request start, serves the request, then settles at request end.
+ *
+ * Identity resolution: extracts user identity from OAuth token (preferred) or
+ * wallet address in payment credential (fallback), and passes it to auth as
+ * sourceAccountId for payment recording/reconciliation.
  */
 async function handleProtocolCredential(
   config: ATXPConfig,
@@ -105,6 +172,12 @@ async function handleProtocolCredential(
 
   logger.info(`Detected ${protocol} credential on retry request`);
 
+  // Resolve user identity before verification
+  const sourceAccountId = await resolveIdentity(config, req, protocol, credential);
+  if (sourceAccountId) {
+    logger.info(`Resolved identity for ${protocol} payment: ${sourceAccountId}`);
+  }
+
   // Verify at request START
   const verifyResult = await settlement.verify(protocol, credential);
   if (!verifyResult.valid) {
@@ -115,12 +188,17 @@ async function handleProtocolCredential(
 
   logger.info(`${protocol} credential verified successfully`);
 
+  // Build settlement context with identity for reconciliation
+  const context: SettlementContext = {
+    ...(sourceAccountId && { sourceAccountId }),
+  };
+
   // Listen for response finish to settle at request END (only on success)
   res.on('finish', async () => {
     if (res.statusCode >= 200 && res.statusCode < 300) {
       try {
         logger.debug(`Request finished successfully (${res.statusCode}), settling ${protocol} payment`);
-        await settlement.settle(protocol, credential);
+        await settlement.settle(protocol, credential, context);
       } catch (error) {
         logger.error(`Failed to settle ${protocol} payment: ${error instanceof Error ? error.message : String(error)}`);
       }
