@@ -17,7 +17,8 @@ describe('Omni-challenge Express middleware', () => {
   describe('X-PAYMENT credential detection and routing', () => {
     it('should detect X-PAYMENT credential and call /verify/x402 then /settle/x402', async () => {
       const verifyCall = vi.fn();
-      const settleCall = vi.fn();
+      let settleResolve: () => void;
+      const settlePromise = new Promise<void>(resolve => { settleResolve = resolve; });
 
       mockFetch.mockImplementation(async (url: string | URL) => {
         const urlStr = url.toString();
@@ -26,7 +27,7 @@ describe('Omni-challenge Express middleware', () => {
           return { ok: true, json: async () => ({ valid: true }) };
         }
         if (urlStr.includes('/settle/x402')) {
-          settleCall();
+          settleResolve();
           return { ok: true, json: async () => ({ txHash: '0xabc', settledAmount: '10000' }) };
         }
         return { ok: false, status: 404, text: async () => 'Not found' };
@@ -39,7 +40,7 @@ describe('Omni-challenge Express middleware', () => {
       const app = express();
       app.use(express.json());
       app.use(router);
-      app.get('/resource', (req, res) => {
+      app.get('/resource', (_req, res) => {
         res.json({ data: 'protected resource' });
       });
 
@@ -49,13 +50,9 @@ describe('Omni-challenge Express middleware', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ data: 'protected resource' });
-
-      // Verify was called at request start
       expect(verifyCall).toHaveBeenCalledTimes(1);
 
-      // Wait for settle (it happens on response finish)
-      await new Promise(resolve => setTimeout(resolve, 50));
-      expect(settleCall).toHaveBeenCalledTimes(1);
+      await settlePromise;
     });
 
     it('should reject invalid X402 credential when verify returns invalid', async () => {
@@ -129,6 +126,8 @@ describe('Omni-challenge Express middleware', () => {
   describe('verify at request start, settle at request end', () => {
     it('should verify before serving and settle after serving (not both upfront)', async () => {
       const callOrder: string[] = [];
+      let settleResolve: () => void;
+      const settlePromise = new Promise<void>(resolve => { settleResolve = resolve; });
 
       mockFetch.mockImplementation(async (url: string | URL) => {
         const urlStr = url.toString();
@@ -138,6 +137,7 @@ describe('Omni-challenge Express middleware', () => {
         }
         if (urlStr.includes('/settle/x402')) {
           callOrder.push('settle');
+          settleResolve();
           return { ok: true, json: async () => ({ txHash: '0x123', settledAmount: '10000' }) };
         }
         return { ok: false, status: 404, text: async () => 'Not found' };
@@ -150,8 +150,7 @@ describe('Omni-challenge Express middleware', () => {
       const app = express();
       app.use(express.json());
       app.use(router);
-      app.get('/resource', (req, res) => {
-        // At this point, verify should have been called but not settle
+      app.get('/resource', (_req, res) => {
         callOrder.push('serve');
         res.json({ data: 'served' });
       });
@@ -160,10 +159,7 @@ describe('Omni-challenge Express middleware', () => {
         .get('/resource')
         .set('X-PAYMENT', 'x402-credential');
 
-      // Wait for async settle callback
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Verify the order: verify → serve → settle
+      await settlePromise;
       expect(callOrder).toEqual(['verify', 'serve', 'settle']);
     });
   });

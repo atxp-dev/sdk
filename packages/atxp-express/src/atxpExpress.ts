@@ -219,7 +219,10 @@ async function handleProtocolCredential(
 
   logger.info(`${protocol} credential verified successfully`);
 
-  // Listen for response finish to settle at request END (only on success)
+  // Listen for response finish to settle at request END (only on success).
+  // TODO: If settlement fails after a 200, the client received the resource for free.
+  // This needs a retry queue or dead-letter mechanism for production reliability.
+  // For now, failures are logged and the payment is lost.
   res.on('finish', async () => {
     if (res.statusCode >= 200 && res.statusCode < 300) {
       try {

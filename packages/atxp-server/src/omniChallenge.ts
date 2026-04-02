@@ -17,6 +17,8 @@ export function buildX402Requirements(args: {
 }): X402PaymentRequirements {
   const accepts: X402PaymentOption[] = args.options.map(option => ({
     scheme: 'exact',
+    // X402 spec normalizes testnet networks to their mainnet names in challenges.
+    // base_sepolia → base so the client knows which chain family to use.
     network: option.network === 'base' || option.network === 'base_sepolia' ? 'base' : option.network,
     maxAmountRequired: option.amount.times(1e6).toFixed(0), // Convert to smallest unit (USDC has 6 decimals)
     resource: args.resource,
