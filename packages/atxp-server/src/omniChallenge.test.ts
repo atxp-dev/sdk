@@ -9,8 +9,8 @@ import {
   omniChallengeHttpResponse,
   buildOmniChallenge,
 } from './omniChallenge.js';
-import { PAYMENT_REQUIRED_ERROR_CODE, PAYMENT_REQUIRED_PREAMBLE } from '@atxp/common';
-import { parseMPPHeader } from '@atxp/mpp';
+import { PAYMENT_REQUIRED_PREAMBLE } from '@atxp/common';
+import { parseMPPHeader, MPP_ERROR_CODE } from '@atxp/mpp';
 
 describe('omniChallenge', () => {
   const defaultOptions = [
@@ -95,7 +95,7 @@ describe('omniChallenge', () => {
         x402,
       );
 
-      expect(error.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
+      expect(error.code).toBe(MPP_ERROR_CODE);
       expect(error.message).toContain(PAYMENT_REQUIRED_PREAMBLE);
       expect(error.message).toContain('pr_789');
 

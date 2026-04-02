@@ -1,5 +1,6 @@
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
-import { PAYMENT_REQUIRED_ERROR_CODE, PAYMENT_REQUIRED_PREAMBLE, AuthorizationServerUrl } from "@atxp/common";
+import { PAYMENT_REQUIRED_PREAMBLE, AuthorizationServerUrl } from "@atxp/common";
+import { MPP_ERROR_CODE } from "@atxp/mpp";
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
 
@@ -85,8 +86,13 @@ export function serializeMppHeader(challenge: MppChallengeData): string {
 }
 
 /**
- * Create an omni-challenge MCP error (for MCP SSE transport).
- * Contains both ATXP-MCP challenge data in a single JSON-RPC error.
+ * Create an omni-challenge MCP error containing challenge data for ALL protocols.
+ *
+ * Uses MPP's error code (-32042) as the unified payment-required code.
+ * error.data contains both ATXP-MCP fields (paymentRequestId, paymentRequestUrl)
+ * and MPP fields (data.mpp). Standard MPP clients detect -32042 + data.mpp.
+ * ATXP clients detect -32042 + data.paymentRequestId (and also handle legacy -30402).
+ * X402 data is included as data.x402 for completeness but X402 is HTTP-only.
  */
 export function omniChallengeMcpError(
   server: AuthorizationServerUrl,
@@ -113,7 +119,7 @@ export function omniChallengeMcpError(
 
   const amountText = chargeAmount ? ` You will be charged ${chargeAmount.toString()}.` : '';
   return new McpError(
-    PAYMENT_REQUIRED_ERROR_CODE,
+    MPP_ERROR_CODE,
     `${PAYMENT_REQUIRED_PREAMBLE}${amountText} Please pay at: ${atxpMcp.paymentRequestUrl} and then try again.`,
     data,
   );

@@ -1,6 +1,7 @@
 import { OAuthAuthenticationRequiredError, OAuthClient } from './oAuth.js';
 import {
   PAYMENT_REQUIRED_ERROR_CODE,
+  OMNI_PAYMENT_ERROR_CODE,
   paymentRequiredError,
   AccessToken,
   AuthorizationServerUrl,
@@ -357,8 +358,9 @@ export class ATXPFetcher {
   }
 
   protected handlePaymentRequestError = async (paymentRequestError: McpError): Promise<boolean> => {
-    if (paymentRequestError.code !== PAYMENT_REQUIRED_ERROR_CODE) {
-      throw new Error(`ATXP: expected payment required error (code ${PAYMENT_REQUIRED_ERROR_CODE}); got code ${paymentRequestError.code}`);
+    // Accept both legacy -30402 (PAYMENT_REQUIRED_ERROR_CODE) and new -32042 (OMNI_PAYMENT_ERROR_CODE)
+    if (paymentRequestError.code !== PAYMENT_REQUIRED_ERROR_CODE && paymentRequestError.code !== OMNI_PAYMENT_ERROR_CODE) {
+      throw new Error(`ATXP: expected payment required error (code ${PAYMENT_REQUIRED_ERROR_CODE} or ${OMNI_PAYMENT_ERROR_CODE}); got code ${paymentRequestError.code}`);
     }
     const paymentRequestUrl = (paymentRequestError.data as {paymentRequestUrl: string}|undefined)?.paymentRequestUrl;
     if (!paymentRequestUrl) {
@@ -691,8 +693,9 @@ export class ATXPFetcher {
         }
       }
 
-      // Check for MCP error with payment required code - use duck typing since instanceof may fail with bundling
-      const mcpError = (fetchError as Error & { code?: number })?.code === PAYMENT_REQUIRED_ERROR_CODE ? fetchError as McpError : null;
+      // Check for MCP error with payment required code - accept both legacy -30402 and new omni -32042
+      const errorCode = (fetchError as Error & { code?: number })?.code;
+      const mcpError = (errorCode === PAYMENT_REQUIRED_ERROR_CODE || errorCode === OMNI_PAYMENT_ERROR_CODE) ? fetchError as McpError : null;
 
       if (mcpError) {
         this.logger.info(`Payment required - ATXP client starting payment flow ${(mcpError?.data as {paymentRequestUrl: string}|undefined)?.paymentRequestUrl}`);

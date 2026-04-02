@@ -19,6 +19,7 @@ export {
 // Payment error handling
 export {
   PAYMENT_REQUIRED_ERROR_CODE,
+  OMNI_PAYMENT_ERROR_CODE,
   PAYMENT_REQUIRED_PREAMBLE,
   paymentRequiredError
 } from './paymentRequiredError.js';

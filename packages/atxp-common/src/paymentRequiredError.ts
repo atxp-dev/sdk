@@ -2,7 +2,11 @@ import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { AuthorizationServerUrl } from "./types.js";
 import { BigNumber } from 'bignumber.js';
 
-export const PAYMENT_REQUIRED_ERROR_CODE = -30402; // Payment required
+// Legacy ATXP-MCP error code. Kept for backwards compatibility with old servers.
+export const PAYMENT_REQUIRED_ERROR_CODE = -30402;
+// New unified omni-challenge error code. Same as MPP's -32042.
+// Going forward, all payment challenges use this code with both ATXP-MCP and MPP data in error.data.
+export const OMNI_PAYMENT_ERROR_CODE = -32042;
 // Do NOT modify this message. It is used by clients to identify an ATXP payment required error
 // in an MCP response. Changing it will break back-compatability.
 export const PAYMENT_REQUIRED_PREAMBLE = 'Payment via ATXP is required. ';
