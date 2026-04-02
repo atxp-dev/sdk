@@ -22,6 +22,17 @@ import {
 } from '@atxp/common';
 import type { PaymentMaker, ProspectivePayment, ClientConfig, PaymentFailureContext } from './types.js';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
+import { X402ProtocolHandler } from './x402ProtocolHandler.js';
+import { MPPProtocolHandler } from './mppProtocolHandler.js';
+
+/** Default protocol handlers — all supported protocols enabled out of the box.
+ *  TODO: Extract ATXP-MCP into an ATXPProtocolHandler so all three protocols use
+ *  the same ProtocolHandler interface. Currently ATXP-MCP is special-cased in
+ *  handlePaymentRequestError and runs as the fallback when no handler matches. */
+const DEFAULT_PROTOCOL_HANDLERS: ProtocolHandler[] = [
+  new X402ProtocolHandler(),
+  new MPPProtocolHandler(),
+];
 import { InsufficientFundsError, ATXPPaymentError } from './errors.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -110,7 +121,7 @@ export class ATXPFetcher {
       onPayment = async () => {},
       onPaymentFailure,
       onPaymentAttemptFailed,
-      protocolHandlers = [],
+      protocolHandlers,
       protocolFlag
     } = config;
     // Use React Native safe fetch if in React Native environment
@@ -132,7 +143,7 @@ export class ATXPFetcher {
     this.onPayment = onPayment;
     this.onPaymentFailure = onPaymentFailure || this.defaultPaymentFailureHandler;
     this.onPaymentAttemptFailed = onPaymentAttemptFailed;
-    this.protocolHandlers = protocolHandlers;
+    this.protocolHandlers = protocolHandlers ?? DEFAULT_PROTOCOL_HANDLERS;
     this.protocolFlag = protocolFlag;
   }
 
