@@ -234,6 +234,41 @@ describe('ProtocolSettlement', () => {
       expect(body.amount).toBe('1.00');
     });
 
+    it('should include sourceAccountId in MPP settle when context provides it', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xid', settledAmount: '1.00' }),
+      });
+
+      const mppCredential = {
+        challenge: 'ch_id',
+        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
+        payload: { signature: 'abc', amount: '1.00', payTo: '0xDst' },
+      };
+      const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
+      await settlement.settle('mpp', credential, { sourceAccountId: 'tempo:0xTestUser' });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.sourceAccountId).toBe('tempo:0xTestUser');
+    });
+
+    it('should include sourceAccountId in X402 settle when context provides it', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xid', settledAmount: '10000' }),
+      });
+
+      const payload = { signature: '0xabc' };
+      const credential = Buffer.from(JSON.stringify(payload)).toString('base64');
+      await settlement.settle('x402', credential, {
+        paymentRequirements: { network: 'base' },
+        sourceAccountId: 'base:0xTestUser',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.sourceAccountId).toBe('base:0xTestUser');
+    });
+
     it('should handle raw JSON MPP credential (not base64)', async () => {
       mockFetch.mockResolvedValue({
         ok: true,

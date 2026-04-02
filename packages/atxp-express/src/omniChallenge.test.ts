@@ -167,4 +167,83 @@ describe('Omni-challenge Express middleware', () => {
       expect(callOrder).toEqual(['verify', 'serve', 'settle']);
     });
   });
+
+  describe('identity resolution for settlement', () => {
+    it('should resolve identity from MPP credential wallet and pass to settle', async () => {
+      let settleBody: Record<string, unknown> = {};
+      let settleResolve: () => void;
+      const settlePromise = new Promise<void>(resolve => { settleResolve = resolve; });
+
+      mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
+        const urlStr = url.toString();
+        if (urlStr.includes('/verify/mpp')) {
+          return { ok: true, json: async () => ({ valid: true }) };
+        }
+        if (urlStr.includes('/settle/mpp')) {
+          if (init?.body) settleBody = JSON.parse(init.body as string);
+          settleResolve();
+          return { ok: true, json: async () => ({ txHash: '0xmpp', settledAmount: '1.00' }) };
+        }
+        return { ok: false, status: 404, text: async () => 'Not found' };
+      });
+
+      const mppCredential = {
+        challenge: 'ch_123',
+        source: { chain: 'tempo', address: '0xWalletAddr', network: 'tempo' },
+        payload: { signature: 'abc', amount: '1.00', payTo: '0xDst' },
+      };
+      const encodedCredential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.get('/resource', (_req, res) => res.json({ ok: true }));
+
+      const response = await request(app)
+        .get('/resource')
+        .set('Authorization', `Payment ${encodedCredential}`);
+
+      expect(response.status).toBe(200);
+      await settlePromise;
+      expect(settleBody.sourceAccountId).toBe('tempo:0xWalletAddr');
+    });
+
+    it('should settle X402 without sourceAccountId when no OAuth token', async () => {
+      let settleBody: Record<string, unknown> = {};
+
+      mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
+        const urlStr = url.toString();
+        if (urlStr.includes('/verify/x402')) {
+          return { ok: true, json: async () => ({ valid: true }) };
+        }
+        if (urlStr.includes('/settle/x402')) {
+          if (init?.body) settleBody = JSON.parse(init.body as string);
+          return { ok: true, json: async () => ({ txHash: '0xabc', settledAmount: '10000' }) };
+        }
+        return { ok: false, status: 404, text: async () => 'Not found' };
+      });
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.get('/resource', (_req, res) => res.json({ ok: true }));
+
+      // X402 without Bearer token — no OAuth identity available
+      await request(app)
+        .get('/resource')
+        .set('X-PAYMENT', 'x402-payment-credential');
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+      // No sourceAccountId since there's no OAuth token and X402 can't extract payer pre-settlement
+      expect(settleBody.sourceAccountId).toBeUndefined();
+    });
+  });
 });

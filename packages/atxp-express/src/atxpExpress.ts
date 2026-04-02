@@ -119,8 +119,10 @@ async function resolveIdentity(
         logger.debug(`Resolved identity from OAuth token: ${tokenCheck.data.sub}`);
         return tokenCheck.data.sub;
       }
-    } catch {
-      logger.debug('Failed to resolve identity from OAuth token, falling back to credential');
+    } catch (error) {
+      // Bearer token present but check failed — likely a config problem (wrong issuer, JWKS
+      // unreachable, etc.), not just a missing token. Log at warn to surface it.
+      logger.warn(`Failed to resolve identity from OAuth token, falling back to credential: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -175,11 +177,18 @@ async function handleProtocolCredential(
   // Resolve user identity before verification
   const sourceAccountId = await resolveIdentity(config, req, protocol, credential);
   if (sourceAccountId) {
-    logger.info(`Resolved identity for ${protocol} payment: ${sourceAccountId}`);
+    logger.debug(`Resolved identity for ${protocol} payment: ${sourceAccountId}`);
   }
 
+  // Build context with identity — passed to both verify and settle so auth
+  // can use sourceAccountId for account-level checks (rate limiting, spend limits)
+  // during verification, and for payment recording during settlement.
+  const context: SettlementContext = {
+    ...(sourceAccountId && { sourceAccountId }),
+  };
+
   // Verify at request START
-  const verifyResult = await settlement.verify(protocol, credential);
+  const verifyResult = await settlement.verify(protocol, credential, context);
   if (!verifyResult.valid) {
     logger.warn(`${protocol} credential verification failed`);
     res.status(402).json({ error: 'invalid_payment', error_description: `${protocol} credential verification failed` });
@@ -187,11 +196,6 @@ async function handleProtocolCredential(
   }
 
   logger.info(`${protocol} credential verified successfully`);
-
-  // Build settlement context with identity for reconciliation
-  const context: SettlementContext = {
-    ...(sourceAccountId && { sourceAccountId }),
-  };
 
   // Listen for response finish to settle at request END (only on success)
   res.on('finish', async () => {
