@@ -1,5 +1,8 @@
-import { RequirePaymentConfig, paymentRequiredError, extractNetworkFromAccountId, extractAddressFromAccountId, Network } from "@atxp/common";
+import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAccountId, Network } from "@atxp/common";
+import { BigNumber } from "bignumber.js";
 import { getATXPConfig, atxpAccountId, atxpToken } from "./atxpContext.js";
+import { buildX402Requirements, buildMppChallenge, omniChallengeMcpError } from "./omniChallenge.js";
+import { getATXPResource } from "./atxpContext.js";
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
   const config = getATXPConfig();
@@ -51,7 +54,8 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   const existingPaymentId = await paymentConfig.getExistingPaymentId?.();
   if (existingPaymentId) {
     config.logger.info(`Found existing payment ID ${existingPaymentId}`);
-    throw paymentRequiredError(config.server, existingPaymentId, paymentAmount)
+    // Use the base charge options (before source expansion) for the omni-challenge
+    throw buildOmniError(config, existingPaymentId, paymentAmount, charge.options);
   }
 
   // For createPaymentRequest, use the minimumPayment if configured
@@ -94,5 +98,35 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   config.logger.debug(`Creating payment request with sourceAccountId: ${user}, destinationAccountId: ${charge.destinationAccountId}`);
   const paymentId = await config.paymentServer.createPaymentRequest(paymentRequest);
   config.logger.info(`Created payment request ${paymentId}`);
-  throw paymentRequiredError(config.server, paymentId, paymentAmount);
+  throw buildOmniError(config, paymentId, paymentAmount, options);
+}
+
+/**
+ * Build an omni-challenge MCP error that includes ATXP-MCP + X402 + MPP data.
+ * This enables clients to detect and respond to any supported protocol.
+ */
+function buildOmniError(
+  config: { server: import("@atxp/common").AuthorizationServerUrl; logger: import("@atxp/common").Logger },
+  paymentId: string,
+  paymentAmount: BigNumber,
+  options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>,
+) {
+  const resource = getATXPResource()?.toString() ?? '';
+
+  const x402Requirements = buildX402Requirements({
+    options,
+    resource,
+    payeeName: '',
+  });
+
+  // Include MPP challenge if any option is on Tempo
+  const mppChallenge = buildMppChallenge({ id: paymentId, options });
+
+  return omniChallengeMcpError(
+    config.server,
+    paymentId,
+    paymentAmount,
+    x402Requirements,
+    mppChallenge,
+  );
 }
