@@ -207,23 +207,18 @@ export class ProtocolSettlement {
     }
 
     if (protocol === 'mpp') {
-      // MPP: auth expects { credential: MppCredential } for verify,
-      // and { credential: MppCredential, amount: string } for settle.
-      // The credential is base64-encoded or raw JSON MppCredential.
+      // MPP: auth expects { credential: <standard MPP credential>, sourceAccountId? }.
+      // The credential is base64url-encoded JSON containing { challenge, payload, source }.
+      // Auth uses mppx internally to verify + settle (broadcast pre-signed tx or check txHash).
       let parsedCredential: unknown;
       try {
         parsedCredential = JSON.parse(Buffer.from(credential, 'base64').toString());
       } catch {
         parsedCredential = JSON.parse(credential);
         // If this throws, the credential is genuinely malformed — let it propagate.
-        // Auth would reject it anyway, but a clear error here is better than
-        // a confusing "unexpected field" from auth's Zod validation.
       }
-      const payload = (parsedCredential as Record<string, unknown>)?.payload as Record<string, unknown> | undefined;
-      const amount = payload?.amount != null ? String(payload.amount) : undefined;
       return {
         credential: parsedCredential,
-        ...(amount && { amount }),
         ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
       };
     }

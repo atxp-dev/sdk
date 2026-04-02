@@ -137,16 +137,16 @@ describe('ProtocolSettlement', () => {
       );
     });
 
-    it('should call /verify/mpp with parsed credential', async () => {
+    it('should call /verify/mpp with standard MPP credential', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ valid: true }),
       });
 
       const mppCredential = {
-        challenge: 'ch_456',
-        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
-        payload: { signature: 'def', amount: '2.50', payTo: '0xDst' },
+        challenge: { id: 'ch_456', method: 'tempo', intent: 'charge', request: { amount: '25000' } },
+        payload: { type: 'hash', hash: '0xabc' },
+        source: 'did:pkh:eip155:4217:0xSrc',
       };
       const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
       const result = await settlement.verify('mpp', credential);
@@ -214,36 +214,36 @@ describe('ProtocolSettlement', () => {
       );
     });
 
-    it('should call /settle/mpp with parsed credential and amount', async () => {
+    it('should call /settle/mpp with standard MPP credential', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ txHash: '0xmpp', settledAmount: '1.00' }),
+        json: async () => ({ txHash: '0xmpp', settledAmount: '10000' }),
       });
 
       const mppCredential = {
-        challenge: 'ch_123',
-        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
-        payload: { signature: 'abc', amount: '1.00', payTo: '0xDst', memo: 'test' },
+        challenge: { id: 'ch_123', method: 'tempo', intent: 'charge', request: { amount: '10000' } },
+        payload: { type: 'transaction', signature: '0xsignedtx' },
+        source: 'did:pkh:eip155:4217:0xSrc',
       };
       const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
       const result = await settlement.settle('mpp', credential);
 
-      expect(result).toEqual({ txHash: '0xmpp', settledAmount: '1.00' });
+      expect(result).toEqual({ txHash: '0xmpp', settledAmount: '10000' });
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.credential).toEqual(mppCredential);
-      expect(body.amount).toBe('1.00');
+      expect(body.amount).toBeUndefined();
     });
 
     it('should include sourceAccountId in MPP settle when context provides it', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ txHash: '0xid', settledAmount: '1.00' }),
+        json: async () => ({ txHash: '0xid', settledAmount: '10000' }),
       });
 
       const mppCredential = {
-        challenge: 'ch_id',
-        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
-        payload: { signature: 'abc', amount: '1.00', payTo: '0xDst' },
+        challenge: { id: 'ch_id', method: 'tempo', intent: 'charge', request: { amount: '10000' } },
+        payload: { type: 'transaction', signature: '0xsigned' },
+        source: 'did:pkh:eip155:4217:0xSrc',
       };
       const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
       await settlement.settle('mpp', credential, { sourceAccountId: 'tempo:0xTestUser' });
@@ -272,20 +272,20 @@ describe('ProtocolSettlement', () => {
     it('should handle raw JSON MPP credential (not base64)', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ txHash: '0xraw', settledAmount: '0.50' }),
+        json: async () => ({ txHash: '0xraw', settledAmount: '5000' }),
       });
 
       const mppCredential = {
-        challenge: 'ch_789',
-        source: { chain: 'tempo', address: '0xSrc', network: 'tempo' },
-        payload: { signature: 'ghi', amount: '0.50', payTo: '0xDst' },
+        challenge: { id: 'ch_789', method: 'tempo', intent: 'charge', request: { amount: '5000' } },
+        payload: { type: 'hash', hash: '0xabc' },
+        source: 'did:pkh:eip155:4217:0xSrc',
       };
       const result = await settlement.settle('mpp', JSON.stringify(mppCredential));
 
-      expect(result).toEqual({ txHash: '0xraw', settledAmount: '0.50' });
+      expect(result).toEqual({ txHash: '0xraw', settledAmount: '5000' });
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.credential).toEqual(mppCredential);
-      expect(body.amount).toBe('0.50');
+      expect(body.amount).toBeUndefined();
     });
 
     it('should throw on non-ok settle response', async () => {

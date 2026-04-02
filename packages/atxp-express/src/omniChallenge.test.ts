@@ -188,9 +188,9 @@ describe('Omni-challenge Express middleware', () => {
       });
 
       const mppCredential = {
-        challenge: 'ch_123',
-        source: { chain: 'tempo', address: '0xWalletAddr', network: 'tempo' },
-        payload: { signature: 'abc', amount: '1.00', payTo: '0xDst' },
+        challenge: { id: 'ch_123', method: 'tempo', intent: 'charge', request: { amount: '10000' } },
+        payload: { type: 'transaction', signature: '0xsignedtx' },
+        source: 'did:pkh:eip155:4217:0xWalletAddr',
       };
       const encodedCredential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
 

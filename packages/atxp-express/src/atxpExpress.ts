@@ -126,7 +126,8 @@ async function resolveIdentity(
     }
   }
 
-  // Fallback: extract wallet address from the payment credential
+  // Fallback: extract identity from the MPP credential's source field.
+  // Standard MPP uses a DID string: "did:pkh:eip155:<chainId>:<address>"
   if (protocol === 'mpp') {
     try {
       let parsed: Record<string, unknown>;
@@ -135,11 +136,19 @@ async function resolveIdentity(
       } catch {
         parsed = JSON.parse(credential);
       }
-      const source = parsed.source as Record<string, string> | undefined;
-      if (source?.chain && source?.address) {
-        const identity = `${source.chain}:${source.address}`;
-        logger.debug(`Resolved identity from MPP credential wallet: ${identity}`);
-        return identity;
+      const source = parsed.source;
+      if (typeof source === 'string' && source.startsWith('did:pkh:eip155:')) {
+        // Extract chain ID and address from DID: did:pkh:eip155:<chainId>:<address>
+        const parts = source.split(':');
+        const chainId = parts[3];
+        const address = parts[4];
+        if (chainId && address) {
+          // Map chainId to network name for our AccountId format
+          const network = chainId === '4217' ? 'tempo' : chainId === '42431' ? 'tempo_moderato' : `eip155:${chainId}`;
+          const identity = `${network}:${address}`;
+          logger.debug(`Resolved identity from MPP credential source DID: ${identity}`);
+          return identity;
+        }
       }
     } catch {
       // Not parseable — no identity
