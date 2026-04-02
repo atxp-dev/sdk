@@ -1,9 +1,21 @@
 import { AuthorizationServerUrl, FetchLike, Logger, type PaymentProtocol } from "@atxp/common";
-import type { MPPChallenge } from "@atxp/mpp";
-// Re-export from common/mpp so consumers of @atxp/server get the same types
+// Re-export from common so consumers of @atxp/server get the same type
 export type { PaymentProtocol } from "@atxp/common";
-// Re-export MPPChallenge directly. Also available as MppChallengeData for backwards compat.
-export type { MPPChallenge as MppChallengeData };
+
+/**
+ * MPP challenge data included in omni-challenge.
+ * Mirrors the MPPChallenge interface from @atxp/mpp to avoid cross-package
+ * type resolution issues in CI (rollup dts + tsc project references).
+ */
+export type MppChallengeData = {
+  id: string;
+  method: string;
+  intent: string;
+  amount: string;
+  currency: string;
+  network: string;
+  recipient: string;
+};
 
 /**
  * Result of detecting which protocol a client used from its credential.
