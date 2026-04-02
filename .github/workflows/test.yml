@@ -49,9 +49,6 @@ jobs:
       env: 
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-    - name: Clean stale nested @atxp packages
-      run: find packages -path '*/node_modules/@atxp' -type d -maxdepth 3 -exec rm -rf {} + 2>/dev/null || true
-
     - name: Run build
       run: npm run build
       
