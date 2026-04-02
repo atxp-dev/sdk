@@ -2,8 +2,8 @@ import { AuthorizationServerUrl, FetchLike, Logger, type PaymentProtocol } from 
 import type { MPPChallenge } from "@atxp/mpp";
 // Re-export from common/mpp so consumers of @atxp/server get the same types
 export type { PaymentProtocol } from "@atxp/common";
-// Re-export MPPChallenge as MppChallengeData — single source of truth for the challenge shape
-export type MppChallengeData = MPPChallenge;
+// Re-export MPPChallenge directly. Also available as MppChallengeData for backwards compat.
+export type { MPPChallenge as MppChallengeData };
 
 /**
  * Result of detecting which protocol a client used from its credential.

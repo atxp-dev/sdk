@@ -21,6 +21,8 @@ import {
 export function atxpExpress(args: ATXPArgs): Router {
   const config = buildServerConfig(args);
   const router = Router();
+  // Single ProtocolSettlement instance shared across all requests (stateless, just holds config)
+  const settlement = new ProtocolSettlement(config.server, config.logger);
 
   // Regular middleware
   const atxpMiddleware = async (req: Request, res: Response, next: NextFunction) => {
@@ -53,7 +55,7 @@ export function atxpExpress(args: ATXPArgs): Router {
 
         if (detected) {
           // This is a retry with payment credentials — verify and settle
-          await handleProtocolCredential(config, req, res, next, detected.protocol, detected.credential);
+          await handleProtocolCredential(config, settlement, req, res, next, detected.protocol, detected.credential);
           return;
         }
 
@@ -172,6 +174,7 @@ async function resolveIdentity(
  */
 async function handleProtocolCredential(
   config: ATXPConfig,
+  settlement: ProtocolSettlement,
   req: Request,
   res: Response,
   next: NextFunction,
@@ -179,7 +182,6 @@ async function handleProtocolCredential(
   credential: string,
 ): Promise<void> {
   const logger = config.logger;
-  const settlement = new ProtocolSettlement(config.server, logger);
 
   logger.info(`Detected ${protocol} credential on retry request`);
 
@@ -196,8 +198,19 @@ async function handleProtocolCredential(
     ...(sourceAccountId && { sourceAccountId }),
   };
 
-  // Verify at request START
-  const verifyResult = await settlement.verify(protocol, credential, context);
+  // Verify at request START.
+  // Note: for X402, context.paymentRequirements is not available here because the
+  // middleware doesn't have the original 402 challenge data from the previous request.
+  // Auth handles undefined paymentRequirements gracefully (Coinbase facilitator can
+  // verify Permit2 signatures without them).
+  let verifyResult;
+  try {
+    verifyResult = await settlement.verify(protocol, credential, context);
+  } catch (error) {
+    logger.warn(`${protocol} credential parsing/verification error: ${error instanceof Error ? error.message : String(error)}`);
+    res.status(400).json({ error: 'invalid_payment', error_description: `Malformed ${protocol} credential` });
+    return;
+  }
   if (!verifyResult.valid) {
     logger.warn(`${protocol} credential verification failed`);
     res.status(402).json({ error: 'invalid_payment', error_description: `${protocol} credential verification failed` });

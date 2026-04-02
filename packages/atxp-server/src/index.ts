@@ -83,7 +83,7 @@ export {
   type X402PaymentRequirements,
   type X402PaymentOption,
   type AtxpMcpChallengeData,
-  type MppChallengeData,
+  type MppChallengeData, // alias for MPPChallenge from @atxp/mpp
   type OmniChallenge,
   type SettlementContext,
   type VerifyResult,
