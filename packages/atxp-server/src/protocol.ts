@@ -37,7 +37,7 @@ export type X402PaymentRequirements = {
 export type X402PaymentOption = {
   scheme: string;
   network: string;
-  maxAmountRequired: string;
+  amount: string;
   resource: string;
   description: string;
   mimeType?: string;
@@ -102,13 +102,14 @@ export type SettleResult = {
  *
  * Detects:
  * - ATXP via `X-ATXP-PAYMENT` header
- * - X402 via `X-PAYMENT` header
+ * - X402 via `PAYMENT-SIGNATURE` (v2) or `X-PAYMENT` (v1) header
  * - MPP via `Authorization: Payment <credential>` header
  *
  * Returns null if no payment credential is detected.
  */
 export function detectProtocol(headers: {
   'x-atxp-payment'?: string;
+  'payment-signature'?: string;
   'x-payment'?: string;
   'authorization'?: string;
 }): CredentialDetection | null {
@@ -118,10 +119,10 @@ export function detectProtocol(headers: {
     return { protocol: 'atxp', credential: atxpPayment };
   }
 
-  // X-PAYMENT header indicates X402 protocol
-  const xPayment = headers['x-payment'];
-  if (xPayment) {
-    return { protocol: 'x402', credential: xPayment };
+  // PAYMENT-SIGNATURE (v2) or X-PAYMENT (v1) header indicates X402 protocol
+  const paymentSig = headers['payment-signature'] || headers['x-payment'];
+  if (paymentSig) {
+    return { protocol: 'x402', credential: paymentSig };
   }
 
   // Authorization: Payment <credential> indicates MPP protocol

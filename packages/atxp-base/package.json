@@ -36,9 +36,10 @@
     "@account-kit/infra": "^4.81.3",
     "@atxp/client": "0.10.13",
     "@atxp/common": "0.10.13",
+    "@x402/core": "^2.9.0",
+    "@x402/evm": "^2.9.0",
     "bignumber.js": "^9.3.0",
-    "viem": "^2.34.0",
-    "x402": "^0.3.0"
+    "viem": "^2.34.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

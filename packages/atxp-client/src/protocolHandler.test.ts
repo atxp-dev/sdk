@@ -36,12 +36,12 @@ function createMockAccount(paymentMakers?: PaymentMaker[]): Account {
 
 function createX402Challenge() {
   return {
-    x402Version: 1,
+    x402Version: 2,
     accepts: [{
-      network: 'base',
+      network: 'eip155:8453',
       scheme: 'exact',
       payTo: '0xrecipient',
-      maxAmountRequired: '1000000',
+      amount: '1000000',
       description: 'Test payment',
     }]
   };

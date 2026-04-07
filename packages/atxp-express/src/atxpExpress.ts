@@ -46,6 +46,7 @@ export function atxpExpress(args: ATXPArgs): Router {
       // with full pricing context (amount, options, destination).
       const detected = detectProtocol({
         'x-atxp-payment': req.headers['x-atxp-payment'] as string | undefined,
+        'payment-signature': req.headers['payment-signature'] as string | undefined,
         'x-payment': req.headers['x-payment'] as string | undefined,
         'authorization': req.headers['authorization'] as string | undefined,
       });
@@ -75,13 +76,18 @@ export function atxpExpress(args: ATXPArgs): Router {
       // before charging, using the pricing context it has (amount, options).
       return withATXPContext(config, resource, tokenCheck, () => {
         if (detected) {
-          const sourceAccountId = resolveIdentitySync(config, req, detected.protocol, detected.credential);
+          // Resolve identity from the credential itself (ATXP/MPP embed the source),
+          // then fall back to the OAuth sub. This is critical for X402: the credential
+          // doesn't contain the user's identity, but the OAuth token does. The settle
+          // must use the same sourceAccountId as the charge (atxpAccountId() = OAuth sub)
+          // so the ledger entries match.
+          const sourceAccountId = resolveIdentitySync(config, req, detected.protocol, detected.credential) || user || undefined;
           setDetectedCredential({
             protocol: detected.protocol,
             credential: detected.credential,
             sourceAccountId,
           });
-          logger.info(`Stored ${detected.protocol} credential in context for requirePayment`);
+          logger.info(`Stored ${detected.protocol} credential in context for requirePayment (sourceAccountId=${sourceAccountId})`);
         }
         return next();
       });

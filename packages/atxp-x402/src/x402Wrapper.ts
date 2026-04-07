@@ -2,7 +2,8 @@ import { ProspectivePayment, type FetchWrapper, type ClientArgs, ATXPAccount, AT
 import { BaseAccount } from '@atxp/base';
 import { FetchLike } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
-import { createPaymentHeader, selectPaymentRequirements } from 'x402/client';
+import { ExactEvmScheme, toClientEvmSigner } from '@x402/evm';
+import { x402HTTPClient, x402Client } from '@x402/core/client';
 import { LocalAccount } from 'viem';
 
 /**
@@ -37,7 +38,9 @@ interface X402Challenge {
 }
 
 function isX402Challenge(obj: unknown): obj is X402Challenge {
-  return typeof obj === 'object' && obj !== null;
+  if (typeof obj !== 'object' || obj === null) return false;
+  const candidate = obj as Record<string, unknown>;
+  return typeof candidate.x402Version !== 'undefined' && Array.isArray(candidate.accepts);
 }
 
 /**
@@ -95,12 +98,11 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         });
       }
 
-      // Select the best payment requirements (prefer base network, exact scheme)
-      const selectedPaymentRequirements = selectPaymentRequirements(
-        paymentChallenge.accepts,
-        'base',
-        'exact'
-      );
+      // Select the best payment requirements (prefer exact scheme on any base-like network)
+      const accepts = paymentChallenge.accepts as Array<Record<string, unknown>>;
+      const selectedPaymentRequirements = accepts.find(
+        (a) => a.scheme === 'exact'
+      ) ?? accepts[0];
 
       if (!selectedPaymentRequirements) {
         log.info('No suitable X402 payment option found');
@@ -111,9 +113,10 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         });
       }
 
-      // Convert amount from wei to human-readable for logging and approval
-      const amountInUsdc = Number(selectedPaymentRequirements.maxAmountRequired) / (10 ** 6);
-      const network = selectedPaymentRequirements.network;
+      // Convert amount from atomic units to human-readable for logging and approval
+      const rawAmount = selectedPaymentRequirements.amount;
+      const amountInUsdc = Number(rawAmount) / (10 ** 6);
+      const network = selectedPaymentRequirements.network as string;
       log.debug(`Payment required: ${amountInUsdc} USDC on ${network} to ${selectedPaymentRequirements.payTo}`);
 
       // Create the ProspectivePayment object for callbacks
@@ -122,10 +125,10 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       const prospectivePayment: ProspectivePayment = {
         accountId,
         resourceUrl: url,
-        resourceName: selectedPaymentRequirements.description || url,
+        resourceName: (selectedPaymentRequirements.description as string) || url,
         currency: 'USDC',
         amount: new BigNumber(amountInUsdc),
-        iss: selectedPaymentRequirements.payTo
+        iss: selectedPaymentRequirements.payTo as string
       };
 
       // Check if payment should be approved
@@ -195,13 +198,30 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         }
       }
 
-      // Create the X402 payment header using the x402 library
-      log.debug('Creating X402 payment header with signer');
-      const paymentHeader = await createPaymentHeader(
-        signer,
-        paymentChallenge.x402Version as number,
-        selectedPaymentRequirements
-      );
+      // Create the X402 payment payload using the @x402/evm library.
+      // TODO: This x402 client bootstrap (scheme + client + httpClient + createPaymentPayload +
+      // encodePaymentSignatureHeader) is duplicated in baseAccount.ts. Extract a shared helper
+      // once both packages can import from a common location that depends on @x402/core + @x402/evm.
+      log.debug('Creating X402 payment payload with signer');
+      const evmSigner = toClientEvmSigner(signer);
+      const scheme = new ExactEvmScheme(evmSigner);
+      const x402ClientInstance = new x402Client();
+
+      // v2 uses CAIP-2 network IDs ("eip155:8453")
+      x402ClientInstance.register(network as `${string}:${string}`, scheme);
+      const httpClient = new x402HTTPClient(x402ClientInstance);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const paymentRequired = {
+        x402Version: paymentChallenge.x402Version,
+        accepts: [selectedPaymentRequirements],
+        resource: { url: typeof input === 'string' ? input : input.toString() },
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const paymentPayload = await httpClient.createPaymentPayload(paymentRequired as any);
+      const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
+      const paymentHeader = paymentHeaders['PAYMENT-SIGNATURE'] || paymentHeaders['X-PAYMENT'] || paymentHeaders['x-payment'] || '';
 
       // Add the payment header and retry the request, preserving ALL original headers
       // This is crucial to maintain Accept and other headers
@@ -268,8 +288,9 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       log.error(`Failed to handle X402 payment challenge: ${error}`);
 
       if (onPaymentFailure && isX402Challenge(paymentChallenge) && paymentChallenge.accepts && Array.isArray(paymentChallenge.accepts) && paymentChallenge.accepts[0]) {
-        const firstOption = paymentChallenge.accepts[0] as { maxAmountRequired?: string | number; description?: string; network?: string; payTo?: string };
-        const amount = firstOption.maxAmountRequired ? Number(firstOption.maxAmountRequired) / (10 ** 6) : 0;
+        const firstOption = paymentChallenge.accepts[0] as { amount?: string | number; description?: string; network?: string; payTo?: string };
+        const rawAmt = firstOption.amount;
+        const amount = rawAmt ? Number(rawAmt) / (10 ** 6) : 0;
         const url = typeof input === 'string' ? input : input.toString();
         const accountId = await account.getAccountId();
         const errorNetwork = firstOption.network || 'unknown';

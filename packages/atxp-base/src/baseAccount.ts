@@ -5,7 +5,8 @@ import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
 import { base } from 'viem/chains';
-import { createPaymentHeader } from 'x402/client';
+import { ExactEvmScheme, toClientEvmSigner } from '@x402/evm';
+import { x402HTTPClient, x402Client } from '@x402/core/client';
 
 export class BaseAccount implements Account {
   readonly usesAccountsAuthorize = false;
@@ -89,14 +90,31 @@ export class BaseAccount implements Account {
           throw new Error('BaseAccount: x402 authorize requires paymentRequirements');
         }
         const reqs = params.paymentRequirements as Record<string, unknown>;
-        const x402Version = (reqs.x402Version as number) || 1;
+        const x402Version = (reqs.x402Version as number) || 2;
+
+        // TODO: This x402 client bootstrap (scheme + client + httpClient + createPaymentPayload +
+        // encodePaymentSignatureHeader) is duplicated in x402Wrapper.ts. Extract a shared helper
+        // once both packages can import from a common location that depends on @x402/core + @x402/evm.
+        const signer = toClientEvmSigner(this.getLocalAccount());
+        const scheme = new ExactEvmScheme(signer);
+        const client = new x402Client();
+        // v2 uses CAIP-2 network IDs ("eip155:8453")
+        client.register(reqs.network as `${string}:${string}`, scheme);
+        const httpClient = new x402HTTPClient(client);
+
+        // Build PaymentRequired envelope from the enriched requirements
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const paymentHeader = await createPaymentHeader(
-          this.getLocalAccount(),
+        const paymentRequired = {
           x402Version,
-          reqs as any,
-        );
-        return { protocol, credential: paymentHeader as string };
+          accepts: [reqs],
+          resource: { url: params.destination || '' },
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const paymentPayload = await httpClient.createPaymentPayload(paymentRequired as any);
+        const headers = httpClient.encodePaymentSignatureHeader(paymentPayload);
+        const paymentHeader = headers['PAYMENT-SIGNATURE'] || headers['X-PAYMENT'] || headers['x-payment'] || '';
+        return { protocol, credential: paymentHeader };
       }
       case 'atxp': {
         if (!params.amount) {

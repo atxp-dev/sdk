@@ -32,6 +32,27 @@ describe('detectProtocol', () => {
     });
   });
 
+  it('should detect X402 from payment-signature header (v2)', () => {
+    const result = detectProtocol({
+      'payment-signature': 'v2-payment-signature-credential',
+    });
+    expect(result).toEqual({
+      protocol: 'x402',
+      credential: 'v2-payment-signature-credential',
+    });
+  });
+
+  it('should prefer payment-signature over x-payment when both present', () => {
+    const result = detectProtocol({
+      'payment-signature': 'v2-credential',
+      'x-payment': 'v1-credential',
+    });
+    expect(result).toEqual({
+      protocol: 'x402',
+      credential: 'v2-credential',
+    });
+  });
+
   it('should return null when no payment credential is present', () => {
     const result = detectProtocol({});
     expect(result).toBeNull();

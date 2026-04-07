@@ -25,15 +25,17 @@ describe('omniChallenge', () => {
         payeeName: 'Test Server',
       });
 
-      expect(result.x402Version).toBe(1);
+      expect(result.x402Version).toBe(2);
       expect(result.accepts).toHaveLength(1);
       expect(result.accepts[0]).toMatchObject({
         scheme: 'exact',
-        network: 'base',
-        maxAmountRequired: '10000', // 0.01 * 1e6
+        network: 'eip155:8453',
+        amount: '10000', // 0.01 * 1e6
         resource: 'https://example.com/api',
         description: 'Test Server',
+        mimeType: 'application/json',
         payTo: '0xDestination',
+        asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
       });
     });
 
@@ -109,7 +111,7 @@ describe('omniChallenge', () => {
 
       // X402 fields
       expect(data.x402).toBeDefined();
-      expect(data.x402.x402Version).toBe(1);
+      expect(data.x402.x402Version).toBe(2);
       expect(data.x402.accepts).toHaveLength(1);
       expect(data.x402.accepts[0].payTo).toBe('0xDestination');
     });
@@ -134,7 +136,7 @@ describe('omniChallenge', () => {
 
       // Body should be X402 format
       const body = JSON.parse(response.body);
-      expect(body.x402Version).toBe(1);
+      expect(body.x402Version).toBe(2);
       expect(body.accepts).toHaveLength(1);
       expect(body.accepts[0].payTo).toBe('0xDestination');
 
@@ -317,7 +319,7 @@ describe('omniChallenge', () => {
       expect(challenge.atxpMcp.chargeAmount).toBe('0.1');
 
       // X402 data
-      expect(challenge.x402.x402Version).toBe(1);
+      expect(challenge.x402.x402Version).toBe(2);
       expect(challenge.x402.accepts).toHaveLength(1);
 
       // No MPP without mppChallengeId

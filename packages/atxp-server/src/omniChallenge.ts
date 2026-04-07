@@ -1,5 +1,5 @@
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
-import { PAYMENT_REQUIRED_PREAMBLE, AuthorizationServerUrl } from "@atxp/common";
+import { PAYMENT_REQUIRED_PREAMBLE, AuthorizationServerUrl, USDC_ADDRESSES, CAIP2_NETWORKS } from "@atxp/common";
 import { MPP_ERROR_CODE } from "@atxp/mpp";
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
@@ -16,39 +16,30 @@ export function buildX402Requirements(args: {
   resource: string;
   payeeName: string;
 }): X402PaymentRequirements {
-  // Filter to X402-compatible options only: real chain addresses on networks with Permit2 support.
-  // X402 uses Coinbase's facilitator which currently supports base (and base_sepolia).
-  // Exclude: ATXP account IDs, Solana (non-EVM), Tempo/World/Polygon (no Permit2 facilitator).
+  // Filter to X402-compatible options only: real chain addresses on networks with
+  // EIP-3009 (transferWithAuthorization) support via the Coinbase CDP facilitator.
   const X402_NETWORKS = new Set(['base', 'base_sepolia']);
   const chainOptions = args.options.filter(o =>
     X402_NETWORKS.has(o.network) && o.address.startsWith('0x')
   );
-  // USDC contract addresses per network (for X402 asset field).
-  // Source: https://developers.circle.com/stablecoins/usdc-on-main-networks
-  const USDC_ASSETS: Record<string, string> = {
-    base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    base_sepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-  };
 
-  // Note on testnet: network is normalized to 'base' for the X402 spec field, but the
-  // asset address uses the original option.network (e.g. 'base_sepolia') to select the
-  // correct USDC contract. On testnet this means network='base' with a sepolia USDC
-  // address — the X402 facilitator uses the asset contract address as source of truth
-  // for chain resolution, not the network name.
   const accepts: X402PaymentOption[] = chainOptions.map(option => ({
     scheme: 'exact',
-    network: option.network === 'base' || option.network === 'base_sepolia' ? 'base' : option.network,
-    maxAmountRequired: option.amount.times(1e6).toFixed(0),
+    network: CAIP2_NETWORKS[option.network] || option.network,
+    amount: option.amount.times(1e6).toFixed(0),
     resource: args.resource,
     description: args.payeeName,
     mimeType: 'application/json',
     payTo: option.address,
     maxTimeoutSeconds: 300,
-    asset: USDC_ASSETS[option.network] || USDC_ASSETS['base'],
+    asset: USDC_ADDRESSES[option.network] || USDC_ADDRESSES['base'],
+    // EIP-712 domain for Circle's USDC v2 contract (EIP-3009 transferWithAuthorization).
+    // If Circle changes the domain name/version in a future contract upgrade, this must be updated.
+    extra: { name: 'USD Coin', version: '2' },
   }));
 
   return {
-    x402Version: 1,
+    x402Version: 2,
     accepts,
   };
 }
