@@ -34,7 +34,6 @@ interface X402Challenge {
  */
 function selectPaymentRequirements(
   accepts: X402ChallengeAccept[],
-  _preferredNetwork?: string,
   preferredScheme = 'exact',
 ): X402ChallengeAccept | undefined {
   return accepts.find(a => a.scheme === preferredScheme) ?? accepts[0];
@@ -95,7 +94,6 @@ export class X402ProtocolHandler implements ProtocolHandler {
     try {
       const selectedPaymentRequirements = selectPaymentRequirements(
         paymentChallenge.accepts,
-        undefined,
         'exact'
       );
 
