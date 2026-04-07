@@ -8,26 +8,20 @@ import request from 'supertest';
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-describe('Omni-challenge Express middleware', () => {
+describe('settle-at-start Express middleware', () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
   });
 
-  describe('X-PAYMENT credential detection and routing', () => {
-    it('should detect X-PAYMENT credential and call /verify/x402 then /settle/x402', async () => {
-      const verifyCall = vi.fn();
-      let settleResolve: () => void;
-      const settlePromise = new Promise<void>(resolve => { settleResolve = resolve; });
+  describe('credential detected → settle at request start', () => {
+    it('should settle X402 credential before the handler runs', async () => {
+      const callOrder: string[] = [];
 
       mockFetch.mockImplementation(async (url: string | URL) => {
         const urlStr = url.toString();
-        if (urlStr.includes('/verify/x402')) {
-          verifyCall();
-          return { ok: true, json: async () => ({ valid: true }) };
-        }
         if (urlStr.includes('/settle/x402')) {
-          settleResolve();
+          callOrder.push('settle');
           return { ok: true, json: async () => ({ txHash: '0xabc', settledAmount: '10000' }) };
         }
         return { ok: false, status: 404, text: async () => 'Not found' };
@@ -41,6 +35,7 @@ describe('Omni-challenge Express middleware', () => {
       app.use(express.json());
       app.use(router);
       app.get('/resource', (_req, res) => {
+        callOrder.push('handler');
         res.json({ data: 'protected resource' });
       });
 
@@ -50,95 +45,25 @@ describe('Omni-challenge Express middleware', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ data: 'protected resource' });
-      expect(verifyCall).toHaveBeenCalledTimes(1);
-
-      await settlePromise;
+      // settle happened before handler
+      expect(callOrder).toEqual(['settle', 'handler']);
     });
 
-    it('should reject invalid X402 credential when verify returns invalid', async () => {
-      mockFetch.mockImplementation(async (url: string | URL) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/verify/x402')) {
-          return { ok: true, json: async () => ({ valid: false }) };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
-      });
-
-      const router = atxpExpress(TH.config({
-        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true }) }),
-      }));
-
-      const app = express();
-      app.use(express.json());
-      app.use(router);
-      app.get('/resource', (req, res) => {
-        res.json({ data: 'should not reach' });
-      });
-
-      const response = await request(app)
-        .get('/resource')
-        .set('X-PAYMENT', 'invalid-x402-credential');
-
-      expect(response.status).toBe(402);
-      expect(response.body.error).toBe('invalid_payment');
-    });
-  });
-
-  describe('Bearer JWT is NOT treated as ATXP payment credential', () => {
-    it('should pass Bearer JWT through as normal OAuth token, not call verify/settle', async () => {
-      const verifyCall = vi.fn();
-
-      mockFetch.mockImplementation(async (url: string | URL) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/verify/atxp')) {
-          verifyCall();
-          return { ok: true, json: async () => ({ valid: true }) };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
-      });
-
-      const router = atxpExpress(TH.config({
-        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true }) }),
-      }));
-
-      const app = express();
-      app.use(express.json());
-      app.use(router);
-      app.get('/resource', (req, res) => {
-        res.json({ data: 'protected resource' });
-      });
-
-      // Bearer JWT should be treated as OAuth token, not ATXP payment credential
-      const oauthJwt = 'eyJhbGciOiJFUzI1NksifQ.eyJzdWIiOiJ0ZXN0LXVzZXIifQ.signaturepart';
-
-      const response = await request(app)
-        .get('/resource')
-        .set('Authorization', `Bearer ${oauthJwt}`);
-
-      // Request should succeed through normal middleware path (MCP token check)
-      expect(response.status).toBe(200);
-
-      // verify/settle should NOT have been called — JWT is OAuth, not payment
-      expect(verifyCall).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('verify at request start, settle at request end', () => {
-    it('should verify before serving and settle after serving (not both upfront)', async () => {
+    it('should settle MPP credential before the handler runs', async () => {
       const callOrder: string[] = [];
-      let settleResolve: () => void;
-      const settlePromise = new Promise<void>(resolve => { settleResolve = resolve; });
+
+      const mppCredential = {
+        challenge: { id: 'ch_123', method: 'tempo', intent: 'charge', request: { amount: '10000' } },
+        payload: { type: 'transaction', signature: '0xsignedtx' },
+        source: 'did:pkh:eip155:4217:0xWalletAddr',
+      };
+      const encodedCredential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
 
       mockFetch.mockImplementation(async (url: string | URL) => {
         const urlStr = url.toString();
-        if (urlStr.includes('/verify/x402')) {
-          callOrder.push('verify');
-          return { ok: true, json: async () => ({ valid: true }) };
-        }
-        if (urlStr.includes('/settle/x402')) {
+        if (urlStr.includes('/settle/mpp')) {
           callOrder.push('settle');
-          settleResolve();
-          return { ok: true, json: async () => ({ txHash: '0x123', settledAmount: '10000' }) };
+          return { ok: true, json: async () => ({ txHash: '0xmpp', settledAmount: '10000' }) };
         }
         return { ok: false, status: 404, text: async () => 'Not found' };
       });
@@ -151,33 +76,190 @@ describe('Omni-challenge Express middleware', () => {
       app.use(express.json());
       app.use(router);
       app.get('/resource', (_req, res) => {
-        callOrder.push('serve');
-        res.json({ data: 'served' });
+        callOrder.push('handler');
+        res.json({ ok: true });
       });
 
-      await request(app)
+      const response = await request(app)
         .get('/resource')
-        .set('X-PAYMENT', 'x402-credential');
+        .set('Authorization', `Payment ${encodedCredential}`);
 
-      await settlePromise;
-      expect(callOrder).toEqual(['verify', 'serve', 'settle']);
+      expect(response.status).toBe(200);
+      expect(callOrder).toEqual(['settle', 'handler']);
+    });
+
+    it('should settle ATXP credential before the handler runs', async () => {
+      const callOrder: string[] = [];
+
+      const atxpCredential = JSON.stringify({
+        sourceAccountId: 'atxp_acct_test123',
+        sourceAccountToken: 'tok_abc',
+      });
+
+      mockFetch.mockImplementation(async (url: string | URL) => {
+        const urlStr = url.toString();
+        if (urlStr.includes('/settle/atxp')) {
+          callOrder.push('settle');
+          return { ok: true, json: async () => ({ txHash: 'atxp_tx', settledAmount: '5000' }) };
+        }
+        return { ok: false, status: 404, text: async () => 'Not found' };
+      });
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.get('/resource', (_req, res) => {
+        callOrder.push('handler');
+        res.json({ ok: true });
+      });
+
+      const response = await request(app)
+        .get('/resource')
+        .set('X-ATXP-PAYMENT', atxpCredential);
+
+      expect(response.status).toBe(200);
+      expect(callOrder).toEqual(['settle', 'handler']);
+    });
+  });
+
+  describe('settlement failure → 402 and handler does not run', () => {
+    it('should return 402 when X402 settlement fails', async () => {
+      let handlerCalled = false;
+
+      mockFetch.mockImplementation(async (url: string | URL) => {
+        const urlStr = url.toString();
+        if (urlStr.includes('/settle/x402')) {
+          return { ok: false, status: 400, text: async () => 'Settlement failed' };
+        }
+        return { ok: false, status: 404, text: async () => 'Not found' };
+      });
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.get('/resource', (_req, res) => {
+        handlerCalled = true;
+        res.json({ data: 'should not reach' });
+      });
+
+      const response = await request(app)
+        .get('/resource')
+        .set('X-PAYMENT', 'bad-x402-credential');
+
+      expect(response.status).toBe(402);
+      expect(response.body.error).toBe('settlement_failed');
+      expect(handlerCalled).toBe(false);
+    });
+
+    it('should return 402 when MPP settlement fails', async () => {
+      let handlerCalled = false;
+
+      mockFetch.mockImplementation(async (url: string | URL) => {
+        const urlStr = url.toString();
+        if (urlStr.includes('/settle/mpp')) {
+          return { ok: false, status: 400, text: async () => 'MPP settlement failed' };
+        }
+        return { ok: false, status: 404, text: async () => 'Not found' };
+      });
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.get('/resource', (_req, res) => {
+        handlerCalled = true;
+        res.json({ ok: true });
+      });
+
+      const mppCredential = Buffer.from(JSON.stringify({ payload: {} })).toString('base64');
+
+      const response = await request(app)
+        .get('/resource')
+        .set('Authorization', `Payment ${mppCredential}`);
+
+      expect(response.status).toBe(402);
+      expect(response.body.error).toBe('settlement_failed');
+      expect(handlerCalled).toBe(false);
+    });
+  });
+
+  describe('no credential → normal flow continues', () => {
+    it('should pass through to handler when no payment credential is present', async () => {
+      // No fetch calls expected for settle
+      mockFetch.mockImplementation(async () => {
+        throw new Error('fetch should not be called');
+      });
+
+      const router = atxpExpress(TH.config({
+        destination: 'test-destination',
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.get('/resource', (_req, res) => {
+        res.json({ data: 'public resource' });
+      });
+
+      const response = await request(app)
+        .get('/resource');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ data: 'public resource' });
+    });
+
+    it('should treat Bearer JWT as OAuth token, not payment credential', async () => {
+      // fetch should not be called for settle — Bearer is OAuth, not a payment protocol
+      let settleCalled = false;
+      mockFetch.mockImplementation(async (url: string | URL) => {
+        const urlStr = url.toString();
+        if (urlStr.includes('/settle/')) {
+          settleCalled = true;
+        }
+        return { ok: false, status: 404, text: async () => 'Not found' };
+      });
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.get('/resource', (_req, res) => {
+        res.json({ data: 'protected resource' });
+      });
+
+      const oauthJwt = 'eyJhbGciOiJFUzI1NksifQ.eyJzdWIiOiJ0ZXN0LXVzZXIifQ.signaturepart';
+
+      const response = await request(app)
+        .get('/resource')
+        .set('Authorization', `Bearer ${oauthJwt}`);
+
+      expect(response.status).toBe(200);
+      expect(settleCalled).toBe(false);
     });
   });
 
   describe('identity resolution for settlement', () => {
-    it('should resolve identity from MPP credential wallet and pass to settle', async () => {
+    it('should resolve identity from MPP credential and pass sourceAccountId to settle', async () => {
       let settleBody: Record<string, unknown> = {};
-      let settleResolve: () => void;
-      const settlePromise = new Promise<void>(resolve => { settleResolve = resolve; });
 
       mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
         const urlStr = url.toString();
-        if (urlStr.includes('/verify/mpp')) {
-          return { ok: true, json: async () => ({ valid: true }) };
-        }
         if (urlStr.includes('/settle/mpp')) {
           if (init?.body) settleBody = JSON.parse(init.body as string);
-          settleResolve();
           return { ok: true, json: async () => ({ txHash: '0xmpp', settledAmount: '1.00' }) };
         }
         return { ok: false, status: 404, text: async () => 'Not found' };
@@ -204,23 +286,25 @@ describe('Omni-challenge Express middleware', () => {
         .set('Authorization', `Payment ${encodedCredential}`);
 
       expect(response.status).toBe(200);
-      await settlePromise;
       expect(settleBody.sourceAccountId).toBe('tempo:0xWalletAddr');
     });
 
-    it('should settle X402 without sourceAccountId when no OAuth token', async () => {
+    it('should resolve identity from ATXP raw JSON credential', async () => {
       let settleBody: Record<string, unknown> = {};
 
       mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
         const urlStr = url.toString();
-        if (urlStr.includes('/verify/x402')) {
-          return { ok: true, json: async () => ({ valid: true }) };
-        }
-        if (urlStr.includes('/settle/x402')) {
+        if (urlStr.includes('/settle/atxp')) {
           if (init?.body) settleBody = JSON.parse(init.body as string);
-          return { ok: true, json: async () => ({ txHash: '0xabc', settledAmount: '10000' }) };
+          return { ok: true, json: async () => ({ txHash: 'atxp_tx', settledAmount: '5000' }) };
         }
         return { ok: false, status: 404, text: async () => 'Not found' };
+      });
+
+      // Raw JSON (not base64-encoded)
+      const atxpCredential = JSON.stringify({
+        sourceAccountId: 'atxp_acct_raw123',
+        sourceAccountToken: 'tok_raw',
       });
 
       const router = atxpExpress(TH.config({
@@ -232,14 +316,47 @@ describe('Omni-challenge Express middleware', () => {
       app.use(router);
       app.get('/resource', (_req, res) => res.json({ ok: true }));
 
-      // X402 without Bearer token — no OAuth identity available
-      await request(app)
+      const response = await request(app)
         .get('/resource')
-        .set('X-PAYMENT', 'x402-payment-credential');
+        .set('X-ATXP-PAYMENT', atxpCredential);
 
-      await new Promise(resolve => setTimeout(resolve, 50));
-      // No sourceAccountId since there's no OAuth token and X402 can't extract payer pre-settlement
-      expect(settleBody.sourceAccountId).toBeUndefined();
+      expect(response.status).toBe(200);
+      expect(settleBody.sourceAccountId).toBe('atxp_acct_raw123');
+    });
+
+    it('should resolve identity from ATXP base64-encoded credential', async () => {
+      let settleBody: Record<string, unknown> = {};
+
+      mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
+        const urlStr = url.toString();
+        if (urlStr.includes('/settle/atxp')) {
+          if (init?.body) settleBody = JSON.parse(init.body as string);
+          return { ok: true, json: async () => ({ txHash: 'atxp_tx', settledAmount: '5000' }) };
+        }
+        return { ok: false, status: 404, text: async () => 'Not found' };
+      });
+
+      // Base64-encoded JSON
+      const atxpCredential = Buffer.from(JSON.stringify({
+        sourceAccountId: 'atxp_acct_b64_456',
+        sourceAccountToken: 'tok_b64',
+      })).toString('base64');
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.get('/resource', (_req, res) => res.json({ ok: true }));
+
+      const response = await request(app)
+        .get('/resource')
+        .set('X-ATXP-PAYMENT', atxpCredential);
+
+      expect(response.status).toBe(200);
+      expect(settleBody.sourceAccountId).toBe('atxp_acct_b64_456');
     });
   });
 });

@@ -678,8 +678,8 @@ export class ATXPFetcher {
     // Body: merge x402 data at top level (X402ProtocolHandler expects x402Version/accepts at root)
     // AND include the full errorData so ATXPAccountHandler can access all protocol data.
     const bodyObj = {
-      ...(x402Data && typeof x402Data === 'object' ? x402Data as Record<string, unknown> : {}),
       ...errorData,
+      ...(x402Data && typeof x402Data === 'object' ? x402Data as Record<string, unknown> : {}),
     };
     const body = JSON.stringify(bodyObj);
 

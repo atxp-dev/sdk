@@ -177,10 +177,15 @@ async function resolveIdentity(
   // ATXP: identity comes from the credential's sourceAccountId field
   if (protocol === 'atxp') {
     try {
-      const parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
+      } catch {
+        parsed = JSON.parse(credential);
+      }
       if (parsed.sourceAccountId) {
         logger.debug(`Resolved identity from ATXP credential: ${parsed.sourceAccountId}`);
-        return parsed.sourceAccountId;
+        return parsed.sourceAccountId as string;
       }
     } catch {
       // Not parseable
