@@ -47,6 +47,9 @@ export function buildX402Requirements(args: {
     payTo: option.address,
     maxTimeoutSeconds: 300,
     asset: USDC_ASSETS[option.network] || USDC_ASSETS['base'],
+    // EIP-712 domain parameters required by x402 v2 ExactEvmScheme for
+    // EIP-3009 transferWithAuthorization typed data signing.
+    extra: { name: 'USD Coin', version: '2' },
   }));
 
   return {
