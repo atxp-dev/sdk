@@ -20,11 +20,11 @@ vi.mock('@x402/evm', () => {
 // Mock @x402/core/client to avoid real x402 client logic
 vi.mock('@x402/core/client', () => {
   const mockCreatePaymentPayload = vi.fn().mockResolvedValue({
-    x402Version: 1,
+    x402Version: 2,
     scheme: 'exact',
-    network: 'base',
+    network: 'eip155:8453',
     payload: { signature: '0xmocked' },
-    accepted: { scheme: 'exact', network: 'base', payTo: '0xrecipient', amount: '1000000', asset: '0x', maxTimeoutSeconds: 60, extra: {} },
+    accepted: { scheme: 'exact', network: 'eip155:8453', payTo: '0xrecipient', amount: '1000000', asset: '0x', maxTimeoutSeconds: 60, extra: {} },
     resource: { url: 'https://example.com/api' },
   });
   const mockEncodePaymentSignatureHeader = vi.fn().mockReturnValue({
@@ -33,7 +33,6 @@ vi.mock('@x402/core/client', () => {
 
   class MockX402Client {
     register = vi.fn().mockReturnThis();
-    registerV1 = vi.fn().mockReturnThis();
   }
 
   class MockX402HTTPClient {
@@ -130,13 +129,13 @@ describe('wrapWithX402', () => {
     Object.setPrototypeOf(mockBaseAccount, (await import('@atxp/base')).BaseAccount.prototype);
 
     const x402Challenge = {
-      x402Version: 1,
+      x402Version: 2,
       accepts: [
         {
-          network: 'base',
+          network: 'eip155:8453',
           scheme: 'exact',
           payTo: '0xrecipient',
-          maxAmountRequired: '1000000',
+          amount: '1000000',
           description: 'Test payment',
         },
       ],
@@ -190,13 +189,13 @@ describe('wrapWithX402', () => {
   it('should handle 402 responses and retry with payment', async () => {
     // First response: 402 with X402 challenge in JSON body
     const x402Challenge = {
-      x402Version: 1,
+      x402Version: 2,
       accepts: [
         {
-          network: 'base',
+          network: 'eip155:8453',
           scheme: 'exact',
           payTo: '0xrecipient',
-          maxAmountRequired: '1000000',
+          amount: '1000000',
           description: 'Test payment',
         },
       ],
@@ -275,13 +274,13 @@ describe('wrapWithX402', () => {
 
   it('should handle payment approval rejection', async () => {
     const x402Challenge = {
-      x402Version: 1,
+      x402Version: 2,
       accepts: [
         {
-          network: 'base',
+          network: 'eip155:8453',
           scheme: 'exact',
           payTo: '0xrecipient',
-          maxAmountRequired: '1000000',
+          amount: '1000000',
           description: 'Test payment',
         },
       ],
@@ -360,13 +359,13 @@ describe('wrapWithX402', () => {
 
   it('should handle x402 library errors', async () => {
     const x402Challenge = {
-      x402Version: 1,
+      x402Version: 2,
       accepts: [
         {
-          network: 'base',
+          network: 'eip155:8453',
           scheme: 'exact',
           payTo: '0xrecipient',
-          maxAmountRequired: '1000000',
+          amount: '1000000',
           description: 'Test payment',
         },
       ],
@@ -415,7 +414,7 @@ describe('wrapWithX402', () => {
   it('should handle no suitable payment option', async () => {
     // X402 challenge with empty accepts array
     const x402Challenge = {
-      x402Version: 1,
+      x402Version: 2,
       accepts: [],
     };
 

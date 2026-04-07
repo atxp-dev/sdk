@@ -128,7 +128,7 @@ describe('ATXPAccountHandler', () => {
         x402: {
           accepts: [
             { network: 'atxp', payTo: 'atxp_acct_123' },
-            { network: 'base', payTo: '0xDEST', maxAmountRequired: '1000000' },
+            { network: 'eip155:8453', payTo: '0xDEST', amount: '1000000' },
           ],
         },
       });
@@ -143,7 +143,7 @@ describe('ATXPAccountHandler', () => {
         expect.objectContaining({
           destination: '0xDEST',
           paymentRequirements: expect.objectContaining({
-            network: 'base',
+            network: 'eip155:8453',
             payTo: '0xDEST',
           }),
         }),

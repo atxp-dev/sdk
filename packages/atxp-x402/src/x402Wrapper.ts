@@ -112,8 +112,7 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       }
 
       // Convert amount from atomic units to human-readable for logging and approval
-      // v1 uses maxAmountRequired, v2 uses amount
-      const rawAmount = selectedPaymentRequirements.amount ?? selectedPaymentRequirements.maxAmountRequired;
+      const rawAmount = selectedPaymentRequirements.amount;
       const amountInUsdc = Number(rawAmount) / (10 ** 6);
       const network = selectedPaymentRequirements.network as string;
       log.debug(`Payment required: ${amountInUsdc} USDC on ${network} to ${selectedPaymentRequirements.payTo}`);
@@ -202,19 +201,14 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       const evmSigner = toClientEvmSigner(signer);
       const scheme = new ExactEvmScheme(evmSigner);
       const x402ClientInstance = new x402Client();
-      const x402Version = paymentChallenge.x402Version as number;
 
-      // v1 uses plain network names ("base"), v2 uses CAIP-2 ("eip155:8453")
-      if (x402Version === 1) {
-        x402ClientInstance.registerV1(network, scheme);
-      } else {
-        x402ClientInstance.register(network as `${string}:${string}`, scheme);
-      }
+      // v2 uses CAIP-2 network IDs ("eip155:8453")
+      x402ClientInstance.register(network as `${string}:${string}`, scheme);
       const httpClient = new x402HTTPClient(x402ClientInstance);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const paymentRequired = {
-        x402Version,
+        x402Version: 2,
         accepts: [selectedPaymentRequirements],
         resource: { url: typeof input === 'string' ? input : input.toString() },
       };
@@ -289,8 +283,8 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       log.error(`Failed to handle X402 payment challenge: ${error}`);
 
       if (onPaymentFailure && isX402Challenge(paymentChallenge) && paymentChallenge.accepts && Array.isArray(paymentChallenge.accepts) && paymentChallenge.accepts[0]) {
-        const firstOption = paymentChallenge.accepts[0] as { amount?: string | number; maxAmountRequired?: string | number; description?: string; network?: string; payTo?: string };
-        const rawAmt = firstOption.amount ?? firstOption.maxAmountRequired;
+        const firstOption = paymentChallenge.accepts[0] as { amount?: string | number; description?: string; network?: string; payTo?: string };
+        const rawAmt = firstOption.amount;
         const amount = rawAmt ? Number(rawAmt) / (10 ** 6) : 0;
         const url = typeof input === 'string' ? input : input.toString();
         const accountId = await account.getAccountId();

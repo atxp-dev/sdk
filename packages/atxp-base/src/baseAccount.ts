@@ -95,12 +95,8 @@ export class BaseAccount implements Account {
         const signer = toClientEvmSigner(this.getLocalAccount());
         const scheme = new ExactEvmScheme(signer);
         const client = new x402Client();
-        // v1 uses plain network names ("base"), v2 uses CAIP-2 ("eip155:8453")
-        if (x402Version === 1) {
-          client.registerV1(reqs.network as string, scheme);
-        } else {
-          client.register(reqs.network as `${string}:${string}`, scheme);
-        }
+        // v2 uses CAIP-2 network IDs ("eip155:8453")
+        client.register(reqs.network as `${string}:${string}`, scheme);
         const httpClient = new x402HTTPClient(client);
 
         // Build PaymentRequired envelope from the enriched requirements

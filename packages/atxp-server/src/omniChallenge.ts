@@ -40,7 +40,7 @@ export function buildX402Requirements(args: {
   const accepts: X402PaymentOption[] = chainOptions.map(option => ({
     scheme: 'exact',
     network: CAIP2_NETWORKS[option.network] || option.network,
-    maxAmountRequired: option.amount.times(1e6).toFixed(0),
+    amount: option.amount.times(1e6).toFixed(0),
     resource: args.resource,
     description: args.payeeName,
     mimeType: 'application/json',
