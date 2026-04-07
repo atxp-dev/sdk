@@ -23,16 +23,23 @@ export function buildX402Requirements(args: {
   const chainOptions = args.options.filter(o =>
     X402_NETWORKS.has(o.network) && o.address.startsWith('0x')
   );
+  // USDC contract addresses per network (for X402 asset field).
+  // Source: https://developers.circle.com/stablecoins/usdc-on-main-networks
+  const USDC_ASSETS: Record<string, string> = {
+    base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    base_sepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+  };
+
   const accepts: X402PaymentOption[] = chainOptions.map(option => ({
     scheme: 'exact',
-    // X402 spec normalizes testnet networks to their mainnet names in challenges.
-    // base_sepolia → base so the client knows which chain family to use.
     network: option.network === 'base' || option.network === 'base_sepolia' ? 'base' : option.network,
-    maxAmountRequired: option.amount.times(1e6).toFixed(0), // Convert to smallest unit (USDC has 6 decimals)
+    maxAmountRequired: option.amount.times(1e6).toFixed(0),
     resource: args.resource,
     description: args.payeeName,
+    mimeType: 'application/json',
     payTo: option.address,
     maxTimeoutSeconds: 300,
+    asset: USDC_ASSETS[option.network] || USDC_ASSETS['base'],
   }));
 
   return {

@@ -24,7 +24,10 @@ export {
   getATXPResource,
   atxpAccountId,
   atxpToken,
-  withATXPContext
+  withATXPContext,
+  getDetectedCredential,
+  setDetectedCredential,
+  type DetectedCredential,
 } from './atxpContext.js';
 
 // Core platform-agnostic business logic (no I/O dependencies)
