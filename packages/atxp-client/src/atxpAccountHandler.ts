@@ -40,7 +40,7 @@ export class ATXPAccountHandler implements ProtocolHandler {
     const authorizeParams = await buildAuthorizeParams(challengeData, fetchFn, logger);
 
     if (!authorizeParams.amount) {
-      logger.warn('ATXPAccountHandler: no amount in challenge data, cannot authorize');
+      logger.error(`ATXPAccountHandler: no amount in challenge data, cannot authorize. Challenge keys: ${Object.keys(challengeData).join(', ')}`);
       return null;
     }
 

@@ -25,7 +25,8 @@ import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import { X402ProtocolHandler } from './x402ProtocolHandler.js';
 import { MPPProtocolHandler } from './mppProtocolHandler.js';
 import { ATXPAccountHandler } from './atxpAccountHandler.js';
-import { ATXPAccount } from '@atxp/common';
+// Note: ATXPAccount import removed — use account.usesAccountsAuthorize instead of instanceof
+// to avoid cross-package instanceof issues with bundlers.
 import { InsufficientFundsError, ATXPPaymentError } from './errors.js';
 import { getIsReactNative, createReactNativeSafeFetch, Destination } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -138,7 +139,7 @@ export class ATXPFetcher {
     this.onPaymentAttemptFailed = onPaymentAttemptFailed;
     // ATXPAccount always delegates to /authorize/auto — no local payments.
     // All other account types use protocol-specific handlers with ATXP push-mode fallback.
-    if (account instanceof ATXPAccount) {
+    if (account.usesAccountsAuthorize) {
       this.protocolHandlers = [new ATXPAccountHandler()];
     } else {
       this.protocolHandlers = protocolHandlers ?? [
@@ -810,7 +811,7 @@ export class ATXPFetcher {
         // ATXPAccount users must NEVER fall back to push mode. All payments go through
         // /authorize/auto via ATXPAccountHandler. Falling back would bypass accounts'
         // protocol selection and use the account's local payment makers directly.
-        if (this.account instanceof ATXPAccount) {
+        if (this.account.usesAccountsAuthorize) {
           throw new Error('Payment authorization failed. ATXPAccountHandler could not complete the payment via /authorize/auto.');
         }
 

@@ -18,6 +18,7 @@ import { ConsoleLogger, Logger } from '@atxp/common';
  * does not provide Paymaster services for Polygon mainnet.
  */
 export class PolygonBrowserAccount implements Account {
+  readonly usesAccountsAuthorize = false;
   private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private walletAddress: string;

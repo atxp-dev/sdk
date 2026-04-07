@@ -236,6 +236,15 @@ export class AuthorizationError extends Error {
 export type Account = PaymentDestination & {
   paymentMakers: PaymentMaker[];
   /**
+   * Whether this account delegates payment authorization to the accounts service.
+   * True for ATXPAccount (uses /authorize/auto), false for local-key accounts
+   * (BaseAccount, SolanaAccount, etc.) that sign locally.
+   *
+   * Used to select the correct protocol handler strategy without instanceof checks
+   * (which break across package boundaries).
+   */
+  readonly usesAccountsAuthorize: boolean;
+  /**
    * Create a spend permission for the given resource URL.
    * This allows pre-authorizing spending for a specific MCP server during OAuth authorization.
    *

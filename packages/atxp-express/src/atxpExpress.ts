@@ -22,19 +22,23 @@ export function atxpExpress(args: ATXPArgs): Router {
   const config = buildServerConfig(args);
   const router = Router();
 
-  // Lazy-init ProtocolSettlement with destinationAccountId (requires async resolution)
-  let _settlement: ProtocolSettlement | null = null;
+  // Lazy-init ProtocolSettlement with destinationAccountId (requires async resolution).
+  // Cache the promise (not the result) to avoid a race where concurrent requests
+  // both see _settlement === null and kick off parallel getAccountId() calls.
+  let _settlementPromise: Promise<ProtocolSettlement> | null = null;
   async function getSettlement(): Promise<ProtocolSettlement> {
-    if (!_settlement) {
-      let destinationAccountId: string | undefined;
-      try {
-        destinationAccountId = await config.destination.getAccountId();
-      } catch {
-        config.logger.warn('Could not resolve destinationAccountId for ProtocolSettlement');
-      }
-      _settlement = new ProtocolSettlement(config.server, config.logger, fetch.bind(globalThis), destinationAccountId);
+    if (!_settlementPromise) {
+      _settlementPromise = (async () => {
+        let destinationAccountId: string | undefined;
+        try {
+          destinationAccountId = await config.destination.getAccountId();
+        } catch {
+          config.logger.warn('Could not resolve destinationAccountId for ProtocolSettlement');
+        }
+        return new ProtocolSettlement(config.server, config.logger, fetch.bind(globalThis), destinationAccountId);
+      })();
     }
-    return _settlement;
+    return _settlementPromise;
   }
 
   const atxpMiddleware = async (req: Request, res: Response, next: NextFunction) => {
@@ -199,6 +203,14 @@ async function resolveIdentity(
  *
  * Returns true if settlement succeeded (request should continue),
  * false if it failed (error response already sent).
+ *
+ * NOTE: Settle-at-start means the payment is committed before the MCP handler runs.
+ * If the MCP handler fails after settlement, the user paid for nothing.
+ * This is the inverse of the old settle-on-finish problem (user gets resource for free
+ * if settlement fails). Settle-at-start is preferred because:
+ * 1. Pre-signed credentials (X402 Permit2, MPP signed tx) will settle regardless
+ * 2. The ledger credit is for future requests too, not just this one
+ * 3. A refund mechanism can be added later; preventing free resource access is harder
  */
 async function settleAtRequestStart(
   config: ATXPConfig,

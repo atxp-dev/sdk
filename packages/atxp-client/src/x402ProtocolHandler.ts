@@ -5,7 +5,8 @@ import { BigNumber } from 'bignumber.js';
 import { buildPaymentHeaders } from './paymentHeaders.js';
 import { selectPaymentRequirements } from 'x402/client';
 
-/** USDC contract addresses by network, used to enrich X402 payment requirements. */
+/** USDC contract addresses by network, used to enrich X402 payment requirements.
+ * Source: https://developers.circle.com/stablecoins/usdc-on-main-networks */
 const USDC_ADDRESSES: Record<string, string> = {
   base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   base_sepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',

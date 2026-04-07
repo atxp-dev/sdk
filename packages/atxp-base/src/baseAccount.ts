@@ -8,6 +8,7 @@ import { base } from 'viem/chains';
 import { createPaymentHeader } from 'x402/client';
 
 export class BaseAccount implements Account {
+  readonly usesAccountsAuthorize = false;
   private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private walletClient: WalletClient;
