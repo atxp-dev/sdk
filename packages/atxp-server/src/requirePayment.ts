@@ -119,6 +119,10 @@ function buildOmniError(
     payeeName: '',
   });
 
+  if (x402Requirements.accepts.length === 0 && options.length > 0) {
+    config.logger.warn(`buildX402Requirements filtered all ${options.length} options — no X402-compatible networks (base/base_sepolia with 0x address). X402 clients will not see any payment options.`);
+  }
+
   // Include MPP challenge if any option is on Tempo
   const mppChallenge = buildMppChallenge({ id: paymentId, options });
 

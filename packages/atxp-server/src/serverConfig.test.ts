@@ -8,6 +8,7 @@ function mockAccount(accountId: string): Account {
   return {
     getAccountId: async () => `base:${accountId}` as any,
     paymentMakers: [],
+    usesAccountsAuthorize: false,
     getSources: async () => [],
     createSpendPermission: async () => null,
   };

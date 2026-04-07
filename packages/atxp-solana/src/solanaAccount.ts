@@ -6,6 +6,7 @@ import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 
 export class SolanaAccount implements Account {
+  readonly usesAccountsAuthorize = false;
   private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private sourcePublicKey: string;

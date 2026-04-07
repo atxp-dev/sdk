@@ -7,6 +7,7 @@ import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
 import { getTempoChain, TEMPO_MAINNET_CHAIN_ID, TEMPO_TESTNET_CHAIN_ID } from './tempoConstants.js';
 
 export class TempoAccount implements Account {
+  readonly usesAccountsAuthorize = false;
   private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private walletClient: WalletClient;

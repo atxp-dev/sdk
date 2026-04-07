@@ -20,6 +20,7 @@ export function mockAccount(accountId: string): Account {
   return {
     getAccountId: async () => formattedAccountId as any,
     paymentMakers: [],
+    usesAccountsAuthorize: false,
     getSources: async () => [],
     createSpendPermission: async () => null,
     authorize: async () => ({ protocol: 'atxp' as const, credential: '' }),

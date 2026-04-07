@@ -140,3 +140,4 @@ dist-cjs
 .DS_Store
 bundle-analysis/
 .npmrc.publish
+CLAUDE.local.md

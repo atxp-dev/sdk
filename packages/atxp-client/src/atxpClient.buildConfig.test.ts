@@ -10,6 +10,7 @@ describe('buildConfig', () => {
       account: {
         getAccountId: async () => 'bdj' as any,
         paymentMakers: [],
+        usesAccountsAuthorize: false,
         getSources: async () => [],
         createSpendPermission: async () => null
       }

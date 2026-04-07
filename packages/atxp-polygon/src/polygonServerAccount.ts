@@ -28,6 +28,7 @@ import type { Chain } from 'viem/chains';
  * ```
  */
 export class PolygonServerAccount implements Account {
+  readonly usesAccountsAuthorize = false;
   private _accountId: AccountId;
   paymentMakers: PaymentMaker[];
   private walletClient: WalletClient;

@@ -27,6 +27,7 @@ function createMockAccount(paymentMakers?: PaymentMaker[]): Account {
       generateJWT: vi.fn().mockResolvedValue('testJWT'),
       getSourceAddress: vi.fn().mockReturnValue('SolAddress123')
     }],
+    usesAccountsAuthorize: false,
     getSources: async () => [{ address: 'SolAddress123', chain: 'solana' as any, walletType: 'eoa' as any }],
     createSpendPermission: async () => null,
     authorize: vi.fn().mockResolvedValue({ protocol: 'atxp', credential: '{}' }),

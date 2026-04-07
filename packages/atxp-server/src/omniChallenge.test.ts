@@ -37,10 +37,11 @@ describe('omniChallenge', () => {
       });
     });
 
-    it('should handle multiple payment options', () => {
+    it('should handle multiple payment options and filter to X402-compatible networks', () => {
       const options = [
         { network: 'base', currency: 'USDC', address: '0xAddr1', amount: new BigNumber('0.01') },
         { network: 'solana', currency: 'USDC', address: 'SolAddr', amount: new BigNumber('0.02') },
+        { network: 'base', currency: 'USDC', address: '0xAddr2', amount: new BigNumber('0.03') },
       ];
 
       const result = buildX402Requirements({
@@ -49,9 +50,10 @@ describe('omniChallenge', () => {
         payeeName: 'Multi-chain Server',
       });
 
+      // Only Base options with 0x addresses are included (X402 uses Permit2, Base only)
       expect(result.accepts).toHaveLength(2);
       expect(result.accepts[0].payTo).toBe('0xAddr1');
-      expect(result.accepts[1].payTo).toBe('SolAddr');
+      expect(result.accepts[1].payTo).toBe('0xAddr2');
     });
   });
 

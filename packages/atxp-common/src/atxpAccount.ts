@@ -141,6 +141,7 @@ class ATXPHttpPaymentMaker implements PaymentMaker {
 }
 
 export class ATXPAccount implements Account {
+  readonly usesAccountsAuthorize = true;
   paymentMakers: PaymentMaker[];
   origin: string;
   token: string;

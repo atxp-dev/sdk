@@ -32,6 +32,7 @@ function atxpFetcher(
   const account: Account = {
     getAccountId: async () => "bdj" as any,
     paymentMakers: paymentMakers ?? mockPaymentMakers(),
+    usesAccountsAuthorize: false,
     getSources: async () => [{
       address: 'SolAddress123',
       chain: 'solana' as any,

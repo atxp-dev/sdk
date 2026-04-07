@@ -42,6 +42,7 @@ describe('Default Payment Failure Handler', () => {
     const account = {
       getAccountId: async () => 'test-account' as any,
       paymentMakers: [],
+      usesAccountsAuthorize: false,
       getSources: async () => [],
       createSpendPermission: async () => null
     };

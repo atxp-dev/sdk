@@ -30,6 +30,7 @@ describe('atxpClient events', () => {
     const account = {
       getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
+      usesAccountsAuthorize: false,
       getSources: vi.fn().mockResolvedValue([]),
       createSpendPermission: vi.fn().mockResolvedValue(null)
     };
@@ -71,6 +72,7 @@ describe('atxpClient events', () => {
     const account = {
       getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
+      usesAccountsAuthorize: false,
       getSources: vi.fn().mockResolvedValue([]),
       createSpendPermission: vi.fn().mockResolvedValue(null)
     };
@@ -116,6 +118,7 @@ describe('atxpClient events', () => {
     const account = {
       getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
+      usesAccountsAuthorize: false,
       getSources: vi.fn().mockResolvedValue([]),
       createSpendPermission: vi.fn().mockResolvedValue(null)
     };
@@ -163,6 +166,7 @@ describe('atxpClient events', () => {
     const account = {
       getAccountId: vi.fn().mockResolvedValue('bdj'),
       paymentMakers: [paymentMaker],
+      usesAccountsAuthorize: false,
       getSources: vi.fn().mockResolvedValue([]),
       createSpendPermission: vi.fn().mockResolvedValue(null)
     };
