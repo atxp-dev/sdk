@@ -38,7 +38,9 @@ interface X402Challenge {
 }
 
 function isX402Challenge(obj: unknown): obj is X402Challenge {
-  return typeof obj === 'object' && obj !== null;
+  if (typeof obj !== 'object' || obj === null) return false;
+  const candidate = obj as Record<string, unknown>;
+  return typeof candidate.x402Version !== 'undefined' && Array.isArray(candidate.accepts);
 }
 
 /**
@@ -196,7 +198,10 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         }
       }
 
-      // Create the X402 payment payload using the @x402/evm library
+      // Create the X402 payment payload using the @x402/evm library.
+      // TODO: This x402 client bootstrap (scheme + client + httpClient + createPaymentPayload +
+      // encodePaymentSignatureHeader) is duplicated in baseAccount.ts. Extract a shared helper
+      // once both packages can import from a common location that depends on @x402/core + @x402/evm.
       log.debug('Creating X402 payment payload with signer');
       const evmSigner = toClientEvmSigner(signer);
       const scheme = new ExactEvmScheme(evmSigner);
@@ -208,7 +213,7 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const paymentRequired = {
-        x402Version: 2,
+        x402Version: paymentChallenge.x402Version,
         accepts: [selectedPaymentRequirements],
         resource: { url: typeof input === 'string' ? input : input.toString() },
       };
@@ -216,7 +221,7 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const paymentPayload = await httpClient.createPaymentPayload(paymentRequired as any);
       const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
-      const paymentHeader = paymentHeaders['X-PAYMENT'] || paymentHeaders['x-payment'] || '';
+      const paymentHeader = paymentHeaders['PAYMENT-SIGNATURE'] || paymentHeaders['X-PAYMENT'] || paymentHeaders['x-payment'] || '';
 
       // Add the payment header and retry the request, preserving ALL original headers
       // This is crucial to maintain Accept and other headers

@@ -1,5 +1,5 @@
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
-import { PAYMENT_REQUIRED_PREAMBLE, AuthorizationServerUrl } from "@atxp/common";
+import { PAYMENT_REQUIRED_PREAMBLE, AuthorizationServerUrl, USDC_ADDRESSES, CAIP2_NETWORKS } from "@atxp/common";
 import { MPP_ERROR_CODE } from "@atxp/mpp";
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
@@ -23,20 +23,6 @@ export function buildX402Requirements(args: {
     X402_NETWORKS.has(o.network) && o.address.startsWith('0x')
   );
 
-  // CAIP-2 network identifiers required by the CDP facilitator.
-  // Source: https://docs.cdp.coinbase.com/x402/network-support
-  const CAIP2_NETWORKS: Record<string, string> = {
-    base: 'eip155:8453',
-    base_sepolia: 'eip155:84532',
-  };
-
-  // USDC contract addresses per network.
-  // Source: https://developers.circle.com/stablecoins/usdc-on-main-networks
-  const USDC_ASSETS: Record<string, string> = {
-    base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    base_sepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-  };
-
   const accepts: X402PaymentOption[] = chainOptions.map(option => ({
     scheme: 'exact',
     network: CAIP2_NETWORKS[option.network] || option.network,
@@ -46,9 +32,9 @@ export function buildX402Requirements(args: {
     mimeType: 'application/json',
     payTo: option.address,
     maxTimeoutSeconds: 300,
-    asset: USDC_ASSETS[option.network] || USDC_ASSETS['base'],
-    // EIP-712 domain parameters required by x402 v2 ExactEvmScheme for
-    // EIP-3009 transferWithAuthorization typed data signing.
+    asset: USDC_ADDRESSES[option.network] || USDC_ADDRESSES['base'],
+    // EIP-712 domain for Circle's USDC v2 contract (EIP-3009 transferWithAuthorization).
+    // If Circle changes the domain name/version in a future contract upgrade, this must be updated.
     extra: { name: 'USD Coin', version: '2' },
   }));
 

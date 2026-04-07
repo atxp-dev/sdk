@@ -28,7 +28,7 @@ vi.mock('@x402/core/client', () => {
     resource: { url: 'https://example.com/api' },
   });
   const mockEncodePaymentSignatureHeader = vi.fn().mockReturnValue({
-    'X-PAYMENT': 'mocked-payment-header',
+    'PAYMENT-SIGNATURE': 'mocked-payment-header',
   });
 
   class MockX402Client {
@@ -412,7 +412,11 @@ describe('wrapWithX402', () => {
   });
 
   it('should handle no suitable payment option', async () => {
-    // X402 challenge with empty accepts array
+    // X402 challenge with empty accepts array.
+    // NOTE: The inline selector always picks accepts[0] regardless of scheme,
+    // so the only way to get "no option" is an empty array. If we add a
+    // smarter selector that filters by supported scheme, this test should
+    // use accepts with an unsupported scheme instead.
     const x402Challenge = {
       x402Version: 2,
       accepts: [],

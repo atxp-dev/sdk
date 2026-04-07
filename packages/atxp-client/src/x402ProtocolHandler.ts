@@ -3,14 +3,7 @@ import type { ProspectivePayment } from './types.js';
 import { ATXPPaymentError } from './errors.js';
 import { BigNumber } from 'bignumber.js';
 import { buildPaymentHeaders } from './paymentHeaders.js';
-/** USDC contract addresses by network, used to enrich X402 payment requirements.
- * Source: https://developers.circle.com/stablecoins/usdc-on-main-networks */
-const USDC_ADDRESSES: Record<string, string> = {
-  'base': '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  'base_sepolia': '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-  'eip155:8453': '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  'eip155:84532': '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-};
+import { USDC_ADDRESSES } from '@atxp/common';
 
 /**
  * Type guard for X402 challenge body (supports v1 and v2).
@@ -45,13 +38,6 @@ function selectPaymentRequirements(
   preferredScheme = 'exact',
 ): X402ChallengeAccept | undefined {
   return accepts.find(a => a.scheme === preferredScheme) ?? accepts[0];
-}
-
-/**
- * Get the amount (in atomic units) from a payment requirement.
- */
-function getAtomicAmount(req: X402ChallengeAccept): number {
-  return Number(req.amount);
 }
 
 function isX402Challenge(obj: unknown): obj is X402Challenge {
@@ -118,7 +104,7 @@ export class X402ProtocolHandler implements ProtocolHandler {
         return this.reconstructResponse(responseBody, response);
       }
 
-      const amountInUsdc = getAtomicAmount(selectedPaymentRequirements) / (10 ** 6);
+      const amountInUsdc = Number(selectedPaymentRequirements.amount) / (10 ** 6);
       const network = selectedPaymentRequirements.network;
       logger.debug(`X402: payment required: ${amountInUsdc} USDC on ${network} to ${selectedPaymentRequirements.payTo}`);
 
@@ -203,7 +189,7 @@ export class X402ProtocolHandler implements ProtocolHandler {
 
       if (isX402Challenge(paymentChallenge) && paymentChallenge.accepts[0]) {
         const firstOption = paymentChallenge.accepts[0];
-        const amount = getAtomicAmount(firstOption) / (10 ** 6);
+        const amount = Number(firstOption.amount) / (10 ** 6);
         const url = typeof originalRequest.url === 'string' ? originalRequest.url : originalRequest.url.toString();
         const accountId = await account.getAccountId();
         const errorNetwork = firstOption.network || 'unknown';

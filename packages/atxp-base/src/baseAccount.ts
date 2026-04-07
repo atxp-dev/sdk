@@ -92,6 +92,9 @@ export class BaseAccount implements Account {
         const reqs = params.paymentRequirements as Record<string, unknown>;
         const x402Version = (reqs.x402Version as number) || 2;
 
+        // TODO: This x402 client bootstrap (scheme + client + httpClient + createPaymentPayload +
+        // encodePaymentSignatureHeader) is duplicated in x402Wrapper.ts. Extract a shared helper
+        // once both packages can import from a common location that depends on @x402/core + @x402/evm.
         const signer = toClientEvmSigner(this.getLocalAccount());
         const scheme = new ExactEvmScheme(signer);
         const client = new x402Client();
@@ -110,7 +113,7 @@ export class BaseAccount implements Account {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const paymentPayload = await httpClient.createPaymentPayload(paymentRequired as any);
         const headers = httpClient.encodePaymentSignatureHeader(paymentPayload);
-        const paymentHeader = headers['X-PAYMENT'] || headers['x-payment'] || '';
+        const paymentHeader = headers['PAYMENT-SIGNATURE'] || headers['X-PAYMENT'] || headers['x-payment'] || '';
         return { protocol, credential: paymentHeader };
       }
       case 'atxp': {

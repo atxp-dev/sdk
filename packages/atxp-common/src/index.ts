@@ -84,6 +84,9 @@ export {
   extractNetworkFromAccountId
 } from './types.js';
 
+// Constants (USDC addresses, CAIP-2 network IDs)
+export { USDC_ADDRESSES, CAIP2_NETWORKS } from './constants.js';
+
 // Utility functions
 export {
   assertNever,

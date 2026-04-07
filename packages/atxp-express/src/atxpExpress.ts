@@ -81,7 +81,7 @@ export function atxpExpress(args: ATXPArgs): Router {
           // doesn't contain the user's identity, but the OAuth token does. The settle
           // must use the same sourceAccountId as the charge (atxpAccountId() = OAuth sub)
           // so the ledger entries match.
-          const sourceAccountId = resolveIdentitySync(config, req, detected.protocol, detected.credential) ?? user ?? undefined;
+          const sourceAccountId = resolveIdentitySync(config, req, detected.protocol, detected.credential) || user || undefined;
           setDetectedCredential({
             protocol: detected.protocol,
             credential: detected.credential,
