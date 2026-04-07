@@ -6,7 +6,7 @@ declare module 'x402/client' {
     network: string;
     scheme: string;
     payTo: string;
-    maxAmountRequired: string | number;
+    amount: string | number;
     description?: string;
     [key: string]: unknown;
   }

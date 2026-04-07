@@ -106,7 +106,7 @@ async function buildAuthorizeParams(
       };
       if (chainOption.payTo) params.destination = chainOption.payTo as string;
       if (chainOption.network) params.network = chainOption.network as string;
-      if (chainOption.maxAmountRequired && !params.amount) params.amount = chainOption.maxAmountRequired as string;
+      if (chainOption.amount && !params.amount) params.amount = chainOption.amount as string;
     }
   }
 

@@ -46,6 +46,7 @@ export function atxpExpress(args: ATXPArgs): Router {
       // with full pricing context (amount, options, destination).
       const detected = detectProtocol({
         'x-atxp-payment': req.headers['x-atxp-payment'] as string | undefined,
+        'payment-signature': req.headers['payment-signature'] as string | undefined,
         'x-payment': req.headers['x-payment'] as string | undefined,
         'authorization': req.headers['authorization'] as string | undefined,
       });

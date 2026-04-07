@@ -30,7 +30,7 @@ describe('omniChallenge', () => {
       expect(result.accepts[0]).toMatchObject({
         scheme: 'exact',
         network: 'eip155:8453',
-        maxAmountRequired: '10000', // 0.01 * 1e6
+        amount: '10000', // 0.01 * 1e6
         resource: 'https://example.com/api',
         description: 'Test Server',
         mimeType: 'application/json',

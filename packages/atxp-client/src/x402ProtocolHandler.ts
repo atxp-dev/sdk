@@ -19,9 +19,7 @@ interface X402ChallengeAccept {
   network: string;
   scheme: string;
   payTo: string;
-  /** v1: maxAmountRequired, v2: amount */
-  maxAmountRequired?: string | number;
-  amount?: string | number;
+  amount: string | number;
   description?: string;
   asset?: string;
   mimeType?: string;
@@ -50,12 +48,10 @@ function selectPaymentRequirements(
 }
 
 /**
- * Get the amount (in atomic units) from a payment requirement,
- * handling both v1 (maxAmountRequired) and v2 (amount) field names.
+ * Get the amount (in atomic units) from a payment requirement.
  */
 function getAtomicAmount(req: X402ChallengeAccept): number {
-  const raw = req.amount ?? req.maxAmountRequired;
-  return raw !== undefined ? Number(raw) : 0;
+  return Number(req.amount);
 }
 
 function isX402Challenge(obj: unknown): obj is X402Challenge {
