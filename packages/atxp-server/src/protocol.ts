@@ -219,7 +219,9 @@ export class ProtocolSettlement {
 
       // paymentRequirements from context may be a full X402PaymentRequirements object
       // ({x402Version, accepts: [...]}) from buildX402Requirements. Auth expects a single
-      // requirement object. Extract the first accept if it's the full format.
+      // requirement object. We extract the first accept because the server currently has
+      // one Base address for X402 — multi-option selection would require correlating the
+      // credential back to the specific accept option the client chose.
       let requirements = context?.paymentRequirements;
       if (requirements && typeof requirements === 'object' && 'accepts' in (requirements as Record<string, unknown>)) {
         const x402Reqs = requirements as { accepts?: unknown[] };

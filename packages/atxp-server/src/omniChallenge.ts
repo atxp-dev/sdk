@@ -30,6 +30,11 @@ export function buildX402Requirements(args: {
     base_sepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
   };
 
+  // Note on testnet: network is normalized to 'base' for the X402 spec field, but the
+  // asset address uses the original option.network (e.g. 'base_sepolia') to select the
+  // correct USDC contract. On testnet this means network='base' with a sepolia USDC
+  // address — the X402 facilitator uses the asset contract address as source of truth
+  // for chain resolution, not the network name.
   const accepts: X402PaymentOption[] = chainOptions.map(option => ({
     scheme: 'exact',
     network: option.network === 'base' || option.network === 'base_sepolia' ? 'base' : option.network,

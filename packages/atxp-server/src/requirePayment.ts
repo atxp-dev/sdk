@@ -1,9 +1,10 @@
 import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAccountId, Network, AuthorizationServerUrl } from "@atxp/common";
+import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { BigNumber } from "bignumber.js";
 import { getATXPConfig, atxpAccountId, atxpToken, getDetectedCredential } from "./atxpContext.js";
 import { buildX402Requirements, buildMppChallenge, omniChallengeMcpError } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
-import { ProtocolSettlement, type SettlementContext, type X402PaymentRequirements } from "./protocol.js";
+import { ProtocolSettlement, type SettlementContext } from "./protocol.js";
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
   const config = getATXPConfig();
@@ -124,6 +125,10 @@ async function settleDetectedCredential(
   const { protocol, credential, sourceAccountId } = detected;
   config.logger.info(`Settling ${protocol} credential in requirePayment (has pricing context)`);
 
+  // ProtocolSettlement is instantiated per-request. This is intentional — the class
+  // is lightweight (stores config references only, no connections or heavy init).
+  // Caching would require threading persistent state through requirePayment's
+  // stateless call chain, for negligible benefit.
   const settlement = new ProtocolSettlement(
     config.server,
     config.logger,
@@ -172,9 +177,12 @@ async function settleDetectedCredential(
     config.logger.info(`${protocol} settlement succeeded: txHash=${result.txHash}, amount=${result.settledAmount}`);
   } catch (error) {
     // Settlement failed — the credential was invalid or the on-chain tx failed.
-    // Don't throw here — let the charge() below fail naturally (ledger wasn't credited).
-    // This gives the caller a proper insufficient_balance error + new challenge.
-    config.logger.warn(`${protocol} settlement failed: ${error instanceof Error ? error.message : String(error)}`);
+    // Throw an explicit error so the client knows its credential was rejected,
+    // rather than silently falling through to charge (which would fail with a
+    // confusing insufficient_balance + new challenge).
+    const reason = error instanceof Error ? error.message : String(error);
+    config.logger.error(`${protocol} settlement failed: ${reason}`);
+    throw new McpError(-32000, `Payment settlement failed for ${protocol}`, { protocol, reason });
   }
 }
 
