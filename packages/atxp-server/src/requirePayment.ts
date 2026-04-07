@@ -164,7 +164,7 @@ async function settleDetectedCredential(
     const x402Requirements = buildX402Requirements({
       options: x402Options,
       resource,
-      payeeName: config.payeeName ?? '',
+      payeeName: config.payeeName,
     });
     if (x402Requirements.accepts.length === 0) {
       config.logger.warn('X402 settle: no compatible payment options after filtering');
