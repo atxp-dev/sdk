@@ -4,7 +4,7 @@ import fetchMock from 'fetch-mock';
 import { mockResourceServer, mockAuthorizationServer } from './clientTestHelpers.js';
 import * as CTH from '@atxp/common/src/commonTestHelpers.js';
 import { ATXPFetcher } from './atxpFetcher.js';
-import { OAuthDb, FetchLike, AuthorizationServerUrl, DEFAULT_AUTHORIZATION_SERVER } from '@atxp/common';
+import { OAuthDb, FetchLike, AuthorizationServerUrl, DEFAULT_AUTHORIZATION_SERVER, AccessToken } from '@atxp/common';
 import { PaymentMaker, ProspectivePayment } from './types.js';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import BigNumber from 'bignumber.js';
@@ -399,5 +399,103 @@ describe('atxpFetcher.fetch payment', () => {
       'LegacyService',    // memo should be payeeName when iss not present
       'bar'               // paymentRequestId
     );
+  });
+});
+
+describe('atxpFetcher protocol handler retry uses OAuth-authenticated fetch', () => {
+  it('should include OAuth Bearer token on ATXPAccountHandler retry requests', async () => {
+    // This test verifies the fix: getProtocolConfig().fetchFn wraps oauthClient.fetch
+    // (not raw fetch), so retries from protocol handlers include the Authorization: Bearer header.
+    //
+    // Flow:
+    // 1. ATXPFetcher.fetch() → oauthClient.fetch() → resource server returns 402
+    // 2. tryProtocolHandlers() → ATXPAccountHandler.handlePaymentChallenge()
+    // 3. account.authorize() returns credential
+    // 4. ATXPAccountHandler retries via config.fetchFn(url, retryInit) → oauthClient.fetch()
+    // 5. oauthClient._doFetch adds Authorization: Bearer from stored token
+    // 6. Retry request has BOTH X-ATXP-PAYMENT and Authorization: Bearer headers
+
+    const f = fetchMock.createInstance();
+    const resourceUrl = 'https://example.com/mcp';
+
+    // Mock the resource server PRM and auth server (needed for OAuthClient initialization)
+    mockResourceServer(f, 'https://example.com', '/mcp', DEFAULT_AUTHORIZATION_SERVER);
+    mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER);
+
+    // First POST: resource server returns 402 with challenge data
+    f.postOnce(resourceUrl, {
+      status: 402,
+      body: {
+        chargeAmount: '0.01',
+        paymentRequestUrl: `${DEFAULT_AUTHORIZATION_SERVER}/payment-request/pr_test`,
+        paymentRequestId: 'pr_test',
+      },
+    });
+    // Second POST: retry after payment authorization succeeds
+    f.postOnce(resourceUrl, {
+      status: 200,
+      body: { content: [{ type: 'text', text: 'paid content' }] },
+    });
+
+    // Create account with usesAccountsAuthorize: true → uses ATXPAccountHandler
+    const authorize = vi.fn().mockResolvedValue({
+      protocol: 'atxp',
+      credential: 'test-payment-credential',
+    });
+    const account: Account = {
+      getAccountId: async () => 'test-user' as any,
+      paymentMakers: [],
+      usesAccountsAuthorize: true,
+      getSources: async () => [],
+      createSpendPermission: async () => null,
+      authorize,
+    };
+
+    // Pre-seed the OAuth DB with an access token so oauthClient._doFetch adds
+    // the Authorization: Bearer header on requests to the resource URL.
+    const db = new MemoryOAuthDb();
+    const storedToken: AccessToken = {
+      accessToken: 'oauth-bearer-token-123',
+      resourceUrl: 'https://example.com/mcp',
+      expiresAt: Date.now() + 60_000,
+    };
+    await db.saveAccessToken('test-user', 'https://example.com/mcp', storedToken);
+
+    const fetcher = new ATXPFetcher({
+      account,
+      db,
+      destinationMakers: new Map(),
+      fetchFn: f.fetchHandler,
+    });
+
+    const res = await fetcher.fetch(resourceUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(200);
+
+    // Verify authorize was called
+    expect(authorize).toHaveBeenCalledTimes(1);
+
+    // Get all calls to the resource URL
+    const mcpCalls = f.callHistory.callLogs.filter(
+      call => call.url === resourceUrl,
+    );
+    expect(mcpCalls.length).toBe(2);
+
+    const retryCall = mcpCalls[1];
+    // fetch-mock stores headers in args[1].headers (the init object passed to fetch)
+    const retryInit = retryCall.args[1] as RequestInit | undefined;
+    const retryHeaders = new Headers(retryInit?.headers);
+
+    // The retry must include the payment credential header
+    expect(retryHeaders.get('X-ATXP-PAYMENT')).toBe('test-payment-credential');
+
+    // CRITICAL: The retry must ALSO include the OAuth Bearer token.
+    // This is the bug that was fixed — previously getProtocolConfig().fetchFn used raw fetch
+    // instead of oauthClient.fetch, so the Bearer token was missing on retries.
+    expect(retryHeaders.get('Authorization')).toBe('Bearer oauth-bearer-token-123');
   });
 });
