@@ -638,12 +638,18 @@ export class ATXPFetcher {
 
   /**
    * Build protocol config for passing to protocol handlers.
+   * Uses the OAuth-authenticated fetch so retries include the Bearer token.
+   * This is essential for MCP where the server needs both the payment credential
+   * header (X-PAYMENT, X-ATXP-PAYMENT, etc.) AND the OAuth Bearer token.
    */
   protected getProtocolConfig(): ProtocolConfig {
     return {
       account: this.account,
       logger: this.logger,
-      fetchFn: this.safeFetchFn,
+      fetchFn: async (url: string | URL, init?: RequestInit) => {
+        const oauthClient = await this.getOAuthClient();
+        return oauthClient.fetch(url, init);
+      },
       approvePayment: this.approvePayment,
       onPayment: this.onPayment,
       onPaymentFailure: this.onPaymentFailure
