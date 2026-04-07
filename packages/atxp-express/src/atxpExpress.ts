@@ -87,7 +87,7 @@ export function atxpExpress(args: ATXPArgs): Router {
             credential: detected.credential,
             sourceAccountId,
           });
-          logger.info(`Stored ${detected.protocol} credential in context for requirePayment`, { sourceAccountId });
+          logger.info(`Stored ${detected.protocol} credential in context for requirePayment (sourceAccountId=${sourceAccountId})`);
         }
         return next();
       });
