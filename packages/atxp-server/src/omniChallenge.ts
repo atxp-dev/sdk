@@ -16,28 +16,30 @@ export function buildX402Requirements(args: {
   resource: string;
   payeeName: string;
 }): X402PaymentRequirements {
-  // Filter to X402-compatible options only: real chain addresses on networks with Permit2 support.
-  // X402 uses Coinbase's facilitator which currently supports base (and base_sepolia).
-  // Exclude: ATXP account IDs, Solana (non-EVM), Tempo/World/Polygon (no Permit2 facilitator).
+  // Filter to X402-compatible options only: real chain addresses on networks with
+  // EIP-3009 (transferWithAuthorization) support via the Coinbase CDP facilitator.
   const X402_NETWORKS = new Set(['base', 'base_sepolia']);
   const chainOptions = args.options.filter(o =>
     X402_NETWORKS.has(o.network) && o.address.startsWith('0x')
   );
-  // USDC contract addresses per network (for X402 asset field).
+
+  // CAIP-2 network identifiers required by the CDP facilitator.
+  // Source: https://docs.cdp.coinbase.com/x402/network-support
+  const CAIP2_NETWORKS: Record<string, string> = {
+    base: 'eip155:8453',
+    base_sepolia: 'eip155:84532',
+  };
+
+  // USDC contract addresses per network.
   // Source: https://developers.circle.com/stablecoins/usdc-on-main-networks
   const USDC_ASSETS: Record<string, string> = {
     base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
     base_sepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
   };
 
-  // Note on testnet: network is normalized to 'base' for the X402 spec field, but the
-  // asset address uses the original option.network (e.g. 'base_sepolia') to select the
-  // correct USDC contract. On testnet this means network='base' with a sepolia USDC
-  // address — the X402 facilitator uses the asset contract address as source of truth
-  // for chain resolution, not the network name.
   const accepts: X402PaymentOption[] = chainOptions.map(option => ({
     scheme: 'exact',
-    network: option.network === 'base' || option.network === 'base_sepolia' ? 'base' : option.network,
+    network: CAIP2_NETWORKS[option.network] || option.network,
     maxAmountRequired: option.amount.times(1e6).toFixed(0),
     resource: args.resource,
     description: args.payeeName,
@@ -48,7 +50,7 @@ export function buildX402Requirements(args: {
   }));
 
   return {
-    x402Version: 1,
+    x402Version: 2,
     accepts,
   };
 }

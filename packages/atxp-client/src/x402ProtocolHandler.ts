@@ -3,27 +3,59 @@ import type { ProspectivePayment } from './types.js';
 import { ATXPPaymentError } from './errors.js';
 import { BigNumber } from 'bignumber.js';
 import { buildPaymentHeaders } from './paymentHeaders.js';
-import { selectPaymentRequirements } from 'x402/client';
-
 /** USDC contract addresses by network, used to enrich X402 payment requirements.
  * Source: https://developers.circle.com/stablecoins/usdc-on-main-networks */
 const USDC_ADDRESSES: Record<string, string> = {
-  base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  base_sepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+  'base': '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  'base_sepolia': '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+  'eip155:8453': '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  'eip155:84532': '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
 };
 
 /**
- * Type guard for X402 challenge body.
+ * Type guard for X402 challenge body (supports v1 and v2).
  */
+interface X402ChallengeAccept {
+  network: string;
+  scheme: string;
+  payTo: string;
+  /** v1: maxAmountRequired, v2: amount */
+  maxAmountRequired?: string | number;
+  amount?: string | number;
+  description?: string;
+  asset?: string;
+  mimeType?: string;
+  maxTimeoutSeconds?: number;
+  extra?: Record<string, unknown>;
+}
+
 interface X402Challenge {
   x402Version: number;
-  accepts: Array<{
-    network: string;
-    scheme: string;
-    payTo: string;
-    maxAmountRequired: string | number;
-    description?: string;
-  }>;
+  accepts: X402ChallengeAccept[];
+  /** v2 adds resource info and extensions */
+  resource?: { url: string; description?: string; mimeType?: string };
+  extensions?: Record<string, unknown>;
+}
+
+/**
+ * Select the first payment requirement matching the 'exact' scheme.
+ * Replaces the old `selectPaymentRequirements` from x402 v1.
+ */
+function selectPaymentRequirements(
+  accepts: X402ChallengeAccept[],
+  _preferredNetwork?: string,
+  preferredScheme = 'exact',
+): X402ChallengeAccept | undefined {
+  return accepts.find(a => a.scheme === preferredScheme) ?? accepts[0];
+}
+
+/**
+ * Get the amount (in atomic units) from a payment requirement,
+ * handling both v1 (maxAmountRequired) and v2 (amount) field names.
+ */
+function getAtomicAmount(req: X402ChallengeAccept): number {
+  const raw = req.amount ?? req.maxAmountRequired;
+  return raw !== undefined ? Number(raw) : 0;
 }
 
 function isX402Challenge(obj: unknown): obj is X402Challenge {
@@ -90,7 +122,7 @@ export class X402ProtocolHandler implements ProtocolHandler {
         return this.reconstructResponse(responseBody, response);
       }
 
-      const amountInUsdc = Number(selectedPaymentRequirements.maxAmountRequired) / (10 ** 6);
+      const amountInUsdc = getAtomicAmount(selectedPaymentRequirements) / (10 ** 6);
       const network = selectedPaymentRequirements.network;
       logger.debug(`X402: payment required: ${amountInUsdc} USDC on ${network} to ${selectedPaymentRequirements.payTo}`);
 
@@ -124,7 +156,8 @@ export class X402ProtocolHandler implements ProtocolHandler {
       // for accounts that sign locally (e.g., BaseAccount).
       const enrichedRequirements = {
         ...selectedPaymentRequirements,
-        asset: selectedPaymentRequirements.asset || USDC_ADDRESSES[network] || USDC_ADDRESSES['base'],
+        x402Version: paymentChallenge.x402Version,
+        asset: selectedPaymentRequirements.asset || USDC_ADDRESSES[network] || USDC_ADDRESSES['eip155:8453'],
         mimeType: selectedPaymentRequirements.mimeType || 'application/json',
       };
 
@@ -174,7 +207,7 @@ export class X402ProtocolHandler implements ProtocolHandler {
 
       if (isX402Challenge(paymentChallenge) && paymentChallenge.accepts[0]) {
         const firstOption = paymentChallenge.accepts[0];
-        const amount = firstOption.maxAmountRequired ? Number(firstOption.maxAmountRequired) / (10 ** 6) : 0;
+        const amount = getAtomicAmount(firstOption) / (10 ** 6);
         const url = typeof originalRequest.url === 'string' ? originalRequest.url : originalRequest.url.toString();
         const accountId = await account.getAccountId();
         const errorNetwork = firstOption.network || 'unknown';

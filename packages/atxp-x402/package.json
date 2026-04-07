@@ -36,9 +36,10 @@
     "@atxp/base": "0.10.13",
     "@atxp/client": "0.10.13",
     "@atxp/common": "0.10.13",
+    "@x402/core": "^2.9.0",
+    "@x402/evm": "^2.9.0",
     "bignumber.js": "^9.1.2",
-    "viem": "^2.21.54",
-    "x402": "^1.1.0"
+    "viem": "^2.21.54"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
