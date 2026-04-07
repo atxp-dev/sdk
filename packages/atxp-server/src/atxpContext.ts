@@ -1,14 +1,27 @@
-import { TokenData, AccountId } from "@atxp/common";
+import { TokenData, AccountId, type PaymentProtocol } from "@atxp/common";
 import { ATXPConfig, TokenCheck } from "./types.js";
 import { AsyncLocalStorage } from "async_hooks";
 
 const contextStorage = new AsyncLocalStorage<ATXPContext | null>();
+
+/**
+ * Payment credential detected by the middleware from request headers.
+ * Stored in context so requirePayment can settle it with full pricing context.
+ */
+export type DetectedCredential = {
+  protocol: PaymentProtocol;
+  credential: string;
+  /** User identity resolved from OAuth token or credential source */
+  sourceAccountId?: string;
+};
 
 type ATXPContext = {
   token: string | null;
   tokenData: TokenData | null;
   config: ATXPConfig;
   resource: URL;
+  /** Payment credential from retry request (X-PAYMENT, X-ATXP-PAYMENT, etc.) */
+  detectedCredential?: DetectedCredential;
 }
 
 export function getATXPConfig(): ATXPConfig | null {
@@ -31,6 +44,25 @@ export function atxpAccountId(): AccountId | null {
 export function atxpToken(): string | null {
   const context = contextStorage.getStore();
   return context?.token ?? null;
+}
+
+/**
+ * Get the payment credential detected by middleware on this request.
+ * Returns null if this is not a retry with a payment credential.
+ */
+export function getDetectedCredential(): DetectedCredential | null {
+  const context = contextStorage.getStore();
+  return context?.detectedCredential ?? null;
+}
+
+/**
+ * Store a payment credential in the ATXP context (called by middleware).
+ */
+export function setDetectedCredential(credential: DetectedCredential): void {
+  const context = contextStorage.getStore();
+  if (context) {
+    context.detectedCredential = credential;
+  }
 }
 
 // Helper function to run code within a user context

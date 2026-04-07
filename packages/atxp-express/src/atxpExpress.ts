@@ -12,34 +12,14 @@ import {
   sendProtectedResourceMetadataNode,
   sendOAuthMetadataNode,
   detectProtocol,
-  ProtocolSettlement,
+  setDetectedCredential,
   type PaymentProtocol,
   type ATXPConfig,
-  type SettlementContext,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
   const config = buildServerConfig(args);
   const router = Router();
-
-  // Lazy-init ProtocolSettlement with destinationAccountId (requires async resolution).
-  // Cache the promise (not the result) to avoid a race where concurrent requests
-  // both see _settlement === null and kick off parallel getAccountId() calls.
-  let _settlementPromise: Promise<ProtocolSettlement> | null = null;
-  async function getSettlement(): Promise<ProtocolSettlement> {
-    if (!_settlementPromise) {
-      _settlementPromise = (async () => {
-        let destinationAccountId: string | undefined;
-        try {
-          destinationAccountId = await config.destination.getAccountId();
-        } catch {
-          config.logger.warn('Could not resolve destinationAccountId for ProtocolSettlement');
-        }
-        return new ProtocolSettlement(config.server, config.logger, fetch.bind(globalThis), destinationAccountId);
-      })();
-    }
-    return _settlementPromise;
-  }
 
   const atxpMiddleware = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -61,35 +41,19 @@ export function atxpExpress(args: ATXPArgs): Router {
       const mcpRequests = await parseMcpRequestsNode(config, requestUrl, req, req.body);
       logger.debug(`${mcpRequests.length} MCP requests found in request`);
 
-      // Detect payment credentials BEFORE the MCP/non-MCP branch.
-      // This allows X402/MPP/ATXP credentials to work on both MCP and non-MCP requests.
+      // Detect payment credentials from request headers.
+      // The credential is stored in ATXP context for requirePayment() to settle
+      // with full pricing context (amount, options, destination).
       const detected = detectProtocol({
         'x-atxp-payment': req.headers['x-atxp-payment'] as string | undefined,
         'x-payment': req.headers['x-payment'] as string | undefined,
         'authorization': req.headers['authorization'] as string | undefined,
       });
 
-      if (detected) {
-        // Settle at request start: validate → credit ledger → proceed
-        const settlement = await getSettlement();
-        const settled = await settleAtRequestStart(config, settlement, req, res, detected.protocol, detected.credential);
-        if (!settled) return; // settle returned an error response
-
-        if (mcpRequests.length > 0) {
-          // MCP request with credential: run MCP handler (requirePayment will charge from credited ledger)
-          logger.debug('Request started with protocol credential - MCP flow');
-          const tokenCheck = await checkTokenNode(config, resource, req);
-          if (sendOAuthChallenge(res, tokenCheck)) return;
-          return withATXPContext(config, resource, tokenCheck, next);
-        } else {
-          // Non-MCP request with credential: just proceed
-          next();
-          return;
-        }
-      }
-
-      // No credential detected — normal flow
       if (mcpRequests.length === 0) {
+        // Non-MCP request with credential: for REST APIs, the route handler
+        // is responsible for checking payment (not requirePayment).
+        // TODO: Support settle-in-handler for non-MCP REST APIs.
         next();
         return;
       }
@@ -106,7 +70,21 @@ export function atxpExpress(args: ATXPArgs): Router {
         return;
       }
 
-      return withATXPContext(config, resource, tokenCheck, next);
+      // Set up ATXP context, then store detected credential if present.
+      // requirePayment() will find it via getDetectedCredential() and settle
+      // before charging, using the pricing context it has (amount, options).
+      return withATXPContext(config, resource, tokenCheck, () => {
+        if (detected) {
+          const sourceAccountId = resolveIdentitySync(config, req, detected.protocol, detected.credential);
+          setDetectedCredential({
+            protocol: detected.protocol,
+            credential: detected.credential,
+            sourceAccountId,
+          });
+          logger.info(`Stored ${detected.protocol} credential in context for requirePayment`);
+        }
+        return next();
+      });
     } catch (error) {
       config.logger.error(`Critical error in atxp middleware - returning HTTP 500. Error: ${error instanceof Error ? error.message : String(error)}`);
       config.logger.debug(JSON.stringify(error, null, 2));
@@ -119,36 +97,31 @@ export function atxpExpress(args: ATXPArgs): Router {
 }
 
 /**
- * Resolve the user's identity from the request.
+ * Synchronous identity resolution from request headers/credential.
  *
  * Priority:
- * 1. OAuth Bearer token → extract `sub` claim (preferred)
- * 2. Wallet address from payment credential (fallback for non-OAuth clients)
+ * 1. ATXP credential sourceAccountId
+ * 2. MPP credential source DID
+ * 3. X402: not available until after settlement
  */
-async function resolveIdentity(
+function resolveIdentitySync(
   config: ATXPConfig,
   req: Request,
   protocol: PaymentProtocol,
   credential: string,
-): Promise<string | undefined> {
-  const logger = config.logger;
-
-  // Try OAuth Bearer token first (works when Authorization header isn't used by the payment protocol)
-  const authHeader = req.headers['authorization'];
-  if (authHeader?.startsWith('Bearer ')) {
+): string | undefined {
+  if (protocol === 'atxp') {
     try {
-      const resource = getResource(config, new URL(req.url, req.protocol + '://' + req.host), req.headers);
-      const tokenCheck = await checkTokenNode(config, resource, req);
-      if (tokenCheck.data?.sub) {
-        logger.debug(`Resolved identity from OAuth token: ${tokenCheck.data.sub}`);
-        return tokenCheck.data.sub;
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
+      } catch {
+        parsed = JSON.parse(credential);
       }
-    } catch (error) {
-      logger.warn(`Failed to resolve identity from OAuth token, falling back to credential: ${error instanceof Error ? error.message : String(error)}`);
-    }
+      if (parsed.sourceAccountId) return parsed.sourceAccountId as string;
+    } catch { /* not parseable */ }
   }
 
-  // Fallback: extract identity from the MPP credential's source field
   if (protocol === 'mpp') {
     try {
       let parsed: Record<string, unknown>;
@@ -164,89 +137,11 @@ async function resolveIdentity(
         const address = parts[4];
         if (chainId && address) {
           const network = chainId === '4217' ? 'tempo' : chainId === '42431' ? 'tempo_moderato' : `eip155:${chainId}`;
-          const identity = `${network}:${address}`;
-          logger.debug(`Resolved identity from MPP credential source DID: ${identity}`);
-          return identity;
+          return `${network}:${address}`;
         }
       }
-    } catch {
-      // Not parseable — no identity
-    }
-  }
-
-  // ATXP: identity comes from the credential's sourceAccountId field
-  if (protocol === 'atxp') {
-    try {
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
-      } catch {
-        parsed = JSON.parse(credential);
-      }
-      if (parsed.sourceAccountId) {
-        logger.debug(`Resolved identity from ATXP credential: ${parsed.sourceAccountId}`);
-        return parsed.sourceAccountId as string;
-      }
-    } catch {
-      // Not parseable
-    }
+    } catch { /* not parseable */ }
   }
 
   return undefined;
-}
-
-/**
- * Settle a payment credential at the START of a request.
- *
- * Calls auth /settle/{protocol} which:
- * 1. Validates the credential
- * 2. Credits the local balance ledger immediately
- * 3. Fires on-chain settlement async
- *
- * After this returns true, the ledger has been credited and requirePayment()
- * will be able to charge from it.
- *
- * Returns true if settlement succeeded (request should continue),
- * false if it failed (error response already sent).
- *
- * NOTE: Settle-at-start means the payment is committed before the MCP handler runs.
- * If the MCP handler fails after settlement, the user paid for nothing.
- * This is the inverse of the old settle-on-finish problem (user gets resource for free
- * if settlement fails). Settle-at-start is preferred because:
- * 1. Pre-signed credentials (X402 Permit2, MPP signed tx) will settle regardless
- * 2. The ledger credit is for future requests too, not just this one
- * 3. A refund mechanism can be added later; preventing free resource access is harder
- */
-async function settleAtRequestStart(
-  config: ATXPConfig,
-  settlement: ProtocolSettlement,
-  req: Request,
-  res: Response,
-  protocol: PaymentProtocol,
-  credential: string,
-): Promise<boolean> {
-  const logger = config.logger;
-  logger.info(`Settling ${protocol} credential at request start`);
-
-  const sourceAccountId = await resolveIdentity(config, req, protocol, credential);
-  if (sourceAccountId) {
-    logger.debug(`Resolved identity for ${protocol} settlement: ${sourceAccountId}`);
-  }
-
-  const context: SettlementContext = {
-    ...(sourceAccountId && { sourceAccountId }),
-  };
-
-  try {
-    const result = await settlement.settle(protocol, credential, context);
-    logger.info(`${protocol} settle-at-start succeeded: txHash=${result.txHash}, amount=${result.settledAmount}`);
-    return true;
-  } catch (error) {
-    logger.warn(`${protocol} settle-at-start failed: ${error instanceof Error ? error.message : String(error)}`);
-    res.status(402).json({
-      error: 'settlement_failed',
-      error_description: `${protocol} credential settlement failed`,
-    });
-    return false;
-  }
 }

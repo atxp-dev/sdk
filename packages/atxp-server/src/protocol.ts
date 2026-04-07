@@ -43,6 +43,7 @@ export type X402PaymentOption = {
   mimeType?: string;
   payTo: string;
   maxTimeoutSeconds?: number;
+  asset?: string;
   extra?: Record<string, unknown>;
 };
 
@@ -215,9 +216,21 @@ export class ProtocolSettlement {
         // If not valid base64 JSON, pass as-is (auth will validate)
         payload = { raw: credential };
       }
+
+      // paymentRequirements from context may be a full X402PaymentRequirements object
+      // ({x402Version, accepts: [...]}) from buildX402Requirements. Auth expects a single
+      // requirement object. We extract the first accept because the server currently has
+      // one Base address for X402 — multi-option selection would require correlating the
+      // credential back to the specific accept option the client chose.
+      let requirements = context?.paymentRequirements;
+      if (requirements && typeof requirements === 'object' && 'accepts' in (requirements as Record<string, unknown>)) {
+        const x402Reqs = requirements as { accepts?: unknown[] };
+        requirements = x402Reqs.accepts?.[0] ?? requirements;
+      }
+
       return {
         payload,
-        paymentRequirements: context?.paymentRequirements,
+        paymentRequirements: requirements,
         ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
         ...(this.destinationAccountId && { destinationAccountId: this.destinationAccountId }),
       };

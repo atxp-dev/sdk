@@ -1,30 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { atxpExpress } from './atxpExpress.js';
 import * as TH from '@atxp/server/serverTestHelpers';
+import { getDetectedCredential, type DetectedCredential } from '@atxp/server';
 import express from 'express';
 import request from 'supertest';
 
-// Mock global fetch for ProtocolSettlement calls
+// Mock global fetch — middleware no longer calls settle, so fetch should not be called
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-describe('settle-at-start Express middleware', () => {
+describe('credential detection Express middleware', () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
   });
 
-  describe('credential detected → settle at request start', () => {
-    it('should settle X402 credential before the handler runs', async () => {
+  describe('credential detected → stored in context, handler proceeds', () => {
+    it('should proceed to handler without settling for X402 credential', async () => {
       const callOrder: string[] = [];
 
-      mockFetch.mockImplementation(async (url: string | URL) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/settle/x402')) {
-          callOrder.push('settle');
-          return { ok: true, json: async () => ({ txHash: '0xabc', settledAmount: '10000' }) };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
+      // fetch should NOT be called — middleware no longer settles
+      mockFetch.mockImplementation(async () => {
+        throw new Error('fetch should not be called — middleware does not settle');
       });
 
       const router = atxpExpress(TH.config({
@@ -45,11 +42,11 @@ describe('settle-at-start Express middleware', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ data: 'protected resource' });
-      // settle happened before handler
-      expect(callOrder).toEqual(['settle', 'handler']);
+      // handler runs, no settle
+      expect(callOrder).toEqual(['handler']);
     });
 
-    it('should settle MPP credential before the handler runs', async () => {
+    it('should proceed to handler without settling for MPP credential', async () => {
       const callOrder: string[] = [];
 
       const mppCredential = {
@@ -59,13 +56,8 @@ describe('settle-at-start Express middleware', () => {
       };
       const encodedCredential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
 
-      mockFetch.mockImplementation(async (url: string | URL) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/settle/mpp')) {
-          callOrder.push('settle');
-          return { ok: true, json: async () => ({ txHash: '0xmpp', settledAmount: '10000' }) };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
+      mockFetch.mockImplementation(async () => {
+        throw new Error('fetch should not be called — middleware does not settle');
       });
 
       const router = atxpExpress(TH.config({
@@ -85,10 +77,10 @@ describe('settle-at-start Express middleware', () => {
         .set('Authorization', `Payment ${encodedCredential}`);
 
       expect(response.status).toBe(200);
-      expect(callOrder).toEqual(['settle', 'handler']);
+      expect(callOrder).toEqual(['handler']);
     });
 
-    it('should settle ATXP credential before the handler runs', async () => {
+    it('should proceed to handler without settling for ATXP credential', async () => {
       const callOrder: string[] = [];
 
       const atxpCredential = JSON.stringify({
@@ -96,13 +88,8 @@ describe('settle-at-start Express middleware', () => {
         sourceAccountToken: 'tok_abc',
       });
 
-      mockFetch.mockImplementation(async (url: string | URL) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/settle/atxp')) {
-          callOrder.push('settle');
-          return { ok: true, json: async () => ({ txHash: 'atxp_tx', settledAmount: '5000' }) };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
+      mockFetch.mockImplementation(async () => {
+        throw new Error('fetch should not be called — middleware does not settle');
       });
 
       const router = atxpExpress(TH.config({
@@ -122,20 +109,16 @@ describe('settle-at-start Express middleware', () => {
         .set('X-ATXP-PAYMENT', atxpCredential);
 
       expect(response.status).toBe(200);
-      expect(callOrder).toEqual(['settle', 'handler']);
+      expect(callOrder).toEqual(['handler']);
     });
   });
 
-  describe('settlement failure → 402 and handler does not run', () => {
-    it('should return 402 when X402 settlement fails', async () => {
+  describe('credential present → handler proceeds (no 402 from middleware)', () => {
+    it('should return 200 even with a bad X402 credential', async () => {
       let handlerCalled = false;
 
-      mockFetch.mockImplementation(async (url: string | URL) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/settle/x402')) {
-          return { ok: false, status: 400, text: async () => 'Settlement failed' };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
+      mockFetch.mockImplementation(async () => {
+        throw new Error('fetch should not be called — middleware does not settle');
       });
 
       const router = atxpExpress(TH.config({
@@ -147,27 +130,22 @@ describe('settle-at-start Express middleware', () => {
       app.use(router);
       app.get('/resource', (_req, res) => {
         handlerCalled = true;
-        res.json({ data: 'should not reach' });
+        res.json({ data: 'handler reached' });
       });
 
       const response = await request(app)
         .get('/resource')
         .set('X-PAYMENT', 'bad-x402-credential');
 
-      expect(response.status).toBe(402);
-      expect(response.body.error).toBe('settlement_failed');
-      expect(handlerCalled).toBe(false);
+      expect(response.status).toBe(200);
+      expect(handlerCalled).toBe(true);
     });
 
-    it('should return 402 when MPP settlement fails', async () => {
+    it('should return 200 even with a bad MPP credential', async () => {
       let handlerCalled = false;
 
-      mockFetch.mockImplementation(async (url: string | URL) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/settle/mpp')) {
-          return { ok: false, status: 400, text: async () => 'MPP settlement failed' };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
+      mockFetch.mockImplementation(async () => {
+        throw new Error('fetch should not be called — middleware does not settle');
       });
 
       const router = atxpExpress(TH.config({
@@ -188,9 +166,8 @@ describe('settle-at-start Express middleware', () => {
         .get('/resource')
         .set('Authorization', `Payment ${mppCredential}`);
 
-      expect(response.status).toBe(402);
-      expect(response.body.error).toBe('settlement_failed');
-      expect(handlerCalled).toBe(false);
+      expect(response.status).toBe(200);
+      expect(handlerCalled).toBe(true);
     });
   });
 
@@ -252,18 +229,14 @@ describe('settle-at-start Express middleware', () => {
     });
   });
 
-  describe('identity resolution for settlement', () => {
-    it('should resolve identity from MPP credential and pass sourceAccountId to settle', async () => {
-      let settleBody: Record<string, unknown> = {};
-
-      mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/settle/mpp')) {
-          if (init?.body) settleBody = JSON.parse(init.body as string);
-          return { ok: true, json: async () => ({ txHash: '0xmpp', settledAmount: '1.00' }) };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
-      });
+  describe('identity resolution from credential (MCP requests)', () => {
+    it('should store MPP credential with sourceAccountId resolved from DID', async () => {
+      // MPP uses Authorization: Payment which conflicts with OAuth Bearer on
+      // MCP requests. For non-MCP requests the middleware detects the credential
+      // but doesn't enter withATXPContext (no ATXP context to store into).
+      // requirePayment() handles this at charge time for MCP. Here we verify the
+      // middleware detects MPP and the handler proceeds without error.
+      let storedCredential: DetectedCredential | null = null;
 
       const mppCredential = {
         challenge: { id: 'ch_123', method: 'tempo', intent: 'charge', request: { amount: '10000' } },
@@ -279,27 +252,24 @@ describe('settle-at-start Express middleware', () => {
       const app = express();
       app.use(express.json());
       app.use(router);
-      app.get('/resource', (_req, res) => res.json({ ok: true }));
+      app.get('/resource', (_req, res) => {
+        storedCredential = getDetectedCredential();
+        res.json({ ok: true });
+      });
 
       const response = await request(app)
         .get('/resource')
         .set('Authorization', `Payment ${encodedCredential}`);
 
       expect(response.status).toBe(200);
-      expect(settleBody.sourceAccountId).toBe('tempo:0xWalletAddr');
+      // Non-MCP path: no ATXP context, so credential is not stored.
+      // The middleware detected it (detectProtocol returns mpp), but
+      // setDetectedCredential only runs inside withATXPContext (MCP path).
+      expect(storedCredential).toBeNull();
     });
 
-    it('should resolve identity from ATXP raw JSON credential', async () => {
-      let settleBody: Record<string, unknown> = {};
-
-      mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/settle/atxp')) {
-          if (init?.body) settleBody = JSON.parse(init.body as string);
-          return { ok: true, json: async () => ({ txHash: 'atxp_tx', settledAmount: '5000' }) };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
-      });
+    it('should store ATXP credential with sourceAccountId from raw JSON', async () => {
+      let storedCredential: DetectedCredential | null = null;
 
       // Raw JSON (not base64-encoded)
       const atxpCredential = JSON.stringify({
@@ -314,27 +284,26 @@ describe('settle-at-start Express middleware', () => {
       const app = express();
       app.use(express.json());
       app.use(router);
-      app.get('/resource', (_req, res) => res.json({ ok: true }));
+      app.post('/', (req, res) => {
+        storedCredential = getDetectedCredential();
+        res.json({ ok: true });
+      });
 
       const response = await request(app)
-        .get('/resource')
-        .set('X-ATXP-PAYMENT', atxpCredential);
+        .post('/')
+        .set('Content-Type', 'application/json')
+        .set('X-ATXP-PAYMENT', atxpCredential)
+        .set('Authorization', 'Bearer test-token')
+        .send(TH.mcpToolRequest());
 
       expect(response.status).toBe(200);
-      expect(settleBody.sourceAccountId).toBe('atxp_acct_raw123');
+      expect(storedCredential).not.toBeNull();
+      expect(storedCredential!.protocol).toBe('atxp');
+      expect(storedCredential!.sourceAccountId).toBe('atxp_acct_raw123');
     });
 
-    it('should resolve identity from ATXP base64-encoded credential', async () => {
-      let settleBody: Record<string, unknown> = {};
-
-      mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
-        const urlStr = url.toString();
-        if (urlStr.includes('/settle/atxp')) {
-          if (init?.body) settleBody = JSON.parse(init.body as string);
-          return { ok: true, json: async () => ({ txHash: 'atxp_tx', settledAmount: '5000' }) };
-        }
-        return { ok: false, status: 404, text: async () => 'Not found' };
-      });
+    it('should store ATXP credential with sourceAccountId from base64-encoded JSON', async () => {
+      let storedCredential: DetectedCredential | null = null;
 
       // Base64-encoded JSON
       const atxpCredential = Buffer.from(JSON.stringify({
@@ -349,14 +318,22 @@ describe('settle-at-start Express middleware', () => {
       const app = express();
       app.use(express.json());
       app.use(router);
-      app.get('/resource', (_req, res) => res.json({ ok: true }));
+      app.post('/', (req, res) => {
+        storedCredential = getDetectedCredential();
+        res.json({ ok: true });
+      });
 
       const response = await request(app)
-        .get('/resource')
-        .set('X-ATXP-PAYMENT', atxpCredential);
+        .post('/')
+        .set('Content-Type', 'application/json')
+        .set('X-ATXP-PAYMENT', atxpCredential)
+        .set('Authorization', 'Bearer test-token')
+        .send(TH.mcpToolRequest());
 
       expect(response.status).toBe(200);
-      expect(settleBody.sourceAccountId).toBe('atxp_acct_b64_456');
+      expect(storedCredential).not.toBeNull();
+      expect(storedCredential!.protocol).toBe('atxp');
+      expect(storedCredential!.sourceAccountId).toBe('atxp_acct_b64_456');
     });
   });
 });
