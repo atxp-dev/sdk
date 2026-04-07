@@ -41,42 +41,43 @@ function isDestinationsApiResponse(obj: unknown): obj is DestinationsApiResponse
   );
 }
 
-function parseDestinationsResponse(data: unknown): Destination[] {
+function parseDestinationsResponse(data: unknown, logger?: Logger): Destination[] {
   // Validate response structure
   if (!isDestinationsApiResponse(data)) {
     throw new Error('Invalid response: expected object with destinations array and paymentRequestId');
   }
 
-  // Validate and convert each destination
-  return data.destinations.map((dest, index) => {
+  // Validate and convert each destination, skipping unrecognized chains/currencies
+  // so that server-side additions don't break older SDK versions.
+  return data.destinations.flatMap((dest, index) => {
     if (!isDestinationResponse(dest)) {
       throw new Error(`Invalid destination at index ${index}: missing required fields (chain, address, currency, amount)`);
     }
-    
-    // Validate chain is a valid Chain enum value
+
+    // Skip unrecognized chains — the server may support newer chains than this SDK version
     if (!isEnumValue(ChainEnum, dest.chain)) {
-      const validChains = Object.values(ChainEnum).join(', ');
-      throw new Error(`Invalid destination at index ${index}: chain "${dest.chain}" is not a valid chain. Valid chains are: ${validChains}`);
+      logger?.warn(`Skipping destination at index ${index}: unrecognized chain "${dest.chain}"`);
+      return [];
     }
-    
-    // Validate currency is a valid Currency enum value
+
+    // Skip unrecognized currencies
     if (!isEnumValue(CurrencyEnum, dest.currency)) {
-      const validCurrencies = Object.values(CurrencyEnum).join(', ');
-      throw new Error(`Invalid destination at index ${index}: currency "${dest.currency}" is not a valid currency. Valid currencies are: ${validCurrencies}`);
+      logger?.warn(`Skipping destination at index ${index}: unrecognized currency "${dest.currency}"`);
+      return [];
     }
-    
+
     // Validate amount is a valid number
     const amount = new BigNumber(dest.amount);
     if (amount.isNaN()) {
       throw new Error(`Invalid destination at index ${index}: amount "${dest.amount}" is not a valid number`);
     }
-    
-    return {
+
+    return [{
       chain: dest.chain as Chain,
       currency: dest.currency as Currency,
       address: dest.address,
       amount: amount
-    };
+    }];
   });
 }
 
@@ -154,7 +155,7 @@ export class ATXPDestinationMaker implements DestinationMaker {
 
       const data = await response.json();
       
-      return parseDestinationsResponse(data);
+      return parseDestinationsResponse(data, logger);
     } catch (error) {
       logger?.error(`ATXPDestinationMaker: Error fetching destinations: ${error}`);
       throw error;
