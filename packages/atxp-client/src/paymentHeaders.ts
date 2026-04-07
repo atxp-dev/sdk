@@ -29,7 +29,7 @@ export function buildPaymentHeaders(result: AuthorizeResult, originalHeaders?: H
       headers.set('Authorization', `Payment ${result.credential}`);
       break;
     case 'atxp':
-      // ATXP uses the existing OAuth flow, not a payment header
+      headers.set('X-ATXP-PAYMENT', result.credential);
       break;
   }
 

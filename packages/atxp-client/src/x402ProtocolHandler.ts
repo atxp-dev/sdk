@@ -3,6 +3,13 @@ import type { ProspectivePayment } from './types.js';
 import { ATXPPaymentError } from './errors.js';
 import { BigNumber } from 'bignumber.js';
 import { buildPaymentHeaders } from './paymentHeaders.js';
+import { selectPaymentRequirements } from 'x402/client';
+
+/** USDC contract addresses by network, used to enrich X402 payment requirements. */
+const USDC_ADDRESSES: Record<string, string> = {
+  base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  base_sepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+};
 
 /**
  * Type guard for X402 challenge body.
@@ -71,8 +78,6 @@ export class X402ProtocolHandler implements ProtocolHandler {
     }
 
     try {
-      const { selectPaymentRequirements } = await import('x402/client');
-
       const selectedPaymentRequirements = selectPaymentRequirements(
         paymentChallenge.accepts,
         undefined,
@@ -114,13 +119,21 @@ export class X402ProtocolHandler implements ProtocolHandler {
         return this.reconstructResponse(responseBody, response);
       }
 
+      // Ensure the payment requirement has asset (USDC contract address) and mimeType
+      // for accounts that sign locally (e.g., BaseAccount).
+      const enrichedRequirements = {
+        ...selectedPaymentRequirements,
+        asset: selectedPaymentRequirements.asset || USDC_ADDRESSES[network] || USDC_ADDRESSES['base'],
+        mimeType: selectedPaymentRequirements.mimeType || 'application/json',
+      };
+
       // Authorize via account.authorize() — ATXPAccount calls the accounts
       // service, BaseAccount signs locally. No fallback — each account type
       // handles authorization according to its capabilities.
       const authorizeResult = await account.authorize({
         protocols: ['x402'],
         destination: url,
-        paymentRequirements: selectedPaymentRequirements,
+        paymentRequirements: enrichedRequirements,
       });
       const paymentHeader = authorizeResult.credential;
 

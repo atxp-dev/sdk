@@ -5,6 +5,7 @@ import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
 import { BasePaymentMaker } from './basePaymentMaker.js';
 import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
 import { base } from 'viem/chains';
+import { createPaymentHeader } from 'x402/client';
 
 export class BaseAccount implements Account {
   private _accountId: AccountId;
@@ -83,7 +84,6 @@ export class BaseAccount implements Account {
 
     switch (protocol) {
       case 'x402': {
-        const { createPaymentHeader } = await import('x402/client');
         if (!params.paymentRequirements) {
           throw new Error('BaseAccount: x402 authorize requires paymentRequirements');
         }

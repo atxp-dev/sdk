@@ -100,19 +100,23 @@ export type SettleResult = {
  * Detect the payment protocol from inbound credentials on a retry request.
  *
  * Detects:
- * - X402 via `X-PAYMENT` header (highest priority)
+ * - ATXP via `X-ATXP-PAYMENT` header
+ * - X402 via `X-PAYMENT` header
  * - MPP via `Authorization: Payment <credential>` header
- *
- * Does NOT detect ATXP-MCP — those payments flow through the MCP token
- * check + requirePayment() path, not HTTP header detection. Bearer JWTs
- * in non-MCP requests are OAuth access tokens, not payment credentials.
  *
  * Returns null if no payment credential is detected.
  */
 export function detectProtocol(headers: {
+  'x-atxp-payment'?: string;
   'x-payment'?: string;
   'authorization'?: string;
 }): CredentialDetection | null {
+  // X-ATXP-PAYMENT header indicates ATXP protocol (pull mode credential)
+  const atxpPayment = headers['x-atxp-payment'];
+  if (atxpPayment) {
+    return { protocol: 'atxp', credential: atxpPayment };
+  }
+
   // X-PAYMENT header indicates X402 protocol
   const xPayment = headers['x-payment'];
   if (xPayment) {
@@ -215,6 +219,7 @@ export class ProtocolSettlement {
         payload,
         paymentRequirements: context?.paymentRequirements,
         ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
+        ...(this.destinationAccountId && { destinationAccountId: this.destinationAccountId }),
       };
     }
 
@@ -232,6 +237,7 @@ export class ProtocolSettlement {
       return {
         credential: parsedCredential,
         ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
+        ...(this.destinationAccountId && { destinationAccountId: this.destinationAccountId }),
       };
     }
 

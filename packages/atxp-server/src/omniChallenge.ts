@@ -16,7 +16,14 @@ export function buildX402Requirements(args: {
   resource: string;
   payeeName: string;
 }): X402PaymentRequirements {
-  const accepts: X402PaymentOption[] = args.options.map(option => ({
+  // Filter to X402-compatible options only: real chain addresses on networks with Permit2 support.
+  // X402 uses Coinbase's facilitator which currently supports base (and base_sepolia).
+  // Exclude: ATXP account IDs, Solana (non-EVM), Tempo/World/Polygon (no Permit2 facilitator).
+  const X402_NETWORKS = new Set(['base', 'base_sepolia']);
+  const chainOptions = args.options.filter(o =>
+    X402_NETWORKS.has(o.network) && o.address.startsWith('0x')
+  );
+  const accepts: X402PaymentOption[] = chainOptions.map(option => ({
     scheme: 'exact',
     // X402 spec normalizes testnet networks to their mainnet names in challenges.
     // base_sepolia → base so the client knows which chain family to use.
