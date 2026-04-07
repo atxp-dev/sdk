@@ -3,13 +3,50 @@ import { wrapWithX402 } from './x402Wrapper.js';
 import { ATXPAccount, ATXPLocalAccount } from '@atxp/client';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 
-vi.mock('x402/client', () => ({
-  createPaymentHeader: vi.fn().mockResolvedValue('mocked-payment-header'),
-  selectPaymentRequirements: vi.fn((accepts, network) => {
-    // Return the first accept that matches the network, or null
-    return accepts.find((a: any) => a.network === network) || null;
-  })
-}));
+// Mock @x402/evm to avoid actual EVM signing
+vi.mock('@x402/evm', () => {
+  class MockExactEvmScheme {
+    scheme = 'exact';
+    createPaymentPayload = vi.fn().mockResolvedValue({
+      payload: { signature: '0xmocked' },
+    });
+  }
+  return {
+    toClientEvmSigner: vi.fn((signer: any) => signer),
+    ExactEvmScheme: MockExactEvmScheme,
+  };
+});
+
+// Mock @x402/core/client to avoid real x402 client logic
+vi.mock('@x402/core/client', () => {
+  const mockCreatePaymentPayload = vi.fn().mockResolvedValue({
+    x402Version: 1,
+    scheme: 'exact',
+    network: 'base',
+    payload: { signature: '0xmocked' },
+    accepted: { scheme: 'exact', network: 'base', payTo: '0xrecipient', amount: '1000000', asset: '0x', maxTimeoutSeconds: 60, extra: {} },
+    resource: { url: 'https://example.com/api' },
+  });
+  const mockEncodePaymentSignatureHeader = vi.fn().mockReturnValue({
+    'X-PAYMENT': 'mocked-payment-header',
+  });
+
+  class MockX402Client {
+    register = vi.fn().mockReturnThis();
+    registerV1 = vi.fn().mockReturnThis();
+  }
+
+  class MockX402HTTPClient {
+    createPaymentPayload = mockCreatePaymentPayload;
+    encodePaymentSignatureHeader = mockEncodePaymentSignatureHeader;
+    constructor(_client: any) {}
+  }
+
+  return {
+    x402Client: MockX402Client,
+    x402HTTPClient: MockX402HTTPClient,
+  };
+});
 
 // Mock ATXPLocalAccount.create while preserving actual exports like ATXPPaymentError
 vi.mock('@atxp/client', async (importOriginal) => {
@@ -376,22 +413,10 @@ describe('wrapWithX402', () => {
   });
 
   it('should handle no suitable payment option', async () => {
-    // Mock selectPaymentRequirements to return null for unsupported network
-    const { selectPaymentRequirements } = await import('x402/client');
-    (selectPaymentRequirements as Mock).mockReturnValueOnce(null);
-
-    // X402 challenge with unsupported network
+    // X402 challenge with empty accepts array
     const x402Challenge = {
       x402Version: 1,
-      accepts: [
-        {
-          network: 'ethereum',  // Not base
-          scheme: 'exact',
-          payTo: '0xrecipient',
-          maxAmountRequired: '1000000',
-          description: 'Test payment',
-        },
-      ],
+      accepts: [],
     };
 
     const response402 = new Response(JSON.stringify(x402Challenge), {
