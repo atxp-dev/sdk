@@ -302,6 +302,37 @@ describe('credential detection Express middleware', () => {
       expect(storedCredential!.sourceAccountId).toBe('atxp_acct_raw123');
     });
 
+    it('should store X402 credential with sourceAccountId from OAuth sub (fallback)', async () => {
+      let storedCredential: DetectedCredential | null = null;
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'atxp:atxp_acct_x402user' }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', (_req, res) => {
+        storedCredential = getDetectedCredential();
+        res.json({ ok: true });
+      });
+
+      const response = await request(app)
+        .post('/')
+        .set('Content-Type', 'application/json')
+        .set('X-PAYMENT', 'x402-payment-credential')
+        .set('Authorization', 'Bearer test-token')
+        .send(TH.mcpToolRequest());
+
+      expect(response.status).toBe(200);
+      expect(storedCredential).not.toBeNull();
+      expect(storedCredential!.protocol).toBe('x402');
+      // X402 credentials don't contain identity, so sourceAccountId falls back
+      // to the OAuth sub. This ensures the settle credits the same account that
+      // the charge deducts from (atxpAccountId() = OAuth sub).
+      expect(storedCredential!.sourceAccountId).toBe('atxp:atxp_acct_x402user');
+    });
+
     it('should store ATXP credential with sourceAccountId from base64-encoded JSON', async () => {
       let storedCredential: DetectedCredential | null = null;
 
