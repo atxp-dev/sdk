@@ -388,6 +388,6 @@ export class ATXPAccount implements Account {
       credential = responseBody.credential;
     }
 
-    return { protocol, credential, ...(responseBody.context && { context: responseBody.context }) };
+    return { protocol, credential, context: responseBody.context };
   }
 }

@@ -151,7 +151,7 @@ export class ProtocolSettlement {
    * Verify a payment credential at request start.
    * Calls auth `/verify/{protocol}` to check if the credential is valid.
    *
-   * For X402: sends { payload, paymentRequirements } (credential is the X-PAYMENT header).
+   * For X402: sends { payload, paymentRequirements } (credential is the PAYMENT-SIGNATURE / X-PAYMENT header).
    * For ATXP: sends { sourceAccountId, destinationAccountId, sourceAccountToken, options }.
    */
   async verify(protocol: PaymentProtocol, credential: string, context?: SettlementContext): Promise<VerifyResult> {
