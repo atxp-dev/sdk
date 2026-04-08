@@ -367,7 +367,7 @@ export class ATXPAccount implements Account {
       );
     }
 
-    const responseBody = await response.json() as { protocol: string; credential: string };
+    const responseBody = await response.json() as { protocol: string; credential: string; context?: Record<string, unknown> };
 
     if (!responseBody || typeof responseBody.protocol !== 'string' || typeof responseBody.credential !== 'string') {
       throw new AuthorizationError(
@@ -388,6 +388,6 @@ export class ATXPAccount implements Account {
       credential = responseBody.credential;
     }
 
-    return { protocol, credential };
+    return { protocol, credential, ...(responseBody.context && { context: responseBody.context }) };
   }
 }

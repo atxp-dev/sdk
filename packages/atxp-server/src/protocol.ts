@@ -209,7 +209,8 @@ export class ProtocolSettlement {
   private buildRequestBody(protocol: PaymentProtocol, credential: string, context?: SettlementContext): unknown {
     if (protocol === 'x402') {
       // X402: auth expects { payload, paymentRequirements }
-      // The credential is the base64-encoded X-PAYMENT header containing the payload
+      // The credential is the base64-encoded PAYMENT-SIGNATURE header containing the payload.
+      // paymentRequirements come from context (MCP server: from pricing config; LLM: from authorize response).
       let payload: unknown;
       try {
         payload = JSON.parse(Buffer.from(credential, 'base64').toString());
