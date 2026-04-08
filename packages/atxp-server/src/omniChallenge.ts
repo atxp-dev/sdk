@@ -249,3 +249,89 @@ export function buildOmniChallenge(args: {
     ...(mpp && { mpp }),
   };
 }
+
+/**
+ * Convert destination sources (from /account/:id/sources) to the internal
+ * options format used by buildX402Requirements and buildMppChallenges.
+ */
+export function sourcesToOptions(
+  sources: Array<{ chain: string; address: string }>,
+  amount: BigNumber,
+  currency = 'USDC',
+): Array<{ network: string; currency: string; address: string; amount: BigNumber }> {
+  return sources.map(s => ({
+    network: s.chain,
+    currency,
+    address: s.address,
+    amount,
+  }));
+}
+
+/**
+ * Build protocol-specific payment data from destination sources.
+ *
+ * This is the single source of truth for "given chain addresses + amount,
+ * what do the protocol challenges look like?" Used by:
+ * - requirePayment() → builds omni-challenge MCP error / HTTP 402
+ * - LLM / any server-side caller → builds authorize params
+ */
+export function buildPaymentOptions(args: {
+  amount: BigNumber;
+  sources: Array<{ chain: string; address: string }>;
+  resource?: string;
+  payeeName?: string;
+  /** Challenge ID for MPP (auto-generated if not provided) */
+  challengeId?: string;
+}): {
+  x402: X402PaymentRequirements;
+  mpp: MppChallengeData[] | null;
+  /** Internal options format (for callers that need it) */
+  options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
+} {
+  const options = sourcesToOptions(args.sources, args.amount);
+  const challengeId = args.challengeId ?? `pay-${Date.now()}`;
+
+  return {
+    x402: buildX402Requirements({
+      options,
+      resource: args.resource ?? '',
+      payeeName: args.payeeName ?? '',
+    }),
+    mpp: buildMppChallenges({ id: challengeId, options }),
+    options,
+  };
+}
+
+/**
+ * Build authorize params from destination sources.
+ *
+ * Returns the protocol-specific fields that should be spread into
+ * account.authorize() — X402 paymentRequirements + MPP challenges.
+ * The caller provides these alongside { protocols, amount, destination, memo }.
+ *
+ * This is the server-side equivalent of what the SDK client's
+ * ATXPAccountHandler extracts from an MCP omni-challenge. Use it when
+ * the caller acts as its own server (e.g., LLM batch settlement).
+ */
+export function buildAuthorizeParamsFromSources(args: {
+  amount: BigNumber;
+  sources: Array<{ chain: string; address: string }>;
+  resource?: string;
+  payeeName?: string;
+  challengeId?: string;
+}): {
+  /** X402: single payment requirement (first Base option). Matches what
+   *  ATXPAccountHandler extracts from the omni-challenge accepts array. */
+  paymentRequirements?: X402PaymentOption;
+  /** MPP challenges array (for /authorize/mpp) */
+  challenges: MppChallengeData[];
+} {
+  const payment = buildPaymentOptions(args);
+  // Extract the first X402 accept — /authorize/x402 expects a single
+  // requirement object, not the full { x402Version, accepts } wrapper.
+  const firstX402 = payment.x402.accepts[0] ?? undefined;
+  return {
+    ...(firstX402 && { paymentRequirements: firstX402 }),
+    challenges: payment.mpp ?? [],
+  };
+}

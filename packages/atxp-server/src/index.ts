@@ -105,6 +105,9 @@ export {
   omniChallengeMcpError,
   omniChallengeHttpResponse,
   buildOmniChallenge,
+  sourcesToOptions,
+  buildPaymentOptions,
+  buildAuthorizeParamsFromSources,
 } from './omniChallenge.js';
 
 // Re-export ATXP Account implementations from @atxp/common
