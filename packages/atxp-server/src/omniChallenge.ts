@@ -289,7 +289,7 @@ export function buildPaymentOptions(args: {
   options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
 } {
   const options = sourcesToOptions(args.sources, args.amount);
-  const challengeId = args.challengeId ?? `pay-${Date.now()}`;
+  const challengeId = args.challengeId ?? `pay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   return {
     x402: buildX402Requirements({

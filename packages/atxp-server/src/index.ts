@@ -110,6 +110,12 @@ export {
   buildAuthorizeParamsFromSources,
 } from './omniChallenge.js';
 
+// Opaque identity for MPP Authorization: Payment ↔ OAuth Bearer coexistence
+export {
+  signOpaqueIdentity,
+  verifyOpaqueIdentity,
+} from './opaqueIdentity.js';
+
 // Re-export ATXP Account implementations from @atxp/common
 export {
   ATXPAccount

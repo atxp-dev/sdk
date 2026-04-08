@@ -15,6 +15,8 @@ import {
   setDetectedCredential,
   type PaymentProtocol,
   type ATXPConfig,
+  type TokenCheck,
+  verifyOpaqueIdentity,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
@@ -48,7 +50,6 @@ export function atxpExpress(args: ATXPArgs): Router {
         'x-atxp-payment': req.headers['x-atxp-payment'] as string | undefined,
         'payment-signature': req.headers['payment-signature'] as string | undefined,
         'x-payment': req.headers['x-payment'] as string | undefined,
-        'x-mpp-payment': req.headers['x-mpp-payment'] as string | undefined,
         'authorization': req.headers['authorization'] as string | undefined,
       });
 
@@ -61,14 +62,40 @@ export function atxpExpress(args: ATXPArgs): Router {
       }
 
       logger.debug(`Request started - ${req.method} ${req.path}`);
-      const tokenCheck = await checkTokenNode(config, resource, req);
-      const user = tokenCheck.data?.sub ?? null;
+      let tokenCheck: TokenCheck = await checkTokenNode(config, resource, req);
+      let user = tokenCheck.data?.sub ?? null;
+
+      // When Authorization: Payment replaces Authorization: Bearer (MPP retry),
+      // the OAuth token check fails. Recover identity from the credential's
+      // opaque field (signed by the server at challenge time).
+      if (detected && detected.protocol === 'mpp' && !tokenCheck.passes) {
+        try {
+          let parsed: Record<string, unknown>;
+          try { parsed = JSON.parse(Buffer.from(detected.credential, 'base64').toString()); }
+          catch { parsed = JSON.parse(detected.credential); }
+          const challenge = parsed.challenge as Record<string, unknown> | undefined;
+          const opaque = challenge?.opaque as Record<string, unknown> | undefined;
+          const challengeId = challenge?.id as string | undefined;
+          if (opaque && challengeId) {
+            const recoveredSub = verifyOpaqueIdentity(opaque, challengeId);
+            if (recoveredSub) {
+              logger.info(`Recovered identity from MPP opaque: ${recoveredSub}`);
+              user = recoveredSub;
+              // Synthesize a passing tokenCheck so withATXPContext sets the user
+              tokenCheck = { passes: true, data: { sub: recoveredSub }, token: null } as unknown as TokenCheck;
+            }
+          }
+        } catch { /* credential not parseable — fall through to OAuth challenge */ }
+      }
 
       res.on('finish', async () => {
         logger.debug(`Request finished ${user ? `for user ${user} ` : ''}- ${req.method} ${req.path}`);
       });
 
-      if (sendOAuthChallenge(res, tokenCheck)) {
+      // Skip OAuth challenge when a payment credential is detected (the identity
+      // was recovered from opaque above, or the credential is from an external
+      // MPP client which proceeds anonymously).
+      if (!detected && sendOAuthChallenge(res, tokenCheck)) {
         return;
       }
 

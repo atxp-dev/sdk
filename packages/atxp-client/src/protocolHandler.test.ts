@@ -555,10 +555,10 @@ describe('MPPProtocolHandler', () => {
         expect.objectContaining({ protocols: ['mpp'] })
       );
 
-      // Verify retry included X-MPP-Payment header
+      // Verify retry included Authorization: Payment header (standard MPP)
       const retryCall = mockFetch.mock.calls[0];
       const retryHeaders = retryCall[1].headers as Headers;
-      expect(retryHeaders.get('X-MPP-Payment')).toBe('mpp-credential-base64');
+      expect(retryHeaders.get('Authorization')).toBe('Payment mpp-credential-base64');
 
       // Verify onPayment was called
       expect(mockOnPayment).toHaveBeenCalled();

@@ -15,6 +15,9 @@ export type MppChallengeData = {
   currency: string;
   network: string;
   recipient: string;
+  /** Server-defined opaque data echoed by clients. Used to carry signed
+   *  identity when Authorization: Payment replaces Authorization: Bearer. */
+  opaque?: Record<string, string>;
 };
 
 /**
@@ -112,7 +115,6 @@ export function detectProtocol(headers: {
   'x-atxp-payment'?: string;
   'payment-signature'?: string;
   'x-payment'?: string;
-  'x-mpp-payment'?: string;
   'authorization'?: string;
 }): CredentialDetection | null {
   // X-ATXP-PAYMENT header indicates ATXP protocol (pull mode credential)
@@ -125,13 +127,6 @@ export function detectProtocol(headers: {
   const paymentSig = headers['payment-signature'] || headers['x-payment'];
   if (paymentSig) {
     return { protocol: 'x402', credential: paymentSig };
-  }
-
-  // X-MPP-Payment header: ATXP-specific MPP credential header, used when
-  // Authorization: Bearer is present (to preserve OAuth identity).
-  const xMppPayment = headers['x-mpp-payment'];
-  if (xMppPayment) {
-    return { protocol: 'mpp', credential: xMppPayment };
   }
 
   // Authorization: Payment <credential> indicates standard MPP protocol

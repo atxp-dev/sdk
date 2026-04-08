@@ -5,6 +5,7 @@ import { getATXPConfig, atxpAccountId, atxpToken, getDetectedCredential } from "
 import { buildPaymentOptions, omniChallengeMcpError } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { ProtocolSettlement, type SettlementContext } from "./protocol.js";
+import { signOpaqueIdentity } from "./opaqueIdentity.js";
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
   const config = getATXPConfig();
@@ -208,6 +209,16 @@ function buildOmniError(
 
   if (payment.x402.accepts.length === 0 && sources.length > 0) {
     config.logger.warn(`buildPaymentOptions filtered all ${sources.length} sources — no X402-compatible networks. X402 clients will not see any payment options.`);
+  }
+
+  // Inject signed identity into MPP challenges' opaque field.
+  // On the retry request, Authorization: Payment replaces Authorization: Bearer,
+  // so the server recovers the user identity from this opaque field instead.
+  const userId = atxpAccountId();
+  if (payment.mpp && userId) {
+    for (const challenge of payment.mpp) {
+      challenge.opaque = signOpaqueIdentity(userId, challenge.id);
+    }
   }
 
   return omniChallengeMcpError(

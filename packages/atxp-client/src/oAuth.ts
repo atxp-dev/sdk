@@ -382,7 +382,12 @@ export class OAuthClient extends OAuthResourceClient {
     if (tokenData) {
       // Create a new Headers object from existing headers (if any)
       const headers = new Headers(requestInit.headers);
-      headers.set('Authorization', `Bearer ${tokenData.accessToken}`);
+      // Don't overwrite Authorization: Payment (MPP credential) with Bearer.
+      // The server recovers OAuth identity from the credential's opaque field.
+      const existing = headers.get('Authorization');
+      if (!existing || !existing.startsWith('Payment ')) {
+        headers.set('Authorization', `Bearer ${tokenData.accessToken}`);
+      }
       requestInit.headers = headers;
     }
     
