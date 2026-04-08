@@ -211,6 +211,9 @@ export interface AuthorizeResult {
   protocol: PaymentProtocol;
   /** Opaque credential string - pass to ProtocolSettlement.settle() */
   credential: string;
+  /** Optional settlement context from authorize (e.g., paymentRequirements for X402).
+   *  Pass to ProtocolSettlement.settle() as the context parameter. */
+  context?: Record<string, unknown>;
 }
 
 /**

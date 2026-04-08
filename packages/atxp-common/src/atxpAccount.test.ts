@@ -300,6 +300,30 @@ describe('ATXPAccount', () => {
 
       expect(result.protocol).toBe('x402');
       expect(result.credential).toBe('x402-header-value');
+      expect(result.context).toBeUndefined();
+    });
+
+    it('should pass through context from authorize response', async () => {
+      const x402Context = { paymentRequirements: { network: 'eip155:8453', amount: '10000', payTo: '0xabc' } };
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ protocol: 'x402', credential: 'x402-header-value', context: x402Context }),
+      });
+
+      const account = new ATXPAccount(
+        'https://accounts.example.com?connection_token=ct_abc123&account_id=atxp_acct_xyz',
+        { fetchFn: mockFetch }
+      );
+
+      const result = await account.authorize({
+        protocols: ['x402'],
+        amount: new BigNumber('1'),
+        destination: 'https://example.com',
+      });
+
+      expect(result.protocol).toBe('x402');
+      expect(result.credential).toBe('x402-header-value');
+      expect(result.context).toEqual(x402Context);
     });
 
     it('should call /authorize/auto and return mpp credential as-is', async () => {

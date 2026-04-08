@@ -151,7 +151,7 @@ export class ProtocolSettlement {
    * Verify a payment credential at request start.
    * Calls auth `/verify/{protocol}` to check if the credential is valid.
    *
-   * For X402: sends { payload, paymentRequirements } (credential is the X-PAYMENT header).
+   * For X402: sends { payload, paymentRequirements } (credential is the PAYMENT-SIGNATURE / X-PAYMENT header).
    * For ATXP: sends { sourceAccountId, destinationAccountId, sourceAccountToken, options }.
    */
   async verify(protocol: PaymentProtocol, credential: string, context?: SettlementContext): Promise<VerifyResult> {
@@ -209,7 +209,8 @@ export class ProtocolSettlement {
   private buildRequestBody(protocol: PaymentProtocol, credential: string, context?: SettlementContext): unknown {
     if (protocol === 'x402') {
       // X402: auth expects { payload, paymentRequirements }
-      // The credential is the base64-encoded X-PAYMENT header containing the payload
+      // The credential is the base64-encoded PAYMENT-SIGNATURE header containing the payload.
+      // paymentRequirements come from context (MCP server: from pricing config; LLM: from authorize response).
       let payload: unknown;
       try {
         payload = JSON.parse(Buffer.from(credential, 'base64').toString());
