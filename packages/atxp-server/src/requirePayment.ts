@@ -2,7 +2,7 @@ import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAc
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { BigNumber } from "bignumber.js";
 import { getATXPConfig, atxpAccountId, atxpToken, getDetectedCredential } from "./atxpContext.js";
-import { buildPaymentOptions, sourcesToOptions, buildX402Requirements, omniChallengeMcpError } from "./omniChallenge.js";
+import { buildPaymentOptions, omniChallengeMcpError } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { ProtocolSettlement, type SettlementContext } from "./protocol.js";
 
