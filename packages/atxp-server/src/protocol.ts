@@ -64,7 +64,8 @@ export type AtxpMcpChallengeData = {
 export type OmniChallenge = {
   atxpMcp: AtxpMcpChallengeData;
   x402: X402PaymentRequirements;
-  mpp?: MppChallengeData;
+  /** MPP challenges — one per supported chain (e.g., Solana + Tempo). */
+  mpp?: MppChallengeData[];
 };
 
 /**
@@ -111,6 +112,7 @@ export function detectProtocol(headers: {
   'x-atxp-payment'?: string;
   'payment-signature'?: string;
   'x-payment'?: string;
+  'x-mpp-payment'?: string;
   'authorization'?: string;
 }): CredentialDetection | null {
   // X-ATXP-PAYMENT header indicates ATXP protocol (pull mode credential)
@@ -125,7 +127,14 @@ export function detectProtocol(headers: {
     return { protocol: 'x402', credential: paymentSig };
   }
 
-  // Authorization: Payment <credential> indicates MPP protocol
+  // X-MPP-Payment header: ATXP-specific MPP credential header, used when
+  // Authorization: Bearer is present (to preserve OAuth identity).
+  const xMppPayment = headers['x-mpp-payment'];
+  if (xMppPayment) {
+    return { protocol: 'mpp', credential: xMppPayment };
+  }
+
+  // Authorization: Payment <credential> indicates standard MPP protocol
   const authHeader = headers['authorization'];
   if (authHeader?.startsWith('Payment ')) {
     return { protocol: 'mpp', credential: authHeader.slice('Payment '.length) };

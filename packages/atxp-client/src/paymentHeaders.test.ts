@@ -11,11 +11,11 @@ describe('buildPaymentHeaders', () => {
     expect(headers.get('Access-Control-Expose-Headers')).toBe('X-PAYMENT-RESPONSE');
   });
 
-  it('mpp: sets Authorization: Payment header', () => {
+  it('mpp: sets X-MPP-Payment header', () => {
     const result: AuthorizeResult = { protocol: 'mpp', credential: 'mpp-token-123' };
     const headers = buildPaymentHeaders(result);
 
-    expect(headers.get('Authorization')).toBe('Payment mpp-token-123');
+    expect(headers.get('X-MPP-Payment')).toBe('mpp-token-123');
   });
 
   it('atxp: does not set payment headers (no-op)', () => {
@@ -44,7 +44,7 @@ describe('buildPaymentHeaders', () => {
 
     expect(headers.get('Content-Type')).toBe('text/plain');
     expect(headers.get('Accept')).toBe('application/json');
-    expect(headers.get('Authorization')).toBe('Payment tok');
+    expect(headers.get('X-MPP-Payment')).toBe('tok');
   });
 
   it('handles undefined original headers', () => {

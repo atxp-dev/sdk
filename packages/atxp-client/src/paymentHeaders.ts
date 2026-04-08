@@ -26,7 +26,11 @@ export function buildPaymentHeaders(result: AuthorizeResult, originalHeaders?: H
       headers.set('Access-Control-Expose-Headers', 'X-PAYMENT-RESPONSE');
       break;
     case 'mpp':
-      headers.set('Authorization', `Payment ${result.credential}`);
+      // Use X-MPP-Payment to carry the credential alongside the OAuth Bearer
+      // token. Standard MPP uses Authorization: Payment, but the ATXP fetch
+      // layer adds Authorization: Bearer for identity — using X-MPP-Payment
+      // prevents the two from conflicting.
+      headers.set('X-MPP-Payment', result.credential);
       break;
     case 'atxp':
       headers.set('X-ATXP-PAYMENT', result.credential);

@@ -100,6 +100,7 @@ export {
   buildX402Requirements,
   buildAtxpMcpChallenge,
   buildMppChallenge,
+  buildMppChallenges,
   serializeMppHeader,
   omniChallengeMcpError,
   omniChallengeHttpResponse,

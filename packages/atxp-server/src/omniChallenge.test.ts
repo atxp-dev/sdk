@@ -239,7 +239,8 @@ describe('omniChallenge', () => {
       );
 
       const data = error.data as any;
-      expect(data.mpp).toEqual(mpp);
+      // data.mpp is now an array (multi-chain support)
+      expect(data.mpp).toEqual([mpp]);
       expect(data.x402).toBeDefined();
       expect(data.paymentRequestId).toBe('pr_mpp');
     });
@@ -343,8 +344,8 @@ describe('omniChallenge', () => {
       });
 
       expect(challenge.mpp).toBeDefined();
-      expect(challenge.mpp!.id).toBe('ch_omni');
-      expect(challenge.mpp!.network).toBe('tempo');
+      expect(challenge.mpp![0].id).toBe('ch_omni');
+      expect(challenge.mpp![0].network).toBe('tempo');
     });
   });
 });

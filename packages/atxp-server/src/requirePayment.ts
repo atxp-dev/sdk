@@ -2,7 +2,7 @@ import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAc
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { BigNumber } from "bignumber.js";
 import { getATXPConfig, atxpAccountId, atxpToken, getDetectedCredential } from "./atxpContext.js";
-import { buildX402Requirements, buildMppChallenge, omniChallengeMcpError } from "./omniChallenge.js";
+import { buildX402Requirements, buildMppChallenges, omniChallengeMcpError } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { ProtocolSettlement, type SettlementContext } from "./protocol.js";
 
@@ -207,13 +207,13 @@ function buildOmniError(
     config.logger.warn(`buildX402Requirements filtered all ${options.length} options — no X402-compatible networks. X402 clients will not see any payment options.`);
   }
 
-  const mppChallenge = buildMppChallenge({ id: paymentId, options });
+  const mppChallenges = buildMppChallenges({ id: paymentId, options });
 
   return omniChallengeMcpError(
     config.server,
     paymentId,
     paymentAmount,
     x402Requirements,
-    mppChallenge,
+    mppChallenges,
   );
 }

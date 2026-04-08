@@ -64,29 +64,14 @@ export function parseMPPHeader(headerValue: string): MPPChallenge | null {
 }
 
 /**
- * Parse MPP challenge from MCP JSON-RPC error data.
+ * Parse a single MPP challenge object (validates required fields).
  */
-export function parseMPPFromMCPError(errorData: unknown): MPPChallenge | null {
-  if (typeof errorData !== 'object' || errorData === null) {
-    return null;
-  }
-
-  const data = errorData as Record<string, unknown>;
-  const mpp = data.mpp;
-
-  if (typeof mpp !== 'object' || mpp === null) {
-    return null;
-  }
-
-  const mppObj = mpp as Record<string, unknown>;
-
-  // Validate all required fields
+function parseMppObject(obj: unknown): MPPChallenge | null {
+  if (typeof obj !== 'object' || obj === null) return null;
+  const mppObj = obj as Record<string, unknown>;
   for (const field of REQUIRED_FIELDS) {
-    if (typeof mppObj[field] !== 'string') {
-      return null;
-    }
+    if (typeof mppObj[field] !== 'string') return null;
   }
-
   return {
     id: mppObj.id as string,
     method: mppObj.method as string,
@@ -96,6 +81,62 @@ export function parseMPPFromMCPError(errorData: unknown): MPPChallenge | null {
     network: mppObj.network as string,
     recipient: mppObj.recipient as string,
   };
+}
+
+/**
+ * Parse MPP challenge from MCP JSON-RPC error data.
+ * Returns the first valid challenge found.
+ * data.mpp can be a single challenge object or an array of challenges.
+ */
+export function parseMPPFromMCPError(errorData: unknown): MPPChallenge | null {
+  const challenges = parseMPPChallengesFromMCPError(errorData);
+  return challenges.length > 0 ? challenges[0] : null;
+}
+
+/**
+ * Parse ALL MPP challenges from MCP JSON-RPC error data.
+ * data.mpp can be a single challenge object or an array of challenges.
+ */
+export function parseMPPChallengesFromMCPError(errorData: unknown): MPPChallenge[] {
+  if (typeof errorData !== 'object' || errorData === null) {
+    return [];
+  }
+
+  const data = errorData as Record<string, unknown>;
+  const mpp = data.mpp;
+  if (!mpp) return [];
+
+  // Array of challenges (multi-chain)
+  if (Array.isArray(mpp)) {
+    const results: MPPChallenge[] = [];
+    for (const item of mpp) {
+      const parsed = parseMppObject(item);
+      if (parsed) results.push(parsed);
+    }
+    return results;
+  }
+
+  // Single challenge (backwards compat)
+  const parsed = parseMppObject(mpp);
+  return parsed ? [parsed] : [];
+}
+
+/**
+ * Parse ALL MPP challenges from a comma-separated WWW-Authenticate header value.
+ * Per RFC 7235 §4.1, multiple challenges can be comma-separated.
+ */
+export function parseMPPHeaders(headerValue: string): MPPChallenge[] {
+  if (!headerValue) return [];
+
+  // Split on 'Payment' to handle multiple challenges:
+  // "Payment method="solana",..., Payment method="tempo",..."
+  const parts = headerValue.split(/,\s*(?=Payment\b)/).filter(Boolean);
+  const results: MPPChallenge[] = [];
+  for (const part of parts) {
+    const parsed = parseMPPHeader(part.trim());
+    if (parsed) results.push(parsed);
+  }
+  return results;
 }
 
 /**

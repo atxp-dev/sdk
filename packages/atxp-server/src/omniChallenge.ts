@@ -4,9 +4,12 @@ import { MPP_ERROR_CODE } from "@atxp/mpp";
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
 
-// pathUSD uses 6 decimals, same as USDC. If a new Tempo stablecoin uses
-// different decimals, this constant and buildMppChallenge need updating.
-const PATHUSD_DECIMALS = 6;
+// USDC and pathUSD both use 6 decimals.
+const STABLECOIN_DECIMALS = 6;
+
+// Solana USDC mint addresses
+const SOLANA_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const SOLANA_USDC_MINT_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 
 /**
  * Build X402 payment requirements from charge options.
@@ -65,25 +68,61 @@ export function buildAtxpMcpChallenge(
 
 /**
  * Build MPP challenge data from charge options.
- * Uses the first Tempo-compatible option (MPP requires Tempo chain).
+ * Returns one challenge per supported chain (Solana and/or Tempo).
  * Returns null if no suitable option is available.
+ *
+ * MPP spec supports multiple payment methods per 402 response:
+ * - HTTP: multiple `WWW-Authenticate: Payment` headers
+ * - MCP: array of challenges in `data.mpp`
+ */
+export function buildMppChallenges(args: {
+  id: string;
+  options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
+}): MppChallengeData[] | null {
+  const challenges: MppChallengeData[] = [];
+
+  // Solana option (USDC on Solana mainnet or devnet)
+  const solanaOption = args.options.find(o => o.network === 'solana' || o.network === 'solana_devnet');
+  if (solanaOption) {
+    const isDevnet = solanaOption.network === 'solana_devnet';
+    challenges.push({
+      id: args.id,
+      method: 'solana',
+      intent: 'charge',
+      amount: solanaOption.amount.times(10 ** STABLECOIN_DECIMALS).toFixed(0),
+      currency: isDevnet ? SOLANA_USDC_MINT_DEVNET : SOLANA_USDC_MINT,
+      network: isDevnet ? 'devnet' : 'mainnet-beta',
+      recipient: solanaOption.address,
+    });
+  }
+
+  // Tempo option (pathUSD on Tempo mainnet or moderato)
+  const tempoOption = args.options.find(o => o.network === 'tempo' || o.network === 'tempo_moderato');
+  if (tempoOption) {
+    challenges.push({
+      id: args.id,
+      method: 'tempo',
+      intent: 'charge',
+      amount: tempoOption.amount.times(10 ** STABLECOIN_DECIMALS).toFixed(0),
+      currency: tempoOption.currency || 'pathUSD',
+      network: tempoOption.network,
+      recipient: tempoOption.address,
+    });
+  }
+
+  return challenges.length > 0 ? challenges : null;
+}
+
+/**
+ * Build a single MPP challenge (backwards compat helper).
+ * @deprecated Use buildMppChallenges for multi-chain support.
  */
 export function buildMppChallenge(args: {
   id: string;
   options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
 }): MppChallengeData | null {
-  const tempoOption = args.options.find(o => o.network === 'tempo' || o.network === 'tempo_moderato');
-  if (!tempoOption) return null;
-
-  return {
-    id: args.id,
-    method: 'tempo',
-    intent: 'charge',
-    amount: tempoOption.amount.times(10 ** PATHUSD_DECIMALS).toFixed(0),
-    currency: tempoOption.currency || 'pathUSD',
-    network: tempoOption.network,
-    recipient: tempoOption.address,
-  };
+  const challenges = buildMppChallenges(args);
+  return challenges?.[0] ?? null;
 }
 
 /**
@@ -109,7 +148,7 @@ export function omniChallengeMcpError(
   paymentRequestId: string,
   chargeAmount: BigNumber | undefined,
   x402Requirements: X402PaymentRequirements,
-  mppChallenge?: MppChallengeData | null,
+  mppChallenges?: MppChallengeData[] | MppChallengeData | null,
 ): McpError {
   const atxpMcp = buildAtxpMcpChallenge(server, paymentRequestId, chargeAmount);
 
@@ -122,9 +161,13 @@ export function omniChallengeMcpError(
     x402: x402Requirements,
   };
 
-  // MPP fields (JSON-RPC error code -32042 with mpp object)
-  if (mppChallenge) {
-    data.mpp = mppChallenge;
+  // MPP fields (JSON-RPC error code -32042 with mpp array)
+  // Normalize single challenge to array for consistency.
+  if (mppChallenges) {
+    const challenges = Array.isArray(mppChallenges) ? mppChallenges : [mppChallenges];
+    if (challenges.length > 0) {
+      data.mpp = challenges;
+    }
   }
 
   const amountText = chargeAmount ? ` You will be charged ${chargeAmount.toString()}.` : '';
@@ -142,13 +185,16 @@ export function omniChallengeMcpError(
  * - status: 402
  * - headers: includes X-ATXP-Payment-Request header with ATXP-MCP data
  * - body: X402 payment requirements JSON
+ *
+ * For multiple MPP challenges, emits multiple WWW-Authenticate headers
+ * (comma-separated per RFC 7235 §4.1).
  */
 export function omniChallengeHttpResponse(
   server: AuthorizationServerUrl,
   paymentRequestId: string,
   chargeAmount: BigNumber | undefined,
   x402Requirements: X402PaymentRequirements,
-  mppChallenge?: MppChallengeData | null,
+  mppChallenges?: MppChallengeData[] | MppChallengeData | null,
 ): {
   status: 402;
   headers: Record<string, string>;
@@ -161,8 +207,12 @@ export function omniChallengeHttpResponse(
     'X-ATXP-Payment-Request': JSON.stringify(atxpMcp),
   };
 
-  if (mppChallenge) {
-    headers['WWW-Authenticate'] = serializeMppHeader(mppChallenge);
+  if (mppChallenges) {
+    const challenges = Array.isArray(mppChallenges) ? mppChallenges : [mppChallenges];
+    if (challenges.length > 0) {
+      // Multiple WWW-Authenticate values are comma-separated per RFC 7235 §4.1
+      headers['WWW-Authenticate'] = challenges.map(c => serializeMppHeader(c)).join(', ');
+    }
   }
 
   return {
@@ -186,7 +236,7 @@ export function buildOmniChallenge(args: {
   mppChallengeId?: string;
 }): OmniChallenge {
   const mpp = args.mppChallengeId
-    ? buildMppChallenge({ id: args.mppChallengeId, options: args.options })
+    ? buildMppChallenges({ id: args.mppChallengeId, options: args.options })
     : null;
 
   return {

@@ -203,8 +203,10 @@ export interface AuthorizeParams {
   memo?: string;
   /** X402: payment requirements from server challenge */
   paymentRequirements?: unknown;
-  /** MPP: challenge object from server */
+  /** MPP: single challenge object from server (backwards compat) */
   challenge?: unknown;
+  /** MPP: array of challenges from multi-chain omni-challenge (preferred) */
+  challenges?: unknown[];
 }
 
 export interface AuthorizeResult {
