@@ -92,6 +92,7 @@ export {
   type VerifyResult,
   type SettleResult,
   detectProtocol,
+  parseCredentialBase64,
   ProtocolSettlement,
 } from './protocol.js';
 
@@ -100,11 +101,21 @@ export {
   buildX402Requirements,
   buildAtxpMcpChallenge,
   buildMppChallenge,
+  buildMppChallenges,
   serializeMppHeader,
   omniChallengeMcpError,
   omniChallengeHttpResponse,
   buildOmniChallenge,
+  sourcesToOptions,
+  buildPaymentOptions,
+  buildAuthorizeParamsFromSources,
 } from './omniChallenge.js';
+
+// Opaque identity for MPP Authorization: Payment ↔ OAuth Bearer coexistence
+export {
+  signOpaqueIdentity,
+  verifyOpaqueIdentity,
+} from './opaqueIdentity.js';
 
 // Re-export ATXP Account implementations from @atxp/common
 export {

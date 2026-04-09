@@ -337,6 +337,7 @@ export class ATXPAccount implements Account {
     // X402 fields
     if (params.paymentRequirements) body.paymentRequirements = params.paymentRequirements;
     // MPP fields
+    if (params.challenges) body.challenges = params.challenges;
     if (params.challenge) body.challenge = params.challenge;
 
     const controller = new AbortController();

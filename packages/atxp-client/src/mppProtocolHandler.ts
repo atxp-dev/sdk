@@ -5,8 +5,8 @@ import type { ProspectivePayment } from './types.js';
 import {
   MPP_ERROR_CODE,
   type MPPChallenge,
-  parseMPPHeader,
-  parseMPPFromMCPError,
+  parseMPPHeaders,
+  parseMPPChallengesFromMCPError,
   hasMPPChallenge,
   hasMPPMCPError,
 } from '@atxp/mpp';
@@ -38,13 +38,16 @@ export class MPPProtocolHandler implements ProtocolHandler {
   ): Promise<Response | null> {
     const { account, logger, approvePayment } = config;
 
-    // Extract the challenge and body text from the response
-    const extracted = await this.extractChallenge(response, logger);
-    if (!extracted) {
+    // Extract ALL challenges and body text from the response
+    const extracted = await this.extractChallenges(response, logger);
+    if (!extracted || extracted.challenges.length === 0) {
       logger.error('MPP: failed to extract challenge from response');
       return null;
     }
-    const { challenge, bodyText } = extracted;
+    const { challenges, bodyText } = extracted;
+
+    // Use first challenge for approval display (all have the same amount)
+    const primaryChallenge = challenges[0];
 
     const url = typeof originalRequest.url === 'string'
       ? originalRequest.url
@@ -52,24 +55,24 @@ export class MPPProtocolHandler implements ProtocolHandler {
 
     // Build prospective payment for approval
     const accountId = await account.getAccountId();
-    const prospectivePayment = this.buildProspectivePayment(challenge, url, accountId);
+    const prospectivePayment = this.buildProspectivePayment(primaryChallenge, url, accountId);
 
     // Ask for approval
     const approved = await approvePayment(prospectivePayment);
     if (!approved) {
       logger.info('MPP: payment not approved');
-      await this.reportFailure(config, prospectivePayment, new Error('Payment not approved'), challenge.network, true);
+      await this.reportFailure(config, prospectivePayment, new Error('Payment not approved'), primaryChallenge.network, true);
       return this.reconstructResponse(bodyText, response);
     }
 
-    return this.authorizeAndRetry(challenge, prospectivePayment, originalRequest, config, bodyText, response);
+    return this.authorizeAndRetry(challenges, prospectivePayment, originalRequest, config, bodyText, response);
   }
 
   /**
-   * Extract MPP challenge from response - tries HTTP header first, then MCP error body.
-   * Returns both the challenge and the body text to avoid double-consumption.
+   * Extract ALL MPP challenges from response - tries HTTP headers first, then MCP error body.
+   * Returns all challenges and the body text to avoid double-consumption.
    */
-  private async extractChallenge(response: Response, logger: Logger): Promise<{ challenge: MPPChallenge; bodyText: string } | null> {
+  private async extractChallenges(response: Response, logger: Logger): Promise<{ challenges: MPPChallenge[]; bodyText: string } | null> {
     // Read body once upfront to avoid double consumption (response.text() can only be called once)
     let bodyText = '';
     try {
@@ -78,17 +81,17 @@ export class MPPProtocolHandler implements ProtocolHandler {
       // Body may not be available
     }
 
-    // Try HTTP header first
+    // Try HTTP headers first (may contain multiple Payment challenges)
     const header = response.headers.get('WWW-Authenticate');
     if (header) {
-      const challenge = parseMPPHeader(header);
-      if (challenge) {
-        logger.debug('MPP: parsed challenge from WWW-Authenticate header');
-        return { challenge, bodyText };
+      const challenges = parseMPPHeaders(header);
+      if (challenges.length > 0) {
+        logger.debug(`MPP: parsed ${challenges.length} challenge(s) from WWW-Authenticate header`);
+        return { challenges, bodyText };
       }
     }
 
-    // Try MCP error body (use clone since response body may have been consumed above)
+    // Try MCP error body
     try {
       const parsed = JSON.parse(bodyText);
 
@@ -99,10 +102,10 @@ export class MPPProtocolHandler implements ProtocolHandler {
         parsed.error !== null &&
         parsed.error.code === MPP_ERROR_CODE
       ) {
-        const challenge = parseMPPFromMCPError(parsed.error.data);
-        if (challenge) {
-          logger.debug('MPP: parsed challenge from MCP error body');
-          return { challenge, bodyText };
+        const challenges = parseMPPChallengesFromMCPError(parsed.error.data);
+        if (challenges.length > 0) {
+          logger.debug(`MPP: parsed ${challenges.length} challenge(s) from MCP error body`);
+          return { challenges, bodyText };
         }
       }
     } catch {
@@ -149,9 +152,10 @@ export class MPPProtocolHandler implements ProtocolHandler {
 
   /**
    * Call /authorize/mpp on accounts service and retry the original request with the credential.
+   * Sends all challenges to accounts — accounts picks the chain via feature flag.
    */
   private async authorizeAndRetry(
-    challenge: MPPChallenge,
+    challenges: MPPChallenge[],
     prospectivePayment: ProspectivePayment,
     originalRequest: { url: string | URL; init?: RequestInit },
     config: ProtocolConfig,
@@ -159,6 +163,7 @@ export class MPPProtocolHandler implements ProtocolHandler {
     originalResponse: Response
   ): Promise<Response> {
     const { account, logger, fetchFn, onPayment } = config;
+    const primaryChallenge = challenges[0];
 
     try {
       logger.debug('MPP: calling /authorize/auto on accounts service');
@@ -168,7 +173,8 @@ export class MPPProtocolHandler implements ProtocolHandler {
         authorizeResult = await account.authorize({
           protocols: ['mpp'],
           destination: typeof originalRequest.url === 'string' ? originalRequest.url : originalRequest.url.toString(),
-          challenge,
+          // Send all challenges — accounts picks the right one via ff:mpp-chain
+          challenges,
         });
       } catch (authorizeError) {
         // AuthorizationError = server rejected the request (HTTP error from accounts)
@@ -188,17 +194,40 @@ export class MPPProtocolHandler implements ProtocolHandler {
 
       if (retryResponse.ok) {
         logger.info('MPP: payment accepted');
-        await onPayment({ payment: prospectivePayment, transactionHash: challenge.id, network: challenge.network });
+        // The actual settlement chain is decided by accounts (via ff:mpp-chain),
+        // which may differ from primaryChallenge.network. Use authorize result's
+        // context if it contains chain info, otherwise fall back to the challenge.
+        // TODO: accounts /authorize/auto should return the settled chain + txHash
+        // in AuthorizeResult.context so the client can report accurately.
+        const settledNetwork = (
+          typeof authorizeResult.context?.network === 'string'
+            ? authorizeResult.context.network
+            : primaryChallenge.network
+        );
+        // primaryChallenge.id is a challenge ID, not a transaction hash.
+        // The actual tx hash is not available until settlement completes on the
+        // server side, so we report an empty string here.
+        const txHash = (
+          typeof authorizeResult.context?.transactionHash === 'string'
+            ? authorizeResult.context.transactionHash
+            : ''
+        );
+        await onPayment({ payment: prospectivePayment, transactionHash: txHash, network: settledNetwork });
       } else {
         logger.warn(`MPP: request failed after payment with status ${retryResponse.status}`);
-        await this.reportFailure(config, prospectivePayment, new Error(`Request failed with status ${retryResponse.status}`), challenge.network, false);
+        const failureNetwork = (
+          typeof authorizeResult.context?.network === 'string'
+            ? authorizeResult.context.network
+            : primaryChallenge.network
+        );
+        await this.reportFailure(config, prospectivePayment, new Error(`Request failed with status ${retryResponse.status}`), failureNetwork, false);
       }
 
       return retryResponse;
     } catch (error) {
       logger.error(`MPP: failed to handle payment challenge: ${error}`);
       const cause = error instanceof Error ? error : new Error(String(error));
-      await this.reportFailure(config, prospectivePayment, cause, challenge.network, true);
+      await this.reportFailure(config, prospectivePayment, cause, primaryChallenge.network, true);
       return this.reconstructResponse(bodyText, originalResponse);
     }
   }

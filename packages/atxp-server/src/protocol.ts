@@ -15,6 +15,9 @@ export type MppChallengeData = {
   currency: string;
   network: string;
   recipient: string;
+  /** Server-defined opaque data echoed by clients. Used to carry signed
+   *  identity when Authorization: Payment replaces Authorization: Bearer. */
+  opaque?: Record<string, unknown>;
 };
 
 /**
@@ -64,7 +67,8 @@ export type AtxpMcpChallengeData = {
 export type OmniChallenge = {
   atxpMcp: AtxpMcpChallengeData;
   x402: X402PaymentRequirements;
-  mpp?: MppChallengeData;
+  /** MPP challenges — one per supported chain (e.g., Solana + Tempo). */
+  mpp?: MppChallengeData[];
 };
 
 /**
@@ -125,13 +129,29 @@ export function detectProtocol(headers: {
     return { protocol: 'x402', credential: paymentSig };
   }
 
-  // Authorization: Payment <credential> indicates MPP protocol
+  // Authorization: Payment <credential> indicates standard MPP protocol
   const authHeader = headers['authorization'];
   if (authHeader?.startsWith('Payment ')) {
     return { protocol: 'mpp', credential: authHeader.slice('Payment '.length) };
   }
 
   return null;
+}
+
+/**
+ * Parse a credential string that may be base64-encoded JSON or raw JSON.
+ * Returns the parsed object, or null if neither decoding succeeds.
+ */
+export function parseCredentialBase64(credential: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(Buffer.from(credential, 'base64').toString()) as Record<string, unknown>;
+  } catch {
+    try {
+      return JSON.parse(credential) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
 }
 
 /**
@@ -211,13 +231,7 @@ export class ProtocolSettlement {
       // X402: auth expects { payload, paymentRequirements }
       // The credential is the base64-encoded PAYMENT-SIGNATURE header containing the payload.
       // paymentRequirements come from context (MCP server: from pricing config; LLM: from authorize response).
-      let payload: unknown;
-      try {
-        payload = JSON.parse(Buffer.from(credential, 'base64').toString());
-      } catch {
-        // If not valid base64 JSON, pass as-is (auth will validate)
-        payload = { raw: credential };
-      }
+      const payload: unknown = parseCredentialBase64(credential) ?? { raw: credential };
 
       // paymentRequirements from context may be a full X402PaymentRequirements object
       // ({x402Version, accepts: [...]}) from buildX402Requirements. Auth expects a single
@@ -242,12 +256,9 @@ export class ProtocolSettlement {
       // MPP: auth expects { credential: <standard MPP credential>, sourceAccountId? }.
       // The credential is base64url-encoded JSON containing { challenge, payload, source }.
       // Auth uses mppx internally to verify + settle (broadcast pre-signed tx or check txHash).
-      let parsedCredential: unknown;
-      try {
-        parsedCredential = JSON.parse(Buffer.from(credential, 'base64').toString());
-      } catch {
-        parsedCredential = JSON.parse(credential);
-        // If this throws, the credential is genuinely malformed — let it propagate.
+      const parsedCredential = parseCredentialBase64(credential);
+      if (!parsedCredential) {
+        throw new Error('MPP credential is not valid base64 JSON or raw JSON');
       }
       return {
         credential: parsedCredential,

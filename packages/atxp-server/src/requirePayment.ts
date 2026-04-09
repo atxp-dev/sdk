@@ -2,9 +2,10 @@ import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAc
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { BigNumber } from "bignumber.js";
 import { getATXPConfig, atxpAccountId, atxpToken, getDetectedCredential } from "./atxpContext.js";
-import { buildX402Requirements, buildMppChallenge, omniChallengeMcpError } from "./omniChallenge.js";
+import { buildPaymentOptions, omniChallengeMcpError } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { ProtocolSettlement, type SettlementContext } from "./protocol.js";
+import { signOpaqueIdentity } from "./opaqueIdentity.js";
 
 export async function requirePayment(paymentConfig: RequirePaymentConfig): Promise<void> {
   const config = getATXPConfig();
@@ -60,35 +61,26 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     return;
   }
 
+  // Check for an existing payment ID first (idempotency) — avoids the
+  // getSources fetch when we already have a payment to re-challenge with.
   const existingPaymentId = await paymentConfig.getExistingPaymentId?.();
   if (existingPaymentId) {
     config.logger.info(`Found existing payment ID ${existingPaymentId}`);
-    throw buildOmniError(config, existingPaymentId, paymentAmount, charge.options);
+    const sources = await fetchAllSources(config, destinationNetwork, destinationAddress);
+    throw buildOmniError(config, existingPaymentId, paymentAmount, sources);
   }
 
-  // For createPaymentRequest, use the minimumPayment if configured
-  const options = [{
-    network: destinationNetwork,
+  // Fetch all destination chain addresses for the omni-challenge.
+  // The primary ATXP destination is always included; chain-specific
+  // addresses (base, solana, etc.) come from getSources().
+  const allSources = await fetchAllSources(config, destinationNetwork, destinationAddress);
+
+  const options = allSources.map(source => ({
+    network: source.chain as Network,
     currency: config.currency,
-    address: destinationAddress,
+    address: source.address,
     amount: paymentAmount
-  }];
-
-  try {
-    const sources = await config.destination.getSources();
-    config.logger.debug(`Fetched ${sources.length} sources for destination account`);
-    for (const source of sources) {
-      options.push({
-        network: source.chain as Network,
-        currency: config.currency,
-        address: source.address,
-        amount: paymentAmount
-      });
-    }
-    config.logger.debug(`Payment request will include ${options.length} total options`);
-  } catch (error) {
-    config.logger.warn(`Failed to fetch account sources, will use ATXP option only: ${error}`);
-  }
+  }));
 
   const paymentRequest = {
     options,
@@ -100,7 +92,30 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   config.logger.debug(`Creating payment request with sourceAccountId: ${user}, destinationAccountId: ${charge.destinationAccountId}`);
   const paymentId = await config.paymentServer.createPaymentRequest(paymentRequest);
   config.logger.info(`Created payment request ${paymentId}`);
-  throw buildOmniError(config, paymentId, paymentAmount, options);
+  throw buildOmniError(config, paymentId, paymentAmount, allSources);
+}
+
+/**
+ * Fetch all destination chain addresses for an omni-challenge.
+ * Combines the primary ATXP destination with chain-specific addresses from getSources().
+ */
+async function fetchAllSources(
+  config: NonNullable<ReturnType<typeof getATXPConfig>>,
+  destinationNetwork: Network,
+  destinationAddress: string,
+): Promise<Array<{ chain: string; address: string }>> {
+  const sources: Array<{ chain: string; address: string }> = [
+    { chain: destinationNetwork, address: destinationAddress },
+  ];
+  try {
+    const fetched = await config.destination.getSources();
+    config.logger.debug(`Fetched ${fetched.length} sources for destination account`);
+    sources.push(...fetched);
+    config.logger.debug(`Payment request will include ${sources.length} total options`);
+  } catch (error) {
+    config.logger.warn(`Failed to fetch account sources, will use ATXP option only: ${error}`);
+  }
+  return sources;
 }
 
 /**
@@ -148,28 +163,18 @@ async function settleDetectedCredential(
   // pattern — the server generates requirements from its own config.
   if (protocol === 'x402') {
     const resource = getATXPResource()?.toString() ?? '';
-    // Fetch destination's chain addresses (base, solana, etc.)
-    let x402Options = charge.options;
+    let sources: Array<{ chain: string; address: string }> = charge.options.map(o => ({ chain: o.network, address: o.address }));
     try {
-      const sources = await config.destination.getSources();
-      x402Options = sources.map(s => ({
-        network: s.chain as string,
-        currency: config.currency,
-        address: s.address,
-        amount: paymentAmount,
-      }));
+      const fetchedSources = await config.destination.getSources();
+      sources = fetchedSources.map(s => ({ chain: s.chain, address: s.address }));
     } catch (err) {
       config.logger.warn(`Failed to fetch destination sources for X402 settle: ${err}`);
     }
-    const x402Requirements = buildX402Requirements({
-      options: x402Options,
-      resource,
-      payeeName: config.payeeName,
-    });
-    if (x402Requirements.accepts.length === 0) {
+    const payment = buildPaymentOptions({ amount: paymentAmount, sources, resource, payeeName: config.payeeName });
+    if (payment.x402.accepts.length === 0) {
       config.logger.warn('X402 settle: no compatible payment options after filtering');
     }
-    context.paymentRequirements = x402Requirements;
+    context.paymentRequirements = payment.x402;
   }
 
   try {
@@ -188,32 +193,44 @@ async function settleDetectedCredential(
 
 /**
  * Build an omni-challenge MCP error that includes ATXP-MCP + X402 + MPP data.
+ * Uses buildPaymentOptions (shared with buildAuthorizeParamsFromSources) to
+ * ensure consistent challenge generation across MCP servers and LLM callers.
  */
 function buildOmniError(
   config: { server: AuthorizationServerUrl; logger: import("@atxp/common").Logger },
   paymentId: string,
   paymentAmount: BigNumber,
-  options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>,
+  sources: Array<{ chain: string; address: string }>,
 ) {
   const resource = getATXPResource()?.toString() ?? '';
 
-  const x402Requirements = buildX402Requirements({
-    options,
+  const payment = buildPaymentOptions({
+    amount: paymentAmount,
+    sources,
     resource,
     payeeName: '',
+    challengeId: paymentId,
   });
 
-  if (x402Requirements.accepts.length === 0 && options.length > 0) {
-    config.logger.warn(`buildX402Requirements filtered all ${options.length} options — no X402-compatible networks. X402 clients will not see any payment options.`);
+  if (payment.x402.accepts.length === 0 && sources.length > 0) {
+    config.logger.warn(`buildPaymentOptions filtered all ${sources.length} sources — no X402-compatible networks. X402 clients will not see any payment options.`);
   }
 
-  const mppChallenge = buildMppChallenge({ id: paymentId, options });
+  // Inject signed identity into MPP challenges' opaque field.
+  // On the retry request, Authorization: Payment replaces Authorization: Bearer,
+  // so the server recovers the user identity from this opaque field instead.
+  const userId = atxpAccountId();
+  if (payment.mpp && userId) {
+    for (const challenge of payment.mpp) {
+      challenge.opaque = signOpaqueIdentity(userId, challenge.id);
+    }
+  }
 
   return omniChallengeMcpError(
     config.server,
     paymentId,
     paymentAmount,
-    x402Requirements,
-    mppChallenge,
+    payment.x402,
+    payment.mpp,
   );
 }

@@ -54,6 +54,7 @@ export class ATXPAccountHandler implements ProtocolHandler {
         destination: authorizeParams.destination as string | undefined,
         paymentRequirements: authorizeParams.paymentRequirements,
         challenge: authorizeParams.challenge,
+        challenges: authorizeParams.challenges as unknown[] | undefined,
       });
     } catch (error) {
       logger.error(`ATXPAccountHandler: authorize failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -110,12 +111,16 @@ async function buildAuthorizeParams(
     }
   }
 
-  // Try MPP data for destination
+  // Try MPP data for destination.
+  // data.mpp may be a single challenge or an array of challenges (multi-chain).
   if (data.mpp) {
-    params.challenge = data.mpp;
-    const mpp = data.mpp as { recipient?: string; amount?: string };
-    if (mpp.recipient && !params.destination) params.destination = mpp.recipient;
-    if (mpp.amount && !params.amount) params.amount = mpp.amount;
+    const mppArray = Array.isArray(data.mpp) ? data.mpp : [data.mpp];
+    // Send all challenges to accounts — it picks the chain via feature flag
+    params.challenges = mppArray;
+    // Extract destination/amount from the first challenge
+    const firstMpp = mppArray[0] as { recipient?: string; amount?: string } | undefined;
+    if (firstMpp?.recipient && !params.destination) params.destination = firstMpp.recipient;
+    if (firstMpp?.amount && !params.amount) params.amount = firstMpp.amount;
   }
 
   // If we still don't have a destination, fetch the payment request to get it

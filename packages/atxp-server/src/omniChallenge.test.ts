@@ -8,6 +8,8 @@ import {
   omniChallengeMcpError,
   omniChallengeHttpResponse,
   buildOmniChallenge,
+  buildPaymentOptions,
+  buildAuthorizeParamsFromSources,
 } from './omniChallenge.js';
 import { PAYMENT_REQUIRED_PREAMBLE } from '@atxp/common';
 import { parseMPPHeader, MPP_ERROR_CODE } from '@atxp/mpp';
@@ -239,7 +241,8 @@ describe('omniChallenge', () => {
       );
 
       const data = error.data as any;
-      expect(data.mpp).toEqual(mpp);
+      // data.mpp is now an array (multi-chain support)
+      expect(data.mpp).toEqual([mpp]);
       expect(data.x402).toBeDefined();
       expect(data.paymentRequestId).toBe('pr_mpp');
     });
@@ -343,8 +346,135 @@ describe('omniChallenge', () => {
       });
 
       expect(challenge.mpp).toBeDefined();
-      expect(challenge.mpp!.id).toBe('ch_omni');
-      expect(challenge.mpp!.network).toBe('tempo');
+      expect(challenge.mpp![0].id).toBe('ch_omni');
+      expect(challenge.mpp![0].network).toBe('tempo');
+    });
+  });
+
+  describe('buildPaymentOptions', () => {
+    it('should return X402 requirements for base addresses and MPP challenges for solana + tempo', () => {
+      const sources = [
+        { chain: 'base', address: '0xBaseAddr' },
+        { chain: 'solana', address: 'SolanaAddr123' },
+        { chain: 'tempo', address: '0xTempoAddr' },
+      ];
+
+      const result = buildPaymentOptions({
+        amount: new BigNumber('0.05'),
+        sources,
+        resource: 'https://example.com/api',
+        payeeName: 'Test Server',
+        challengeId: 'ch_test_1',
+      });
+
+      // X402: only base addresses (X402 uses Permit2, Base only)
+      expect(result.x402.x402Version).toBe(2);
+      expect(result.x402.accepts).toHaveLength(1);
+      expect(result.x402.accepts[0].payTo).toBe('0xBaseAddr');
+      expect(result.x402.accepts[0].amount).toBe('50000'); // 0.05 * 1e6
+
+      // MPP: solana + tempo challenges
+      expect(result.mpp).not.toBeNull();
+      expect(result.mpp).toHaveLength(2);
+      expect(result.mpp![0].method).toBe('solana');
+      expect(result.mpp![0].recipient).toBe('SolanaAddr123');
+      expect(result.mpp![0].id).toBe('ch_test_1');
+      expect(result.mpp![1].method).toBe('tempo');
+      expect(result.mpp![1].recipient).toBe('0xTempoAddr');
+
+      // Options: all three sources converted
+      expect(result.options).toHaveLength(3);
+    });
+
+    it('should return null MPP when only base sources are provided', () => {
+      const sources = [
+        { chain: 'base', address: '0xOnlyBase' },
+      ];
+
+      const result = buildPaymentOptions({
+        amount: new BigNumber('1.00'),
+        sources,
+      });
+
+      expect(result.x402.accepts).toHaveLength(1);
+      expect(result.mpp).toBeNull();
+    });
+
+    it('should auto-generate challengeId when not provided', () => {
+      const sources = [
+        { chain: 'solana', address: 'SolAddr' },
+      ];
+
+      const result = buildPaymentOptions({
+        amount: new BigNumber('0.01'),
+        sources,
+      });
+
+      expect(result.mpp).not.toBeNull();
+      expect(result.mpp![0].id).toMatch(/^pay-/);
+    });
+  });
+
+  describe('buildAuthorizeParamsFromSources', () => {
+    it('should return first X402 accept as paymentRequirements and MPP challenges array', () => {
+      const sources = [
+        { chain: 'base', address: '0xBaseAddr' },
+        { chain: 'solana', address: 'SolanaAddr123' },
+        { chain: 'tempo', address: '0xTempoAddr' },
+      ];
+
+      const result = buildAuthorizeParamsFromSources({
+        amount: new BigNumber('0.10'),
+        sources,
+        resource: 'https://example.com/resource',
+        payeeName: 'Auth Test',
+        challengeId: 'ch_auth_1',
+      });
+
+      // paymentRequirements: single X402 option (first accept), not the full wrapper
+      expect(result.paymentRequirements).toBeDefined();
+      expect(result.paymentRequirements!.payTo).toBe('0xBaseAddr');
+      expect(result.paymentRequirements!.amount).toBe('100000'); // 0.10 * 1e6
+      expect(result.paymentRequirements!.scheme).toBe('exact');
+      // Should NOT have x402Version — it's the inner accept, not the wrapper
+      expect((result.paymentRequirements as any).x402Version).toBeUndefined();
+
+      // challenges: MPP array with solana + tempo
+      expect(result.challenges).toHaveLength(2);
+      expect(result.challenges[0].method).toBe('solana');
+      expect(result.challenges[0].id).toBe('ch_auth_1');
+      expect(result.challenges[1].method).toBe('tempo');
+    });
+
+    it('should omit paymentRequirements when no X402-compatible sources exist', () => {
+      const sources = [
+        { chain: 'solana', address: 'SolOnly' },
+      ];
+
+      const result = buildAuthorizeParamsFromSources({
+        amount: new BigNumber('0.01'),
+        sources,
+        challengeId: 'ch_no_x402',
+      });
+
+      expect(result.paymentRequirements).toBeUndefined();
+      expect(result.challenges).toHaveLength(1);
+      expect(result.challenges[0].method).toBe('solana');
+    });
+
+    it('should return empty challenges when no MPP-compatible sources exist', () => {
+      const sources = [
+        { chain: 'base', address: '0xBaseOnly' },
+      ];
+
+      const result = buildAuthorizeParamsFromSources({
+        amount: new BigNumber('0.50'),
+        sources,
+      });
+
+      expect(result.paymentRequirements).toBeDefined();
+      expect(result.paymentRequirements!.payTo).toBe('0xBaseOnly');
+      expect(result.challenges).toEqual([]);
     });
   });
 });

@@ -674,11 +674,20 @@ export class ATXPFetcher {
 
     const headers = new Headers({ 'Content-Type': 'application/json' });
 
-    // Add MPP challenge as WWW-Authenticate header (standard MPP detection)
-    if (mppData && typeof mppData === 'object') {
-      const mpp = mppData as Record<string, string>;
-      const parts = Object.entries(mpp).map(([k, v]) => `${k}="${v}"`).join(', ');
-      headers.set('WWW-Authenticate', `Payment ${parts}`);
+    // Add MPP challenge(s) as WWW-Authenticate header (standard MPP detection).
+    // data.mpp may be a single challenge or an array of challenges (multi-chain).
+    if (mppData) {
+      const mppArray = Array.isArray(mppData) ? mppData : [mppData];
+      const headerValues: string[] = [];
+      for (const mpp of mppArray) {
+        if (typeof mpp === 'object' && mpp !== null) {
+          const parts = Object.entries(mpp as Record<string, string>).map(([k, v]) => `${k}="${v}"`).join(', ');
+          headerValues.push(`Payment ${parts}`);
+        }
+      }
+      if (headerValues.length > 0) {
+        headers.set('WWW-Authenticate', headerValues.join(', '));
+      }
     }
 
     // Body: merge x402 data at top level (X402ProtocolHandler expects x402Version/accepts at root)

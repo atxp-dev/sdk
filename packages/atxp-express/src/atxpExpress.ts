@@ -15,6 +15,9 @@ import {
   setDetectedCredential,
   type PaymentProtocol,
   type ATXPConfig,
+  type TokenCheck,
+  verifyOpaqueIdentity,
+  parseCredentialBase64,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
@@ -60,14 +63,43 @@ export function atxpExpress(args: ATXPArgs): Router {
       }
 
       logger.debug(`Request started - ${req.method} ${req.path}`);
-      const tokenCheck = await checkTokenNode(config, resource, req);
-      const user = tokenCheck.data?.sub ?? null;
+      let tokenCheck: TokenCheck = await checkTokenNode(config, resource, req);
+      let user = tokenCheck.data?.sub ?? null;
+
+      // When Authorization: Payment replaces Authorization: Bearer (MPP retry),
+      // the OAuth token check fails. Recover identity from the credential's
+      // opaque field (signed by the server at challenge time).
+      if (detected && detected.protocol === 'mpp' && !tokenCheck.passes) {
+        const parsed = parseCredentialBase64(detected.credential);
+        if (parsed) {
+          const challenge = parsed.challenge as Record<string, unknown> | undefined;
+          const opaque = challenge?.opaque as Record<string, unknown> | undefined;
+          const challengeId = challenge?.id as string | undefined;
+          if (opaque && challengeId) {
+            const recoveredSub = verifyOpaqueIdentity(opaque, challengeId);
+            if (recoveredSub) {
+              logger.info(`Recovered identity from MPP opaque: ${recoveredSub}`);
+              user = recoveredSub;
+              // Synthesize a passing tokenCheck so withATXPContext sets the user
+              tokenCheck = { passes: true, data: { sub: recoveredSub }, token: null } as unknown as TokenCheck;
+            }
+          }
+        }
+      }
 
       res.on('finish', async () => {
         logger.debug(`Request finished ${user ? `for user ${user} ` : ''}- ${req.method} ${req.path}`);
       });
 
-      if (sendOAuthChallenge(res, tokenCheck)) {
+      // OAuth challenge logic:
+      // - ATXP/X402: use separate headers (X-ATXP-PAYMENT, PAYMENT-SIGNATURE, X-PAYMENT),
+      //   so Bearer is still present — skip OAuth challenge.
+      // - MPP: replaces Authorization: Bearer with Authorization: Payment, so OAuth
+      //   token check fails. Only skip OAuth if opaque identity was recovered above.
+      //   If opaque verification failed/missing, the client should have included Bearer too.
+      // - No credential: normal OAuth challenge.
+      const shouldChallengeOAuth = !detected || (detected.protocol === 'mpp' && !user);
+      if (shouldChallengeOAuth && sendOAuthChallenge(res, tokenCheck)) {
         return;
       }
 
@@ -117,25 +149,13 @@ function resolveIdentitySync(
   credential: string,
 ): string | undefined {
   if (protocol === 'atxp') {
-    try {
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
-      } catch {
-        parsed = JSON.parse(credential);
-      }
-      if (parsed.sourceAccountId) return parsed.sourceAccountId as string;
-    } catch { /* not parseable */ }
+    const parsed = parseCredentialBase64(credential);
+    if (parsed?.sourceAccountId) return parsed.sourceAccountId as string;
   }
 
   if (protocol === 'mpp') {
-    try {
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
-      } catch {
-        parsed = JSON.parse(credential);
-      }
+    const parsed = parseCredentialBase64(credential);
+    if (parsed) {
       const source = parsed.source;
       if (typeof source === 'string' && source.startsWith('did:pkh:eip155:')) {
         const parts = source.split(':');
@@ -146,7 +166,7 @@ function resolveIdentitySync(
           return `${network}:${address}`;
         }
       }
-    } catch { /* not parseable */ }
+    }
   }
 
   return undefined;
