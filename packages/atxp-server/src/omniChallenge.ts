@@ -96,7 +96,7 @@ export function buildMppChallenges(args: {
     });
   }
 
-  // Tempo option (pathUSD on Tempo mainnet or moderato)
+  // Tempo option (USDC on Tempo mainnet, pathUSD on moderato)
   const tempoOption = args.options.find(o => o.network === 'tempo' || o.network === 'tempo_moderato');
   if (tempoOption) {
     challenges.push({
@@ -104,7 +104,7 @@ export function buildMppChallenges(args: {
       method: 'tempo',
       intent: 'charge',
       amount: tempoOption.amount.times(10 ** STABLECOIN_DECIMALS).toFixed(0),
-      currency: tempoOption.currency || 'pathUSD',
+      currency: tempoOption.currency || 'USDC',
       network: tempoOption.network,
       recipient: tempoOption.address,
     });
