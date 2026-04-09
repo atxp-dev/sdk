@@ -108,7 +108,10 @@ async function fetchAllSources(
     { chain: destinationNetwork, address: destinationAddress },
   ];
   try {
-    const fetched = await config.destination.getSources();
+    // Request all supported chains including Tempo for MPP challenges.
+    // Old SDK clients (< 0.11.0) won't see Tempo because they don't pass
+    // ?include=tempo — only the server-side requirePayment does.
+    const fetched = await config.destination.getSources({ include: ['tempo'] });
     config.logger.debug(`Fetched ${fetched.length} sources for destination account`);
     sources.push(...fetched);
     config.logger.debug(`Payment request will include ${sources.length} total options`);
