@@ -81,6 +81,10 @@ export function buildMppChallenges(args: {
 }): MppChallengeData[] | null {
   const challenges: MppChallengeData[] = [];
 
+  // MPP challenges expire after 5 minutes (matches AUTHORIZE_EXPIRY_MS in accounts).
+  // mppx's verify() requires this field for Tempo challenges.
+  const expires = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
   // Solana option (USDC on Solana mainnet or devnet)
   const solanaOption = args.options.find(o => o.network === 'solana' || o.network === 'solana_devnet');
   if (solanaOption) {
@@ -93,20 +97,26 @@ export function buildMppChallenges(args: {
       currency: isDevnet ? SOLANA_USDC_MINT_DEVNET : SOLANA_USDC_MINT,
       network: isDevnet ? 'devnet' : 'mainnet-beta',
       recipient: solanaOption.address,
+      expires,
     });
   }
 
   // Tempo option (USDC on Tempo mainnet, pathUSD on moderato)
+  // NOTE: Tempo mppx expects human-readable amount (e.g., "0.01") with a
+  // `decimals` field. Its schema internally calls parseUnits(amount, decimals)
+  // to convert to raw token units. This differs from Solana MPP which expects
+  // the amount pre-converted to micro-units.
   const tempoOption = args.options.find(o => o.network === 'tempo' || o.network === 'tempo_moderato');
   if (tempoOption) {
     challenges.push({
       id: args.id,
       method: 'tempo',
       intent: 'charge',
-      amount: tempoOption.amount.times(10 ** STABLECOIN_DECIMALS).toFixed(0),
+      amount: tempoOption.amount.toString(),
       currency: tempoOption.currency || 'USDC',
       network: tempoOption.network,
       recipient: tempoOption.address,
+      expires,
     });
   }
 

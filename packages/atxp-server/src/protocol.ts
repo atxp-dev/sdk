@@ -15,6 +15,8 @@ export type MppChallengeData = {
   currency: string;
   network: string;
   recipient: string;
+  /** ISO 8601 expiry timestamp. Required by mppx's verify() for Tempo. */
+  expires?: string;
   /** Server-defined opaque data echoed by clients. Used to carry signed
    *  identity when Authorization: Payment replaces Authorization: Bearer. */
   opaque?: Record<string, unknown>;
