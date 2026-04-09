@@ -61,44 +61,26 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     return;
   }
 
-  // Fetch all destination chain addresses for the omni-challenge.
-  // The primary ATXP destination is always included; chain-specific
-  // addresses (base, solana, etc.) come from getSources().
-  const options = [{
-    network: destinationNetwork,
-    currency: config.currency,
-    address: destinationAddress,
-    amount: paymentAmount
-  }];
-
-  let fetchedSources: Array<{ chain: string; address: string }> = [];
-  try {
-    fetchedSources = await config.destination.getSources();
-    config.logger.debug(`Fetched ${fetchedSources.length} sources for destination account`);
-    for (const source of fetchedSources) {
-      options.push({
-        network: source.chain as Network,
-        currency: config.currency,
-        address: source.address,
-        amount: paymentAmount
-      });
-    }
-    config.logger.debug(`Payment request will include ${options.length} total options`);
-  } catch (error) {
-    config.logger.warn(`Failed to fetch account sources, will use ATXP option only: ${error}`);
-  }
-
-  // Sources for buildOmniError — combines primary + fetched
-  const allSources = [
-    { chain: destinationNetwork, address: destinationAddress },
-    ...fetchedSources,
-  ];
-
+  // Check for an existing payment ID first (idempotency) — avoids the
+  // getSources fetch when we already have a payment to re-challenge with.
   const existingPaymentId = await paymentConfig.getExistingPaymentId?.();
   if (existingPaymentId) {
     config.logger.info(`Found existing payment ID ${existingPaymentId}`);
-    throw buildOmniError(config, existingPaymentId, paymentAmount, allSources);
+    const sources = await fetchAllSources(config, destinationNetwork, destinationAddress);
+    throw buildOmniError(config, existingPaymentId, paymentAmount, sources);
   }
+
+  // Fetch all destination chain addresses for the omni-challenge.
+  // The primary ATXP destination is always included; chain-specific
+  // addresses (base, solana, etc.) come from getSources().
+  const allSources = await fetchAllSources(config, destinationNetwork, destinationAddress);
+
+  const options = allSources.map(source => ({
+    network: source.chain as Network,
+    currency: config.currency,
+    address: source.address,
+    amount: paymentAmount
+  }));
 
   const paymentRequest = {
     options,
@@ -111,6 +93,29 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   const paymentId = await config.paymentServer.createPaymentRequest(paymentRequest);
   config.logger.info(`Created payment request ${paymentId}`);
   throw buildOmniError(config, paymentId, paymentAmount, allSources);
+}
+
+/**
+ * Fetch all destination chain addresses for an omni-challenge.
+ * Combines the primary ATXP destination with chain-specific addresses from getSources().
+ */
+async function fetchAllSources(
+  config: NonNullable<ReturnType<typeof getATXPConfig>>,
+  destinationNetwork: Network,
+  destinationAddress: string,
+): Promise<Array<{ chain: string; address: string }>> {
+  const sources: Array<{ chain: string; address: string }> = [
+    { chain: destinationNetwork, address: destinationAddress },
+  ];
+  try {
+    const fetched = await config.destination.getSources();
+    config.logger.debug(`Fetched ${fetched.length} sources for destination account`);
+    sources.push(...fetched);
+    config.logger.debug(`Payment request will include ${sources.length} total options`);
+  } catch (error) {
+    config.logger.warn(`Failed to fetch account sources, will use ATXP option only: ${error}`);
+  }
+  return sources;
 }
 
 /**

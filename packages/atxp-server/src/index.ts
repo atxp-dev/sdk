@@ -92,6 +92,7 @@ export {
   type VerifyResult,
   type SettleResult,
   detectProtocol,
+  parseCredentialBase64,
   ProtocolSettlement,
 } from './protocol.js';
 

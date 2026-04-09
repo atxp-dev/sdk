@@ -17,6 +17,7 @@ import {
   type ATXPConfig,
   type TokenCheck,
   verifyOpaqueIdentity,
+  parseCredentialBase64,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
@@ -69,10 +70,8 @@ export function atxpExpress(args: ATXPArgs): Router {
       // the OAuth token check fails. Recover identity from the credential's
       // opaque field (signed by the server at challenge time).
       if (detected && detected.protocol === 'mpp' && !tokenCheck.passes) {
-        try {
-          let parsed: Record<string, unknown>;
-          try { parsed = JSON.parse(Buffer.from(detected.credential, 'base64').toString()); }
-          catch { parsed = JSON.parse(detected.credential); }
+        const parsed = parseCredentialBase64(detected.credential);
+        if (parsed) {
           const challenge = parsed.challenge as Record<string, unknown> | undefined;
           const opaque = challenge?.opaque as Record<string, unknown> | undefined;
           const challengeId = challenge?.id as string | undefined;
@@ -85,17 +84,22 @@ export function atxpExpress(args: ATXPArgs): Router {
               tokenCheck = { passes: true, data: { sub: recoveredSub }, token: null } as unknown as TokenCheck;
             }
           }
-        } catch { /* credential not parseable — fall through to OAuth challenge */ }
+        }
       }
 
       res.on('finish', async () => {
         logger.debug(`Request finished ${user ? `for user ${user} ` : ''}- ${req.method} ${req.path}`);
       });
 
-      // Skip OAuth challenge when a payment credential is detected (the identity
-      // was recovered from opaque above, or the credential is from an external
-      // MPP client which proceeds anonymously).
-      if (!detected && sendOAuthChallenge(res, tokenCheck)) {
+      // OAuth challenge logic:
+      // - ATXP/X402: use separate headers (X-ATXP-PAYMENT, PAYMENT-SIGNATURE, X-PAYMENT),
+      //   so Bearer is still present — skip OAuth challenge.
+      // - MPP: replaces Authorization: Bearer with Authorization: Payment, so OAuth
+      //   token check fails. Only skip OAuth if opaque identity was recovered above.
+      //   If opaque verification failed/missing, the client should have included Bearer too.
+      // - No credential: normal OAuth challenge.
+      const shouldChallengeOAuth = !detected || (detected.protocol === 'mpp' && !user);
+      if (shouldChallengeOAuth && sendOAuthChallenge(res, tokenCheck)) {
         return;
       }
 
@@ -145,25 +149,13 @@ function resolveIdentitySync(
   credential: string,
 ): string | undefined {
   if (protocol === 'atxp') {
-    try {
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
-      } catch {
-        parsed = JSON.parse(credential);
-      }
-      if (parsed.sourceAccountId) return parsed.sourceAccountId as string;
-    } catch { /* not parseable */ }
+    const parsed = parseCredentialBase64(credential);
+    if (parsed?.sourceAccountId) return parsed.sourceAccountId as string;
   }
 
   if (protocol === 'mpp') {
-    try {
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(Buffer.from(credential, 'base64').toString());
-      } catch {
-        parsed = JSON.parse(credential);
-      }
+    const parsed = parseCredentialBase64(credential);
+    if (parsed) {
       const source = parsed.source;
       if (typeof source === 'string' && source.startsWith('did:pkh:eip155:')) {
         const parts = source.split(':');
@@ -174,7 +166,7 @@ function resolveIdentitySync(
           return `${network}:${address}`;
         }
       }
-    } catch { /* not parseable */ }
+    }
   }
 
   return undefined;
