@@ -383,6 +383,7 @@ export class OAuthClient extends OAuthResourceClient {
       // Create a new Headers object from existing headers (if any)
       const headers = new Headers(requestInit.headers);
       // Don't overwrite Authorization: Payment (MPP credential) with Bearer.
+      // Contract: buildPaymentHeaders.ts sets Authorization: Payment for MPP.
       // The server recovers OAuth identity from the credential's opaque field.
       const existing = headers.get('Authorization');
       if (!existing || !existing.startsWith('Payment ')) {

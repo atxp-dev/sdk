@@ -194,10 +194,33 @@ export class MPPProtocolHandler implements ProtocolHandler {
 
       if (retryResponse.ok) {
         logger.info('MPP: payment accepted');
-        await onPayment({ payment: prospectivePayment, transactionHash: primaryChallenge.id, network: primaryChallenge.network });
+        // The actual settlement chain is decided by accounts (via ff:mpp-chain),
+        // which may differ from primaryChallenge.network. Use authorize result's
+        // context if it contains chain info, otherwise fall back to the challenge.
+        // TODO: accounts /authorize/auto should return the settled chain + txHash
+        // in AuthorizeResult.context so the client can report accurately.
+        const settledNetwork = (
+          typeof authorizeResult.context?.network === 'string'
+            ? authorizeResult.context.network
+            : primaryChallenge.network
+        );
+        // primaryChallenge.id is a challenge ID, not a transaction hash.
+        // The actual tx hash is not available until settlement completes on the
+        // server side, so we report an empty string here.
+        const txHash = (
+          typeof authorizeResult.context?.transactionHash === 'string'
+            ? authorizeResult.context.transactionHash
+            : ''
+        );
+        await onPayment({ payment: prospectivePayment, transactionHash: txHash, network: settledNetwork });
       } else {
         logger.warn(`MPP: request failed after payment with status ${retryResponse.status}`);
-        await this.reportFailure(config, prospectivePayment, new Error(`Request failed with status ${retryResponse.status}`), primaryChallenge.network, false);
+        const failureNetwork = (
+          typeof authorizeResult.context?.network === 'string'
+            ? authorizeResult.context.network
+            : primaryChallenge.network
+        );
+        await this.reportFailure(config, prospectivePayment, new Error(`Request failed with status ${retryResponse.status}`), failureNetwork, false);
       }
 
       return retryResponse;

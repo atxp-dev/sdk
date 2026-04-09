@@ -20,8 +20,16 @@
 
 import { createHmac, randomBytes } from 'crypto';
 
-// Per-process HMAC key — generated once at startup, never exported.
-const HMAC_KEY = randomBytes(32);
+// HMAC key for signing opaque identity fields.
+// - ATXP_OPAQUE_KEY env var (base64): use when running multiple instances behind
+//   a load balancer so that any instance can verify tokens signed by another.
+// - Random fallback: safe for single-instance deployments; key rotates on restart
+//   but challenges are short-lived (~5 min) so this is acceptable.
+const HMAC_KEY = (() => {
+  const envKey = process.env.ATXP_OPAQUE_KEY;
+  if (envKey) return Buffer.from(envKey, 'base64');
+  return randomBytes(32);
+})();
 
 /**
  * Sign a user identity for embedding in an MPP challenge's opaque field.
