@@ -19,27 +19,41 @@ export function buildX402Requirements(args: {
   resource: string;
   payeeName: string;
 }): X402PaymentRequirements {
-  // Filter to X402-compatible options only: real chain addresses on networks with
-  // EIP-3009 (transferWithAuthorization) support via the Coinbase CDP facilitator.
-  const X402_NETWORKS = new Set(['base', 'base_sepolia']);
+  // Filter to X402-compatible options: networks supported by the CDP facilitator.
+  // EVM networks: EIP-3009 (transferWithAuthorization) via Coinbase CDP.
+  // Solana: SPL TransferChecked via CDP facilitator.
+  const X402_EVM_NETWORKS = new Set(['base', 'base_sepolia']);
+  const X402_SVM_NETWORKS = new Set(['solana', 'solana_devnet']);
+
   const chainOptions = args.options.filter(o =>
-    X402_NETWORKS.has(o.network) && o.address.startsWith('0x')
+    (X402_EVM_NETWORKS.has(o.network) && o.address.startsWith('0x')) ||
+    (X402_SVM_NETWORKS.has(o.network) && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(o.address))
   );
 
-  const accepts: X402PaymentOption[] = chainOptions.map(option => ({
-    scheme: 'exact',
-    network: CAIP2_NETWORKS[option.network] || option.network,
-    amount: option.amount.times(1e6).toFixed(0),
-    resource: args.resource,
-    description: args.payeeName,
-    mimeType: 'application/json',
-    payTo: option.address,
-    maxTimeoutSeconds: 300,
-    asset: USDC_ADDRESSES[option.network] || USDC_ADDRESSES['base'],
-    // EIP-712 domain for Circle's USDC v2 contract (EIP-3009 transferWithAuthorization).
-    // If Circle changes the domain name/version in a future contract upgrade, this must be updated.
-    extra: { name: 'USD Coin', version: '2' },
-  }));
+  const accepts: X402PaymentOption[] = chainOptions.map(option => {
+    const isSvm = X402_SVM_NETWORKS.has(option.network);
+    return {
+      scheme: 'exact',
+      network: CAIP2_NETWORKS[option.network] || option.network,
+      amount: option.amount.times(1e6).toFixed(0),
+      resource: args.resource,
+      description: args.payeeName,
+      mimeType: 'application/json',
+      payTo: option.address,
+      maxTimeoutSeconds: 300,
+      asset: USDC_ADDRESSES[option.network] || USDC_ADDRESSES['base'],
+      extra: isSvm
+        ? {
+          // SVM: feePayer is the CDP facilitator's Solana address.
+          // TODO: Fetch dynamically from facilitator /supported endpoint.
+          // Currently hardcoded from CDP facilitator v2 response.
+          feePayer: option.network === 'solana_devnet' || option.network === 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
+            ? 'Hc3sdEAsCGQcpgfivywog9uwtk8gUBUZgsxdME1EJy88' // devnet
+            : 'BFK9TLC3edb13K6v4YyH3DwPb5DSUpkWvb7XnqCL9b4F', // mainnet
+        }
+        : { name: 'USD Coin', version: '2' }, // EVM: EIP-712 domain for USDC v2
+    };
+  });
 
   return {
     x402Version: 2,

@@ -96,7 +96,10 @@ async function buildAuthorizeParams(
   // For X402 authorize, pass a SINGLE selected requirement, not the full accepts array.
   if (data.x402) {
     const x402 = data.x402 as { accepts?: Array<Record<string, unknown>> };
-    const chainOption = x402.accepts?.find(a => a.network && a.network !== 'atxp');
+    // Prefer Solana X402 when available. Falls back to first non-ATXP option (Base).
+    // TODO: Chain selection should be configurable or use a feature flag.
+    const chainOption = x402.accepts?.find(a => a.network?.toString().startsWith('solana'))
+      || x402.accepts?.find(a => a.network && a.network !== 'atxp');
     if (chainOption) {
       // Pass the selected payment requirement (single object for /authorize/x402).
       // Add defaults for fields the X402 authorize endpoint requires but the omni-challenge may omit.
