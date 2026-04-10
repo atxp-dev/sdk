@@ -16,6 +16,12 @@ export interface MPPChallenge {
   currency: string;
   network: string;
   recipient: string;
+  /** ISO 8601 expiry. Set by the server for Tempo challenges; required by mppx verify. */
+  expires?: string;
+  /** Server-defined opaque data for identity recovery on MPP retry requests. */
+  opaque?: Record<string, unknown>;
+  /** Nested request object. mppx's createCredential reads amount/currency/recipient from here. */
+  request?: Record<string, unknown>;
 }
 
 const REQUIRED_FIELDS: (keyof MPPChallenge)[] = [
@@ -60,6 +66,7 @@ export function parseMPPHeader(headerValue: string): MPPChallenge | null {
     currency: params.currency,
     network: params.network,
     recipient: params.recipient,
+    ...(params.expires && { expires: params.expires }),
   };
 }
 
@@ -72,7 +79,16 @@ function parseMppObject(obj: unknown): MPPChallenge | null {
   for (const field of REQUIRED_FIELDS) {
     if (typeof mppObj[field] !== 'string') return null;
   }
+  // Spread all fields from the server's challenge JSON, then overlay typed
+  // assertions for known fields. This preserves unknown fields (e.g., new
+  // server-side additions) so they reach downstream consumers like mppx,
+  // while giving known fields their correct types. The MPPChallenge interface
+  // does NOT have an index signature, so callers get type safety for known
+  // fields and must cast if they need unknown ones.
+  // Note: the HTTP header path (parseMPPHeader) can only extract string
+  // fields, so complex objects like opaque/request only survive the JSON path.
   return {
+    ...mppObj,
     id: mppObj.id as string,
     method: mppObj.method as string,
     intent: mppObj.intent as string,
@@ -80,7 +96,7 @@ function parseMppObject(obj: unknown): MPPChallenge | null {
     currency: mppObj.currency as string,
     network: mppObj.network as string,
     recipient: mppObj.recipient as string,
-  };
+  } as MPPChallenge;
 }
 
 /**

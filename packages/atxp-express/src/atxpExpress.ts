@@ -108,12 +108,17 @@ export function atxpExpress(args: ATXPArgs): Router {
       // before charging, using the pricing context it has (amount, options).
       return withATXPContext(config, resource, tokenCheck, () => {
         if (detected) {
-          // Resolve identity from the credential itself (ATXP/MPP embed the source),
-          // then fall back to the OAuth sub. This is critical for X402: the credential
-          // doesn't contain the user's identity, but the OAuth token does. The settle
-          // must use the same sourceAccountId as the charge (atxpAccountId() = OAuth sub)
-          // so the ledger entries match.
-          const sourceAccountId = resolveIdentitySync(config, req, detected.protocol, detected.credential) || user || undefined;
+          // Resolve identity for the settlement ledger credit.
+          // The settle must use the same sourceAccountId as the charge
+          // (atxpAccountId() = OAuth sub) so the ledger entries match.
+          // For MPP: prefer the OAuth user (recovered from opaque) over the
+          // wallet address from the credential's `source` field — the ledger
+          // is keyed by OAuth identity, not wallet address.
+          // For ATXP: use the sourceAccountId embedded in the credential.
+          // For X402: falls back to OAuth sub (credential has no identity).
+          const sourceAccountId = (detected.protocol === 'mpp' && user)
+            ? user
+            : resolveIdentitySync(config, req, detected.protocol, detected.credential) || user || undefined;
           setDetectedCredential({
             protocol: detected.protocol,
             credential: detected.credential,

@@ -82,6 +82,7 @@ export function buildMppChallenges(args: {
   const challenges: MppChallengeData[] = [];
 
   // Solana option (USDC on Solana mainnet or devnet)
+  // Amount in micro-units (e.g., 10000 = 0.01 USDC). @solana/mpp expects this.
   const solanaOption = args.options.find(o => o.network === 'solana' || o.network === 'solana_devnet');
   if (solanaOption) {
     const isDevnet = solanaOption.network === 'solana_devnet';
@@ -97,16 +98,21 @@ export function buildMppChallenges(args: {
   }
 
   // Tempo option (USDC on Tempo mainnet, pathUSD on moderato)
+  // Amount in human-readable format (e.g., "0.01"). mppx's verify schema
+  // internally calls parseUnits(amount, decimals) to convert to raw units.
+  // This differs from Solana MPP which expects pre-converted micro-units.
+  // expires is required by mppx's verify() for Tempo challenge validation.
   const tempoOption = args.options.find(o => o.network === 'tempo' || o.network === 'tempo_moderato');
   if (tempoOption) {
     challenges.push({
       id: args.id,
       method: 'tempo',
       intent: 'charge',
-      amount: tempoOption.amount.times(10 ** STABLECOIN_DECIMALS).toFixed(0),
+      amount: tempoOption.amount.toString(),
       currency: tempoOption.currency || 'USDC',
       network: tempoOption.network,
       recipient: tempoOption.address,
+      expires: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     });
   }
 
@@ -131,7 +137,10 @@ export function buildMppChallenge(args: {
  */
 export function serializeMppHeader(challenge: MppChallengeData): string {
   const esc = (v: string) => v.replace(/"/g, '\\"');
-  return `Payment method="${esc(challenge.method)}", intent="${esc(challenge.intent)}", id="${esc(challenge.id)}", amount="${esc(challenge.amount)}", currency="${esc(challenge.currency)}", network="${esc(challenge.network)}", recipient="${esc(challenge.recipient)}"`;
+  const base = `Payment method="${esc(challenge.method)}", intent="${esc(challenge.intent)}", id="${esc(challenge.id)}", amount="${esc(challenge.amount)}", currency="${esc(challenge.currency)}", network="${esc(challenge.network)}", recipient="${esc(challenge.recipient)}"`;
+  // Append optional fields when present
+  const expires = challenge.expires ? `, expires="${esc(challenge.expires)}"` : '';
+  return base + expires;
 }
 
 /**

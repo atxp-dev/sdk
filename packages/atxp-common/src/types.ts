@@ -193,7 +193,7 @@ export interface DestinationMaker {
  */
 export interface PaymentDestination {
   getAccountId: () => Promise<AccountId>;
-  getSources: () => Promise<Source[]>;
+  getSources: (options?: { include?: string[] }) => Promise<Source[]>;
 }
 
 export interface AuthorizeParams {

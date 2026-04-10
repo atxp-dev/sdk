@@ -4,6 +4,7 @@ import {
   buildX402Requirements,
   buildAtxpMcpChallenge,
   buildMppChallenge,
+  buildMppChallenges,
   serializeMppHeader,
   omniChallengeMcpError,
   omniChallengeHttpResponse,
@@ -151,22 +152,25 @@ describe('omniChallenge', () => {
   });
 
   describe('buildMppChallenge', () => {
-    it('should build MPP challenge from Tempo option', () => {
+    it('should build MPP challenge from Tempo option with human-readable amount and expires', () => {
       const options = [
         { network: 'base', currency: 'USDC', address: '0xBase', amount: new BigNumber('0.01') },
         { network: 'tempo', currency: 'pathUSD', address: '0xTempo', amount: new BigNumber('0.01') },
       ];
 
       const result = buildMppChallenge({ id: 'ch_123', options });
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         id: 'ch_123',
         method: 'tempo',
         intent: 'charge',
-        amount: '10000',
+        amount: '0.01',
         currency: 'pathUSD',
         network: 'tempo',
         recipient: '0xTempo',
       });
+      // Tempo challenges include expires; Solana does not
+      expect(result!.expires).toBeDefined();
+      expect(new Date(result!.expires!).getTime()).toBeGreaterThan(Date.now());
     });
 
     it('should accept tempo_moderato (testnet) as a Tempo option', () => {
@@ -183,6 +187,43 @@ describe('omniChallenge', () => {
     it('should return null when no Tempo option is available', () => {
       const result = buildMppChallenge({ id: 'ch_456', options: defaultOptions });
       expect(result).toBeNull();
+    });
+  });
+
+  describe('buildMppChallenges amount format and expires', () => {
+    it('Solana challenges use micro-units and have no expires', () => {
+      const options = [
+        { network: 'solana', currency: 'USDC', address: 'SolAddr', amount: new BigNumber('0.01') },
+      ];
+      const result = buildMppChallenges({ id: 'ch_sol', options });
+      expect(result).toHaveLength(1);
+      expect(result![0].amount).toBe('10000'); // 0.01 * 10^6
+      expect(result![0].expires).toBeUndefined();
+    });
+
+    it('Tempo challenges use human-readable amount and include expires', () => {
+      const options = [
+        { network: 'tempo', currency: 'USDC', address: '0xTempo', amount: new BigNumber('1.5') },
+      ];
+      const result = buildMppChallenges({ id: 'ch_tempo', options });
+      expect(result).toHaveLength(1);
+      expect(result![0].amount).toBe('1.5'); // human-readable, not micro-units
+      expect(result![0].expires).toBeDefined();
+    });
+
+    it('multi-chain challenges have different amount formats per chain', () => {
+      const options = [
+        { network: 'solana', currency: 'USDC', address: 'SolAddr', amount: new BigNumber('0.01') },
+        { network: 'tempo', currency: 'USDC', address: '0xTempo', amount: new BigNumber('0.01') },
+      ];
+      const result = buildMppChallenges({ id: 'ch_multi', options });
+      expect(result).toHaveLength(2);
+      const solana = result!.find(c => c.method === 'solana')!;
+      const tempo = result!.find(c => c.method === 'tempo')!;
+      expect(solana.amount).toBe('10000');
+      expect(solana.expires).toBeUndefined();
+      expect(tempo.amount).toBe('0.01');
+      expect(tempo.expires).toBeDefined();
     });
   });
 
@@ -220,6 +261,24 @@ describe('omniChallenge', () => {
       const header = serializeMppHeader(original);
       const parsed = parseMPPHeader(header);
       expect(parsed).toEqual(original);
+    });
+
+    it('should round-trip expires through serialize → parse', () => {
+      const original = {
+        id: 'ch_expires',
+        method: 'tempo',
+        intent: 'charge',
+        amount: '0.01',
+        currency: 'USDC',
+        network: 'tempo',
+        recipient: '0xRecipient',
+        expires: '2026-04-10T00:00:00.000Z',
+      };
+
+      const header = serializeMppHeader(original);
+      expect(header).toContain('expires="2026-04-10T00:00:00.000Z"');
+      const parsed = parseMPPHeader(header);
+      expect(parsed!.expires).toBe('2026-04-10T00:00:00.000Z');
     });
   });
 

@@ -42,9 +42,12 @@ export class AccountIdDestination implements PaymentDestination {
     return this.accountId;
   }
 
-  async getSources(): Promise<Source[]> {
+  async getSources(options?: { include?: string[] }): Promise<Source[]> {
+    const query = options?.include?.length
+      ? `?${new URLSearchParams({ include: options.include.join(',') })}`
+      : '';
     const response = await this.fetchFn(
-      `${this.accountsBaseUrl}/account/${this.unqualifiedAccountId}/sources`,
+      `${this.accountsBaseUrl}/account/${this.unqualifiedAccountId}/sources${query}`,
       {
         method: 'GET',
         headers: {
