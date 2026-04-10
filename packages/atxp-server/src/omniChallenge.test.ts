@@ -42,10 +42,10 @@ describe('omniChallenge', () => {
       });
     });
 
-    it('should handle multiple payment options and filter to X402-compatible networks', () => {
+    it('should include both EVM and Solana X402 options', () => {
       const options = [
         { network: 'base', currency: 'USDC', address: '0xAddr1', amount: new BigNumber('0.01') },
-        { network: 'solana', currency: 'USDC', address: 'SolAddr', amount: new BigNumber('0.02') },
+        { network: 'solana', currency: 'USDC', address: '7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV', amount: new BigNumber('0.02') },
         { network: 'base', currency: 'USDC', address: '0xAddr2', amount: new BigNumber('0.03') },
       ];
 
@@ -55,10 +55,65 @@ describe('omniChallenge', () => {
         payeeName: 'Multi-chain Server',
       });
 
-      // Only Base options with 0x addresses are included (X402 uses Permit2, Base only)
-      expect(result.accepts).toHaveLength(2);
+      // EVM options first, then Solana
+      expect(result.accepts).toHaveLength(3);
       expect(result.accepts[0].payTo).toBe('0xAddr1');
       expect(result.accepts[1].payTo).toBe('0xAddr2');
+      expect(result.accepts[2].payTo).toBe('7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV');
+    });
+
+    it('should include feePayer in extra for Solana X402 options', () => {
+      const options = [
+        { network: 'solana', currency: 'USDC', address: '7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV', amount: new BigNumber('0.01') },
+      ];
+
+      const result = buildX402Requirements({
+        options,
+        resource: 'https://example.com',
+        payeeName: 'Solana Server',
+      });
+
+      expect(result.accepts).toHaveLength(1);
+      expect(result.accepts[0].extra).toHaveProperty('feePayer');
+      expect(result.accepts[0].extra.feePayer).toBe('BFK9TLC3edb13K6v4YyH3DwPb5DSUpkWvb7XnqCL9b4F');
+      expect(result.accepts[0].network).toBe('solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp');
+      expect(result.accepts[0].asset).toBe('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+    });
+
+    it('should filter out Solana addresses that are too short (invalid base58)', () => {
+      const options = [
+        { network: 'base', currency: 'USDC', address: '0xAddr1', amount: new BigNumber('0.01') },
+        { network: 'solana', currency: 'USDC', address: 'ShortAddr', amount: new BigNumber('0.02') },
+      ];
+
+      const result = buildX402Requirements({
+        options,
+        resource: 'https://example.com',
+        payeeName: 'Test',
+      });
+
+      // Only Base option included — short Solana address filtered out
+      expect(result.accepts).toHaveLength(1);
+      expect(result.accepts[0].payTo).toBe('0xAddr1');
+    });
+
+    it('should include EIP-712 domain in extra for EVM options but not Solana', () => {
+      const options = [
+        { network: 'base', currency: 'USDC', address: '0xAddr1', amount: new BigNumber('0.01') },
+        { network: 'solana', currency: 'USDC', address: '7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV', amount: new BigNumber('0.01') },
+      ];
+
+      const result = buildX402Requirements({
+        options,
+        resource: 'https://example.com',
+        payeeName: 'Test',
+      });
+
+      // EVM has EIP-712 domain
+      expect(result.accepts[0].extra).toEqual({ name: 'USD Coin', version: '2' });
+      // Solana has feePayer, not EIP-712 domain
+      expect(result.accepts[1].extra).toHaveProperty('feePayer');
+      expect(result.accepts[1].extra).not.toHaveProperty('name');
     });
   });
 
@@ -475,7 +530,7 @@ describe('omniChallenge', () => {
   });
 
   describe('buildAuthorizeParamsFromSources', () => {
-    it('should return first X402 accept as paymentRequirements and MPP challenges array', () => {
+    it('should return full X402 accepts array and MPP challenges', () => {
       const sources = [
         { chain: 'base', address: '0xBaseAddr' },
         { chain: 'solana', address: 'SolanaAddr123' },
@@ -490,13 +545,12 @@ describe('omniChallenge', () => {
         challengeId: 'ch_auth_1',
       });
 
-      // paymentRequirements: single X402 option (first accept), not the full wrapper
+      // paymentRequirements: full {x402Version, accepts} — accounts picks chain via flag
       expect(result.paymentRequirements).toBeDefined();
-      expect(result.paymentRequirements!.payTo).toBe('0xBaseAddr');
-      expect(result.paymentRequirements!.amount).toBe('100000'); // 0.10 * 1e6
-      expect(result.paymentRequirements!.scheme).toBe('exact');
-      // Should NOT have x402Version — it's the inner accept, not the wrapper
-      expect((result.paymentRequirements as any).x402Version).toBeUndefined();
+      expect(result.paymentRequirements!.x402Version).toBe(2);
+      expect(result.paymentRequirements!.accepts.length).toBeGreaterThan(0);
+      expect(result.paymentRequirements!.accepts[0].payTo).toBe('0xBaseAddr');
+      expect(result.paymentRequirements!.accepts[0].amount).toBe('100000');
 
       // challenges: MPP array with solana + tempo
       expect(result.challenges).toHaveLength(2);
@@ -532,7 +586,8 @@ describe('omniChallenge', () => {
       });
 
       expect(result.paymentRequirements).toBeDefined();
-      expect(result.paymentRequirements!.payTo).toBe('0xBaseOnly');
+      expect(result.paymentRequirements!.x402Version).toBe(2);
+      expect(result.paymentRequirements!.accepts[0].payTo).toBe('0xBaseOnly');
       expect(result.challenges).toEqual([]);
     });
   });

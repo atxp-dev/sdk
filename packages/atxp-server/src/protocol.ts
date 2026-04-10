@@ -246,21 +246,31 @@ export class ProtocolSettlement {
 
       // paymentRequirements from context may be a full X402PaymentRequirements object
       // ({x402Version, accepts: [...]}) from buildX402Requirements. Auth expects a single
-      // requirement object. Select the accept matching the payload chain:
-      // - Solana payloads have a "transaction" field → pick solana: accept
-      // - EVM payloads → pick eip155: accept
-      // - Fallback: first accept
+      // requirement object. Select the accept matching the credential's chain.
       let requirements = context?.paymentRequirements;
       if (requirements && typeof requirements === 'object' && 'accepts' in (requirements as Record<string, unknown>)) {
         const x402Reqs = requirements as { accepts?: Array<{ network?: string; [k: string]: unknown }> };
         const accepts = x402Reqs.accepts ?? [];
+
+        // Detect chain from the credential's accepted.network field (set by the accounts
+        // authorize route — SVM payloads have solana: network, EVM have eip155:).
+        // If the parsed payload includes an accepted object, use its network directly.
         const payloadObj = payload as Record<string, unknown> | null;
-        const isSvm = payloadObj && typeof payloadObj === 'object' && 'payload' in payloadObj &&
-          typeof (payloadObj.payload as Record<string, unknown>)?.transaction === 'string';
-        if (isSvm) {
-          requirements = accepts.find(a => a.network?.startsWith('solana')) ?? accepts[0];
+        const acceptedNetwork = (payloadObj?.accepted as Record<string, unknown> | undefined)?.network as string | undefined;
+
+        if (acceptedNetwork) {
+          const match = accepts.find(a => a.network === acceptedNetwork);
+          if (!match) {
+            this.logger.warn(`ProtocolSettlement: credential network ${acceptedNetwork} not in accepts [${accepts.map(a => a.network).join(', ')}], using first accept`);
+          }
+          requirements = match ?? accepts[0];
         } else {
-          requirements = accepts.find(a => a.network?.startsWith('eip155')) ?? accepts[0];
+          // Fallback for EVM payloads which don't embed accepted (x402HTTPClient format)
+          const evmMatch = accepts.find(a => a.network?.startsWith('eip155'));
+          if (!evmMatch) {
+            this.logger.warn(`ProtocolSettlement: no EVM accept found in [${accepts.map(a => a.network).join(', ')}], using first accept`);
+          }
+          requirements = evmMatch ?? accepts[0];
         }
       }
 

@@ -117,7 +117,7 @@ describe('ATXPAccountHandler', () => {
   });
 
   describe('buildAuthorizeParams (via handlePaymentChallenge)', () => {
-    it('extracts destination from x402 accepts, skipping network=atxp', async () => {
+    it('passes full x402 accepts array to accounts, skipping network=atxp', async () => {
       const authorize = vi.fn().mockResolvedValue({ protocol: 'x402', credential: 'x402-cred' });
       const account = createMockAccount({ authorize });
       const fetchFn = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
@@ -126,9 +126,11 @@ describe('ATXPAccountHandler', () => {
       const response = make402Response({
         chargeAmount: '1000000',
         x402: {
+          x402Version: 2,
           accepts: [
             { network: 'atxp', payTo: 'atxp_acct_123' },
             { network: 'eip155:8453', payTo: '0xDEST', amount: '1000000' },
+            { network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp', payTo: 'SolDest', amount: '1000000' },
           ],
         },
       });
@@ -139,15 +141,13 @@ describe('ATXPAccountHandler', () => {
         config,
       );
 
-      expect(authorize).toHaveBeenCalledWith(
-        expect.objectContaining({
-          destination: '0xDEST',
-          paymentRequirements: expect.objectContaining({
-            network: 'eip155:8453',
-            payTo: '0xDEST',
-          }),
-        }),
-      );
+      // Full accepts passed (minus atxp) — accounts picks chain via feature flag
+      const callArgs = authorize.mock.calls[0][0];
+      expect(callArgs.destination).toBe('0xDEST'); // from first non-atxp option
+      expect(callArgs.paymentRequirements.x402Version).toBe(2);
+      expect(callArgs.paymentRequirements.accepts).toHaveLength(2); // atxp filtered
+      expect(callArgs.paymentRequirements.accepts[0].network).toBe('eip155:8453');
+      expect(callArgs.paymentRequirements.accepts[1].network).toBe('solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp');
     });
 
     it('fetches payment request when no x402 data provides a destination', async () => {

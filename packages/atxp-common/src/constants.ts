@@ -18,7 +18,7 @@ export const USDC_ADDRESSES: Record<string, string> = {
 };
 
 /**
- * CAIP-2 network identifiers for EVM chains supported by the CDP facilitator.
+ * CAIP-2 network identifiers for chains supported by the CDP facilitator.
  *
  * Source: https://docs.cdp.coinbase.com/x402/network-support
  */

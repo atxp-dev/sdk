@@ -90,27 +90,31 @@ async function buildAuthorizeParams(
   // Try to get amount from challenge
   if (data.chargeAmount) params.amount = String(data.chargeAmount);
 
-  // Try to get destination from x402 data (has payTo address).
-  // Skip the ATXP option (network='atxp', payTo is an account ID not a blockchain address)
-  // and prefer a real chain option (base, solana, etc.).
-  // For X402 authorize, pass a SINGLE selected requirement, not the full accepts array.
+  // Pass full X402 accepts array to accounts — accounts picks the chain
+  // via ff:x402-chain feature flag (same pattern as MPP multi-chain challenges).
   if (data.x402) {
-    const x402 = data.x402 as { accepts?: Array<Record<string, unknown>> };
-    // Prefer Solana X402 when available (lower fees, faster confirmation).
-    // Falls back to first non-ATXP option (Base EVM).
-    const chainOption = x402.accepts?.find(a => a.network?.toString().startsWith('solana'))
-      || x402.accepts?.find(a => a.network && a.network !== 'atxp');
-    if (chainOption) {
-      // Pass the selected payment requirement (single object for /authorize/x402).
-      // Add defaults for fields the X402 authorize endpoint requires but the omni-challenge may omit.
+    const x402 = data.x402 as { x402Version?: number; accepts?: Array<Record<string, unknown>> };
+    const chainAccepts = x402.accepts?.filter(
+      (a): a is Record<string, unknown> & { network: string } =>
+        typeof a.network === 'string' && a.network !== 'atxp'
+    );
+
+    if (chainAccepts && chainAccepts.length > 0) {
+      // Send full { x402Version, accepts } so accounts can pick via feature flag.
+      // Add defaults for fields the authorize endpoint requires.
       params.paymentRequirements = {
-        ...chainOption,
-        mimeType: chainOption.mimeType || 'application/json',
-        asset: chainOption.asset || 'USDC',
+        x402Version: x402.x402Version ?? 2,
+        accepts: chainAccepts.map(a => ({
+          ...a,
+          mimeType: (a.mimeType as string) || 'application/json',
+          asset: (a.asset as string) || 'USDC',
+        })),
       };
-      if (chainOption.payTo) params.destination = chainOption.payTo as string;
-      if (chainOption.network) params.network = chainOption.network as string;
-      if (chainOption.amount && !params.amount) params.amount = chainOption.amount as string;
+      // Extract destination/amount from the first option for generic fields
+      const first = chainAccepts[0];
+      if (first.payTo) params.destination = first.payTo as string;
+      if (first.network) params.network = first.network;
+      if (first.amount && !params.amount) params.amount = first.amount as string;
     }
   }
 
