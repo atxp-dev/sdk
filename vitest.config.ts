@@ -5,7 +5,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'packages/**/*.test.ts'],
-    exclude: ['**/*.expo.test.ts', '**/*.expo.test.tsx', 'node_modules/**', 'dist/**'],
+    exclude: ['**/*.expo.test.ts', '**/*.expo.test.tsx', '**/*.integration.test.ts', 'node_modules/**', 'dist/**'],
   },
   define: {
     global: 'globalThis',
