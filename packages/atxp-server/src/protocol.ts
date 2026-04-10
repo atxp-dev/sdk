@@ -259,7 +259,11 @@ export class ProtocolSettlement {
         const acceptedNetwork = (payloadObj?.accepted as Record<string, unknown> | undefined)?.network as string | undefined;
 
         if (acceptedNetwork) {
-          requirements = accepts.find(a => a.network === acceptedNetwork) ?? accepts[0];
+          const match = accepts.find(a => a.network === acceptedNetwork);
+          if (!match) {
+            this.logger.warn(`ProtocolSettlement: credential network ${acceptedNetwork} not in accepts [${accepts.map(a => a.network).join(', ')}], using first accept`);
+          }
+          requirements = match ?? accepts[0];
         } else {
           // Fallback for EVM payloads which don't embed accepted (x402HTTPClient format)
           requirements = accepts.find(a => a.network?.startsWith('eip155')) ?? accepts[0];

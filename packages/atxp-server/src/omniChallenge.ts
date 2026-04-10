@@ -57,7 +57,7 @@ export function buildX402Requirements(args: {
       mimeType: 'application/json',
       payTo: option.address,
       maxTimeoutSeconds: 300,
-      asset: USDC_ADDRESSES[option.network],
+      asset: USDC_ADDRESSES[option.network] || USDC_ADDRESSES['solana'],
       extra: { feePayer: SOLANA_FEE_PAYERS[option.network] || SOLANA_FEE_PAYERS['solana'] },
     })),
   ];
@@ -350,18 +350,15 @@ export function buildAuthorizeParamsFromSources(args: {
   payeeName?: string;
   challengeId?: string;
 }): {
-  /** X402: single payment requirement (first Base option). Matches what
-   *  ATXPAccountHandler extracts from the omni-challenge accepts array. */
-  paymentRequirements?: X402PaymentOption;
+  /** X402: full accepts array — accounts picks chain via ff:x402-chain flag. */
+  paymentRequirements?: X402PaymentRequirements;
   /** MPP challenges array (for /authorize/mpp) */
   challenges: MppChallengeData[];
 } {
   const payment = buildPaymentOptions(args);
-  // Extract the first X402 accept — /authorize/x402 expects a single
-  // requirement object, not the full { x402Version, accepts } wrapper.
-  const firstX402 = payment.x402.accepts[0] ?? undefined;
+  const hasX402 = payment.x402.accepts.length > 0;
   return {
-    ...(firstX402 && { paymentRequirements: firstX402 }),
+    ...(hasX402 && { paymentRequirements: payment.x402 }),
     challenges: payment.mpp ?? [],
   };
 }

@@ -94,19 +94,26 @@ async function buildAuthorizeParams(
   // via ff:x402-chain feature flag (same pattern as MPP multi-chain challenges).
   if (data.x402) {
     const x402 = data.x402 as { x402Version?: number; accepts?: Array<Record<string, unknown>> };
-    const chainAccepts = x402.accepts?.filter(a => a.network && a.network !== 'atxp')
-      ?.map(a => ({ ...a, mimeType: a.mimeType || 'application/json', asset: a.asset || 'USDC' }));
+    const chainAccepts = x402.accepts?.filter(
+      (a): a is Record<string, unknown> & { network: string } =>
+        typeof a.network === 'string' && a.network !== 'atxp'
+    );
 
     if (chainAccepts && chainAccepts.length > 0) {
-      // Send full { x402Version, accepts } so accounts can pick via feature flag
+      // Send full { x402Version, accepts } so accounts can pick via feature flag.
+      // Add defaults for fields the authorize endpoint requires.
       params.paymentRequirements = {
         x402Version: x402.x402Version ?? 2,
-        accepts: chainAccepts,
+        accepts: chainAccepts.map(a => ({
+          ...a,
+          mimeType: (a.mimeType as string) || 'application/json',
+          asset: (a.asset as string) || 'USDC',
+        })),
       };
       // Extract destination/amount from the first option for generic fields
       const first = chainAccepts[0];
       if (first.payTo) params.destination = first.payTo as string;
-      if (first.network) params.network = first.network as string;
+      if (first.network) params.network = first.network;
       if (first.amount && !params.amount) params.amount = first.amount as string;
     }
   }

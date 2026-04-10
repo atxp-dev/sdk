@@ -530,7 +530,7 @@ describe('omniChallenge', () => {
   });
 
   describe('buildAuthorizeParamsFromSources', () => {
-    it('should return first X402 accept as paymentRequirements and MPP challenges array', () => {
+    it('should return full X402 accepts array and MPP challenges', () => {
       const sources = [
         { chain: 'base', address: '0xBaseAddr' },
         { chain: 'solana', address: 'SolanaAddr123' },
@@ -545,13 +545,12 @@ describe('omniChallenge', () => {
         challengeId: 'ch_auth_1',
       });
 
-      // paymentRequirements: single X402 option (first accept), not the full wrapper
+      // paymentRequirements: full {x402Version, accepts} — accounts picks chain via flag
       expect(result.paymentRequirements).toBeDefined();
-      expect(result.paymentRequirements!.payTo).toBe('0xBaseAddr');
-      expect(result.paymentRequirements!.amount).toBe('100000'); // 0.10 * 1e6
-      expect(result.paymentRequirements!.scheme).toBe('exact');
-      // Should NOT have x402Version — it's the inner accept, not the wrapper
-      expect((result.paymentRequirements as any).x402Version).toBeUndefined();
+      expect(result.paymentRequirements!.x402Version).toBe(2);
+      expect(result.paymentRequirements!.accepts.length).toBeGreaterThan(0);
+      expect(result.paymentRequirements!.accepts[0].payTo).toBe('0xBaseAddr');
+      expect(result.paymentRequirements!.accepts[0].amount).toBe('100000');
 
       // challenges: MPP array with solana + tempo
       expect(result.challenges).toHaveLength(2);
@@ -587,7 +586,8 @@ describe('omniChallenge', () => {
       });
 
       expect(result.paymentRequirements).toBeDefined();
-      expect(result.paymentRequirements!.payTo).toBe('0xBaseOnly');
+      expect(result.paymentRequirements!.x402Version).toBe(2);
+      expect(result.paymentRequirements!.accepts[0].payTo).toBe('0xBaseOnly');
       expect(result.challenges).toEqual([]);
     });
   });
