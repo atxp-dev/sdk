@@ -11,11 +11,20 @@ export type MppChallengeData = {
   id: string;
   method: string;
   intent: string;
+  /**
+   * Payment amount. Format depends on the chain (check `method`):
+   * - `"solana"`: micro-units as an integer string (e.g., `"10000"` = 0.01 USDC)
+   * - `"tempo"`: human-readable decimal string (e.g., `"0.01"`)
+   *
+   * This asymmetry exists because each chain's MPP library expects a different
+   * input format: @solana/mpp uses micro-units, mppx uses human-readable with
+   * a `decimals` field and internally calls `parseUnits(amount, decimals)`.
+   */
   amount: string;
   currency: string;
   network: string;
   recipient: string;
-  /** ISO 8601 expiry timestamp. Required by mppx's verify() for Tempo. */
+  /** ISO 8601 expiry timestamp. Required by mppx's verify() for Tempo challenges. */
   expires?: string;
   /** Server-defined opaque data echoed by clients. Used to carry signed
    *  identity when Authorization: Payment replaces Authorization: Bearer. */

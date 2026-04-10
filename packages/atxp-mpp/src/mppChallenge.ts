@@ -16,6 +16,12 @@ export interface MPPChallenge {
   currency: string;
   network: string;
   recipient: string;
+  /** ISO 8601 expiry. Set by the server for Tempo challenges; required by mppx verify. */
+  expires?: string;
+  /** Server-defined opaque data for identity recovery on MPP retry requests. */
+  opaque?: Record<string, unknown>;
+  /** Extra fields from the challenge that parsers should preserve (e.g., request). */
+  [key: string]: unknown;
 }
 
 const REQUIRED_FIELDS: (keyof MPPChallenge)[] = [
@@ -60,6 +66,7 @@ export function parseMPPHeader(headerValue: string): MPPChallenge | null {
     currency: params.currency,
     network: params.network,
     recipient: params.recipient,
+    ...(params.expires && { expires: params.expires }),
   };
 }
 
@@ -72,7 +79,11 @@ function parseMppObject(obj: unknown): MPPChallenge | null {
   for (const field of REQUIRED_FIELDS) {
     if (typeof mppObj[field] !== 'string') return null;
   }
+  // Preserve all fields from the challenge object (e.g., expires, opaque,
+  // request) — downstream consumers like mppx need them even though they're
+  // not part of the core MPP spec.
   return {
+    ...mppObj,
     id: mppObj.id as string,
     method: mppObj.method as string,
     intent: mppObj.intent as string,
