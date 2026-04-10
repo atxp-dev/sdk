@@ -246,13 +246,22 @@ export class ProtocolSettlement {
 
       // paymentRequirements from context may be a full X402PaymentRequirements object
       // ({x402Version, accepts: [...]}) from buildX402Requirements. Auth expects a single
-      // requirement object. We extract the first accept because the server currently has
-      // one Base address for X402 — multi-option selection would require correlating the
-      // credential back to the specific accept option the client chose.
+      // requirement object. Select the accept matching the payload chain:
+      // - Solana payloads have a "transaction" field → pick solana: accept
+      // - EVM payloads → pick eip155: accept
+      // - Fallback: first accept
       let requirements = context?.paymentRequirements;
       if (requirements && typeof requirements === 'object' && 'accepts' in (requirements as Record<string, unknown>)) {
-        const x402Reqs = requirements as { accepts?: unknown[] };
-        requirements = x402Reqs.accepts?.[0] ?? requirements;
+        const x402Reqs = requirements as { accepts?: Array<{ network?: string; [k: string]: unknown }> };
+        const accepts = x402Reqs.accepts ?? [];
+        const payloadObj = payload as Record<string, unknown> | null;
+        const isSvm = payloadObj && typeof payloadObj === 'object' && 'payload' in payloadObj &&
+          typeof (payloadObj.payload as Record<string, unknown>)?.transaction === 'string';
+        if (isSvm) {
+          requirements = accepts.find(a => a.network?.startsWith('solana')) ?? accepts[0];
+        } else {
+          requirements = accepts.find(a => a.network?.startsWith('eip155')) ?? accepts[0];
+        }
       }
 
       return {

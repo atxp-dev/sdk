@@ -19,27 +19,50 @@ export function buildX402Requirements(args: {
   resource: string;
   payeeName: string;
 }): X402PaymentRequirements {
-  // Filter to X402-compatible options only: real chain addresses on networks with
-  // EIP-3009 (transferWithAuthorization) support via the Coinbase CDP facilitator.
-  const X402_NETWORKS = new Set(['base', 'base_sepolia']);
-  const chainOptions = args.options.filter(o =>
-    X402_NETWORKS.has(o.network) && o.address.startsWith('0x')
+  // EVM networks: EIP-3009 transferWithAuthorization via CDP facilitator (0x addresses)
+  const X402_EVM_NETWORKS = new Set(['base', 'base_sepolia']);
+  // SVM networks: SPL TransferChecked via CDP facilitator (base58 Solana addresses)
+  const X402_SVM_NETWORKS = new Set(['solana', 'solana_devnet']);
+
+  const evmOptions = args.options.filter(o =>
+    X402_EVM_NETWORKS.has(o.network) && o.address.startsWith('0x')
+  );
+  const svmOptions = args.options.filter(o =>
+    X402_SVM_NETWORKS.has(o.network) && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(o.address)
   );
 
-  const accepts: X402PaymentOption[] = chainOptions.map(option => ({
-    scheme: 'exact',
-    network: CAIP2_NETWORKS[option.network] || option.network,
-    amount: option.amount.times(1e6).toFixed(0),
-    resource: args.resource,
-    description: args.payeeName,
-    mimeType: 'application/json',
-    payTo: option.address,
-    maxTimeoutSeconds: 300,
-    asset: USDC_ADDRESSES[option.network] || USDC_ADDRESSES['base'],
-    // EIP-712 domain for Circle's USDC v2 contract (EIP-3009 transferWithAuthorization).
-    // If Circle changes the domain name/version in a future contract upgrade, this must be updated.
-    extra: { name: 'USD Coin', version: '2' },
-  }));
+  // CDP facilitator fee payer addresses for Solana X402
+  const SOLANA_FEE_PAYERS: Record<string, string> = {
+    solana: 'BFK9TLC3edb13K6v4YyH3DwPb5DSUpkWvb7XnqCL9b4F',
+    solana_devnet: 'Hc3sdEAsCGQcpgfivywog9uwtk8gUBUZgsxdME1EJy88',
+  };
+
+  const accepts: X402PaymentOption[] = [
+    ...evmOptions.map(option => ({
+      scheme: 'exact' as const,
+      network: CAIP2_NETWORKS[option.network] || option.network,
+      amount: option.amount.times(1e6).toFixed(0),
+      resource: args.resource,
+      description: args.payeeName,
+      mimeType: 'application/json',
+      payTo: option.address,
+      maxTimeoutSeconds: 300,
+      asset: USDC_ADDRESSES[option.network] || USDC_ADDRESSES['base'],
+      extra: { name: 'USD Coin', version: '2' },
+    })),
+    ...svmOptions.map(option => ({
+      scheme: 'exact' as const,
+      network: CAIP2_NETWORKS[option.network] || option.network,
+      amount: option.amount.times(1e6).toFixed(0),
+      resource: args.resource,
+      description: args.payeeName,
+      mimeType: 'application/json',
+      payTo: option.address,
+      maxTimeoutSeconds: 300,
+      asset: USDC_ADDRESSES[option.network] || SOLANA_USDC_MINT,
+      extra: { feePayer: SOLANA_FEE_PAYERS[option.network] || SOLANA_FEE_PAYERS['solana'] },
+    })),
+  ];
 
   return {
     x402Version: 2,
