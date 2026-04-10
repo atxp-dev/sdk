@@ -262,6 +262,24 @@ describe('omniChallenge', () => {
       const parsed = parseMPPHeader(header);
       expect(parsed).toEqual(original);
     });
+
+    it('should round-trip expires through serialize → parse', () => {
+      const original = {
+        id: 'ch_expires',
+        method: 'tempo',
+        intent: 'charge',
+        amount: '0.01',
+        currency: 'USDC',
+        network: 'tempo',
+        recipient: '0xRecipient',
+        expires: '2026-04-10T00:00:00.000Z',
+      };
+
+      const header = serializeMppHeader(original);
+      expect(header).toContain('expires="2026-04-10T00:00:00.000Z"');
+      const parsed = parseMPPHeader(header);
+      expect(parsed!.expires).toBe('2026-04-10T00:00:00.000Z');
+    });
   });
 
   describe('omniChallengeMcpError with MPP', () => {

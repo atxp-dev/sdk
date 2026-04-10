@@ -20,8 +20,8 @@ export interface MPPChallenge {
   expires?: string;
   /** Server-defined opaque data for identity recovery on MPP retry requests. */
   opaque?: Record<string, unknown>;
-  /** Extra fields from the challenge that parsers should preserve (e.g., request). */
-  [key: string]: unknown;
+  /** Nested request object. mppx's createCredential reads amount/currency/recipient from here. */
+  request?: Record<string, unknown>;
 }
 
 const REQUIRED_FIELDS: (keyof MPPChallenge)[] = [
@@ -79,11 +79,10 @@ function parseMppObject(obj: unknown): MPPChallenge | null {
   for (const field of REQUIRED_FIELDS) {
     if (typeof mppObj[field] !== 'string') return null;
   }
-  // Preserve all fields from the challenge object (e.g., expires, opaque,
-  // request) — downstream consumers like mppx need them even though they're
-  // not part of the core MPP spec.
+  // Preserve known optional fields that downstream consumers need.
+  // HTTP header path (parseMPPHeader) only extracts expires since headers
+  // can't carry complex objects like opaque/request.
   return {
-    ...mppObj,
     id: mppObj.id as string,
     method: mppObj.method as string,
     intent: mppObj.intent as string,
@@ -91,6 +90,9 @@ function parseMppObject(obj: unknown): MPPChallenge | null {
     currency: mppObj.currency as string,
     network: mppObj.network as string,
     recipient: mppObj.recipient as string,
+    ...(typeof mppObj.expires === 'string' && { expires: mppObj.expires }),
+    ...(mppObj.opaque && typeof mppObj.opaque === 'object' && { opaque: mppObj.opaque as Record<string, unknown> }),
+    ...(mppObj.request && typeof mppObj.request === 'object' && { request: mppObj.request as Record<string, unknown> }),
   };
 }
 

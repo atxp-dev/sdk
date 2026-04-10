@@ -258,9 +258,11 @@ export class ATXPAccount implements Account {
    */
   async getSources(options?: { include?: string[] }): Promise<Source[]> {
     const unqualifiedAccountId = await this.getUnqualifiedAccountId();
-    const includeParam = options?.include?.length ? `?include=${options.include.join(',')}` : '';
+    const query = options?.include?.length
+      ? `?${new URLSearchParams({ include: options.include.join(',') })}`
+      : '';
 
-    const response = await this.fetchFn(`${this.origin}/account/${unqualifiedAccountId}/sources${includeParam}`, {
+    const response = await this.fetchFn(`${this.origin}/account/${unqualifiedAccountId}/sources${query}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
