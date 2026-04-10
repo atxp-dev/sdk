@@ -266,7 +266,11 @@ export class ProtocolSettlement {
           requirements = match ?? accepts[0];
         } else {
           // Fallback for EVM payloads which don't embed accepted (x402HTTPClient format)
-          requirements = accepts.find(a => a.network?.startsWith('eip155')) ?? accepts[0];
+          const evmMatch = accepts.find(a => a.network?.startsWith('eip155'));
+          if (!evmMatch) {
+            this.logger.warn(`ProtocolSettlement: no EVM accept found in [${accepts.map(a => a.network).join(', ')}], using first accept`);
+          }
+          requirements = evmMatch ?? accepts[0];
         }
       }
 

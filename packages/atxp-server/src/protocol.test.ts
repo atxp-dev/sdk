@@ -318,5 +318,76 @@ describe('ProtocolSettlement', () => {
 
       await expect(settlement.settle('x402', 'cred')).rejects.toThrow('Settlement failed for x402: 500');
     });
+
+    describe('X402 multi-chain accept routing', () => {
+      const multiChainReqs = {
+        x402Version: 2,
+        accepts: [
+          { network: 'eip155:8453', payTo: '0xBase', amount: '10000', scheme: 'exact' },
+          { network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp', payTo: 'SolDest', amount: '10000', scheme: 'exact' },
+        ],
+      };
+
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: async () => ({ txHash: '0x123', settledAmount: '10000' }),
+        });
+      });
+
+      it('should select Solana accept when credential has solana accepted.network', async () => {
+        const solanaPayload = {
+          payload: { transaction: 'base64tx' },
+          accepted: { network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' },
+        };
+        const credential = Buffer.from(JSON.stringify(solanaPayload)).toString('base64');
+
+        await settlement.settle('x402', credential, { paymentRequirements: multiChainReqs });
+
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+        expect(body.paymentRequirements.network).toBe('solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp');
+        expect(body.paymentRequirements.payTo).toBe('SolDest');
+      });
+
+      it('should select EVM accept when credential has no accepted field', async () => {
+        const evmPayload = { signature: '0xabc' };
+        const credential = Buffer.from(JSON.stringify(evmPayload)).toString('base64');
+
+        await settlement.settle('x402', credential, { paymentRequirements: multiChainReqs });
+
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+        expect(body.paymentRequirements.network).toBe('eip155:8453');
+      });
+
+      it('should warn when credential network not found in accepts', async () => {
+        const unknownPayload = {
+          accepted: { network: 'eip155:999999' },
+        };
+        const credential = Buffer.from(JSON.stringify(unknownPayload)).toString('base64');
+
+        await settlement.settle('x402', credential, { paymentRequirements: multiChainReqs });
+
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('credential network eip155:999999 not in accepts'),
+        );
+      });
+
+      it('should warn when no EVM accept exists for EVM fallback', async () => {
+        const solanaOnlyReqs = {
+          x402Version: 2,
+          accepts: [
+            { network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp', payTo: 'SolDest', amount: '10000', scheme: 'exact' },
+          ],
+        };
+        const evmPayload = { signature: '0xabc' };
+        const credential = Buffer.from(JSON.stringify(evmPayload)).toString('base64');
+
+        await settlement.settle('x402', credential, { paymentRequirements: solanaOnlyReqs });
+
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('no EVM accept found'),
+        );
+      });
+    });
   });
 });
