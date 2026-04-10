@@ -79,10 +79,16 @@ function parseMppObject(obj: unknown): MPPChallenge | null {
   for (const field of REQUIRED_FIELDS) {
     if (typeof mppObj[field] !== 'string') return null;
   }
-  // Preserve known optional fields that downstream consumers need.
-  // HTTP header path (parseMPPHeader) only extracts expires since headers
-  // can't carry complex objects like opaque/request.
+  // Spread all fields from the server's challenge JSON, then overlay typed
+  // assertions for known fields. This preserves unknown fields (e.g., new
+  // server-side additions) so they reach downstream consumers like mppx,
+  // while giving known fields their correct types. The MPPChallenge interface
+  // does NOT have an index signature, so callers get type safety for known
+  // fields and must cast if they need unknown ones.
+  // Note: the HTTP header path (parseMPPHeader) can only extract string
+  // fields, so complex objects like opaque/request only survive the JSON path.
   return {
+    ...mppObj,
     id: mppObj.id as string,
     method: mppObj.method as string,
     intent: mppObj.intent as string,
@@ -90,10 +96,7 @@ function parseMppObject(obj: unknown): MPPChallenge | null {
     currency: mppObj.currency as string,
     network: mppObj.network as string,
     recipient: mppObj.recipient as string,
-    ...(typeof mppObj.expires === 'string' && { expires: mppObj.expires }),
-    ...(mppObj.opaque && typeof mppObj.opaque === 'object' && { opaque: mppObj.opaque as Record<string, unknown> }),
-    ...(mppObj.request && typeof mppObj.request === 'object' && { request: mppObj.request as Record<string, unknown> }),
-  };
+  } as MPPChallenge;
 }
 
 /**
