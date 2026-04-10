@@ -7,35 +7,33 @@ import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppC
 // USDC and pathUSD both use 6 decimals.
 const STABLECOIN_DECIMALS = 6;
 
-// Solana USDC mint addresses
-const SOLANA_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const SOLANA_USDC_MINT_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+// X402-compatible network sets
+const X402_EVM_NETWORKS = new Set(['base', 'base_sepolia']);
+const X402_SVM_NETWORKS = new Set(['solana', 'solana_devnet']);
+
+// CDP facilitator fee payer addresses for Solana X402.
+// Source: https://docs.cdp.coinbase.com/x402/network-support
+const SOLANA_FEE_PAYERS: Record<string, string> = {
+  solana: 'BFK9TLC3edb13K6v4YyH3DwPb5DSUpkWvb7XnqCL9b4F',
+  solana_devnet: 'Hc3sdEAsCGQcpgfivywog9uwtk8gUBUZgsxdME1EJy88',
+};
 
 /**
  * Build X402 payment requirements from charge options.
+ * Returns EVM (Base) and SVM (Solana) options. The accepts array is ordered
+ * EVM-first — clients that don't have a chain preference use the first option.
  */
 export function buildX402Requirements(args: {
   options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
   resource: string;
   payeeName: string;
 }): X402PaymentRequirements {
-  // EVM networks: EIP-3009 transferWithAuthorization via CDP facilitator (0x addresses)
-  const X402_EVM_NETWORKS = new Set(['base', 'base_sepolia']);
-  // SVM networks: SPL TransferChecked via CDP facilitator (base58 Solana addresses)
-  const X402_SVM_NETWORKS = new Set(['solana', 'solana_devnet']);
-
   const evmOptions = args.options.filter(o =>
     X402_EVM_NETWORKS.has(o.network) && o.address.startsWith('0x')
   );
   const svmOptions = args.options.filter(o =>
     X402_SVM_NETWORKS.has(o.network) && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(o.address)
   );
-
-  // CDP facilitator fee payer addresses for Solana X402
-  const SOLANA_FEE_PAYERS: Record<string, string> = {
-    solana: 'BFK9TLC3edb13K6v4YyH3DwPb5DSUpkWvb7XnqCL9b4F',
-    solana_devnet: 'Hc3sdEAsCGQcpgfivywog9uwtk8gUBUZgsxdME1EJy88',
-  };
 
   const accepts: X402PaymentOption[] = [
     ...evmOptions.map(option => ({
@@ -59,7 +57,7 @@ export function buildX402Requirements(args: {
       mimeType: 'application/json',
       payTo: option.address,
       maxTimeoutSeconds: 300,
-      asset: USDC_ADDRESSES[option.network] || SOLANA_USDC_MINT,
+      asset: USDC_ADDRESSES[option.network],
       extra: { feePayer: SOLANA_FEE_PAYERS[option.network] || SOLANA_FEE_PAYERS['solana'] },
     })),
   ];
@@ -114,7 +112,7 @@ export function buildMppChallenges(args: {
       method: 'solana',
       intent: 'charge',
       amount: solanaOption.amount.times(10 ** STABLECOIN_DECIMALS).toFixed(0),
-      currency: isDevnet ? SOLANA_USDC_MINT_DEVNET : SOLANA_USDC_MINT,
+      currency: USDC_ADDRESSES[isDevnet ? 'solana_devnet' : 'solana'],
       network: isDevnet ? 'devnet' : 'mainnet-beta',
       recipient: solanaOption.address,
     });
