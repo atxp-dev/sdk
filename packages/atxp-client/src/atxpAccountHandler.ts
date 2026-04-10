@@ -90,26 +90,24 @@ async function buildAuthorizeParams(
   // Try to get amount from challenge
   if (data.chargeAmount) params.amount = String(data.chargeAmount);
 
-  // Try to get destination from x402 data (has payTo address).
-  // Skip the ATXP option (network='atxp', payTo is an account ID not a blockchain address)
-  // and prefer a real chain option (base, solana, etc.).
-  // For X402 authorize, pass a SINGLE selected requirement, not the full accepts array.
+  // Pass full X402 accepts array to accounts — accounts picks the chain
+  // via ff:x402-chain feature flag (same pattern as MPP multi-chain challenges).
   if (data.x402) {
-    const x402 = data.x402 as { accepts?: Array<Record<string, unknown>> };
-    // Use the first non-ATXP accept option. Chain preference is server-driven
-    // via the ordering of accepts (buildX402Requirements controls the order).
-    const chainOption = x402.accepts?.find(a => a.network && a.network !== 'atxp');
-    if (chainOption) {
-      // Pass the selected payment requirement (single object for /authorize/x402).
-      // Add defaults for fields the X402 authorize endpoint requires but the omni-challenge may omit.
+    const x402 = data.x402 as { x402Version?: number; accepts?: Array<Record<string, unknown>> };
+    const chainAccepts = x402.accepts?.filter(a => a.network && a.network !== 'atxp')
+      ?.map(a => ({ ...a, mimeType: a.mimeType || 'application/json', asset: a.asset || 'USDC' }));
+
+    if (chainAccepts && chainAccepts.length > 0) {
+      // Send full { x402Version, accepts } so accounts can pick via feature flag
       params.paymentRequirements = {
-        ...chainOption,
-        mimeType: chainOption.mimeType || 'application/json',
-        asset: chainOption.asset || 'USDC',
+        x402Version: x402.x402Version ?? 2,
+        accepts: chainAccepts,
       };
-      if (chainOption.payTo) params.destination = chainOption.payTo as string;
-      if (chainOption.network) params.network = chainOption.network as string;
-      if (chainOption.amount && !params.amount) params.amount = chainOption.amount as string;
+      // Extract destination/amount from the first option for generic fields
+      const first = chainAccepts[0];
+      if (first.payTo) params.destination = first.payTo as string;
+      if (first.network) params.network = first.network as string;
+      if (first.amount && !params.amount) params.amount = first.amount as string;
     }
   }
 
