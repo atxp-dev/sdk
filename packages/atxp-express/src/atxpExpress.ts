@@ -170,50 +170,60 @@ export function atxpExpress(args: ATXPArgs): Router {
  * New clients: see JSON-RPC error with code -30402 + full error.data → x402/mpp works
  */
 function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
-  // Save original res.end (may be patched by supertest or other middleware)
   const origEnd = res.end;
+  const origWriteHead = res.writeHead;
+
+  // Capture writeHead args so we can replay with corrected Content-Length.
+  let deferredWriteHead: { statusCode: number; headers?: any } | null = null;
+
+  (res as any).writeHead = function (statusCode: number, ...rest: any[]) {
+    // Only defer if a payment challenge might need rewriting.
+    // We can't know yet (challenge is set during tool handler execution),
+    // so always defer. Replayed in res.end.
+    const headers = typeof rest[0] === 'object' ? rest[0] : rest[1];
+    deferredWriteHead = { statusCode, headers };
+    return this;
+  };
 
   res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
-    // Restore original immediately to avoid any re-entry issues
+    // Restore originals immediately to avoid re-entry
     res.end = origEnd;
+    (res as any).writeHead = origWriteHead;
 
     const challenge = getPendingPaymentChallenge();
-    if (!challenge) {
-      return origEnd.apply(this, args);
-    }
 
     const chunk = args[0];
-    if (!chunk) {
-      return origEnd.apply(this, args);
+    const body = chunk
+      ? (typeof chunk === 'string' ? chunk : Buffer.isBuffer(chunk) ? chunk.toString('utf-8') : null)
+      : null;
+
+    const rewritten = (challenge && body)
+      ? tryRewritePaymentResponse(body, challenge, logger)
+      : null;
+
+    // Replay writeHead with correct Content-Length
+    if (deferredWriteHead) {
+      const finalBody = rewritten ?? body;
+      const headers = { ...deferredWriteHead.headers };
+      if (finalBody) {
+        headers['Content-Length'] = Buffer.byteLength(finalBody, 'utf-8');
+      }
+      origWriteHead.call(this, deferredWriteHead.statusCode, headers);
     }
 
-    const body = typeof chunk === 'string'
-      ? chunk
-      : Buffer.isBuffer(chunk)
-        ? chunk.toString('utf-8')
-        : null;
-
-    if (!body) {
-      return origEnd.apply(this, args);
+    if (rewritten) {
+      return origEnd.call(this, rewritten, args[1], args[2]);
     }
-
-    const rewritten = tryRewritePaymentResponse(body, challenge, logger);
-    if (!rewritten) {
-      return origEnd.apply(this, args);
-    }
-
-    // Replace the body with the rewritten JSON-RPC error.
-    // Don't set Content-Length — writeHead() was already called by the transport,
-    // so headers are already sent. The chunked encoding handles length.
-    return origEnd.call(this, rewritten, args[1], args[2]);
+    return origEnd.apply(this, args);
   } as any;
 }
 
 /**
  * Attempt to rewrite a wrapped payment tool error into a JSON-RPC error.
  * Returns the rewritten JSON string, or null if the body isn't a wrapped payment error.
+ * Exported for testing.
  */
-function tryRewritePaymentResponse(
+export function tryRewritePaymentResponse(
   body: string,
   challenge: PendingPaymentChallenge,
   logger: import("@atxp/common").Logger,
@@ -250,8 +260,9 @@ function tryRewritePaymentResponse(
 /**
  * Check if a single JSON-RPC response is a wrapped payment tool error.
  * If so, return a JSON-RPC error object with the full challenge data.
+ * Exported for testing.
  */
-function rewriteSingleResponse(
+export function rewriteSingleResponse(
   msg: unknown,
   challenge: PendingPaymentChallenge,
 ): Record<string, unknown> | null {
@@ -264,17 +275,21 @@ function rewriteSingleResponse(
   const result = obj.result as Record<string, unknown>;
   if (!result.isError) return null;
 
-  // Verify the tool error text matches the stored challenge message.
-  // McpError formats .message as "MCP error <code>: <original>", so the
-  // wrapped text will contain the challenge message as a substring.
+  // Verify this is OUR payment error by checking the text contains the
+  // payment request URL from the stored challenge. This is more robust than
+  // matching the full message text — immune to McpError message formatting
+  // changes (prefixes, truncation, escaping).
   const content = result.content;
   if (!Array.isArray(content)) return null;
+
+  const paymentUrl = (challenge.data as Record<string, unknown>).paymentRequestUrl;
+  if (!paymentUrl || typeof paymentUrl !== 'string') return null;
 
   const matchesChallenge = content.some(
     (c: unknown) => c && typeof c === 'object' &&
       (c as Record<string, unknown>).type === 'text' &&
       typeof (c as Record<string, unknown>).text === 'string' &&
-      ((c as Record<string, unknown>).text as string).includes(challenge.message)
+      ((c as Record<string, unknown>).text as string).includes(paymentUrl)
   );
   if (!matchesChallenge) return null;
 

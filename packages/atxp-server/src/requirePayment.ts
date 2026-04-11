@@ -1,7 +1,7 @@
 import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAccountId, Network, AuthorizationServerUrl } from "@atxp/common";
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { BigNumber } from "bignumber.js";
-import { getATXPConfig, atxpAccountId, atxpToken, getDetectedCredential } from "./atxpContext.js";
+import { getATXPConfig, atxpAccountId, atxpToken, getDetectedCredential, setPendingPaymentChallenge } from "./atxpContext.js";
 import { buildPaymentOptions, omniChallengeMcpError } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { ProtocolSettlement, type SettlementContext } from "./protocol.js";
@@ -229,11 +229,23 @@ function buildOmniError(
     }
   }
 
-  return omniChallengeMcpError(
+  const error = omniChallengeMcpError(
     config.server,
     paymentId,
     paymentAmount,
     payment.x402,
     payment.mpp,
   );
+
+  // Store in ALS so atxpExpress can rewrite McpServer's wrapped tool error
+  // back into a JSON-RPC error with full challenge data. Done here at the
+  // throw site (not in omniChallengeMcpError) so the side effect only occurs
+  // when the error is actually thrown.
+  setPendingPaymentChallenge({
+    code: error.code,
+    message: error.message,
+    data: error.data as Record<string, unknown>,
+  });
+
+  return error;
 }
