@@ -202,10 +202,10 @@ function installPaymentResponseRewriter(res: Response, logger: import("@atxp/com
       return origEnd.apply(this, args);
     }
 
-    // Replace the body with the rewritten JSON-RPC error
-    const buf = Buffer.from(rewritten, 'utf-8');
-    this.setHeader('Content-Length', buf.byteLength);
-    return origEnd.call(this, buf, args[1] || 'utf-8', args[2]);
+    // Replace the body with the rewritten JSON-RPC error.
+    // Don't set Content-Length — writeHead() was already called by the transport,
+    // so headers are already sent. The chunked encoding handles length.
+    return origEnd.call(this, rewritten, args[1], args[2]);
   } as any;
 }
 
