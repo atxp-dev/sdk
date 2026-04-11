@@ -171,50 +171,35 @@ export function atxpExpress(args: ATXPArgs): Router {
  */
 function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
   const origEnd = res.end;
-  const origWriteHead = res.writeHead;
-
-  // Capture writeHead args so we can replay with corrected Content-Length.
-  let deferredWriteHead: { statusCode: number; headers?: any } | null = null;
-
-  (res as any).writeHead = function (statusCode: number, ...rest: any[]) {
-    // Only defer if a payment challenge might need rewriting.
-    // We can't know yet (challenge is set during tool handler execution),
-    // so always defer. Replayed in res.end.
-    const headers = typeof rest[0] === 'object' ? rest[0] : rest[1];
-    deferredWriteHead = { statusCode, headers };
-    return this;
-  };
 
   res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
-    // Restore originals immediately to avoid re-entry
+    // Restore original immediately to avoid re-entry
     res.end = origEnd;
-    (res as any).writeHead = origWriteHead;
 
     const challenge = getPendingPaymentChallenge();
+    if (!challenge) {
+      return origEnd.apply(this, args);
+    }
 
     const chunk = args[0];
     const body = chunk
       ? (typeof chunk === 'string' ? chunk : Buffer.isBuffer(chunk) ? chunk.toString('utf-8') : null)
       : null;
 
-    const rewritten = (challenge && body)
-      ? tryRewritePaymentResponse(body, challenge, logger)
-      : null;
-
-    // Replay writeHead with correct Content-Length
-    if (deferredWriteHead) {
-      const finalBody = rewritten ?? body;
-      const headers = { ...deferredWriteHead.headers };
-      if (finalBody) {
-        headers['Content-Length'] = Buffer.byteLength(finalBody, 'utf-8');
-      }
-      origWriteHead.call(this, deferredWriteHead.statusCode, headers);
+    if (!body) {
+      return origEnd.apply(this, args);
     }
 
-    if (rewritten) {
-      return origEnd.call(this, rewritten, args[1], args[2]);
+    const rewritten = tryRewritePaymentResponse(body, challenge, logger);
+    if (!rewritten) {
+      return origEnd.apply(this, args);
     }
-    return origEnd.apply(this, args);
+
+    // Replace the body. writeHead was already called by the transport with
+    // Content-Type but no Content-Length (MCP SDK uses chunked encoding).
+    // If Content-Length was set, the size difference may cause issues — but
+    // the MCP SDK's StreamableHTTPServerTransport does not set Content-Length.
+    return origEnd.call(this, rewritten, args[1], args[2]);
   } as any;
 }
 
