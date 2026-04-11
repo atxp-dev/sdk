@@ -134,12 +134,8 @@ export function atxpExpress(args: ATXPArgs): Router {
         // McpServer catches McpError(-30402) and wraps it into a CallToolResult,
         // discarding error.data (which contains x402/mpp challenge data).
         // We detect the wrapped error and reconstruct the JSON-RPC error using
-        // challenge data stored in AsyncLocalStorage by omniChallengeMcpError.
-        try {
-          installPaymentResponseRewriter(res, logger);
-        } catch (e) {
-          logger.warn(`Failed to install payment response rewriter: ${e}`);
-        }
+        // challenge data stored in AsyncLocalStorage by buildOmniError.
+        installPaymentResponseRewriter(res, logger);
 
         return next();
       });
@@ -195,11 +191,9 @@ function installPaymentResponseRewriter(res: Response, logger: import("@atxp/com
       return origEnd.apply(this, args);
     }
 
-    // Replace the body. writeHead was already called by the transport with
-    // Content-Type but no Content-Length (MCP SDK uses chunked encoding).
-    // If Content-Length was set, the size difference may cause issues — but
-    // the MCP SDK's StreamableHTTPServerTransport does not set Content-Length.
-    return origEnd.call(this, rewritten, args[1], args[2]);
+    // Replace the body, preserving any encoding/callback args.
+    args[0] = rewritten;
+    return origEnd.apply(this, args);
   } as any;
 }
 

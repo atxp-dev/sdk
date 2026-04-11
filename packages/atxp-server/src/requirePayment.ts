@@ -238,9 +238,9 @@ function buildOmniError(
   );
 
   // Store in ALS so atxpExpress can rewrite McpServer's wrapped tool error
-  // back into a JSON-RPC error with full challenge data. Done here at the
-  // throw site (not in omniChallengeMcpError) so the side effect only occurs
-  // when the error is actually thrown.
+  // back into a JSON-RPC error with full challenge data. Done here (not in
+  // omniChallengeMcpError) so the side effect is visible at the call site
+  // and doesn't fire when the error is constructed for inspection/testing.
   setPendingPaymentChallenge({
     code: error.code,
     message: error.message,
