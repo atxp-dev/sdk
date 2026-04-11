@@ -308,11 +308,16 @@ export class ProtocolSettlement {
       this.logger.warn('ProtocolSettlement: ATXP credential is not valid JSON, using context fallback');
     }
 
+    // Prefer context options (from requirePayment's pricing config) over the
+    // credential's options. The server has accurate destination chain info;
+    // the credential may have stale or "unknown" network values from accounts.
+    const options = context?.options ?? parsed.options ?? [];
+
     return {
       sourceAccountId: parsed.sourceAccountId ?? context?.sourceAccountId,
       destinationAccountId: this.destinationAccountId ?? context?.destinationAccountId,
       sourceAccountToken: parsed.sourceAccountToken ?? credential,
-      options: parsed.options ?? context?.options ?? [],
+      options,
     };
   }
 }
