@@ -1,5 +1,5 @@
 import type { Logger, AccountId } from '@atxp/common';
-import { AuthorizationError } from '@atxp/common';
+import { AuthorizationError, PAYMENT_REQUIRED_ERROR_CODE } from '@atxp/common';
 import type { ProtocolHandler, ProtocolConfig } from './protocolHandler.js';
 import type { ProspectivePayment } from './types.js';
 import {
@@ -100,7 +100,9 @@ export class MPPProtocolHandler implements ProtocolHandler {
         parsed !== null &&
         typeof parsed.error === 'object' &&
         parsed.error !== null &&
-        parsed.error.code === MPP_ERROR_CODE
+        // Accept both MPP's -32042 and legacy ATXP's -30402 (servers currently
+        // send -30402 for backwards compat with old clients)
+        (parsed.error.code === MPP_ERROR_CODE || parsed.error.code === PAYMENT_REQUIRED_ERROR_CODE)
       ) {
         const challenges = parseMPPChallengesFromMCPError(parsed.error.data);
         if (challenges.length > 0) {
