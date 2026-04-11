@@ -3,6 +3,7 @@ import { PAYMENT_REQUIRED_PREAMBLE, PAYMENT_REQUIRED_ERROR_CODE, AuthorizationSe
 import { MPP_ERROR_CODE } from "@atxp/mpp";
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
+import { setPendingPaymentChallenge } from "./atxpContext.js";
 
 // USDC and pathUSD both use 6 decimals.
 const STABLECOIN_DECIMALS = 6;
@@ -209,11 +210,16 @@ export function omniChallengeMcpError(
   }
 
   const amountText = chargeAmount ? ` You will be charged ${chargeAmount.toString()}.` : '';
-  // Use legacy -30402 (not MPP_ERROR_CODE -32042) for backwards compatibility.
-  // See function JSDoc for rationale. TODO: switch to MPP_ERROR_CODE once old clients are phased out.
+  const message = `${PAYMENT_REQUIRED_PREAMBLE}${amountText} Please pay at: ${atxpMcp.paymentRequestUrl} and then try again.`;
+
+  // Store the challenge in AsyncLocalStorage so the atxpExpress middleware
+  // can rewrite McpServer's wrapped tool error back into a proper JSON-RPC
+  // error with full challenge data (x402, mpp, etc.).
+  setPendingPaymentChallenge({ code: PAYMENT_REQUIRED_ERROR_CODE, message, data });
+
   return new McpError(
     PAYMENT_REQUIRED_ERROR_CODE,
-    `${PAYMENT_REQUIRED_PREAMBLE}${amountText} Please pay at: ${atxpMcp.paymentRequestUrl} and then try again.`,
+    message,
     data,
   );
 }

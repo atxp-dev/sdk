@@ -15,6 +15,17 @@ export type DetectedCredential = {
   sourceAccountId?: string;
 };
 
+/**
+ * Payment challenge stored in context by omniChallengeMcpError.
+ * The atxpExpress middleware reads this to rewrite wrapped tool errors
+ * back into proper JSON-RPC errors with full challenge data.
+ */
+export type PendingPaymentChallenge = {
+  code: number;
+  message: string;
+  data: Record<string, unknown>;
+};
+
 type ATXPContext = {
   token: string | null;
   tokenData: TokenData | null;
@@ -22,6 +33,8 @@ type ATXPContext = {
   resource: URL;
   /** Payment credential from retry request (X-PAYMENT, X-ATXP-PAYMENT, etc.) */
   detectedCredential?: DetectedCredential;
+  /** Payment challenge pending response rewrite (set by omniChallengeMcpError) */
+  pendingPaymentChallenge?: PendingPaymentChallenge;
 }
 
 export function getATXPConfig(): ATXPConfig | null {
@@ -62,6 +75,27 @@ export function setDetectedCredential(credential: DetectedCredential): void {
   const context = contextStorage.getStore();
   if (context) {
     context.detectedCredential = credential;
+  }
+}
+
+/**
+ * Get the pending payment challenge (set by omniChallengeMcpError).
+ * Used by atxpExpress to rewrite wrapped tool errors into JSON-RPC errors.
+ */
+export function getPendingPaymentChallenge(): PendingPaymentChallenge | null {
+  const context = contextStorage.getStore();
+  return context?.pendingPaymentChallenge ?? null;
+}
+
+/**
+ * Store a payment challenge in context before throwing McpError.
+ * The middleware will read this to reconstruct the JSON-RPC error
+ * that McpServer's wrapping discards.
+ */
+export function setPendingPaymentChallenge(challenge: PendingPaymentChallenge): void {
+  const context = contextStorage.getStore();
+  if (context) {
+    context.pendingPaymentChallenge = challenge;
   }
 }
 

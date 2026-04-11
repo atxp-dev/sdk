@@ -27,7 +27,9 @@ export {
   withATXPContext,
   getDetectedCredential,
   setDetectedCredential,
+  getPendingPaymentChallenge,
   type DetectedCredential,
+  type PendingPaymentChallenge,
 } from './atxpContext.js';
 
 // Core platform-agnostic business logic (no I/O dependencies)
