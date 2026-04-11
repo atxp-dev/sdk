@@ -1,5 +1,5 @@
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
-import { PAYMENT_REQUIRED_PREAMBLE, AuthorizationServerUrl, USDC_ADDRESSES, CAIP2_NETWORKS } from "@atxp/common";
+import { PAYMENT_REQUIRED_PREAMBLE, PAYMENT_REQUIRED_ERROR_CODE, AuthorizationServerUrl, USDC_ADDRESSES, CAIP2_NETWORKS } from "@atxp/common";
 import { MPP_ERROR_CODE } from "@atxp/mpp";
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
@@ -167,10 +167,18 @@ export function serializeMppHeader(challenge: MppChallengeData): string {
 /**
  * Create an omni-challenge MCP error containing challenge data for ALL protocols.
  *
- * Uses MPP's error code (-32042) as the unified payment-required code.
+ * Uses the legacy ATXP error code (-30402) for backwards compatibility with
+ * existing clients that only check for -30402. The MPP spec defines -32042
+ * (MPP_ERROR_CODE) but we can't use it yet — old SDK clients (<0.11.0) don't
+ * recognize -32042 and would silently ignore payment challenges.
+ *
+ * New SDK clients (>=0.10.x) accept both -30402 and -32042, so this works
+ * with both old and new clients. Once old clients are phased out, switch
+ * back to MPP_ERROR_CODE (-32042).
+ *
  * error.data contains both ATXP-MCP fields (paymentRequestId, paymentRequestUrl)
- * and MPP fields (data.mpp). Standard MPP clients detect -32042 + data.mpp.
- * ATXP clients detect -32042 + data.paymentRequestId (and also handle legacy -30402).
+ * and MPP fields (data.mpp). Standard MPP clients detect the code + data.mpp.
+ * ATXP clients detect the code + data.paymentRequestId.
  * X402 data is included as data.x402 for completeness but X402 is HTTP-only.
  */
 export function omniChallengeMcpError(
@@ -201,8 +209,10 @@ export function omniChallengeMcpError(
   }
 
   const amountText = chargeAmount ? ` You will be charged ${chargeAmount.toString()}.` : '';
+  // Use legacy -30402 (not MPP_ERROR_CODE -32042) for backwards compatibility.
+  // See function JSDoc for rationale. TODO: switch to MPP_ERROR_CODE once old clients are phased out.
   return new McpError(
-    MPP_ERROR_CODE,
+    PAYMENT_REQUIRED_ERROR_CODE,
     `${PAYMENT_REQUIRED_PREAMBLE}${amountText} Please pay at: ${atxpMcp.paymentRequestUrl} and then try again.`,
     data,
   );

@@ -3,10 +3,16 @@
  *
  * MPP challenges come in two forms:
  * 1. HTTP level: HTTP 402 with WWW-Authenticate: Payment header
- * 2. MCP level: JSON-RPC error with code -32042 containing MPP data
+ * 2. MCP level: JSON-RPC error with code -32042 (or -30402 for backwards compat)
  */
 
+// The MPP spec defines -32042 as the error code for payment challenges.
+// TODO: Once clients prior to v0.11.0 are phased out, servers can switch
+// from PAYMENT_REQUIRED_ERROR_CODE (-30402) back to MPP_ERROR_CODE (-32042).
 export const MPP_ERROR_CODE = -32042;
+
+// Legacy ATXP error code. Servers currently send this for backwards compat.
+const LEGACY_PAYMENT_ERROR_CODE = -30402;
 
 export interface MPPChallenge {
   id: string;
@@ -181,7 +187,7 @@ export async function hasMPPMCPError(response: Response): Promise<boolean> {
       parsed !== null &&
       typeof parsed.error === 'object' &&
       parsed.error !== null &&
-      parsed.error.code === MPP_ERROR_CODE
+      (parsed.error.code === MPP_ERROR_CODE || parsed.error.code === LEGACY_PAYMENT_ERROR_CODE)
     ) {
       const challenge = parseMPPFromMCPError(parsed.error.data);
       return challenge !== null;
