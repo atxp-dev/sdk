@@ -13,9 +13,11 @@ import {
   sendOAuthMetadataNode,
   detectProtocol,
   setDetectedCredential,
+  getPendingPaymentChallenge,
   type PaymentProtocol,
   type ATXPConfig,
   type TokenCheck,
+  type PendingPaymentChallenge,
   verifyOpaqueIdentity,
   parseCredentialBase64,
 } from "@atxp/server";
@@ -126,6 +128,15 @@ export function atxpExpress(args: ATXPArgs): Router {
           });
           logger.info(`Stored ${detected.protocol} credential in context for requirePayment (sourceAccountId=${sourceAccountId})`);
         }
+
+        // Intercept the response to rewrite McpServer's wrapped payment errors
+        // back into proper JSON-RPC errors with full challenge data.
+        // McpServer catches McpError(-30402) and wraps it into a CallToolResult,
+        // discarding error.data (which contains x402/mpp challenge data).
+        // We detect the wrapped error and reconstruct the JSON-RPC error using
+        // challenge data stored in AsyncLocalStorage by buildOmniError.
+        installPaymentResponseRewriter(res, logger);
+
         return next();
       });
     } catch (error) {
@@ -137,6 +148,141 @@ export function atxpExpress(args: ATXPArgs): Router {
 
   router.use(atxpMiddleware);
   return router;
+}
+
+/**
+ * Intercept res.end to rewrite wrapped payment errors into JSON-RPC errors.
+ *
+ * McpServer catches McpError(-30402) thrown by requirePayment and wraps it
+ * into a CallToolResult: {result: {isError: true, content: [{text: "..."}]}}.
+ * This discards error.data which carries x402 accepts and mpp challenges.
+ *
+ * This function intercepts the response before it's sent. If a payment
+ * challenge was stored in AsyncLocalStorage (by omniChallengeMcpError), and
+ * the response body is a wrapped tool error containing the payment preamble,
+ * we rewrite it into a proper JSON-RPC error with the full challenge data.
+ *
+ * Old clients: see JSON-RPC error with code -30402 → Branch 1 matches
+ * New clients: see JSON-RPC error with code -30402 + full error.data → x402/mpp works
+ */
+function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
+  const origEnd = res.end;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
+    // Restore original immediately to avoid re-entry
+    res.end = origEnd;
+
+    const challenge = getPendingPaymentChallenge();
+    if (!challenge) {
+      return (origEnd as any).apply(this, args);
+    }
+
+    const chunk = args[0];
+    const body = chunk
+      ? (typeof chunk === 'string' ? chunk : Buffer.isBuffer(chunk) ? chunk.toString('utf-8') : null)
+      : null;
+
+    if (!body) {
+      return (origEnd as any).apply(this, args);
+    }
+
+    const rewritten = tryRewritePaymentResponse(body, challenge, logger);
+    if (!rewritten) {
+      return (origEnd as any).apply(this, args);
+    }
+
+    // Replace the body, preserving any encoding/callback args.
+    args[0] = rewritten;
+    return (origEnd as any).apply(this, args);
+  } as any;
+}
+
+/**
+ * Attempt to rewrite a wrapped payment tool error into a JSON-RPC error.
+ * Returns the rewritten JSON string, or null if the body isn't a wrapped payment error.
+ * Exported for testing.
+ */
+export function tryRewritePaymentResponse(
+  body: string,
+  challenge: PendingPaymentChallenge,
+  logger: import("@atxp/common").Logger,
+): string | null {
+  try {
+    const json = JSON.parse(body);
+
+    // Handle single JSON-RPC response (enableJsonResponse: true)
+    const rewritten = rewriteSingleResponse(json, challenge);
+    if (rewritten) {
+      logger.debug('Rewrote wrapped payment tool error → JSON-RPC error with challenge data');
+      return JSON.stringify(rewritten);
+    }
+
+    // Handle batch JSON-RPC response (array)
+    if (Array.isArray(json)) {
+      let didRewrite = false;
+      const results = json.map((item: unknown) => {
+        const r = rewriteSingleResponse(item, challenge);
+        if (r) { didRewrite = true; return r; }
+        return item;
+      });
+      if (didRewrite) {
+        logger.debug('Rewrote wrapped payment tool error in batch → JSON-RPC error with challenge data');
+        return JSON.stringify(results);
+      }
+    }
+  } catch {
+    // Not valid JSON — SSE or non-MCP response, skip rewriting
+  }
+  return null;
+}
+
+/**
+ * Check if a single JSON-RPC response is a wrapped payment tool error.
+ * If so, return a JSON-RPC error object with the full challenge data.
+ * Exported for testing.
+ */
+export function rewriteSingleResponse(
+  msg: unknown,
+  challenge: PendingPaymentChallenge,
+): Record<string, unknown> | null {
+  if (!msg || typeof msg !== 'object') return null;
+  const obj = msg as Record<string, unknown>;
+
+  // Must be a JSON-RPC response (has "result", not "error")
+  if (obj.jsonrpc !== '2.0' || !obj.result || obj.error) return null;
+
+  const result = obj.result as Record<string, unknown>;
+  if (!result.isError) return null;
+
+  // Verify this is OUR payment error by checking the text contains the
+  // payment request URL from the stored challenge. This is more robust than
+  // matching the full message text — immune to McpError message formatting
+  // changes (prefixes, truncation, escaping).
+  const content = result.content;
+  if (!Array.isArray(content)) return null;
+
+  const paymentUrl = (challenge.data as Record<string, unknown>).paymentRequestUrl;
+  if (!paymentUrl || typeof paymentUrl !== 'string') return null;
+
+  const matchesChallenge = content.some(
+    (c: unknown) => c && typeof c === 'object' &&
+      (c as Record<string, unknown>).type === 'text' &&
+      typeof (c as Record<string, unknown>).text === 'string' &&
+      ((c as Record<string, unknown>).text as string).includes(paymentUrl)
+  );
+  if (!matchesChallenge) return null;
+
+  // Rewrite: replace tool result with JSON-RPC error
+  return {
+    jsonrpc: '2.0',
+    id: obj.id,
+    error: {
+      code: challenge.code,
+      message: challenge.message,
+      data: challenge.data,
+    },
+  };
 }
 
 /**

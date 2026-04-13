@@ -3,7 +3,7 @@ import { requirePayment } from './index.js';
 import * as TH from './serverTestHelpers.js';
 import { BigNumber } from 'bignumber.js';
 import { withATXPContext, setDetectedCredential } from './atxpContext.js';
-import { OMNI_PAYMENT_ERROR_CODE } from '@atxp/common';
+import { PAYMENT_REQUIRED_ERROR_CODE } from '@atxp/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ProtocolSettlement } from './protocol.js';
 
@@ -43,7 +43,7 @@ describe('requirePayment', () => {
       try {
         await requirePayment({price: BigNumber(0.01)});
       } catch (err: any) {
-        expect(err.code).toBe(OMNI_PAYMENT_ERROR_CODE);
+        expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
       }
     });
   });
@@ -55,7 +55,7 @@ describe('requirePayment', () => {
       try {
         await requirePayment({price: BigNumber(0.01)});
       } catch (err: any) {
-        expect(err.code).toBe(OMNI_PAYMENT_ERROR_CODE);
+        expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
         expect(paymentServer.createPaymentRequest).toHaveBeenCalledWith({
           options: [{
             network: 'base',
@@ -78,7 +78,7 @@ describe('requirePayment', () => {
       try {
         await requirePayment({price: BigNumber(0.01)});
       } catch (err: any) {
-        expect(err.code).not.toBe(OMNI_PAYMENT_ERROR_CODE);
+        expect(err.code).not.toBe(PAYMENT_REQUIRED_ERROR_CODE);
         expect(err.message).toContain('No user found');
       }
     });
@@ -91,7 +91,7 @@ describe('requirePayment', () => {
       try {
         await requirePayment({price: BigNumber(0.01)});
       } catch (err: any) {
-        expect(err.code).toBe(OMNI_PAYMENT_ERROR_CODE);
+        expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
         expect(err.data.paymentRequestId).toBe('test-payment-request-id');
         expect(err.data.paymentRequestUrl).toBe('https://example.com/payment-request/test-payment-request-id');
       }
@@ -105,7 +105,7 @@ describe('requirePayment', () => {
       try {
         await requirePayment({price: BigNumber(0.01), getExistingPaymentId: async () => 'some-other-payment-id'});
       } catch (err: any) {
-        expect(err.code).toBe(OMNI_PAYMENT_ERROR_CODE);
+        expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
         expect(err.data.paymentRequestId).toBe('some-other-payment-id');
         expect(err.data.paymentRequestUrl).toBe('https://auth.atxp.ai/payment-request/some-other-payment-id');
         expect(paymentServer.createPaymentRequest).not.toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe('requirePayment', () => {
       try {
         await requirePayment({price: BigNumber(0.01)});
       } catch (err: any) {
-        expect(err.code).not.toBe(OMNI_PAYMENT_ERROR_CODE);
+        expect(err.code).not.toBe(PAYMENT_REQUIRED_ERROR_CODE);
         expect(err.message).toContain('Payment request failed');
       }
     });
@@ -143,7 +143,7 @@ describe('requirePayment', () => {
         try {
           await requirePayment({price: BigNumber(0.01)}); // Request 0.01
         } catch (err: any) {
-          expect(err.code).toBe(OMNI_PAYMENT_ERROR_CODE);
+          expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
 
           // Verify charge was called with requested amount (0.01), NOT minimumPayment
           expect(paymentServer.charge).toHaveBeenCalledWith({
@@ -216,7 +216,7 @@ describe('requirePayment', () => {
         try {
           await requirePayment({price: BigNumber(0.01)}); // Request 0.01
         } catch (err: any) {
-          expect(err.code).toBe(OMNI_PAYMENT_ERROR_CODE);
+          expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
 
           // Verify charge was called with requested amount (0.01)
           expect(paymentServer.charge).toHaveBeenCalledWith({
@@ -263,7 +263,7 @@ describe('requirePayment', () => {
         try {
           await requirePayment({price: BigNumber(0.10)}); // Request $0.10, which is higher than minimum
         } catch (err: any) {
-          expect(err.code).toBe(OMNI_PAYMENT_ERROR_CODE);
+          expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
 
           // Should use requested amount (0.10) for charge since it's higher than minimumPayment
           expect(paymentServer.charge).toHaveBeenCalledWith({
@@ -308,7 +308,7 @@ describe('requirePayment', () => {
         try {
           await requirePayment({price: BigNumber(0.01)}); // Request $0.01, which is lower than minimum
         } catch (err: any) {
-          expect(err.code).toBe(OMNI_PAYMENT_ERROR_CODE);
+          expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
 
           // Should use requested amount (0.01) for charge
           expect(paymentServer.charge).toHaveBeenCalledWith({

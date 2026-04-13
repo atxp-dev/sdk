@@ -1,6 +1,5 @@
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { PAYMENT_REQUIRED_PREAMBLE, PAYMENT_REQUIRED_ERROR_CODE, AuthorizationServerUrl, USDC_ADDRESSES, CAIP2_NETWORKS } from "@atxp/common";
-import { MPP_ERROR_CODE } from "@atxp/mpp";
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
 
@@ -209,8 +208,7 @@ export function omniChallengeMcpError(
   }
 
   const amountText = chargeAmount ? ` You will be charged ${chargeAmount.toString()}.` : '';
-  // Use legacy -30402 (not MPP_ERROR_CODE -32042) for backwards compatibility.
-  // See function JSDoc for rationale. TODO: switch to MPP_ERROR_CODE once old clients are phased out.
+
   return new McpError(
     PAYMENT_REQUIRED_ERROR_CODE,
     `${PAYMENT_REQUIRED_PREAMBLE}${amountText} Please pay at: ${atxpMcp.paymentRequestUrl} and then try again.`,
