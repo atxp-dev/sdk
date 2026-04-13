@@ -1,6 +1,5 @@
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { PAYMENT_REQUIRED_PREAMBLE, PAYMENT_REQUIRED_ERROR_CODE, AuthorizationServerUrl, USDC_ADDRESSES, CAIP2_NETWORKS } from "@atxp/common";
-import { MPP_ERROR_CODE } from "@atxp/mpp";
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
 
