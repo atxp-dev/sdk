@@ -28,10 +28,19 @@ export class ATXPAccountHandler implements ProtocolHandler {
   ): Promise<Response | null> {
     const { account, logger, fetchFn } = config;
 
-    // Extract challenge data from the 402 response body
+    // Extract challenge data from the 402 response body.
+    // Plain Express returns challenge fields at the top level.
+    // MCP servers wrap them in a JSON-RPC error envelope:
+    //   { error: { code: -30402, data: { chargeAmount, x402, mpp, ... } } }
+    // Unwrap the envelope so buildAuthorizeParams sees the fields directly.
     let challengeData: Record<string, unknown> = {};
     try {
-      challengeData = await response.clone().json();
+      const parsed = await response.clone().json();
+      if (parsed?.error?.data && typeof parsed.error.data === 'object') {
+        challengeData = parsed.error.data as Record<string, unknown>;
+      } else {
+        challengeData = parsed;
+      }
     } catch {
       // Body might not be JSON
     }
