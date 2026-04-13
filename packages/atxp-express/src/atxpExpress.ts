@@ -167,33 +167,35 @@ export function atxpExpress(args: ATXPArgs): Router {
  */
 function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
   const origEnd = res.end;
+  const origWrite = res.write;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
-    // Restore original immediately to avoid re-entry
-    res.end = origEnd;
-
+  // Rewrite helper shared by both res.write and res.end hooks.
+  // tryRewritePaymentResponse handles both SSE (data: lines) and plain JSON.
+  function rewriteChunk(chunk: unknown): unknown {
     const challenge = getPendingPaymentChallenge();
-    if (!challenge) {
-      return (origEnd as any).apply(this, args);
-    }
+    if (!challenge) return chunk;
 
-    const chunk = args[0];
     const body = chunk
       ? (typeof chunk === 'string' ? chunk : Buffer.isBuffer(chunk) ? chunk.toString('utf-8') : null)
       : null;
+    if (!body) return chunk;
 
-    if (!body) {
-      return (origEnd as any).apply(this, args);
-    }
+    return tryRewritePaymentResponse(body, challenge, logger) ?? chunk;
+  }
 
-    const rewritten = tryRewritePaymentResponse(body, challenge, logger);
-    if (!rewritten) {
-      return (origEnd as any).apply(this, args);
-    }
+  // Hook res.write for SSE streaming responses.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res.write = function writeWithPaymentRewrite(this: Response, ...args: any[]): any {
+    args[0] = rewriteChunk(args[0]);
+    return (origWrite as any).apply(this, args);
+  } as any;
 
-    // Replace the body, preserving any encoding/callback args.
-    args[0] = rewritten;
+  // Hook res.end for non-SSE (enableJsonResponse) responses.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
+    res.end = origEnd;
+    res.write = origWrite;
+    args[0] = rewriteChunk(args[0]);
     return (origEnd as any).apply(this, args);
   } as any;
 }
@@ -208,6 +210,18 @@ export function tryRewritePaymentResponse(
   challenge: PendingPaymentChallenge,
   logger: import("@atxp/common").Logger,
 ): string | null {
+  // SSE transports send JSON-RPC messages as "data: {...}\n\n" lines.
+  // Rewrite each SSE data line that contains a payment error.
+  if (body.includes('data: {')) {
+    let didRewrite = false;
+    const rewritten = body.replace(/^(data: )(.+)$/gm, (_match, prefix: string, json: string) => {
+      const result = tryRewritePaymentResponse(json, challenge, logger);
+      if (result) { didRewrite = true; return prefix + result; }
+      return _match;
+    });
+    if (didRewrite) return rewritten;
+  }
+
   try {
     const json = JSON.parse(body);
 
@@ -232,7 +246,7 @@ export function tryRewritePaymentResponse(
       }
     }
   } catch {
-    // Not valid JSON — SSE or non-MCP response, skip rewriting
+    // Not valid JSON — skip
   }
   return null;
 }

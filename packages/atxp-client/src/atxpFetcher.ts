@@ -758,6 +758,7 @@ export class ATXPFetcher {
       // MCP responses (HTTP 200 with JSON-RPC body) are handled separately via
       // checkForATXPResponse → buildSyntheticResponseFromMcpError → tryProtocolHandlers.
       if (response.status === 402) {
+        this.logger.info('atxpFetcher: got HTTP 402, trying protocol handlers');
         const handlerResult = await this.tryProtocolHandlers(response, url, init);
         if (handlerResult) {
           return handlerResult;
@@ -801,7 +802,7 @@ export class ATXPFetcher {
 
       if (mcpError) {
         const errorData = mcpError.data as Record<string, unknown> | undefined;
-        this.logger.debug(`MCP payment error: code=${mcpError.code}, handlers=${this.protocolHandlers.length}`);
+        this.logger.debug(`MCP payment error: code=${mcpError.code}, hasData=${!!errorData}, dataKeys=${errorData ? JSON.stringify(Object.keys(errorData)) : 'none'}, handlers=${this.protocolHandlers.length}`);
 
         // Check if protocol handlers can handle the omni-challenge data.
         // TODO: Refactor to pass error data directly to handlers instead of building a synthetic
