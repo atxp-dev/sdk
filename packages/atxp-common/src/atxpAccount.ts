@@ -344,7 +344,7 @@ export class ATXPAccount implements Account {
     if (params.challenge) body.challenge = params.challenge;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
     let response: Response;
     try {
       response = await this.fetchFn(`${this.origin}/authorize/auto`, {
