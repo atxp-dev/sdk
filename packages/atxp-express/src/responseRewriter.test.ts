@@ -147,4 +147,41 @@ describe('tryRewritePaymentResponse', () => {
   it('should return null for an empty string', () => {
     expect(tryRewritePaymentResponse('', challenge, logger)).toBeNull();
   });
+
+  it('should rewrite a payment error inside an SSE data line', () => {
+    // SSE transports send JSON-RPC messages as "data: {...}\n\n" lines.
+    // The rewriter must handle this format in addition to raw JSON bodies.
+    const jsonPayload = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        isError: true,
+        content: [{ type: 'text', text: 'MCP error -30402: Payment via ATXP is required. Please pay at: https://auth.example.com/payment-request/pr_123 and then try again.' }],
+      },
+    });
+    const sseBody = `data: ${jsonPayload}\n\n`;
+
+    const result = tryRewritePaymentResponse(sseBody, challenge, logger);
+    expect(result).not.toBeNull();
+    // Should preserve the SSE "data: " prefix
+    expect(result!).toMatch(/^data: /);
+    // Extract the JSON after "data: "
+    const rewrittenJson = result!.replace(/^data: /, '').trim();
+    const parsed = JSON.parse(rewrittenJson);
+    expect(parsed.error.code).toBe(-30402);
+    expect(parsed.error.data.x402).toBeDefined();
+    expect(parsed.error.data.mpp).toBeDefined();
+    expect(parsed.result).toBeUndefined();
+  });
+
+  it('should not rewrite non-payment SSE data lines', () => {
+    const jsonPayload = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      result: { content: [{ type: 'text', text: 'Normal response' }] },
+    });
+    const sseBody = `data: ${jsonPayload}\n\n`;
+
+    expect(tryRewritePaymentResponse(sseBody, challenge, logger)).toBeNull();
+  });
 });

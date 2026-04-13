@@ -36,17 +36,21 @@ export class ATXPAccountHandler implements ProtocolHandler {
     let challengeData: Record<string, unknown> = {};
     try {
       const parsed = await response.clone().json();
+      logger.debug(`ATXPAccountHandler: raw 402 body keys: ${JSON.stringify(Object.keys(parsed))}`);
       if (parsed?.error?.data && typeof parsed.error.data === 'object') {
         challengeData = parsed.error.data as Record<string, unknown>;
+        logger.debug(`ATXPAccountHandler: unwrapped JSON-RPC error.data keys: ${JSON.stringify(Object.keys(challengeData))}`);
       } else {
         challengeData = parsed;
+        logger.debug(`ATXPAccountHandler: using top-level challenge data keys: ${JSON.stringify(Object.keys(challengeData))}`);
       }
-    } catch {
-      // Body might not be JSON
+    } catch (e) {
+      logger.warn(`ATXPAccountHandler: failed to parse 402 body: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     // Build authorize params from the challenge data.
     const authorizeParams = await buildAuthorizeParams(challengeData, fetchFn, logger);
+    logger.debug(`ATXPAccountHandler: authorizeParams keys: ${JSON.stringify(Object.keys(authorizeParams))}, has challenges: ${!!authorizeParams.challenges}`);
 
     if (!authorizeParams.amount) {
       logger.error(`ATXPAccountHandler: no amount in challenge data, cannot authorize. Challenge keys: ${Object.keys(challengeData).join(', ')}`);

@@ -753,11 +753,13 @@ export class ATXPFetcher {
     try {
       // Try to fetch the resource
       response = await oauthClient.fetch(url, init);
+      console.log(`[atxpFetcher-TRACE] response status=${response.status} for ${typeof url === 'string' ? url : url.toString()}`);
 
       // Check HTTP-level protocol handlers for real HTTP 402 responses (REST APIs).
       // MCP responses (HTTP 200 with JSON-RPC body) are handled separately via
       // checkForATXPResponse → buildSyntheticResponseFromMcpError → tryProtocolHandlers.
       if (response.status === 402) {
+        this.logger.info('atxpFetcher: got HTTP 402, trying protocol handlers');
         const handlerResult = await this.tryProtocolHandlers(response, url, init);
         if (handlerResult) {
           return handlerResult;
@@ -768,6 +770,7 @@ export class ATXPFetcher {
       return response;
     } catch (error: unknown) {
       fetchError = error as Error;
+      this.logger.info(`atxpFetcher: caught error: ${error instanceof Error ? error.constructor.name : typeof error}: ${error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200)}, code=${(error as any)?.code}`);
 
       // If we get an OAuth authentication required error, handle it
       if (error instanceof OAuthAuthenticationRequiredError) {
@@ -801,7 +804,7 @@ export class ATXPFetcher {
 
       if (mcpError) {
         const errorData = mcpError.data as Record<string, unknown> | undefined;
-        this.logger.debug(`MCP payment error: code=${mcpError.code}, handlers=${this.protocolHandlers.length}`);
+        this.logger.info(`MCP payment error: code=${mcpError.code}, hasData=${!!errorData}, dataKeys=${errorData ? JSON.stringify(Object.keys(errorData)) : 'none'}, handlers=${this.protocolHandlers.length}`);
 
         // Check if protocol handlers can handle the omni-challenge data.
         // TODO: Refactor to pass error data directly to handlers instead of building a synthetic
