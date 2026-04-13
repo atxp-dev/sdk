@@ -168,13 +168,14 @@ export function atxpExpress(args: ATXPArgs): Router {
 function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
   const origEnd = res.end;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
     // Restore original immediately to avoid re-entry
     res.end = origEnd;
 
     const challenge = getPendingPaymentChallenge();
     if (!challenge) {
-      return origEnd.apply(this, args);
+      return (origEnd as any).apply(this, args);
     }
 
     const chunk = args[0];
@@ -183,17 +184,17 @@ function installPaymentResponseRewriter(res: Response, logger: import("@atxp/com
       : null;
 
     if (!body) {
-      return origEnd.apply(this, args);
+      return (origEnd as any).apply(this, args);
     }
 
     const rewritten = tryRewritePaymentResponse(body, challenge, logger);
     if (!rewritten) {
-      return origEnd.apply(this, args);
+      return (origEnd as any).apply(this, args);
     }
 
     // Replace the body, preserving any encoding/callback args.
     args[0] = rewritten;
-    return origEnd.apply(this, args);
+    return (origEnd as any).apply(this, args);
   } as any;
 }
 
