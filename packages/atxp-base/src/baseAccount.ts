@@ -103,7 +103,6 @@ export class BaseAccount implements Account {
         const httpClient = new x402HTTPClient(client);
 
         // Build PaymentRequired envelope from the enriched requirements
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const paymentRequired = {
           x402Version,
           accepts: [reqs],

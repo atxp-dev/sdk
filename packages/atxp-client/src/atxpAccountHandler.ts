@@ -58,11 +58,19 @@ export class ATXPAccountHandler implements ProtocolHandler {
     }
 
     // Delegate to account.authorize() → accounts /authorize/auto
-    logger.info('ATXPAccountHandler: delegating to account.authorize()');
+    // Only advertise protocols the server actually provided data for.
+    // Always include 'atxp' (needs only amount + destination).
+    // Include 'x402' only if the challenge contained x402 accepts.
+    // Include 'mpp' only if the challenge contained mpp challenges.
+    const protocols: Array<'atxp' | 'x402' | 'mpp'> = ['atxp'];
+    if (authorizeParams.paymentRequirements) protocols.push('x402');
+    if (authorizeParams.challenges) protocols.push('mpp');
+
+    logger.info(`ATXPAccountHandler: delegating to account.authorize() with protocols=[${protocols.join(',')}]`);
     let result;
     try {
       result = await account.authorize({
-        protocols: ['atxp', 'x402', 'mpp'],
+        protocols,
         amount: authorizeParams.amount ? new BigNumber(String(authorizeParams.amount)) : undefined,
         destination: authorizeParams.destination as string | undefined,
         paymentRequirements: authorizeParams.paymentRequirements,
