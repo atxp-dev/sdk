@@ -37,7 +37,7 @@ export async function parseMcpRequests(config: ATXPConfig, requestUrl: URL, req:
   return requests;
 }
 
-export async function parseBody(req: IncomingMessage, logger: Logger): Promise<unknown> {
+export async function parseBody(req: IncomingMessage, _logger: Logger): Promise<unknown> {
   try {
     const ct = req.headers["content-type"];
 
