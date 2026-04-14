@@ -165,7 +165,8 @@ export function atxpExpress(args: ATXPArgs): Router {
  * Old clients: see JSON-RPC error with code -30402 → Branch 1 matches
  * New clients: see JSON-RPC error with code -30402 + full error.data → x402/mpp works
  */
-function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
+/** @internal Exported for testing only. */
+export function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
   const origEnd = res.end;
   const origWrite = res.write;
   const origWriteHead = res.writeHead;
