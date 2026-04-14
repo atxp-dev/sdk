@@ -72,7 +72,7 @@ describe('ATXPAccountHandler', () => {
       expect(authorize).toHaveBeenCalledTimes(1);
       expect(authorize).toHaveBeenCalledWith(
         expect.objectContaining({
-          protocols: ['atxp', 'x402', 'mpp'],
+          protocols: ['atxp'],
           amount: expect.anything(),
         }),
       );
