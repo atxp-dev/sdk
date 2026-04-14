@@ -168,6 +168,7 @@ export function atxpExpress(args: ATXPArgs): Router {
 function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
   const origEnd = res.end;
   const origWrite = res.write;
+  const origWriteHead = res.writeHead;
 
   // Rewrite helper shared by both res.write and res.end hooks.
   // tryRewritePaymentResponse handles both SSE (data: lines) and plain JSON.
@@ -183,9 +184,30 @@ function installPaymentResponseRewriter(res: Response, logger: import("@atxp/com
     return tryRewritePaymentResponse(body, challenge, logger) ?? chunk;
   }
 
+  // Defer writeHead until res.end so we can update Content-Length after
+  // rewriting the body. @hono/node-server's responseViaCache sets
+  // Content-Length from the original (pre-rewrite) body size, then calls
+  // writeHead before end. Without deferring, the client receives the
+  // original Content-Length but the rewritten (larger) body, causing
+  // JSON truncation.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let deferredWriteHead: any[] | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res.writeHead = function writeHeadDeferred(this: Response, ...args: any[]): any {
+    deferredWriteHead = args;
+    return this;
+  } as any;
+
+  function flushWriteHead(self: Response): void {
+    if (!deferredWriteHead) return;
+    (origWriteHead as any).apply(self, deferredWriteHead);
+    deferredWriteHead = null;
+  }
+
   // Hook res.write for SSE streaming responses.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   res.write = function writeWithPaymentRewrite(this: Response, ...args: any[]): any {
+    flushWriteHead(this);
     args[0] = rewriteChunk(args[0]);
     return (origWrite as any).apply(this, args);
   } as any;
@@ -195,7 +217,31 @@ function installPaymentResponseRewriter(res: Response, logger: import("@atxp/com
   res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
     res.end = origEnd;
     res.write = origWrite;
+    res.writeHead = origWriteHead;
     args[0] = rewriteChunk(args[0]);
+
+    // Update Content-Length in deferred writeHead to match the rewritten body.
+    if (deferredWriteHead) {
+      const newBody = args[0];
+      if (newBody != null) {
+        const newLength = typeof newBody === 'string'
+          ? Buffer.byteLength(newBody)
+          : Buffer.isBuffer(newBody)
+            ? newBody.length
+            : undefined;
+        if (newLength !== undefined) {
+          // writeHead(statusCode, headers) or writeHead(statusCode, statusMessage, headers)
+          const headersIdx = typeof deferredWriteHead[1] === 'string' ? 2 : 1;
+          const headers = deferredWriteHead[headersIdx];
+          if (headers && typeof headers === 'object') {
+            headers['Content-Length'] = newLength;
+          }
+        }
+      }
+      (origWriteHead as any).apply(this, deferredWriteHead);
+      deferredWriteHead = null;
+    }
+
     return (origEnd as any).apply(this, args);
   } as any;
 }
