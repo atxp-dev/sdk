@@ -48,8 +48,8 @@ export async function parseBody(req: IncomingMessage, logger: Logger): Promise<u
     }
     const body = await getRawBody(req, encoding, MAXIMUM_MESSAGE_SIZE);
     return JSON.parse(body);
-  } catch (error) {
-    logger.error((error as Error).message);
+  } catch {
+    // Expected for SSE GET requests and other non-JSON bodies
     return undefined;
   }
 }
