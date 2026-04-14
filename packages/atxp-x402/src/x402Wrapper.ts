@@ -211,7 +211,6 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       x402ClientInstance.register(network as `${string}:${string}`, scheme);
       const httpClient = new x402HTTPClient(x402ClientInstance);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const paymentRequired = {
         x402Version: paymentChallenge.x402Version,
         accepts: [selectedPaymentRequirements],
