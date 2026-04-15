@@ -1,6 +1,6 @@
 {
   "name": "@atxp/x402",
-  "version": "0.11.6",
+  "version": "0.11.7",
   "description": "ATXP X402 - X402 protocol integration for ATXP SDK",
   "license": "MIT",
   "repository": {
@@ -29,13 +29,13 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "test": "vitest run",
-    "prepack": "npm run build && npm run typecheck",
+    "prepack": "npm run build && npm run typecheck && rm -rf dist/node_modules dist/_virtual",
     "pack:dry": "npm pack --dry-run"
   },
   "dependencies": {
-    "@atxp/base": "0.11.6",
-    "@atxp/client": "0.11.6",
-    "@atxp/common": "0.11.6",
+    "@atxp/base": "0.11.7",
+    "@atxp/client": "0.11.7",
+    "@atxp/common": "0.11.7",
     "@x402/core": "^2.9.0",
     "@x402/evm": "^2.9.0",
     "bignumber.js": "^9.1.2",
