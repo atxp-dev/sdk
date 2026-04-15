@@ -2,9 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { requirePayment } from './index.js';
 import * as TH from './serverTestHelpers.js';
 import { BigNumber } from 'bignumber.js';
-import { withATXPContext, setDetectedCredential } from './atxpContext.js';
+import { withATXPContext } from './atxpContext.js';
 import { PAYMENT_REQUIRED_ERROR_CODE } from '@atxp/common';
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ProtocolSettlement } from './protocol.js';
 
 describe('requirePayment', () => {
@@ -341,54 +340,10 @@ describe('requirePayment', () => {
     });
   });
 
-  describe('settlement of detected credentials', () => {
-    it('should settle credential and succeed when charge passes after settlement', async () => {
-      const mockSettle = vi.fn().mockResolvedValue({ txHash: '0xabc', settledAmount: '10000' });
-      vi.spyOn(ProtocolSettlement.prototype, 'settle').mockImplementation(mockSettle);
-
-      const paymentServer = TH.paymentServer({ charge: vi.fn().mockResolvedValue(true) });
-      const config = TH.config({ paymentServer });
-
-      await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
-        setDetectedCredential({ protocol: 'x402', credential: 'dGVzdA==', sourceAccountId: 'base:0x123' });
-        await expect(requirePayment({ price: BigNumber(0.01) })).resolves.not.toThrow();
-        expect(mockSettle).toHaveBeenCalledWith('x402', 'dGVzdA==', expect.objectContaining({
-          destinationAccountId: `base:${TH.DESTINATION}`,
-        }));
-        expect(paymentServer.charge).toHaveBeenCalled();
-      });
-
-      vi.restoreAllMocks();
-    });
-
-    it('should throw McpError when settlement fails instead of falling through silently', async () => {
-      const mockSettle = vi.fn().mockRejectedValue(new Error('on-chain tx reverted'));
-      vi.spyOn(ProtocolSettlement.prototype, 'settle').mockImplementation(mockSettle);
-
-      const paymentServer = TH.paymentServer({ charge: vi.fn().mockResolvedValue(false) });
-      const config = TH.config({ paymentServer });
-
-      await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
-        setDetectedCredential({ protocol: 'x402', credential: 'dGVzdA==', sourceAccountId: 'base:0x123' });
-        try {
-          await requirePayment({ price: BigNumber(0.01) });
-          expect.fail('should have thrown');
-        } catch (err: unknown) {
-          // Should be an McpError with settlement failure details, NOT an omni-challenge
-          expect(err).toBeInstanceOf(McpError);
-          const mcpErr = err as McpError;
-          expect(mcpErr.code).toBe(-32000);
-          expect(mcpErr.message).toContain('Payment settlement failed for x402');
-          expect((mcpErr.data as Record<string, unknown>)?.reason).toBe('on-chain tx reverted');
-          // charge() should NOT have been called — we threw before reaching it
-          expect(paymentServer.charge).not.toHaveBeenCalled();
-        }
-      });
-
-      vi.restoreAllMocks();
-    });
-
-    it('should skip settlement and proceed to normal charge when no credential detected', async () => {
+  // Settlement is now handled by the middleware (atxpExpress), not requirePayment().
+  // See atxpExpress.test.ts for settlement tests.
+  describe('requirePayment does not settle (settlement moved to middleware)', () => {
+    it('should charge directly without settling — middleware handles settlement before route code runs', async () => {
       const mockSettle = vi.fn();
       vi.spyOn(ProtocolSettlement.prototype, 'settle').mockImplementation(mockSettle);
 
@@ -396,7 +351,6 @@ describe('requirePayment', () => {
       const config = TH.config({ paymentServer });
 
       await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
-        // No setDetectedCredential call — no credential on this request
         await expect(requirePayment({ price: BigNumber(0.01) })).resolves.not.toThrow();
         expect(mockSettle).not.toHaveBeenCalled();
         expect(paymentServer.charge).toHaveBeenCalled();
