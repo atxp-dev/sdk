@@ -79,6 +79,18 @@ export function setDetectedCredential(credential: DetectedCredential): void {
 }
 
 /**
+ * Clear the payment credential from the ATXP context after successful settlement.
+ * Prevents a second requirePayment() call in the same request from trying to
+ * settle the same already-consumed credential.
+ */
+export function clearDetectedCredential(): void {
+  const context = contextStorage.getStore();
+  if (context) {
+    context.detectedCredential = undefined;
+  }
+}
+
+/**
  * Get the pending payment challenge (set by omniChallengeMcpError).
  * Used by atxpExpress to rewrite wrapped tool errors into JSON-RPC errors.
  */

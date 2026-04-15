@@ -1,7 +1,7 @@
 import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAccountId, Network, AuthorizationServerUrl } from "@atxp/common";
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { BigNumber } from "bignumber.js";
-import { getATXPConfig, atxpAccountId, atxpToken, getDetectedCredential, setPendingPaymentChallenge } from "./atxpContext.js";
+import { getATXPConfig, atxpAccountId, atxpToken, getDetectedCredential, clearDetectedCredential, setPendingPaymentChallenge } from "./atxpContext.js";
 import { buildPaymentOptions, omniChallengeMcpError } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { ProtocolSettlement, type SettlementContext } from "./protocol.js";
@@ -50,6 +50,9 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   const detectedCredential = getDetectedCredential();
   if (detectedCredential) {
     await settleDetectedCredential(config, detectedCredential, charge, destinationAccountId, paymentAmount);
+    // Clear the credential so a second requirePayment() call in the same request
+    // (e.g., image server's post-generation charge) doesn't try to re-settle it.
+    clearDetectedCredential();
     // After settlement, the ledger should be credited. Fall through to charge below.
   }
 
