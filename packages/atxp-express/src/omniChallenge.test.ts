@@ -268,10 +268,12 @@ describe('credential detection Express middleware', () => {
       expect(storedCredential).toBeNull();
     });
 
-    it('should store ATXP credential with sourceAccountId from raw JSON', async () => {
+    // Settlement now happens in the middleware, not in requirePayment().
+    // The credential is NOT stored — it's settled immediately, so
+    // getDetectedCredential() returns null in route handlers.
+    it('should settle ATXP credential in middleware (not store for later)', async () => {
       let storedCredential: DetectedCredential | null = null;
 
-      // Raw JSON (not base64-encoded)
       const atxpCredential = JSON.stringify({
         sourceAccountId: 'atxp_acct_raw123',
         sourceAccountToken: 'tok_raw',
@@ -297,12 +299,11 @@ describe('credential detection Express middleware', () => {
         .send(TH.mcpToolRequest());
 
       expect(response.status).toBe(200);
-      expect(storedCredential).not.toBeNull();
-      expect(storedCredential!.protocol).toBe('atxp');
-      expect(storedCredential!.sourceAccountId).toBe('atxp_acct_raw123');
+      // Credential was settled in middleware, not stored for requirePayment()
+      expect(storedCredential).toBeNull();
     });
 
-    it('should store X402 credential with sourceAccountId from OAuth sub (fallback)', async () => {
+    it('should settle X402 credential in middleware (not store for later)', async () => {
       let storedCredential: DetectedCredential | null = null;
 
       const router = atxpExpress(TH.config({
@@ -325,18 +326,12 @@ describe('credential detection Express middleware', () => {
         .send(TH.mcpToolRequest());
 
       expect(response.status).toBe(200);
-      expect(storedCredential).not.toBeNull();
-      expect(storedCredential!.protocol).toBe('x402');
-      // X402 credentials don't contain identity, so sourceAccountId falls back
-      // to the OAuth sub. This ensures the settle credits the same account that
-      // the charge deducts from (atxpAccountId() = OAuth sub).
-      expect(storedCredential!.sourceAccountId).toBe('atxp:atxp_acct_x402user');
+      expect(storedCredential).toBeNull();
     });
 
-    it('should store ATXP credential with sourceAccountId from base64-encoded JSON', async () => {
+    it('should settle base64-encoded ATXP credential in middleware (not store for later)', async () => {
       let storedCredential: DetectedCredential | null = null;
 
-      // Base64-encoded JSON
       const atxpCredential = Buffer.from(JSON.stringify({
         sourceAccountId: 'atxp_acct_b64_456',
         sourceAccountToken: 'tok_b64',
@@ -362,9 +357,7 @@ describe('credential detection Express middleware', () => {
         .send(TH.mcpToolRequest());
 
       expect(response.status).toBe(200);
-      expect(storedCredential).not.toBeNull();
-      expect(storedCredential!.protocol).toBe('atxp');
-      expect(storedCredential!.sourceAccountId).toBe('atxp_acct_b64_456');
+      expect(storedCredential).toBeNull();
     });
   });
 });
