@@ -12,7 +12,6 @@ import {
   sendProtectedResourceMetadataNode,
   sendOAuthMetadataNode,
   detectProtocol,
-  setDetectedCredential,
   getPendingPaymentChallenge,
   type PaymentProtocol,
   type ATXPConfig,
@@ -20,6 +19,7 @@ import {
   type PendingPaymentChallenge,
   verifyOpaqueIdentity,
   parseCredentialBase64,
+  ProtocolSettlement,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
@@ -105,36 +105,62 @@ export function atxpExpress(args: ATXPArgs): Router {
         return;
       }
 
-      // Set up ATXP context, then store detected credential if present.
-      // requirePayment() will find it via getDetectedCredential() and settle
-      // before charging, using the pricing context it has (amount, options).
-      return withATXPContext(config, resource, tokenCheck, () => {
+      // Set up ATXP context, settle any payment credential, then run route.
+      // Settlement happens HERE (in middleware) rather than in requirePayment()
+      // so the ledger is credited before any route code runs. This avoids
+      // footguns where tool handlers call requirePayment() multiple times
+      // (e.g., pre-flight balance check + post-generation charge) and the
+      // first call consumes the credential, leaving nothing for the second.
+      return withATXPContext(config, resource, tokenCheck, async () => {
         if (detected) {
           // Resolve identity for the settlement ledger credit.
-          // The settle must use the same sourceAccountId as the charge
-          // (atxpAccountId() = OAuth sub) so the ledger entries match.
-          // For MPP: prefer the OAuth user (recovered from opaque) over the
-          // wallet address from the credential's `source` field — the ledger
-          // is keyed by OAuth identity, not wallet address.
-          // For ATXP: use the sourceAccountId embedded in the credential.
-          // For X402: falls back to OAuth sub (credential has no identity).
           const sourceAccountId = (detected.protocol === 'mpp' && user)
             ? user
             : resolveIdentitySync(config, req, detected.protocol, detected.credential) || user || undefined;
-          setDetectedCredential({
-            protocol: detected.protocol,
-            credential: detected.credential,
-            sourceAccountId,
-          });
-          logger.info(`Stored ${detected.protocol} credential in context for requirePayment (sourceAccountId=${sourceAccountId})`);
+
+          // Settle the credential immediately — credits the auth server's
+          // ledger so subsequent charge() calls in requirePayment() succeed.
+          const destinationAccountId = await config.destination.getAccountId();
+          const settlement = new ProtocolSettlement(
+            config.server,
+            logger,
+            fetch.bind(globalThis),
+            destinationAccountId,
+          );
+
+          // For X402: the credential's parsed payload contains `accepted` — the
+          // exact payment requirement the client signed off on. Pass it directly
+          // as paymentRequirements instead of regenerating from server config.
+          // For MPP/ATXP: credentials are self-contained, no extra context needed.
+          const context: Record<string, unknown> = {
+            ...(sourceAccountId && { sourceAccountId }),
+            destinationAccountId,
+          };
+
+          if (detected.protocol === 'x402') {
+            const parsed = parseCredentialBase64(detected.credential);
+            if (parsed?.accepted) {
+              context.paymentRequirements = parsed.accepted;
+            }
+          }
+
+          try {
+            const result = await settlement.settle(
+              detected.protocol,
+              detected.credential,
+              context as Parameters<typeof settlement.settle>[2],
+            );
+            logger.info(`Settled ${detected.protocol} in middleware: txHash=${result.txHash}, amount=${result.settledAmount}`);
+          } catch (error) {
+            logger.error(`Middleware settlement failed for ${detected.protocol}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't store the credential — it's already consumed/invalid.
+            // requirePayment() will see no credential, charge will fail,
+            // and a fresh payment challenge will be issued.
+          }
         }
 
         // Intercept the response to rewrite McpServer's wrapped payment errors
         // back into proper JSON-RPC errors with full challenge data.
-        // McpServer catches McpError(-30402) and wraps it into a CallToolResult,
-        // discarding error.data (which contains x402/mpp challenge data).
-        // We detect the wrapped error and reconstruct the JSON-RPC error using
-        // challenge data stored in AsyncLocalStorage by buildOmniError.
         installPaymentResponseRewriter(res, logger);
 
         return next();
