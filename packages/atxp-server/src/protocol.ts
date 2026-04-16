@@ -106,10 +106,16 @@ export type VerifyResult = {
 
 /**
  * Result of settling a payment.
+ *
+ * `txHash` is null when the auth server reports the payment was already settled
+ * by a prior call (HTTP retry after a successful settle). The original tx hash
+ * is not carried in that response; callers that need it must look it up by
+ * other means (payer / amount / destination).
  */
 export type SettleResult = {
-  txHash: string;
+  txHash: string | null;
   settledAmount: string;
+  alreadySettled?: boolean;
 };
 
 /**
@@ -230,7 +236,7 @@ export class ProtocolSettlement {
     }
 
     const result = await response.json() as SettleResult;
-    this.logger.info(`Settled ${protocol}: txHash=${result.txHash}, amount=${result.settledAmount}`);
+    this.logger.info(`Settled ${protocol}: txHash=${result.txHash ?? '<already-settled>'}, amount=${result.settledAmount}`);
     return result;
   }
 

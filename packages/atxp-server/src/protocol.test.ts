@@ -319,6 +319,31 @@ describe('ProtocolSettlement', () => {
       await expect(settlement.settle('x402', 'cred')).rejects.toThrow('Settlement failed for x402: 500');
     });
 
+    it('should pass through null txHash when auth reports already-settled', async () => {
+      // The auth server returns { txHash: null, alreadySettled: true, ... } on
+      // retries of an already-settled payload. The SDK should surface it as-is
+      // rather than crashing or forcing the type to string.
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          txHash: null,
+          settledAmount: '201000',
+          alreadySettled: true,
+          network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
+          payer: '3FnrCCfHhZhEyeQd5Q69B1faqLvdHoG3WxUesZBBJ7M2',
+          sourceAccountId: 'atxp:atxp_acct_6qB245zVIJeSiIHi8xPmY',
+        }),
+      });
+
+      const payload = { signature: '0xabc' };
+      const credential = Buffer.from(JSON.stringify(payload)).toString('base64');
+      const result = await settlement.settle('x402', credential, { paymentRequirements: { network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' } });
+
+      expect(result.txHash).toBeNull();
+      expect(result.settledAmount).toBe('201000');
+      expect(result.alreadySettled).toBe(true);
+    });
+
     describe('X402 multi-chain accept routing', () => {
       const multiChainReqs = {
         x402Version: 2,

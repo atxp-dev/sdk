@@ -150,7 +150,7 @@ export function atxpExpress(args: ATXPArgs): Router {
               detected.credential,
               context as Parameters<typeof settlement.settle>[2],
             );
-            logger.info(`Settled ${detected.protocol} in middleware: txHash=${result.txHash}, amount=${result.settledAmount}`);
+            logger.info(`Settled ${detected.protocol} in middleware: txHash=${result.txHash ?? '<already-settled>'}, amount=${result.settledAmount}`);
           } catch (error) {
             logger.error(`Middleware settlement failed for ${detected.protocol}: ${error instanceof Error ? error.message : String(error)}`);
             // Don't store the credential — it's already consumed/invalid.
