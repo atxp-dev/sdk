@@ -75,7 +75,9 @@ jobs:
 
           # Update cross-package dependencies to match new version
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-client
+          npm pkg set dependencies."@atxp/mpp"=$VERSION -w packages/atxp-client
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-server
+          npm pkg set dependencies."@atxp/mpp"=$VERSION -w packages/atxp-server
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-sqlite
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-redis
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-base
@@ -86,6 +88,8 @@ jobs:
           npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-worldchain
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-polygon
           npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-polygon
+          npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-tempo
+          npm pkg set dependencies."@atxp/client"=$VERSION -w packages/atxp-tempo
           npm pkg set dependencies."@atxp/server"=$VERSION -w packages/atxp-express
           npm pkg set dependencies."@atxp/common"=$VERSION -w packages/atxp-cloudflare
           npm pkg set dependencies."@atxp/server"=$VERSION -w packages/atxp-cloudflare
