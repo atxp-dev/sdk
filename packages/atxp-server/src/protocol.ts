@@ -178,7 +178,7 @@ export function parseCredentialBase64(credential: string): Record<string, unknow
 export interface ProtocolSettlementOptions {
   /**
    * Identifier for the calling service (e.g. `"llm"`, `"music-mcp"`). Sent
-   * as the `X-ATXP-App-Name` header on every /settle/* and /verify/* request
+   * as the `X-ATXP-APP-NAME` header on every /settle/* and /verify/* request
    * so auth can attribute observability events to the originating app.
    *
    * Resolution order:
@@ -187,6 +187,11 @@ export interface ProtocolSettlementOptions {
    *   3. header omitted
    *
    * An explicit empty string disables the env fallback for this instance.
+   *
+   * Expected format (enforced on the auth side): 1–64 characters,
+   * `[a-zA-Z0-9._-]+`. Values outside this range are accepted by the SDK
+   * but silently dropped by auth's `readAppNameHeader` validator — the
+   * span attribute will be missing rather than the settle failing.
    */
   appName?: string;
 }
@@ -231,7 +236,7 @@ export class ProtocolSettlement {
 
   /**
    * Build the headers sent to auth on every /settle/* and /verify/* request.
-   * Always JSON; adds X-ATXP-App-Name when a non-empty app name is configured.
+   * Always JSON; adds X-ATXP-APP-NAME when a non-empty app name is configured.
    */
   private buildHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };

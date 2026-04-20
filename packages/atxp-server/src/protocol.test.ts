@@ -431,7 +431,7 @@ describe('ProtocolSettlement', () => {
     const headersFromFetch = (fetch: ReturnType<typeof vi.fn>) =>
       fetch.mock.calls[0][1].headers as Record<string, string>;
 
-    it('sends X-ATXP-App-Name when the explicit appName option is set', async () => {
+    it('sends X-ATXP-APP-NAME when the explicit appName option is set', async () => {
       mockFetch.mockResolvedValue(okResponse());
       const s = new ProtocolSettlement(
         'https://auth.atxp.ai' as any,
