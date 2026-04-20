@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { detectProtocol, ProtocolSettlement } from './protocol.js';
 
 describe('detectProtocol', () => {
@@ -413,6 +413,129 @@ describe('ProtocolSettlement', () => {
           expect.stringContaining('no EVM accept found'),
         );
       });
+    });
+  });
+
+  describe('X-ATXP-App-Name header', () => {
+    // Auth reads this header and attaches it to settle observability events
+    // so dashboards can slice by calling service. See auth#254.
+    const savedAppName = process.env.APP_NAME;
+    afterEach(() => {
+      if (savedAppName === undefined) delete process.env.APP_NAME;
+      else process.env.APP_NAME = savedAppName;
+    });
+
+    const okResponse = () => ({ ok: true, json: async () => ({ txHash: '0xabc', settledAmount: '1' }) });
+    const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
+
+    const headersFromFetch = (fetch: ReturnType<typeof vi.fn>) =>
+      fetch.mock.calls[0][1].headers as Record<string, string>;
+
+    it('sends X-ATXP-App-Name when the explicit appName option is set', async () => {
+      mockFetch.mockResolvedValue(okResponse());
+      const s = new ProtocolSettlement(
+        'https://auth.atxp.ai' as any,
+        mockLogger,
+        mockFetch,
+        undefined,
+        { appName: 'llm' },
+      );
+
+      await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
+
+      expect(headersFromFetch(mockFetch)['X-ATXP-App-Name']).toBe('llm');
+    });
+
+    it('falls back to process.env.APP_NAME when appName option is omitted', async () => {
+      process.env.APP_NAME = 'music-mcp';
+      mockFetch.mockResolvedValue(okResponse());
+      const s = new ProtocolSettlement(
+        'https://auth.atxp.ai' as any,
+        mockLogger,
+        mockFetch,
+      );
+
+      await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
+
+      expect(headersFromFetch(mockFetch)['X-ATXP-App-Name']).toBe('music-mcp');
+    });
+
+    it('explicit appName option overrides process.env.APP_NAME', async () => {
+      process.env.APP_NAME = 'from-env';
+      mockFetch.mockResolvedValue(okResponse());
+      const s = new ProtocolSettlement(
+        'https://auth.atxp.ai' as any,
+        mockLogger,
+        mockFetch,
+        undefined,
+        { appName: 'from-option' },
+      );
+
+      await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
+
+      expect(headersFromFetch(mockFetch)['X-ATXP-App-Name']).toBe('from-option');
+    });
+
+    it('explicit empty string disables env fallback (header omitted)', async () => {
+      // Empty-string override lets tests and oddball configs opt out of the
+      // env fallback without mutating process.env.
+      process.env.APP_NAME = 'would-have-used-this';
+      mockFetch.mockResolvedValue(okResponse());
+      const s = new ProtocolSettlement(
+        'https://auth.atxp.ai' as any,
+        mockLogger,
+        mockFetch,
+        undefined,
+        { appName: '' },
+      );
+
+      await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
+
+      expect(headersFromFetch(mockFetch)).not.toHaveProperty('X-ATXP-App-Name');
+    });
+
+    it('omits the header when neither option nor env is set', async () => {
+      delete process.env.APP_NAME;
+      mockFetch.mockResolvedValue(okResponse());
+      const s = new ProtocolSettlement(
+        'https://auth.atxp.ai' as any,
+        mockLogger,
+        mockFetch,
+      );
+
+      await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
+
+      expect(headersFromFetch(mockFetch)).not.toHaveProperty('X-ATXP-App-Name');
+    });
+
+    it('trims whitespace-only values to undefined (header omitted)', async () => {
+      mockFetch.mockResolvedValue(okResponse());
+      const s = new ProtocolSettlement(
+        'https://auth.atxp.ai' as any,
+        mockLogger,
+        mockFetch,
+        undefined,
+        { appName: '   ' },
+      );
+
+      await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
+
+      expect(headersFromFetch(mockFetch)).not.toHaveProperty('X-ATXP-App-Name');
+    });
+
+    it('sets the header on verify() as well as settle()', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ valid: true }) });
+      const s = new ProtocolSettlement(
+        'https://auth.atxp.ai' as any,
+        mockLogger,
+        mockFetch,
+        undefined,
+        { appName: 'llm' },
+      );
+
+      await s.verify('x402', credential, { paymentRequirements: { network: 'base' } });
+
+      expect(headersFromFetch(mockFetch)['X-ATXP-App-Name']).toBe('llm');
     });
   });
 });

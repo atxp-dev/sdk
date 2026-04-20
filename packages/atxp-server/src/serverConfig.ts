@@ -6,7 +6,7 @@ type RequiredATXPConfigFields = 'destination';
 type RequiredATXPConfig = Pick<ATXPConfig, RequiredATXPConfigFields>;
 type OptionalATXPConfig = Omit<ATXPConfig, RequiredATXPConfigFields>;
 export type ATXPArgs = RequiredATXPConfig & Partial<OptionalATXPConfig>;
-type BuildableATXPConfigFields = 'oAuthDb' | 'oAuthClient' | 'paymentServer' | 'logger' | 'minimumPayment';
+type BuildableATXPConfigFields = 'oAuthDb' | 'oAuthClient' | 'paymentServer' | 'logger' | 'minimumPayment' | 'appName';
 
 export const DEFAULT_CONFIG: Required<Omit<OptionalATXPConfig, BuildableATXPConfigFields>> = {
   mountPath: '/',
