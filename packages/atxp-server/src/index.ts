@@ -96,6 +96,7 @@ export {
   detectProtocol,
   parseCredentialBase64,
   ProtocolSettlement,
+  type ProtocolSettlementOptions,
 } from './protocol.js';
 
 // Omni-challenge builders

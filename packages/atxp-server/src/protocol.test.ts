@@ -416,7 +416,7 @@ describe('ProtocolSettlement', () => {
     });
   });
 
-  describe('X-ATXP-App-Name header', () => {
+  describe('X-ATXP-APP-NAME header', () => {
     // Auth reads this header and attaches it to settle observability events
     // so dashboards can slice by calling service. See auth#254.
     const savedAppName = process.env.APP_NAME;
@@ -443,7 +443,7 @@ describe('ProtocolSettlement', () => {
 
       await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
 
-      expect(headersFromFetch(mockFetch)['X-ATXP-App-Name']).toBe('llm');
+      expect(headersFromFetch(mockFetch)['X-ATXP-APP-NAME']).toBe('llm');
     });
 
     it('falls back to process.env.APP_NAME when appName option is omitted', async () => {
@@ -457,7 +457,7 @@ describe('ProtocolSettlement', () => {
 
       await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
 
-      expect(headersFromFetch(mockFetch)['X-ATXP-App-Name']).toBe('music-mcp');
+      expect(headersFromFetch(mockFetch)['X-ATXP-APP-NAME']).toBe('music-mcp');
     });
 
     it('explicit appName option overrides process.env.APP_NAME', async () => {
@@ -473,7 +473,7 @@ describe('ProtocolSettlement', () => {
 
       await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
 
-      expect(headersFromFetch(mockFetch)['X-ATXP-App-Name']).toBe('from-option');
+      expect(headersFromFetch(mockFetch)['X-ATXP-APP-NAME']).toBe('from-option');
     });
 
     it('explicit empty string disables env fallback (header omitted)', async () => {
@@ -491,7 +491,7 @@ describe('ProtocolSettlement', () => {
 
       await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
 
-      expect(headersFromFetch(mockFetch)).not.toHaveProperty('X-ATXP-App-Name');
+      expect(headersFromFetch(mockFetch)).not.toHaveProperty('X-ATXP-APP-NAME');
     });
 
     it('omits the header when neither option nor env is set', async () => {
@@ -505,7 +505,7 @@ describe('ProtocolSettlement', () => {
 
       await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
 
-      expect(headersFromFetch(mockFetch)).not.toHaveProperty('X-ATXP-App-Name');
+      expect(headersFromFetch(mockFetch)).not.toHaveProperty('X-ATXP-APP-NAME');
     });
 
     it('trims whitespace-only values to undefined (header omitted)', async () => {
@@ -520,7 +520,7 @@ describe('ProtocolSettlement', () => {
 
       await s.settle('x402', credential, { paymentRequirements: { network: 'base' } });
 
-      expect(headersFromFetch(mockFetch)).not.toHaveProperty('X-ATXP-App-Name');
+      expect(headersFromFetch(mockFetch)).not.toHaveProperty('X-ATXP-APP-NAME');
     });
 
     it('sets the header on verify() as well as settle()', async () => {
@@ -535,7 +535,7 @@ describe('ProtocolSettlement', () => {
 
       await s.verify('x402', credential, { paymentRequirements: { network: 'base' } });
 
-      expect(headersFromFetch(mockFetch)['X-ATXP-App-Name']).toBe('llm');
+      expect(headersFromFetch(mockFetch)['X-ATXP-APP-NAME']).toBe('llm');
     });
   });
 });

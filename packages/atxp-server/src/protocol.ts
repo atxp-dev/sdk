@@ -191,7 +191,7 @@ export interface ProtocolSettlementOptions {
   appName?: string;
 }
 
-const APP_NAME_HEADER = 'X-ATXP-App-Name';
+const APP_NAME_HEADER = 'X-ATXP-APP-NAME';
 
 /**
  * Client for calling auth service verify/settle endpoints.
@@ -208,10 +208,17 @@ export class ProtocolSettlement {
     private readonly destinationAccountId?: string,
     options?: ProtocolSettlementOptions,
   ) {
-    // Resolve appName at construction time so the value doesn't change
-    // mid-process if someone mutates process.env later.
+    // Resolve appName once per instance. Long-lived callers (LLM constructs
+    // once at startup) get a stable value; short-lived callers that rebuild
+    // the instance — notably @atxp/express, which instantiates per-request
+    // at atxpExpress.ts:~124 — re-read process.env.APP_NAME each time, which
+    // is fine because APP_NAME is a deployment-time constant, not runtime
+    // config.
+    //
     // An explicit empty string (options.appName === '') opts out of the env
-    // fallback — handy for tests that want to assert header-omitted behavior.
+    // fallback — useful when a single process hosts two services and wants
+    // to suppress cross-attribution, or in tests asserting header-omitted
+    // behavior.
     const explicit = options?.appName;
     if (explicit !== undefined) {
       const trimmed = explicit.trim();
