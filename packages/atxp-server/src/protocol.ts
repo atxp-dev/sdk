@@ -172,17 +172,77 @@ export function parseCredentialBase64(credential: string): Record<string, unknow
 }
 
 /**
+ * Constructor options for `ProtocolSettlement`. Kept as a trailing options
+ * bag so new knobs can be added without shifting positional arguments.
+ */
+export interface ProtocolSettlementOptions {
+  /**
+   * Identifier for the calling service (e.g. `"llm"`, `"music-mcp"`). Sent
+   * as the `X-ATXP-APP-NAME` header on every /settle/* and /verify/* request
+   * so auth can attribute observability events to the originating app.
+   *
+   * Resolution order:
+   *   1. this option, if set to a non-empty string
+   *   2. `process.env.APP_NAME`, if set to a non-empty string
+   *   3. header omitted
+   *
+   * An explicit empty string disables the env fallback for this instance.
+   *
+   * Expected format (enforced on the auth side): 1–64 characters,
+   * `[a-zA-Z0-9._-]+`. Values outside this range are accepted by the SDK
+   * but silently dropped by auth's `readAppNameHeader` validator — the
+   * span attribute will be missing rather than the settle failing.
+   */
+  appName?: string;
+}
+
+const APP_NAME_HEADER = 'X-ATXP-APP-NAME';
+
+/**
  * Client for calling auth service verify/settle endpoints.
  * Routes to the appropriate protocol-specific endpoint.
  */
 export class ProtocolSettlement {
+  private readonly appName: string | undefined;
+
   constructor(
     private readonly authServer: AuthorizationServerUrl,
     private readonly logger: Logger,
     private readonly fetchFn: FetchLike = fetch.bind(globalThis),
     /** Destination account ID for ATXP settle (the server/LLM's own account) */
     private readonly destinationAccountId?: string,
-  ) {}
+    options?: ProtocolSettlementOptions,
+  ) {
+    // Resolve appName once per instance. Long-lived callers (LLM constructs
+    // once at startup) get a stable value; short-lived callers that rebuild
+    // the instance — notably @atxp/express, which instantiates per-request
+    // at atxpExpress.ts:~124 — re-read process.env.APP_NAME each time, which
+    // is fine because APP_NAME is a deployment-time constant, not runtime
+    // config.
+    //
+    // An explicit empty string (options.appName === '') opts out of the env
+    // fallback — useful when a single process hosts two services and wants
+    // to suppress cross-attribution, or in tests asserting header-omitted
+    // behavior.
+    const explicit = options?.appName;
+    if (explicit !== undefined) {
+      const trimmed = explicit.trim();
+      this.appName = trimmed || undefined;
+    } else {
+      const envValue = (typeof process !== 'undefined' ? process.env.APP_NAME : undefined)?.trim();
+      this.appName = envValue || undefined;
+    }
+  }
+
+  /**
+   * Build the headers sent to auth on every /settle/* and /verify/* request.
+   * Always JSON; adds X-ATXP-APP-NAME when a non-empty app name is configured.
+   */
+  private buildHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.appName) headers[APP_NAME_HEADER] = this.appName;
+    return headers;
+  }
 
   /**
    * Verify a payment credential at request start.
@@ -199,7 +259,7 @@ export class ProtocolSettlement {
 
     const response = await this.fetchFn(url.toString(), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.buildHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -225,7 +285,7 @@ export class ProtocolSettlement {
 
     const response = await this.fetchFn(url.toString(), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.buildHeaders(),
       body: JSON.stringify(body),
     });
 

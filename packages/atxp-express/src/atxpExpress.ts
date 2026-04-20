@@ -126,6 +126,7 @@ export function atxpExpress(args: ATXPArgs): Router {
             logger,
             fetch.bind(globalThis),
             destinationAccountId,
+            { appName: config.appName },
           );
 
           // For X402: the credential's parsed payload contains `accepted` — the

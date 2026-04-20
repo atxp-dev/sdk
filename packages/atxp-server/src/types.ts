@@ -74,6 +74,23 @@ export type ATXPConfig = {
   oAuthClient: OAuthResourceClient;
   paymentServer: PaymentServer;
   minimumPayment?: BigNumber;
+  /**
+   * Identifier for the calling service (e.g. `"llm"`, `"music-mcp"`). Sent to
+   * auth as the `X-ATXP-APP-NAME` request header on /settle/* and /verify/*
+   * calls so auth can attribute observability events to the originating app.
+   *
+   * When omitted, `ProtocolSettlement` falls back to `process.env.APP_NAME`.
+   * Explicit value takes precedence; set to empty string to disable the env
+   * fallback for this instance.
+   *
+   * Expected format (enforced on the auth side — values outside this format
+   * are silently dropped by the receiver, producing a missing span attribute
+   * rather than a failed settle): 1–64 characters, `[a-zA-Z0-9._-]+`.
+   *
+   * Observability metadata only — auth treats this as untrusted. Do not use
+   * for authorization or billing attribution.
+   */
+  appName?: string;
 }
 
 
