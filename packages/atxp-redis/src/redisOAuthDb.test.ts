@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { RedisOAuthDb } from './index.js';
+import { RedisOAuthDb, DEFAULT_ACCESS_TOKEN_TTL_SECONDS } from './index.js';
 import type { AccessToken, ClientCredentials, PKCEValues } from '@atxp/common';
 
 // Mock Redis client for unit tests
@@ -184,6 +184,62 @@ describe('RedisOAuthDb', () => {
       );
       expect(call![1]).toBeGreaterThan(0);
       expect(call![1]).toBeLessThanOrEqual(3600);
+    });
+  });
+
+  describe('Default TTL (no explicit expiry)', () => {
+    const userId = 'test-user';
+    const url = 'https://example.com';
+    const tokenWithoutExpiry: AccessToken = {
+      accessToken: 'no-expiry-token',
+      resourceUrl: 'https://example.com'
+    };
+
+    it('applies a bounded default TTL instead of storing indefinitely', async () => {
+      // Regression guard: this branch previously called redis.set (no TTL), so
+      // tokens without an expiry accumulated forever and bloated shared Redis.
+      await db.saveAccessToken(userId, url, tokenWithoutExpiry);
+
+      expect(mockRedis.set).not.toHaveBeenCalled();
+      expect(mockRedis.setex).toHaveBeenCalledWith(
+        'test:oauth:access_token:test-user:https://example.com',
+        DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
+        expect.any(String)
+      );
+    });
+
+    it('honors a configured defaultTtl', async () => {
+      const customDb = new RedisOAuthDb({
+        redis: mockRedis,
+        keyPrefix: 'test:oauth:',
+        defaultTtl: 3600
+      });
+
+      await customDb.saveAccessToken(userId, url, tokenWithoutExpiry);
+
+      expect(mockRedis.setex).toHaveBeenCalledWith(
+        'test:oauth:access_token:test-user:https://example.com',
+        3600,
+        expect.any(String)
+      );
+
+      await customDb.close();
+    });
+
+    it('still prefers an explicit token expiry over the default TTL', async () => {
+      const expiresAt = Math.floor(Date.now() / 1000) + 120;
+      await db.saveAccessToken(userId, url, {
+        accessToken: 'expiring-token',
+        resourceUrl: 'https://example.com',
+        expiresAt
+      });
+
+      const call = mockRedis.setex.mock.calls.find(
+        c => c[0] === 'test:oauth:access_token:test-user:https://example.com'
+      );
+      expect(call).toBeDefined();
+      expect(call![1]).toBeGreaterThan(0);
+      expect(call![1]).toBeLessThanOrEqual(120);
     });
   });
 

@@ -1,6 +1,16 @@
 import { ConsoleLogger } from '@atxp/common';
 import type { AccessToken, ClientCredentials, Logger, OAuthDb, PKCEValues } from '@atxp/common';
 
+/**
+ * Default TTL (seconds) applied to access tokens that have neither an explicit
+ * `expiresAt` nor a configured `ttl`. Such tokens were previously stored with
+ * no expiry (plain `SET`), so they accumulated forever and grew shared Redis
+ * instances without bound. 24h is a safe cap: callers (e.g. the ATXP server
+ * middleware) re-save tokens on every request, so active sessions stay cached
+ * while idle entries age out.
+ */
+export const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+
 export interface RedisClient {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<unknown>;
@@ -16,6 +26,7 @@ export interface RedisOAuthDbConfig {
   logger?: Logger;
   keyPrefix?: string;
   ttl?: number; // TTL in seconds for tokens
+  defaultTtl?: number; // Fallback TTL (seconds) for access tokens with no explicit expiry. Defaults to DEFAULT_ACCESS_TOKEN_TTL_SECONDS.
 }
 
 export class RedisOAuthDb implements OAuthDb {
@@ -25,6 +36,7 @@ export class RedisOAuthDb implements OAuthDb {
   private logger: Logger;
   private keyPrefix: string;
   private ttl?: number;
+  private defaultTtl: number;
 
   constructor({
     redis,
@@ -32,7 +44,8 @@ export class RedisOAuthDb implements OAuthDb {
     decrypt = (data: string) => data,
     logger = new ConsoleLogger(),
     keyPrefix = 'oauth:',
-    ttl
+    ttl,
+    defaultTtl = DEFAULT_ACCESS_TOKEN_TTL_SECONDS
   }: RedisOAuthDbConfig) {
     if (typeof redis === 'string') {
       // Dynamic import to avoid bundling issues
@@ -46,6 +59,7 @@ export class RedisOAuthDb implements OAuthDb {
     this.logger = logger;
     this.keyPrefix = keyPrefix;
     this.ttl = ttl;
+    this.defaultTtl = defaultTtl;
   }
 
   private async createRedisClient(redisUrl: string): Promise<RedisClient> {
@@ -187,8 +201,10 @@ export class RedisOAuthDb implements OAuthDb {
       const ttlSeconds = Math.max(1, token.expiresAt - Math.floor(Date.now() / 1000));
       await redis.setex(key, ttlSeconds, data);
     } else {
-      // No expiration, store indefinitely
-      await redis.set(key, data);
+      // No explicit expiry: apply a bounded default TTL so access tokens
+      // cannot accumulate indefinitely. Previously this stored the token with
+      // no expiry, which caused unbounded key growth in shared Redis instances.
+      await redis.setex(key, this.defaultTtl, data);
     }
   }
 
