@@ -142,6 +142,19 @@ describe('SqliteOAuthDb', () => {
       expect(retrieved?.expiresAt).toBeUndefined();
     });
 
+    it('returns null for an expired token (read-path expiry)', async () => {
+      const expired: AccessToken = {
+        accessToken: 'expired-token',
+        expiresAt: Math.floor(Date.now() / 1000) - 60, // 1 minute ago
+        resourceUrl: 'https://example.com'
+      };
+      await db.saveAccessToken('test-user', 'https://example.com', expired);
+
+      // Previously sqlite selected expires_at but never compared it, so it returned
+      // the expired token as valid and never evicted it.
+      expect(await db.getAccessToken('test-user', 'https://example.com')).toBeNull();
+    });
+
     it('should update existing access tokens', async () => {
       await db.saveAccessToken(userId, url, accessToken);
       

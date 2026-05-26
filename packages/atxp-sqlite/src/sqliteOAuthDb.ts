@@ -154,18 +154,38 @@ export class SqliteOAuthDb implements OAuthDb {
     const statement = await this.db.prepareAsync(
       'SELECT resource_url, encrypted_access_token, encrypted_refresh_token, expires_at FROM oauth_access_tokens WHERE user_id = ? AND url = ?'
     );
+    let row: { resource_url: string; encrypted_access_token: string; encrypted_refresh_token: string | null; expires_at: string | null } | null = null;
     try {
       const result = await statement.executeAsync<{ resource_url: string; encrypted_access_token: string; encrypted_refresh_token: string | null; expires_at: string | null }>(userId, url);
-      const row = await result.getFirstAsync();
+      row = await result.getFirstAsync();
+    } finally {
+      await statement.finalizeAsync();
+    }
 
-      if (!row) return null;
+    if (!row) return null;
 
-      return {
-        accessToken: this.decrypt(row.encrypted_access_token),
-        refreshToken: row.encrypted_refresh_token ? this.decrypt(row.encrypted_refresh_token) : undefined,
-        expiresAt: row.expires_at ? parseInt(row.expires_at) : undefined,
-        resourceUrl: row.resource_url
-      };
+    const expiresAt = row.expires_at ? parseInt(row.expires_at) : undefined;
+    // Read-path expiry: never hand back an expired token, and delete the row so the
+    // table doesn't retain dead tokens. expiresAt is Unix epoch seconds.
+    if (expiresAt !== undefined && Date.now() >= expiresAt * 1000) {
+      await this.deleteAccessToken(userId, url);
+      return null;
+    }
+
+    return {
+      accessToken: this.decrypt(row.encrypted_access_token),
+      refreshToken: row.encrypted_refresh_token ? this.decrypt(row.encrypted_refresh_token) : undefined,
+      expiresAt,
+      resourceUrl: row.resource_url
+    };
+  }
+
+  private deleteAccessToken = async (userId: string, url: string): Promise<void> => {
+    const statement = await this.db.prepareAsync(
+      'DELETE FROM oauth_access_tokens WHERE user_id = ? AND url = ?'
+    );
+    try {
+      await statement.executeAsync(userId, url);
     } finally {
       await statement.finalizeAsync();
     }
