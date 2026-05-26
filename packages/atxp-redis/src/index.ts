@@ -204,6 +204,11 @@ export class RedisOAuthDb implements OAuthDb {
       // No explicit expiry: apply a bounded default TTL so access tokens
       // cannot accumulate indefinitely. Previously this stored the token with
       // no expiry, which caused unbounded key growth in shared Redis instances.
+      // Note: with no expiresAt, expires_at is stored null and the read-path
+      // expiry check is skipped, so this TTL is the only bound — a token could be
+      // served for up to defaultTtl after it actually expires upstream. Callers
+      // that can supply expiresAt (the server middleware sets it from the
+      // introspection `exp`) get exact expiry instead of this backstop.
       await redis.setex(key, this.defaultTtl, data);
     }
   }

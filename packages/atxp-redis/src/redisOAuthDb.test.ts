@@ -241,6 +241,19 @@ describe('RedisOAuthDb', () => {
       expect(call![1]).toBeGreaterThan(0);
       expect(call![1]).toBeLessThanOrEqual(120);
     });
+
+    it('refreshes the TTL on every re-save (sliding window)', async () => {
+      // The whole fix relies on this: withATXPContext re-saves on each request,
+      // so an active session keeps re-arming the TTL while idle keys expire.
+      await db.saveAccessToken(userId, url, tokenWithoutExpiry);
+      await db.saveAccessToken(userId, url, tokenWithoutExpiry);
+
+      const calls = mockRedis.setex.mock.calls.filter(
+        c => c[0] === 'test:oauth:access_token:test-user:https://example.com'
+      );
+      expect(calls).toHaveLength(2);
+      expect(calls.every(c => c[1] === DEFAULT_ACCESS_TOKEN_TTL_SECONDS)).toBe(true);
+    });
   });
 
   describe('Encryption Support', () => {
@@ -315,24 +328,26 @@ describe('RedisOAuthDb', () => {
     });
   });
 
-  describe('TTL Configuration', () => {
-    it('should use configured default TTL for tokens without expiration', async () => {
+  describe('Unconditional ttl option', () => {
+    it('applies the configured `ttl` to all tokens, overriding any explicit expiresAt', async () => {
       const ttlDb = new RedisOAuthDb({
         redis: mockRedis,
         keyPrefix: 'test:ttl:',
-        ttl: 1800 // 30 minutes
+        ttl: 1800 // 30 minutes, applied unconditionally to every token
       });
 
-      const tokenWithoutExpiry: AccessToken = {
-        accessToken: 'no-expiry-token',
-        resourceUrl: 'https://example.com'
+      // Token WITH an explicit far-future expiry — the unconditional ttl still wins.
+      const token: AccessToken = {
+        accessToken: 'tok',
+        resourceUrl: 'https://example.com',
+        expiresAt: Math.floor(Date.now() / 1000) + 86400 // 24h
       };
 
-      await ttlDb.saveAccessToken('user', 'https://example.com', tokenWithoutExpiry);
+      await ttlDb.saveAccessToken('user', 'https://example.com', token);
 
       expect(mockRedis.setex).toHaveBeenCalledWith(
         'test:ttl:access_token:user:https://example.com',
-        1800, // Configured TTL
+        1800, // the unconditional ttl, NOT the ~86400 derived from expiresAt
         expect.any(String)
       );
 
