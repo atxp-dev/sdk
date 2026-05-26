@@ -58,7 +58,7 @@ export class MemoryOAuthDb implements OAuthDb {
     }
 
     // Check if token has expired
-    if (token.expiresAt && token.expiresAt < Date.now()) {
+    if (token.expiresAt && token.expiresAt * 1000 < Date.now()) {
       this.logger.info(`Access token expired for user: ${userId}, url: ${url}`);
       this.accessTokens.delete(key);
       return null;
@@ -101,7 +101,7 @@ export class MemoryOAuthDb implements OAuthDb {
     let cleaned = 0;
     
     for (const [key, token] of this.accessTokens.entries()) {
-      if (token.expiresAt && token.expiresAt < now) {
+      if (token.expiresAt && token.expiresAt * 1000 < now) {
         this.accessTokens.delete(key);
         cleaned++;
       }

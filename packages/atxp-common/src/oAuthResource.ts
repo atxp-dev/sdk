@@ -146,7 +146,8 @@ export class OAuthResourceClient {
       active: tokenData.active,
       scope: tokenData.scope,
       sub: tokenData.sub,
-      aud: tokenData.aud
+      aud: tokenData.aud,
+      exp: tokenData.exp
     };
   }
 
