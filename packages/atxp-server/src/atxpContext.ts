@@ -107,7 +107,11 @@ export async function withATXPContext(config: ATXPConfig, resource: URL, tokenIn
     if(tokenInfo.token) {
       const dbData = {
         accessToken: tokenInfo.token!,
-        resourceUrl: ''
+        resourceUrl: '',
+        // Bound the cached token to the introspected token's lifetime (epoch seconds).
+        // Without this the OAuthDb backends store it with no expiry and accumulate
+        // forever (and could hand back an already-expired token).
+        expiresAt: tokenInfo.data.exp
       };
       // Save the token to the oAuthDB so that other users of the DB can access it
       // if needed (ie, for token-exchange for downstream services)

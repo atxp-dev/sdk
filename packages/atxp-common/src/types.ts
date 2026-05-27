@@ -137,7 +137,7 @@ export type PKCEValues = {
 export type AccessToken = {
   accessToken: string,
   refreshToken?: string,
-  expiresAt?: number,
+  expiresAt?: number, // Unix epoch SECONDS (not milliseconds)
   resourceUrl: string
 };
 
@@ -159,6 +159,7 @@ export type TokenData = {
   scope?: string,
   sub?: string,
   aud?: string|string[],
+  exp?: number, // Token expiry as Unix epoch SECONDS (RFC 7662 introspection `exp`), when the authorization server provides it
 }
 
 // This should match MCP SDK's version, however they don't export it

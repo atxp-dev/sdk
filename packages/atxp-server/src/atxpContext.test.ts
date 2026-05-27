@@ -75,4 +75,15 @@ describe('continueWithATXPContext', () => {
     const fromDb = await cfg.oAuthDb.getAccessToken(tokenCheck.data!.sub!, '');
     expect(fromDb).toBeNull();
   });
+
+  it('writes the introspected token expiry (exp) to the oauth DB', async () => {
+    const cfg = TH.config();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const tokenCheck = TH.tokenCheck({ data: { ...TH.tokenData(), exp } });
+    await withATXPContext(cfg, new URL('https://example.com'), tokenCheck, () => {});
+    const fromDb = await cfg.oAuthDb.getAccessToken(tokenCheck.data!.sub!, '');
+    // Root fix: the cached token carries the introspection exp (epoch seconds) so
+    // every OAuthDb backend can bound/evict it instead of storing it forever.
+    expect(fromDb?.expiresAt).toBe(exp);
+  });
 }); 

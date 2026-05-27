@@ -100,7 +100,7 @@ describe('oauthClient', () => {
       db.saveAccessToken('bdj', 'https://example.com/mcp', {
         resourceUrl: 'https://example.com/mcp',
         accessToken: 'test-access-token',
-        expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 30
+        expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30
       });
       const f = fetchMock.createInstance().getOnce('https://example.com/mcp', 401);
       mockResourceServer(f, 'https://example.com', '/mcp');
@@ -121,7 +121,7 @@ describe('oauthClient', () => {
       db.saveAccessToken('bdj', 'https://example.com', {
         resourceUrl: 'https://example.com',
         accessToken: 'test-access-token',
-        expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 30
+        expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30
       });
       const f = fetchMock.createInstance().getOnce('https://example.com/mcp', 401);
       mockResourceServer(f, 'https://example.com', '/mcp');
@@ -158,7 +158,7 @@ describe('oauthClient', () => {
         // Expires in the future, but the server can invalidate tokens whenever it wants
         // regardless. Set the time in the future so future changes to the client don't
         // pre-emptively refresh the token and break this test case
-        expiresAt: Date.now() + 1000,
+        expiresAt: Math.floor(Date.now() / 1000) + 3600,
         refreshToken: 'oldRefreshToken'
       };
       db.saveAccessToken('bdj', 'https://example.com/mcp', oldToken);
@@ -200,7 +200,7 @@ describe('oauthClient', () => {
       expect(token).not.toBeNull();
       expect(token?.accessToken).toEqual('newAccessToken');
       expect(token?.refreshToken).toEqual('newRefreshToken');
-      expect(token?.expiresAt).toBeGreaterThan(Date.now());
+      expect(token?.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
     });
 
     it('should throw if the token refresh fails', async () => {
@@ -211,7 +211,7 @@ describe('oauthClient', () => {
         // Expires in the future, but the server can invalidate tokens whenever it wants
         // regardless. Set the time in the future so future changes to the client don't
         // pre-emptively refresh the token and break this test case
-        expiresAt: Date.now() + 1000,
+        expiresAt: Math.floor(Date.now() / 1000) + 3600,
         refreshToken: 'oldRefreshToken'
       };
       db.saveAccessToken('bdj', 'https://example.com/mcp', oldToken);
@@ -423,7 +423,7 @@ describe('oauthClient', () => {
       const token = await db.getAccessToken('bdj', 'https://example.com/mcp');
       expect(token).not.toBeNull();
       expect(token?.accessToken).toEqual('testAccessToken');
-      expect(token?.expiresAt).toBeGreaterThan(Date.now());
+      expect(token?.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
     });
 
     it('should throw if no PKCE values found for state', async () => {

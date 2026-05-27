@@ -307,8 +307,8 @@ export class OAuthClient extends OAuthResourceClient {
       resourceUrl,
       accessToken: result.access_token,
       refreshToken: result.refresh_token,
-      expiresAt: result.expires_in 
-        ? Date.now() + result.expires_in * 1000
+      expiresAt: result.expires_in
+        ? Math.floor(Date.now() / 1000) + result.expires_in
         : undefined
     });
     
@@ -359,8 +359,8 @@ export class OAuthClient extends OAuthResourceClient {
       resourceUrl: token.resourceUrl,
       accessToken: result.access_token,
       refreshToken: result.refresh_token,
-      expiresAt: result.expires_in 
-        ? Date.now() + result.expires_in * 1000
+      expiresAt: result.expires_in
+        ? Math.floor(Date.now() / 1000) + result.expires_in
         : undefined
     };
     await this.db.saveAccessToken(this.userId, url, at);
