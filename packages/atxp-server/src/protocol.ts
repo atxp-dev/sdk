@@ -26,6 +26,10 @@ export type MppChallengeData = {
   recipient: string;
   /** ISO 8601 expiry timestamp. Required by mppx's verify() for Tempo challenges. */
   expires?: string;
+  /** Resource URL for the payee MCP server. Preserved through accounts/auth for activity labels. */
+  resource?: { url: string };
+  /** Nested request object. mppx credentials preserve request metadata through settlement. */
+  request?: Record<string, unknown>;
   /** Server-defined opaque data echoed by clients. Used to carry signed
    *  identity when Authorization: Payment replaces Authorization: Bearer. */
   opaque?: Record<string, unknown>;
