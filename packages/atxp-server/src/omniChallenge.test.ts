@@ -213,7 +213,11 @@ describe('omniChallenge', () => {
         { network: 'tempo', currency: 'pathUSD', address: '0xTempo', amount: new BigNumber('0.01') },
       ];
 
-      const result = buildMppChallenge({ id: 'ch_123', options });
+      const result = buildMppChallenge({
+        id: 'ch_123',
+        options,
+        resource: 'https://music.mcp.atxp.ai/',
+      });
       expect(result).toMatchObject({
         id: 'ch_123',
         method: 'tempo',
@@ -222,6 +226,13 @@ describe('omniChallenge', () => {
         currency: 'pathUSD',
         network: 'tempo',
         recipient: '0xTempo',
+        resource: { url: 'https://music.mcp.atxp.ai/' },
+        request: {
+          amount: '0.01',
+          currency: 'pathUSD',
+          recipient: '0xTempo',
+          resource: { url: 'https://music.mcp.atxp.ai/' },
+        },
       });
       // Tempo challenges include expires; Solana does not
       expect(result!.expires).toBeDefined();
@@ -493,8 +504,12 @@ describe('omniChallenge', () => {
       expect(result.mpp![0].method).toBe('solana');
       expect(result.mpp![0].recipient).toBe('SolanaAddr123');
       expect(result.mpp![0].id).toBe('ch_test_1');
+      expect(result.mpp![0].resource).toEqual({ url: 'https://example.com/api' });
+      expect(result.mpp![0].request?.resource).toEqual({ url: 'https://example.com/api' });
       expect(result.mpp![1].method).toBe('tempo');
       expect(result.mpp![1].recipient).toBe('0xTempoAddr');
+      expect(result.mpp![1].resource).toEqual({ url: 'https://example.com/api' });
+      expect(result.mpp![1].request?.resource).toEqual({ url: 'https://example.com/api' });
 
       // Options: all three sources converted
       expect(result.options).toHaveLength(3);
@@ -556,7 +571,11 @@ describe('omniChallenge', () => {
       expect(result.challenges).toHaveLength(2);
       expect(result.challenges[0].method).toBe('solana');
       expect(result.challenges[0].id).toBe('ch_auth_1');
+      expect(result.challenges[0].resource).toEqual({ url: 'https://example.com/resource' });
+      expect(result.challenges[0].request?.resource).toEqual({ url: 'https://example.com/resource' });
       expect(result.challenges[1].method).toBe('tempo');
+      expect(result.challenges[1].resource).toEqual({ url: 'https://example.com/resource' });
+      expect(result.challenges[1].request?.resource).toEqual({ url: 'https://example.com/resource' });
     });
 
     it('should omit paymentRequirements when no X402-compatible sources exist', () => {

@@ -98,8 +98,10 @@ export function buildAtxpMcpChallenge(
 export function buildMppChallenges(args: {
   id: string;
   options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
+  resource?: string;
 }): MppChallengeData[] | null {
   const challenges: MppChallengeData[] = [];
+  const resourceField = args.resource ? { resource: { url: args.resource } } : {};
 
   // Solana option (USDC on Solana mainnet or devnet)
   // Amount in micro-units (e.g., 10000 = 0.01 USDC). @solana/mpp expects this.
@@ -114,6 +116,13 @@ export function buildMppChallenges(args: {
       currency: USDC_ADDRESSES[isDevnet ? 'solana_devnet' : 'solana'],
       network: isDevnet ? 'devnet' : 'mainnet-beta',
       recipient: solanaOption.address,
+      ...resourceField,
+      request: {
+        amount: solanaOption.amount.times(10 ** STABLECOIN_DECIMALS).toFixed(0),
+        currency: USDC_ADDRESSES[isDevnet ? 'solana_devnet' : 'solana'],
+        recipient: solanaOption.address,
+        ...resourceField,
+      },
     });
   }
 
@@ -133,6 +142,13 @@ export function buildMppChallenges(args: {
       network: tempoOption.network,
       recipient: tempoOption.address,
       expires: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      ...resourceField,
+      request: {
+        amount: tempoOption.amount.toString(),
+        currency: tempoOption.currency || 'USDC',
+        recipient: tempoOption.address,
+        ...resourceField,
+      },
     });
   }
 
@@ -146,6 +162,7 @@ export function buildMppChallenges(args: {
 export function buildMppChallenge(args: {
   id: string;
   options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
+  resource?: string;
 }): MppChallengeData | null {
   const challenges = buildMppChallenges(args);
   return challenges?.[0] ?? null;
@@ -274,7 +291,7 @@ export function buildOmniChallenge(args: {
   mppChallengeId?: string;
 }): OmniChallenge {
   const mpp = args.mppChallengeId
-    ? buildMppChallenges({ id: args.mppChallengeId, options: args.options })
+    ? buildMppChallenges({ id: args.mppChallengeId, options: args.options, resource: args.resource })
     : null;
 
   return {
@@ -335,7 +352,7 @@ export function buildPaymentOptions(args: {
       resource: args.resource ?? '',
       payeeName: args.payeeName ?? '',
     }),
-    mpp: buildMppChallenges({ id: challengeId, options }),
+    mpp: buildMppChallenges({ id: challengeId, options, resource: args.resource }),
     options,
   };
 }
