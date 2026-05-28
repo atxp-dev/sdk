@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "test": "vitest run --fileParallelism=false",
+    "test": "vitest run",
     "prepack": "npm run build && npm run typecheck",
     "pack:dry": "npm pack --dry-run"
   },

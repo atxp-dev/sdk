@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "test": "vitest run --fileParallelism=false",
+    "test": "vitest run",
     "test:integration": "vitest run src/redisOAuthDb.integration.test.ts --reporter=verbose",
     "prepack": "npm run build && npm run typecheck",
     "pack:dry": "npm pack --dry-run"
