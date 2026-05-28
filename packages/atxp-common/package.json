@@ -38,7 +38,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "test": "vitest run",
+    "test": "vitest run --fileParallelism=false",
     "test:integration": "vitest run --testTimeout=120000 src/**/*.integration.test.ts",
     "test:package-managers": "vitest run --testTimeout=120000 src/platform/packageManager.integration.test.ts",
     "prepack": "npm run build && npm run typecheck",
