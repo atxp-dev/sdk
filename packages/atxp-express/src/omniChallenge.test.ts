@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { atxpExpress } from './atxpExpress.js';
 import * as TH from '@atxp/server/serverTestHelpers';
 import { getDetectedCredential, type DetectedCredential } from '@atxp/server';
@@ -7,12 +7,16 @@ import request from 'supertest';
 
 // Mock global fetch — middleware no longer calls settle, so fetch should not be called
 const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
 
 describe('credential detection Express middleware', () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('credential detected → stored in context, handler proceeds', () => {
