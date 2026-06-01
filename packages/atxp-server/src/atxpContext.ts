@@ -13,6 +13,8 @@ export type DetectedCredential = {
   credential: string;
   /** User identity resolved from OAuth token or credential source */
   sourceAccountId?: string;
+  /** Payment request id carried from the 402 challenge retry, when available. */
+  paymentRequestId?: string;
 };
 
 /**
@@ -33,6 +35,8 @@ type ATXPContext = {
   resource: URL;
   /** Payment credential from retry request (X-PAYMENT, X-ATXP-PAYMENT, etc.) */
   detectedCredential?: DetectedCredential;
+  /** Stable lifecycle id for the current paid retry, shared by settle and charge. */
+  paymentRequestId?: string;
   /** Payment challenge pending response rewrite (set by omniChallengeMcpError) */
   pendingPaymentChallenge?: PendingPaymentChallenge;
 }
@@ -75,6 +79,21 @@ export function setDetectedCredential(credential: DetectedCredential): void {
   const context = contextStorage.getStore();
   if (context) {
     context.detectedCredential = credential;
+    if (credential.paymentRequestId) {
+      context.paymentRequestId = credential.paymentRequestId;
+    }
+  }
+}
+
+export function getPaymentRequestId(): string | null {
+  const context = contextStorage.getStore();
+  return context?.paymentRequestId ?? null;
+}
+
+export function setPaymentRequestId(paymentRequestId: string): void {
+  const context = contextStorage.getStore();
+  if (context) {
+    context.paymentRequestId = paymentRequestId;
   }
 }
 

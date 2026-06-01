@@ -43,6 +43,8 @@ export type RefundErrors = boolean | 'nonMcpOnly';
 export type Charge = Pick<PaymentRequest, 'options' | 'sourceAccountId' | 'destinationAccountId' | 'payeeName'> & {
   // User's OAuth token or connection_token for on-demand charging
   sourceAccountToken?: string;
+  /** Stable id tying /settle/* and the follow-up /charge to one user-visible payment. */
+  paymentRequestId?: string;
 };
 
 export type BalanceRequest = {

@@ -41,6 +41,7 @@ export type MppChallengeData = {
 export type CredentialDetection = {
   protocol: PaymentProtocol;
   credential: string;
+  paymentRequestId?: string;
 };
 
 /**
@@ -92,6 +93,8 @@ export type OmniChallenge = {
 export type SettlementContext = {
   /** X402: the original payment requirements from the challenge */
   paymentRequirements?: unknown;
+  /** Stable id tying settlement and the follow-up charge to one payment lifecycle. */
+  paymentRequestId?: string;
   /** Source account identifier (e.g., "base:0xABC..." from OAuth sub or wallet address).
    *  When present, auth records the payment for this identity. */
   sourceAccountId?: string;
@@ -134,26 +137,29 @@ export type SettleResult = {
  */
 export function detectProtocol(headers: {
   'x-atxp-payment'?: string;
+  'x-atxp-payment-request-id'?: string;
   'payment-signature'?: string;
   'x-payment'?: string;
   'authorization'?: string;
 }): CredentialDetection | null {
+  const paymentRequestId = headers['x-atxp-payment-request-id'];
+
   // X-ATXP-PAYMENT header indicates ATXP protocol (pull mode credential)
   const atxpPayment = headers['x-atxp-payment'];
   if (atxpPayment) {
-    return { protocol: 'atxp', credential: atxpPayment };
+    return { protocol: 'atxp', credential: atxpPayment, ...(paymentRequestId && { paymentRequestId }) };
   }
 
   // PAYMENT-SIGNATURE (v2) or X-PAYMENT (v1) header indicates X402 protocol
   const paymentSig = headers['payment-signature'] || headers['x-payment'];
   if (paymentSig) {
-    return { protocol: 'x402', credential: paymentSig };
+    return { protocol: 'x402', credential: paymentSig, ...(paymentRequestId && { paymentRequestId }) };
   }
 
   // Authorization: Payment <credential> indicates standard MPP protocol
   const authHeader = headers['authorization'];
   if (authHeader?.startsWith('Payment ')) {
-    return { protocol: 'mpp', credential: authHeader.slice('Payment '.length) };
+    return { protocol: 'mpp', credential: authHeader.slice('Payment '.length), ...(paymentRequestId && { paymentRequestId }) };
   }
 
   return null;
@@ -347,6 +353,7 @@ export class ProtocolSettlement {
       return {
         payload,
         paymentRequirements: requirements,
+        ...(context?.paymentRequestId && { paymentRequestId: context.paymentRequestId }),
         ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
         ...(this.destinationAccountId && { destinationAccountId: this.destinationAccountId }),
       };
@@ -362,6 +369,7 @@ export class ProtocolSettlement {
       }
       return {
         credential: parsedCredential,
+        ...(context?.paymentRequestId && { paymentRequestId: context.paymentRequestId }),
         ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
         ...(this.destinationAccountId && { destinationAccountId: this.destinationAccountId }),
       };
@@ -388,6 +396,7 @@ export class ProtocolSettlement {
       destinationAccountId: this.destinationAccountId ?? context?.destinationAccountId,
       sourceAccountToken: parsed.sourceAccountToken ?? credential,
       options,
+      ...(context?.paymentRequestId && { paymentRequestId: context.paymentRequestId }),
     };
   }
 }

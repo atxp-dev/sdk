@@ -189,6 +189,9 @@ export class MPPProtocolHandler implements ProtocolHandler {
       }
 
       const retryHeaders = buildPaymentHeaders(authorizeResult, originalRequest.init?.headers);
+      if (primaryChallenge.id) {
+        retryHeaders.set('X-ATXP-Payment-Request-Id', primaryChallenge.id);
+      }
       const retryInit: RequestInit = { ...originalRequest.init, headers: retryHeaders };
 
       logger.info('MPP: retrying request with Authorization: Payment header');

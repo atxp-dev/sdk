@@ -98,7 +98,10 @@ describe('X402ProtocolHandler', () => {
 
   describe('canHandle', () => {
     it('should detect X402 challenge in 402 response', async () => {
-      const response = new Response(JSON.stringify(createX402Challenge()), { status: 402 });
+      const response = new Response(JSON.stringify({
+        ...createX402Challenge(),
+        paymentRequestId: 'pr_x402_retry',
+      }), { status: 402 });
       expect(await handler.canHandle(response)).toBe(true);
     });
 
@@ -140,7 +143,10 @@ describe('X402ProtocolHandler', () => {
         onPaymentFailure: async () => {},
       };
 
-      const response = new Response(JSON.stringify(createX402Challenge()), { status: 402 });
+      const response = new Response(JSON.stringify({
+        ...createX402Challenge(),
+        paymentRequestId: 'pr_x402_retry',
+      }), { status: 402 });
       const result = await handler.handlePaymentChallenge(
         response,
         { url: 'https://example.com/api' },
@@ -159,6 +165,7 @@ describe('X402ProtocolHandler', () => {
       const retryCall = mockFetch.mock.calls[0];
       const retryHeaders = retryCall[1].headers as Headers;
       expect(retryHeaders.get('X-PAYMENT')).toBe('test-payment-header');
+      expect(retryHeaders.get('X-ATXP-Payment-Request-Id')).toBe('pr_x402_retry');
 
       // Verify onPayment was called
       expect(mockOnPayment).toHaveBeenCalled();
@@ -559,6 +566,7 @@ describe('MPPProtocolHandler', () => {
       const retryCall = mockFetch.mock.calls[0];
       const retryHeaders = retryCall[1].headers as Headers;
       expect(retryHeaders.get('Authorization')).toBe('Payment mpp-credential-base64');
+      expect(retryHeaders.get('X-ATXP-Payment-Request-Id')).toBe('ch_xxx');
 
       // Verify onPayment was called
       expect(mockOnPayment).toHaveBeenCalled();

@@ -13,6 +13,7 @@ import {
   sendOAuthMetadataNode,
   detectProtocol,
   getPendingPaymentChallenge,
+  setPaymentRequestId,
   type PaymentProtocol,
   type ATXPConfig,
   type TokenCheck,
@@ -51,6 +52,7 @@ export function atxpExpress(args: ATXPArgs): Router {
       // with full pricing context (amount, options, destination).
       const detected = detectProtocol({
         'x-atxp-payment': req.headers['x-atxp-payment'] as string | undefined,
+        'x-atxp-payment-request-id': req.headers['x-atxp-payment-request-id'] as string | undefined,
         'payment-signature': req.headers['payment-signature'] as string | undefined,
         'x-payment': req.headers['x-payment'] as string | undefined,
         'authorization': req.headers['authorization'] as string | undefined,
@@ -134,9 +136,13 @@ export function atxpExpress(args: ATXPArgs): Router {
           // as paymentRequirements instead of regenerating from server config.
           // For MPP/ATXP: credentials are self-contained, no extra context needed.
           const context: Record<string, unknown> = {
+            ...(detected.paymentRequestId && { paymentRequestId: detected.paymentRequestId }),
             ...(sourceAccountId && { sourceAccountId }),
             destinationAccountId,
           };
+          if (detected.paymentRequestId) {
+            setPaymentRequestId(detected.paymentRequestId);
+          }
 
           if (detected.protocol === 'x402') {
             const parsed = parseCredentialBase64(detected.credential);

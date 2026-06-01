@@ -1,6 +1,6 @@
 import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAccountId, Network, AuthorizationServerUrl } from "@atxp/common";
 import { BigNumber } from "bignumber.js";
-import { getATXPConfig, atxpAccountId, atxpToken, setPendingPaymentChallenge } from "./atxpContext.js";
+import { getATXPConfig, atxpAccountId, atxpToken, getPaymentRequestId, setPendingPaymentChallenge } from "./atxpContext.js";
 import { buildPaymentOptions, omniChallengeMcpError } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { signOpaqueIdentity } from "./opaqueIdentity.js";
@@ -28,6 +28,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
 
   // Get the user's token for on-demand charging (connection_token flow)
   const token = atxpToken();
+  const paymentRequestId = getPaymentRequestId();
 
   // Always use multi-option format
   const charge = {
@@ -41,6 +42,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     destinationAccountId: destinationAccountId,
     payeeName: config.payeeName,
     ...(token && { sourceAccountToken: token }),
+    ...(paymentRequestId && { paymentRequestId }),
   };
 
   // Settlement is handled by the middleware (atxpExpress) before route code runs.
