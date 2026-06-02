@@ -12,6 +12,19 @@ describe('detectProtocol', () => {
     });
   });
 
+  it('should carry payment request id from the retry header', () => {
+    const result = detectProtocol({
+      'x-payment': 'some-x402-payment-credential',
+      'x-atxp-payment-request-id': 'pr_123',
+    });
+
+    expect(result).toEqual({
+      protocol: 'x402',
+      credential: 'some-x402-payment-credential',
+      paymentRequestId: 'pr_123',
+    });
+  });
+
   it('should NOT detect Bearer JWT as ATXP (could be OAuth token)', () => {
     const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature123';
     const result = detectProtocol({
@@ -267,10 +280,14 @@ describe('ProtocolSettlement', () => {
         source: 'did:pkh:eip155:4217:0xSrc',
       };
       const credential = Buffer.from(JSON.stringify(mppCredential)).toString('base64');
-      await settlement.settle('mpp', credential, { sourceAccountId: 'tempo:0xTestUser' });
+      await settlement.settle('mpp', credential, {
+        sourceAccountId: 'tempo:0xTestUser',
+        paymentRequestId: 'pr_mpp_1',
+      });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.sourceAccountId).toBe('tempo:0xTestUser');
+      expect(body.paymentRequestId).toBe('pr_mpp_1');
     });
 
     it('should include sourceAccountId in X402 settle when context provides it', async () => {
@@ -284,10 +301,12 @@ describe('ProtocolSettlement', () => {
       await settlement.settle('x402', credential, {
         paymentRequirements: { network: 'base' },
         sourceAccountId: 'base:0xTestUser',
+        paymentRequestId: 'pr_x402_1',
       });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.sourceAccountId).toBe('base:0xTestUser');
+      expect(body.paymentRequestId).toBe('pr_x402_1');
     });
 
     it('should handle raw JSON MPP credential (not base64)', async () => {

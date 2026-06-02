@@ -24,6 +24,8 @@ export {
   getATXPResource,
   atxpAccountId,
   atxpToken,
+  getPaymentRequestId,
+  setPaymentRequestId,
   withATXPContext,
   getDetectedCredential,
   setDetectedCredential,
@@ -124,4 +126,3 @@ export {
 export {
   ATXPAccount
 } from '@atxp/common';
-

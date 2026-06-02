@@ -26,6 +26,7 @@ interface X402Challenge {
   /** v2 adds resource info and extensions */
   resource?: { url: string; description?: string; mimeType?: string };
   extensions?: Record<string, unknown>;
+  paymentRequestId?: string;
 }
 
 /**
@@ -156,6 +157,9 @@ export class X402ProtocolHandler implements ProtocolHandler {
         { protocol: 'x402', credential: paymentHeader },
         originalRequest.init?.headers
       );
+      if (paymentChallenge.paymentRequestId) {
+        retryHeaders.set('X-ATXP-Payment-Request-Id', paymentChallenge.paymentRequestId);
+      }
       const retryInit: RequestInit = { ...originalRequest.init, headers: retryHeaders };
 
       logger.info('X402: retrying request with X-PAYMENT header');
