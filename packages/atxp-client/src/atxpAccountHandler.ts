@@ -91,6 +91,10 @@ export class ATXPAccountHandler implements ProtocolHandler {
 
     // Map the returned protocol to the correct HTTP header
     const retryHeaders = buildPaymentHeaders(result, originalRequest.init?.headers);
+    const paymentRequestId = challengeData.paymentRequestId;
+    if (typeof paymentRequestId === 'string' && paymentRequestId) {
+      retryHeaders.set('X-ATXP-Payment-Request-Id', paymentRequestId);
+    }
     const retryInit: RequestInit = { ...originalRequest.init, headers: retryHeaders };
 
     return fetchFn(originalRequest.url, retryInit);
