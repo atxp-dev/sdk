@@ -55,14 +55,17 @@ describe('ATXPAccountHandler', () => {
   });
 
   describe('handlePaymentChallenge', () => {
-    it('delegates to account.authorize() and retries with payment header', async () => {
+    it('delegates to account.authorize() and retries with payment and lifecycle headers', async () => {
       const authorize = vi.fn().mockResolvedValue({ protocol: 'atxp', credential: '{"token":"abc"}' });
       const account = createMockAccount({ authorize });
       const retryResponse = new Response('paid', { status: 200 });
       const fetchFn = vi.fn().mockResolvedValue(retryResponse);
       const config = createMockConfig({ account, fetchFn });
 
-      const response = make402Response({ chargeAmount: '0.01' });
+      const response = make402Response({
+        chargeAmount: '0.01',
+        paymentRequestId: 'pr_lifecycle_123',
+      });
       const result = await handler.handlePaymentChallenge(
         response,
         { url: 'https://example.com/api' },
@@ -77,6 +80,10 @@ describe('ATXPAccountHandler', () => {
         }),
       );
       expect(fetchFn).toHaveBeenCalledTimes(1);
+      const retryInit = fetchFn.mock.calls[0][1] as RequestInit;
+      const retryHeaders = retryInit.headers as Headers;
+      expect(retryHeaders.get('X-ATXP-PAYMENT')).toBe('{"token":"abc"}');
+      expect(retryHeaders.get('X-ATXP-Payment-Request-Id')).toBe('pr_lifecycle_123');
       expect(result).toBe(retryResponse);
     });
 
