@@ -166,9 +166,10 @@ export async function settlePaymentSession(
       session.protocol,
       session.credential,
       session.context,
-      // "up-to" semantics: settle the accumulated actual (≤ cap), not the cap.
-      // For a single requirePayment(price), spent === price === cap, so this is
-      // identical to settling the credential's amount.
+      // "up-to" semantics: settle the accumulated actual (the sum of charged
+      // prices, ≤ cap), not the cap. For a single requirePayment(price), spent
+      // is that price — which equals the cap only when the cap wasn't inflated
+      // by the server's minimumPayment.
       session.spent,
     );
     logger.info(`Settled ${session.protocol} at session close: txHash=${result.txHash ?? '<already-settled>'}, amount=${result.settledAmount}`);
@@ -177,6 +178,6 @@ export async function settlePaymentSession(
     // served and settled=true prevents re-attempt at close. Log a greppable,
     // metric-able marker carrying protocol + amount so an unbilled served
     // request can be reconciled later.
-    logger.error(`settle_failed_at_close protocol=${session.protocol} amount=${session.spent.toString()}: ${error instanceof Error ? error.message : String(error)}`);
+    logger.error(`settle_failed_at_close protocol=${session.protocol} amount=${session.spent.toFixed()}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
