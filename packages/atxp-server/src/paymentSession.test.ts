@@ -118,4 +118,39 @@ describe('settlePaymentSession', () => {
     expect(settleSpy).toHaveBeenCalledTimes(1);
     expect(session.settled).toBe(true);
   });
+
+  // "up-to" semantics: settle the accumulated actual (spent), not the cap.
+  it('settles the accumulated actual (spent) as actualAmount', async () => {
+    const settleSpy = vi.spyOn(ProtocolSettlement.prototype, 'settle').mockResolvedValue({ txHash: '0xabc', settledAmount: '0.003' });
+    // Cap $0.01 from the credential options; charge 3x $0.001 → spent $0.003 < cap.
+    const credential = JSON.stringify({ sourceAccountId: 'atxp_acct_1', options: [{ amount: '0.01' }] });
+    const session = new PaymentSessionState('atxp', credential, {}, logger);
+    session.charge(BigNumber(0.001));
+    session.charge(BigNumber(0.001));
+    session.charge(BigNumber(0.001));
+    expect(session.spent.toNumber()).toBeCloseTo(0.003);
+    expect(session.cap.toNumber()).toBe(0.01);
+
+    await settlePaymentSession(session, 'https://auth.atxp.ai', 'base:dest', undefined, logger);
+
+    expect(settleSpy).toHaveBeenCalledTimes(1);
+    // 4th positional arg is actualAmount; it must equal spent ($0.003 < cap).
+    const actualAmount = settleSpy.mock.calls[0][3] as BigNumber;
+    expect(actualAmount.toString()).toBe(session.spent.toString());
+    expect(actualAmount.toNumber()).toBeCloseTo(0.003);
+  });
+
+  it('settles an actual equal to the cap for a single charge (unchanged one-shot path)', async () => {
+    const settleSpy = vi.spyOn(ProtocolSettlement.prototype, 'settle').mockResolvedValue({ txHash: '0xabc', settledAmount: '0.01' });
+    const credential = JSON.stringify({ sourceAccountId: 'atxp_acct_1', options: [{ amount: '0.01' }] });
+    const session = new PaymentSessionState('atxp', credential, {}, logger);
+    session.charge(BigNumber(0.01));
+
+    await settlePaymentSession(session, 'https://auth.atxp.ai', 'base:dest', undefined, logger);
+
+    const actualAmount = settleSpy.mock.calls[0][3] as BigNumber;
+    // spent === price === cap, so the settled actual equals the cap.
+    expect(actualAmount.toNumber()).toBe(0.01);
+    expect(actualAmount.toNumber()).toBe(session.cap.toNumber());
+  });
 });

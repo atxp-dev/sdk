@@ -1,3 +1,4 @@
+import { BigNumber } from "bignumber.js";
 import { AuthorizationServerUrl, FetchLike, Logger, type PaymentProtocol } from "@atxp/common";
 // Re-export from common so consumers of @atxp/server get the same type
 export type { PaymentProtocol } from "@atxp/common";
@@ -286,12 +287,17 @@ export class ProtocolSettlement {
   /**
    * Settle a payment at request end.
    * Calls auth `/settle/{protocol}` to finalize the payment.
+   *
+   * `actualAmount` (optional) carries the metered "up-to" amount actually spent
+   * (≤ the authorized cap). When provided, the ATXP settle body charges this
+   * amount instead of the cap baked into the credential/context. When omitted,
+   * behavior is exactly as before (settle the credential's own amount).
    */
-  async settle(protocol: PaymentProtocol, credential: string, context?: SettlementContext): Promise<SettleResult> {
+  async settle(protocol: PaymentProtocol, credential: string, context?: SettlementContext, actualAmount?: BigNumber): Promise<SettleResult> {
     const url = new URL(`/settle/${protocol}`, this.authServer);
     this.logger.debug(`Settling ${protocol} credential at ${url}`);
 
-    const body = this.buildRequestBody(protocol, credential, context);
+    const body = this.buildRequestBody(protocol, credential, context, actualAmount);
 
     const response = await this.fetchFn(url.toString(), {
       method: 'POST',
@@ -312,8 +318,14 @@ export class ProtocolSettlement {
 
   /**
    * Build the protocol-specific request body for verify/settle calls.
+   *
+   * `actualAmount` (optional, ATXP only this phase) is the metered "up-to"
+   * amount actually spent. When provided, it overrides the ATXP options[].amount
+   * so /pay charges the actual instead of the authorized cap. x402 and mpp ignore
+   * it for now — their "up-to" mappings (x402 settlementOverrides.amount, mpp
+   * voucher amount) land in their own phases.
    */
-  private buildRequestBody(protocol: PaymentProtocol, credential: string, context?: SettlementContext): unknown {
+  private buildRequestBody(protocol: PaymentProtocol, credential: string, context?: SettlementContext, actualAmount?: BigNumber): unknown {
     if (protocol === 'x402') {
       // X402: auth expects { payload, paymentRequirements }
       // The credential is the base64-encoded PAYMENT-SIGNATURE header containing the payload.
@@ -389,7 +401,16 @@ export class ProtocolSettlement {
     // Prefer context options (from requirePayment's pricing config) over the
     // credential's options. The server has accurate destination chain info;
     // the credential may have stale or "unknown" network values from accounts.
-    const options = context?.options ?? parsed.options ?? [];
+    let options = (context?.options ?? parsed.options ?? []) as Array<Record<string, unknown>>;
+
+    // "up-to" semantics: when an actual metered amount is supplied, settle that
+    // (≤ the authorized cap) instead of the cap baked into the option. This is
+    // what makes /pay charge the actual. A decimal USDC string matches the
+    // human-readable amount format ATXP options already use.
+    if (actualAmount) {
+      const actual = actualAmount.toString();
+      options = options.map(opt => ({ ...opt, amount: actual }));
+    }
 
     return {
       sourceAccountId: parsed.sourceAccountId ?? context?.sourceAccountId,
