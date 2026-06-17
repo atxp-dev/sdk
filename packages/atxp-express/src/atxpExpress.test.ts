@@ -360,9 +360,45 @@ describe('ATXP', () => {
 
       expect(settleCalls()).toHaveLength(1);
     });
+
+    it('settles even when res.end fires OUTSIDE the AsyncLocalStorage context', async () => {
+      // Guards the ALS-independence fix: the route charges the session in-context,
+      // captures `res`, and returns WITHOUT ending the response. The test then
+      // ends it from its OWN context — outside the middleware's withATXPContext
+      // run — so a getStore()-based settle would see a null store and silently
+      // skip billing. The captured-closure settle (bound in-context) must still
+      // fire. (The enableJsonResponse integration test can't reach this: there
+      // res.end runs in-context, so it passes for both impls — this is the case
+      // that actually fails against the old getStore() code.)
+      let capturedRes: import('express').Response | null = null;
+      let signalCaptured!: () => void;
+      const captured = new Promise<void>((r) => { signalCaptured = r; });
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', async (_req, res) => {
+        await requirePayment({ price: BigNumber(0.01) }); // charges the session in-context
+        capturedRes = res;
+        signalCaptured(); // hand res to the test; do NOT end the response here
+      });
+
+      // .then() triggers supertest to send immediately (it otherwise defers
+      // until awaited). The route captures res and returns without ending, so
+      // the response stays open until the test ends it below.
+      const reqPromise = sendPaidMcpCall(app).then((r) => r);
+      await captured; // resumes in the TEST's context — outside the withATXPContext run
+      capturedRes!.end(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true } })); // res.end fires here; ALS store is null
+      await reqPromise;
+
+      expect(settleCalls()).toHaveLength(1);
+    });
   });
 
-  // FIX 3: Phase 1 has no retry/outbox. A close-time settle failure must NOT
+  // FIX 3: a close-time settle failure must NOT
   // fail the already-served request — the route still returns 200 — and the
   // failure must be logged with a greppable, metric-able marker.
   describe('settle failure at close: route still returns 200 and logs a marker', () => {

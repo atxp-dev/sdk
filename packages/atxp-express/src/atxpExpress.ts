@@ -141,13 +141,16 @@ export function atxpExpress(args: ATXPArgs): Router {
       // charges have accumulated.
       return withATXPContext(config, resource, tokenCheck, async () => {
         let session: PaymentSessionState | null = null;
+        // Resolved once here (inside withATXPContext) and reused for both the
+        // settlement context and the close-time settle closure below.
+        let destinationAccountId: string | undefined;
         if (detected) {
           // Resolve identity for the settlement ledger credit.
           const sourceAccountId = (detected.protocol === 'mpp' && user)
             ? user
             : resolveIdentitySync(config, req, detected.protocol, detected.credential) || user || undefined;
 
-          const destinationAccountId = await config.destination.getAccountId();
+          destinationAccountId = await config.destination.getAccountId();
 
           // For X402: the credential's parsed payload contains `accepted` — the
           // exact payment requirement the client signed off on. Pass it directly
@@ -181,13 +184,12 @@ export function atxpExpress(args: ATXPArgs): Router {
         // would be silently skipped, leaving a served request unbilled. Binding
         // the session reference + server/destination/appName/logger now makes
         // the close-time settle independent of ALS at res.end.
-        const destinationAccountIdForSettle = detected ? await config.destination.getAccountId() : undefined;
         const onBeforeEnd = session
           ? async () => {
               await settlePaymentSession(
                 session!,
                 config.server,
-                destinationAccountIdForSettle,
+                destinationAccountId,
                 config.appName,
                 config.logger,
               );
@@ -357,9 +359,15 @@ export function installPaymentResponseRewriter(
     // (settlement still completes server-side before the connection closes).
     // Bound the settle with a timeout so a slow/hung auth server can't stall the
     // client's connection indefinitely.
+    // settlePaymentSession catches its own errors (logs `settle_failed_at_close`)
+    // and never rejects, so the only rejection here is the timeout. The in-flight
+    // settle is NOT aborted and may still complete after this fires — so this is
+    // "not confirmed within the timeout", NOT "definitely unbilled". Use a
+    // distinct marker so reconciliation doesn't treat late-but-successful settles
+    // as failures.
     withTimeout(onBeforeEnd(), SETTLE_AT_CLOSE_TIMEOUT_MS)
       .catch((error) => {
-        logger.error(`settle_failed_at_close (timeout/error): ${error instanceof Error ? error.message : String(error)}`);
+        logger.warn(`settle_unconfirmed_at_close: ${error instanceof Error ? error.message : String(error)} (settle may still complete; not confirmed within ${SETTLE_AT_CLOSE_TIMEOUT_MS}ms)`);
       })
       .finally(() => {
         finalizeEnd(this, args);

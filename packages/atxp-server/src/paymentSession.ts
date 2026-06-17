@@ -15,12 +15,14 @@ export interface PaymentSession {
   /**
    * Authorized amount derived from the credential.
    *
-   * Forward-looking guard only. In Phase 1, settlement uses the credential's
-   * own amount (see settlePaymentSession), NOT `spent`, so the cap does not yet
-   * bound the settled amount — it merely rejects local charges that exceed it.
-   * Full enforcement (settling `spent` up to the cap) arrives with the `upto`
-   * scheme in a later phase. For ATXP credentials carrying no amount, the cap is
-   * Infinity so the single-charge path always works.
+   * Guard only: settlement currently settles the credential's own amount (see
+   * settlePaymentSession), NOT `spent`, so the cap does not bound the settled
+   * amount — it merely rejects local charges that would exceed it. Settling
+   * `spent` up to the cap arrives with the `upto` scheme (streaming-payment-
+   * sessions design doc:
+   * https://github.com/circuitandchisel/accounts/blob/main/docs/STREAMING_PAYMENT_SESSIONS.md).
+   * For ATXP credentials carrying no amount, the cap is Infinity so the
+   * single-charge path always works.
    */
   readonly cap: BigNumber;
   /** Accumulated charges recorded against this session. */
@@ -35,10 +37,10 @@ const USDC_ATOMIC = 1e6;
 /**
  * Derive the authorized cap from a detected credential.
  *
- * Best-effort for Phase 1 (fixed amounts): if the amount cannot be parsed
- * reliably for a protocol, returns Infinity and logs a warning so the
- * single-charge path always works. Settlement still settles the credential in
- * full; cap enforcement is a guard, not the source of the settled amount.
+ * Best-effort: if the amount cannot be parsed reliably for a protocol, returns
+ * Infinity and logs a warning so the single-charge path always works.
+ * Settlement settles the credential's own amount; the cap is a guard, not the
+ * source of the settled amount.
  */
 function deriveCap(
   protocol: PaymentProtocol,
@@ -166,9 +168,10 @@ export async function settlePaymentSession(
     );
     logger.info(`Settled ${session.protocol} at session close: txHash=${result.txHash ?? '<already-settled>'}, amount=${result.settledAmount}`);
   } catch (error) {
-    // Phase 1 has no retry/outbox: the request is already served, settled=true
-    // prevents re-attempt at close. Log a greppable, metric-able marker carrying
-    // protocol + amount so an unbilled served request can be reconciled later.
+    // No retry/outbox yet (tracked in atxp-dev/sdk#178): the request is already
+    // served and settled=true prevents re-attempt at close. Log a greppable,
+    // metric-able marker carrying protocol + amount so an unbilled served
+    // request can be reconciled later.
     logger.error(`settle_failed_at_close protocol=${session.protocol} amount=${session.spent.toString()}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
