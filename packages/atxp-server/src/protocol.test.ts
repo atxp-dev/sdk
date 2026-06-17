@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { BigNumber } from 'bignumber.js';
 import { detectProtocol, ProtocolSettlement } from './protocol.js';
 
 describe('detectProtocol', () => {
@@ -246,6 +247,74 @@ describe('ProtocolSettlement', () => {
           body: expect.stringContaining('"sourceAccountToken":"atxp-jwt-token"'),
         }),
       );
+    });
+
+    it('overrides ATXP options[].amount with the metered actualAmount', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xupto', settledAmount: '0.003' }),
+      });
+
+      // Authorized cap is $0.01 (the option amount); the metered actual is $0.003.
+      await settlement.settle(
+        'atxp',
+        'atxp-jwt-token',
+        { options: [{ network: 'base', currency: 'USDC', address: '0x123', amount: '0.01' }] },
+        BigNumber(0.003),
+      );
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      // Every option carries the actual ($0.003), NOT the cap ($0.01).
+      expect(body.options).toHaveLength(1);
+      expect(body.options[0].amount).toBe('0.003');
+      // Other option fields are preserved.
+      expect(body.options[0].network).toBe('base');
+      expect(body.options[0].address).toBe('0x123');
+    });
+
+    it('settles the credential/context amount unchanged when actualAmount is omitted', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xnoop', settledAmount: '0.01' }),
+      });
+
+      await settlement.settle(
+        'atxp',
+        'atxp-jwt-token',
+        { options: [{ network: 'base', currency: 'USDC', address: '0x123', amount: '0.01' }] },
+      );
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.options[0].amount).toBe('0.01');
+    });
+
+    it('serializes a sub-1e-6 actualAmount as a decimal string, never exponential notation', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xtiny', settledAmount: '0.0000003' }),
+      });
+
+      // BigNumber.toString() would emit "3e-7" (EXPONENTIAL_AT default), which
+      // /pay cannot parse as a decimal USDC string. toFixed() keeps it decimal.
+      await settlement.settle(
+        'atxp',
+        'atxp-jwt-token',
+        { options: [{ network: 'base', currency: 'USDC', address: '0x123', amount: '0.01' }] },
+        BigNumber('0.0000003'),
+      );
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.options[0].amount).toBe('0.0000003');
+      expect(body.options[0].amount).not.toContain('e');
+    });
+
+    it('warns (greppable) and settles the cap when actualAmount is supplied for x402 (up-to not yet wired)', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xx402', settledAmount: '0.01' }) });
+      const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
+
+      await settlement.settle('x402', credential, { paymentRequirements: { network: 'base' } }, BigNumber(0.003));
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('settle_actual_dropped protocol=x402'));
     });
 
     it('should call /settle/mpp with standard MPP credential', async () => {

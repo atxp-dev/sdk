@@ -123,6 +123,61 @@ describe('settlement fires through a real McpServer + StreamableHTTPServerTransp
     expect(String(settleCalls()[0][0])).toContain('/settle/atxp');
   });
 
+  it('settles the summed actual ($0.003) — not the cap ($0.01) — when a tool charges 3x $0.001', async () => {
+    // ATXP credential carrying options with the authorized cap ($0.01). The
+    // express path falls back to the credential's options for the settle body,
+    // and deriveCap reads options[].amount → cap $0.01.
+    const meteredCredential = JSON.stringify({
+      sourceAccountId: 'atxp_acct_test123',
+      sourceAccountToken: 'tok_abc',
+      options: [{ network: 'base', currency: 'USDC', address: '0xdest', amount: '0.01' }],
+    });
+
+    const router = atxpExpress(TH.config({
+      oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+    }));
+    const app = express();
+    app.use(express.json());
+    app.use(router);
+    app.post('/', async (req: Request, res: Response) => {
+      const server = new McpServer({ name: 'test', version: '1.0.0' }, { capabilities: { logging: {} } });
+      server.registerTool(
+        'metered-tool',
+        { description: 'meters 3x $0.001', inputSchema: { message: z.string().optional() } },
+        async (): Promise<CallToolResult> => {
+          // 3 charges of $0.001 each → summed actual $0.003 < cap $0.01.
+          await requirePayment({ price: BigNumber(0.001) });
+          await requirePayment({ price: BigNumber(0.001) });
+          await requirePayment({ price: BigNumber(0.001) });
+          return { content: [{ type: 'text', text: 'metered' }] };
+        },
+      );
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+      res.on('close', () => { transport.close(); server.close(); });
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    });
+
+    const response = await request(app)
+      .post('/')
+      .set('Content-Type', 'application/json')
+      .set('Accept', 'application/json, text/event-stream')
+      .set('Authorization', 'Bearer test-access-token')
+      .set('X-ATXP-PAYMENT', meteredCredential)
+      .send({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'metered-tool', arguments: {} } });
+
+    expect(response.status).toBe(200);
+
+    // Exactly one settle, to /settle/atxp.
+    expect(settleCalls()).toHaveLength(1);
+    expect(String(settleCalls()[0][0])).toContain('/settle/atxp');
+
+    // The settled amount is the SUMMED ACTUAL ($0.003), not the cap ($0.01).
+    const settleBody = JSON.parse((settleCalls()[0][1] as { body: string }).body);
+    expect(settleBody.options).toHaveLength(1);
+    expect(settleBody.options[0].amount).toBe('0.003');
+  });
+
   it('does NOT settle through the transport when the tool charges nothing', async () => {
     const router = atxpExpress(TH.config({
       oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),

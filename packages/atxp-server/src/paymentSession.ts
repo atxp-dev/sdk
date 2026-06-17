@@ -13,16 +13,17 @@ import type { DetectedCredential } from "./atxpContext.js";
  */
 export interface PaymentSession {
   /**
-   * Authorized amount derived from the credential.
+   * Authorized amount derived from the credential — the ceiling for charges.
    *
-   * Guard only: settlement currently settles the credential's own amount (see
-   * settlePaymentSession), NOT `spent`, so the cap does not bound the settled
-   * amount — it merely rejects local charges that would exceed it. Settling
-   * `spent` up to the cap arrives with the `upto` scheme (streaming-payment-
-   * sessions design doc:
-   * https://github.com/circuitandchisel/accounts/blob/main/docs/STREAMING_PAYMENT_SESSIONS.md).
-   * For ATXP credentials carrying no amount, the cap is Infinity so the
-   * single-charge path always works.
+   * "up-to" semantics: settlement settles the accumulated `spent` (≤ cap), not
+   * the cap itself (see settlePaymentSession). The cap bounds local charges,
+   * rejecting any that would exceed it. Each `requirePayment(price)` charges
+   * `price`, so `spent` is the sum of prices (≤ cap) — note `spent < cap` even
+   * for a single charge when the cap was inflated by the server's
+   * `minimumPayment` (cap = max(minimumPayment, price)). For ATXP credentials
+   * carrying no amount, the cap is Infinity so the single-charge path always
+   * works. (streaming-payment-sessions design doc:
+   * https://github.com/circuitandchisel/accounts/blob/main/docs/STREAMING_PAYMENT_SESSIONS.md)
    */
   readonly cap: BigNumber;
   /** Accumulated charges recorded against this session. */
@@ -39,8 +40,8 @@ const USDC_ATOMIC = 1e6;
  *
  * Best-effort: if the amount cannot be parsed reliably for a protocol, returns
  * Infinity and logs a warning so the single-charge path always works.
- * Settlement settles the credential's own amount; the cap is a guard, not the
- * source of the settled amount.
+ * Settlement settles the accumulated `spent` (≤ cap); the cap is the ceiling
+ * that bounds local charges, not directly the settled amount.
  */
 function deriveCap(
   protocol: PaymentProtocol,
@@ -165,6 +166,11 @@ export async function settlePaymentSession(
       session.protocol,
       session.credential,
       session.context,
+      // "up-to" semantics: settle the accumulated actual (the sum of charged
+      // prices, ≤ cap), not the cap. For a single requirePayment(price), spent
+      // is that price — which equals the cap only when the cap wasn't inflated
+      // by the server's minimumPayment.
+      session.spent,
     );
     logger.info(`Settled ${session.protocol} at session close: txHash=${result.txHash ?? '<already-settled>'}, amount=${result.settledAmount}`);
   } catch (error) {
@@ -172,6 +178,6 @@ export async function settlePaymentSession(
     // served and settled=true prevents re-attempt at close. Log a greppable,
     // metric-able marker carrying protocol + amount so an unbilled served
     // request can be reconciled later.
-    logger.error(`settle_failed_at_close protocol=${session.protocol} amount=${session.spent.toString()}: ${error instanceof Error ? error.message : String(error)}`);
+    logger.error(`settle_failed_at_close protocol=${session.protocol} amount=${session.spent.toFixed()}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
