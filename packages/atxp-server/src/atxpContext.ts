@@ -1,6 +1,13 @@
 import { TokenData, AccountId, type PaymentProtocol } from "@atxp/common";
 import { ATXPConfig, TokenCheck } from "./types.js";
 import { AsyncLocalStorage } from "async_hooks";
+import { SettlementContext } from "./protocol.js";
+import {
+  PaymentSession,
+  PaymentSessionState,
+  buildPaymentSession,
+  settlePaymentSession,
+} from "./paymentSession.js";
 
 const contextStorage = new AsyncLocalStorage<ATXPContext | null>();
 
@@ -39,6 +46,9 @@ type ATXPContext = {
   paymentRequestId?: string;
   /** Payment challenge pending response rewrite (set by omniChallengeMcpError) */
   pendingPaymentChallenge?: PendingPaymentChallenge;
+  /** Implicit request-scoped payment session, opened by the middleware when a
+   *  credential is detected. requirePayment() charges it; it settles at close. */
+  paymentSession?: PaymentSessionState;
 }
 
 export function getATXPConfig(): ATXPConfig | null {
@@ -83,6 +93,45 @@ export function setDetectedCredential(credential: DetectedCredential): void {
       context.paymentRequestId = credential.paymentRequestId;
     }
   }
+}
+
+/**
+ * Open an implicit payment session for the detected credential (called by
+ * middleware). Derives the authorized cap from the credential and stores the
+ * session + settlement context in the ALS context.
+ */
+export function openPaymentSession(credential: DetectedCredential, context: SettlementContext): void {
+  const ctx = contextStorage.getStore();
+  if (ctx) {
+    ctx.paymentSession = buildPaymentSession(credential, context, ctx.config.logger);
+  }
+}
+
+/**
+ * Get the current request's payment session, if one was opened.
+ */
+export function paymentSession(): PaymentSession | null {
+  const context = contextStorage.getStore();
+  return context?.paymentSession ?? null;
+}
+
+/**
+ * Settle the current request's payment session if it was charged. Idempotent.
+ * Called at response close (by the express response interceptor).
+ */
+export async function closePaymentSession(): Promise<void> {
+  const context = contextStorage.getStore();
+  const session = context?.paymentSession;
+  if (!context || !session) return;
+  const config = context.config;
+  const destinationAccountId = await config.destination.getAccountId();
+  await settlePaymentSession(
+    session,
+    config.server,
+    destinationAccountId,
+    config.appName,
+    config.logger,
+  );
 }
 
 export function getPaymentRequestId(): string | null {

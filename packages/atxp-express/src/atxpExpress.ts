@@ -14,13 +14,15 @@ import {
   detectProtocol,
   getPendingPaymentChallenge,
   setPaymentRequestId,
+  setDetectedCredential,
+  openPaymentSession,
+  closePaymentSession,
   type PaymentProtocol,
   type ATXPConfig,
   type TokenCheck,
   type PendingPaymentChallenge,
   verifyOpaqueIdentity,
   parseCredentialBase64,
-  ProtocolSettlement,
 } from "@atxp/server";
 
 export function atxpExpress(args: ATXPArgs): Router {
@@ -107,12 +109,14 @@ export function atxpExpress(args: ATXPArgs): Router {
         return;
       }
 
-      // Set up ATXP context, settle any payment credential, then run route.
-      // Settlement happens HERE (in middleware) rather than in requirePayment()
-      // so the ledger is credited before any route code runs. This avoids
-      // footguns where tool handlers call requirePayment() multiple times
-      // (e.g., pre-flight balance check + post-generation charge) and the
-      // first call consumes the credential, leaving nothing for the second.
+      // Set up ATXP context, stash any payment credential, then run route.
+      // Settlement no longer happens here. Instead the middleware opens an
+      // implicit, request-scoped PaymentSession holding the credential and the
+      // settlement context; requirePayment() charges the session locally, and
+      // the session settles exactly once at response close (see below). This
+      // keeps a single credential usable across multiple requirePayment() calls
+      // in one request while deferring the actual settle until the route's
+      // charges have accumulated.
       return withATXPContext(config, resource, tokenCheck, async () => {
         if (detected) {
           // Resolve identity for the settlement ledger credit.
@@ -120,16 +124,7 @@ export function atxpExpress(args: ATXPArgs): Router {
             ? user
             : resolveIdentitySync(config, req, detected.protocol, detected.credential) || user || undefined;
 
-          // Settle the credential immediately — credits the auth server's
-          // ledger so subsequent charge() calls in requirePayment() succeed.
           const destinationAccountId = await config.destination.getAccountId();
-          const settlement = new ProtocolSettlement(
-            config.server,
-            logger,
-            fetch.bind(globalThis),
-            destinationAccountId,
-            { appName: config.appName },
-          );
 
           // For X402: the credential's parsed payload contains `accepted` — the
           // exact payment requirement the client signed off on. Pass it directly
@@ -151,24 +146,15 @@ export function atxpExpress(args: ATXPArgs): Router {
             }
           }
 
-          try {
-            const result = await settlement.settle(
-              detected.protocol,
-              detected.credential,
-              context as Parameters<typeof settlement.settle>[2],
-            );
-            logger.info(`Settled ${detected.protocol} in middleware: txHash=${result.txHash ?? '<already-settled>'}, amount=${result.settledAmount}`);
-          } catch (error) {
-            logger.error(`Middleware settlement failed for ${detected.protocol}: ${error instanceof Error ? error.message : String(error)}`);
-            // Don't store the credential — it's already consumed/invalid.
-            // requirePayment() will see no credential, charge will fail,
-            // and a fresh payment challenge will be issued.
-          }
+          setDetectedCredential({ ...detected, ...(sourceAccountId && { sourceAccountId }) });
+          openPaymentSession(detected, context as Parameters<typeof openPaymentSession>[1]);
         }
 
-        // Intercept the response to rewrite McpServer's wrapped payment errors
-        // back into proper JSON-RPC errors with full challenge data.
-        installPaymentResponseRewriter(res, logger);
+        // Intercept the response to (1) settle the payment session at close —
+        // after the route has run and all requirePayment() charges have
+        // accumulated, but before the response finishes — and (2) rewrite
+        // McpServer's wrapped payment errors into proper JSON-RPC errors.
+        installPaymentResponseRewriter(res, logger, closePaymentSession);
 
         return next();
       });
@@ -198,8 +184,19 @@ export function atxpExpress(args: ATXPArgs): Router {
  * Old clients: see JSON-RPC error with code -30402 → Branch 1 matches
  * New clients: see JSON-RPC error with code -30402 + full error.data → x402/mpp works
  */
-/** @internal Exported for testing only. */
-export function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
+/**
+ * @internal Exported for testing only.
+ *
+ * @param onBeforeEnd Optional async hook run once, before the response body is
+ *   sent, when res.end is first invoked. Used to settle the payment session at
+ *   close (after the route ran, before the response finishes). When omitted,
+ *   res.end stays fully synchronous.
+ */
+export function installPaymentResponseRewriter(
+  res: Response,
+  logger: import("@atxp/common").Logger,
+  onBeforeEnd?: () => Promise<void>,
+): void {
   const origEnd = res.end;
   const origWrite = res.write;
   const origWriteHead = res.writeHead;
@@ -246,9 +243,10 @@ export function installPaymentResponseRewriter(res: Response, logger: import("@a
     return (origWrite as any).apply(this, args);
   } as any;
 
-  // Hook res.end for non-SSE (enableJsonResponse) responses.
+  // Finalize the response: rewrite the body, flush the deferred writeHead with
+  // a corrected Content-Length, restore the original methods, and call origEnd.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
+  function finalizeEnd(self: Response, args: any[]): any {
     res.end = origEnd;
     res.write = origWrite;
     res.writeHead = origWriteHead;
@@ -272,11 +270,38 @@ export function installPaymentResponseRewriter(res: Response, logger: import("@a
           }
         }
       }
-      (origWriteHead as any).apply(this, deferredWriteHead);
+      (origWriteHead as any).apply(self, deferredWriteHead);
       deferredWriteHead = null;
     }
 
-    return (origEnd as any).apply(this, args);
+    return (origEnd as any).apply(self, args);
+  }
+
+  // Guard so the onBeforeEnd hook (session settle) runs at most once even if
+  // res.end is invoked multiple times.
+  let closed = false;
+
+  // Hook res.end for non-SSE (enableJsonResponse) responses.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
+    if (!onBeforeEnd) {
+      return finalizeEnd(this, args);
+    }
+    // Settle before finishing the response. Awaiting here (rather than firing
+    // on res.on('finish')) guarantees the settle completes before the client
+    // sees the response. Idempotent via `closed`.
+    if (closed) {
+      return finalizeEnd(this, args);
+    }
+    closed = true;
+    onBeforeEnd()
+      .catch((error) => {
+        logger.error(`onBeforeEnd hook failed: ${error instanceof Error ? error.message : String(error)}`);
+      })
+      .finally(() => {
+        finalizeEnd(this, args);
+      });
+    return this;
   } as any;
 }
 

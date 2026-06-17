@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { atxpExpress } from './atxpExpress.js';
 import { MemoryOAuthDb } from '@atxp/common';
+import { requirePayment } from '@atxp/server';
 import * as TH from '@atxp/server/serverTestHelpers';
+import { BigNumber } from 'bignumber.js';
 import express from 'express';
 import request from 'supertest';
 
@@ -220,7 +222,11 @@ describe('ATXP', () => {
       const app = express();
       app.use(express.json());
       app.use(router);
-      app.post('/', (_req, res) => res.json({ ok: true }));
+      // requirePayment charges the implicit session; settlement fires at close.
+      app.post('/', async (_req, res) => {
+        await requirePayment({ price: BigNumber(0.01) });
+        res.json({ ok: true });
+      });
 
       await sendMcpToolCall(app).expect(200);
 
@@ -241,7 +247,10 @@ describe('ATXP', () => {
         const app = express();
         app.use(express.json());
         app.use(router);
-        app.post('/', (_req, res) => res.json({ ok: true }));
+        app.post('/', async (_req, res) => {
+          await requirePayment({ price: BigNumber(0.01) });
+          res.json({ ok: true });
+        });
 
         await sendMcpToolCall(app).expect(200);
 
@@ -253,6 +262,103 @@ describe('ATXP', () => {
         if (savedAppName === undefined) delete process.env.APP_NAME;
         else process.env.APP_NAME = savedAppName;
       }
+    });
+  });
+
+  // Phase 1: settlement moved off the inbound request and onto session close.
+  describe('settlement happens once at session close (not inbound)', () => {
+    const mockFetch = vi.fn();
+
+    beforeEach(() => {
+      mockFetch.mockReset();
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xabc', settledAmount: '0.01' }),
+        text: async () => '',
+      });
+      vi.stubGlobal('fetch', mockFetch);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const atxpCredential = JSON.stringify({
+      sourceAccountId: 'atxp_acct_test123',
+      sourceAccountToken: 'tok_abc',
+    });
+
+    const settleCalls = () => mockFetch.mock.calls.filter(
+      ([url]) => typeof url === 'string' && url.includes('/settle/'),
+    );
+
+    const sendPaidMcpCall = (app: express.Application) =>
+      request(app)
+        .post('/')
+        .set('Content-Type', 'application/json')
+        .set('Authorization', 'Bearer test-access-token')
+        .set('X-ATXP-PAYMENT', atxpCredential)
+        .send(TH.mcpToolRequest());
+
+    it('settles exactly once, AFTER the route ran, for a single paid tool call', async () => {
+      const order: string[] = [];
+      mockFetch.mockImplementation(async (url: string | URL) => {
+        if (String(url).includes('/settle/')) order.push('settle');
+        return { ok: true, json: async () => ({ txHash: '0xabc', settledAmount: '0.01' }), text: async () => '' };
+      });
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', async (_req, res) => {
+        order.push('route');
+        await requirePayment({ price: BigNumber(0.01) });
+        res.json({ ok: true });
+      });
+
+      await sendPaidMcpCall(app).expect(200);
+
+      expect(settleCalls()).toHaveLength(1);
+      // Settle is deferred until response close, so it runs after the route.
+      expect(order).toEqual(['route', 'settle']);
+    });
+
+    it('does NOT settle when the route never calls requirePayment (nothing charged)', async () => {
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', (_req, res) => res.json({ ok: true }));
+
+      await sendPaidMcpCall(app).expect(200);
+
+      expect(settleCalls()).toHaveLength(0);
+    });
+
+    it('settles once even when the route calls requirePayment multiple times', async () => {
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', async (_req, res) => {
+        await requirePayment({ price: BigNumber(0.01) });
+        await requirePayment({ price: BigNumber(0.01) });
+        res.json({ ok: true });
+      });
+
+      await sendPaidMcpCall(app).expect(200);
+
+      expect(settleCalls()).toHaveLength(1);
     });
   });
 });
