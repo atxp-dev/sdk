@@ -100,11 +100,13 @@ export function setDetectedCredential(credential: DetectedCredential): void {
  * middleware). Derives the authorized cap from the credential and stores the
  * session + settlement context in the ALS context.
  */
-export function openPaymentSession(credential: DetectedCredential, context: SettlementContext): void {
+export function openPaymentSession(credential: DetectedCredential, context: SettlementContext): PaymentSessionState | null {
   const ctx = contextStorage.getStore();
   if (ctx) {
     ctx.paymentSession = buildPaymentSession(credential, context, ctx.config.logger);
+    return ctx.paymentSession;
   }
+  return null;
 }
 
 /**

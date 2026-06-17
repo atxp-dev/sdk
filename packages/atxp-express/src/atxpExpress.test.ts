@@ -361,4 +361,64 @@ describe('ATXP', () => {
       expect(settleCalls()).toHaveLength(1);
     });
   });
+
+  // FIX 3: Phase 1 has no retry/outbox. A close-time settle failure must NOT
+  // fail the already-served request — the route still returns 200 — and the
+  // failure must be logged with a greppable, metric-able marker.
+  describe('settle failure at close: route still returns 200 and logs a marker', () => {
+    const mockFetch = vi.fn();
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const atxpCredential = JSON.stringify({
+      sourceAccountId: 'atxp_acct_test123',
+      sourceAccountToken: 'tok_abc',
+    });
+
+    const sendPaidMcpCall = (app: express.Application) =>
+      request(app)
+        .post('/')
+        .set('Content-Type', 'application/json')
+        .set('Authorization', 'Bearer test-access-token')
+        .set('X-ATXP-PAYMENT', atxpCredential)
+        .send(TH.mcpToolRequest());
+
+    it('returns 200 and logs settle_failed_at_close when /settle/* rejects', async () => {
+      // Auth /settle/* returns a non-OK status → ProtocolSettlement.settle throws.
+      mockFetch.mockReset();
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+        text: async () => 'settle exploded',
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const logger = TH.logger();
+      const router = atxpExpress(TH.config({
+        logger,
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', async (_req, res) => {
+        await requirePayment({ price: BigNumber(0.01) });
+        res.json({ ok: true });
+      });
+
+      // The served request still succeeds despite the settle failure.
+      const response = await sendPaidMcpCall(app).expect(200);
+      expect(response.body).toMatchObject({ ok: true });
+
+      // The failure is logged with the actionable marker (protocol + amount).
+      const errorLog = (logger.error as any).mock.calls.map((c: any[]) => String(c[0])).join('\n');
+      expect(errorLog).toContain('settle_failed_at_close');
+      expect(errorLog).toContain('protocol=atxp');
+      expect(errorLog).toContain('amount=0.01');
+    });
+  });
 });

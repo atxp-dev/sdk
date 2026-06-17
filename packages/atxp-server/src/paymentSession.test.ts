@@ -33,12 +33,35 @@ describe('PaymentSession.charge', () => {
     expect(session.charge(BigNumber(0.0001))).toBe(false);
   });
 
-  it('derives cap from mpp credential challenge.request.amount', () => {
+  it('derives cap from Solana mpp credential as micro-units (challenge.method=solana)', () => {
+    // Solana MPP amounts are micro-unit integer strings → divide by 1e6.
     const credential = Buffer.from(JSON.stringify({
-      challenge: { id: 'ch_1', request: { amount: '250000' } },
+      challenge: { id: 'ch_1', method: 'solana', request: { amount: '250000' } },
     })).toString('base64');
     const session = new PaymentSessionState('mpp', credential, {}, logger);
     expect(session.cap.toNumber()).toBe(0.25);
+  });
+
+  it('derives cap from Tempo mpp credential as a decimal (challenge.method=tempo, NO /1e6)', () => {
+    // Tempo MPP amounts are human-readable decimal strings → use as-is.
+    // Regression: dividing by 1e6 made the cap 1e-9, falsely re-challenging
+    // already-paid Tempo requests (infinite loop).
+    const credential = Buffer.from(JSON.stringify({
+      challenge: { id: 'ch_1', method: 'tempo', request: { amount: '0.001' } },
+    })).toString('base64');
+    const session = new PaymentSessionState('mpp', credential, {}, logger);
+    expect(session.cap.toNumber()).toBe(0.001);
+    // A charge at the Tempo price must fit under the cap (not be rejected).
+    expect(session.charge(BigNumber(0.001))).toBe(true);
+  });
+
+  it('treats an mpp credential with no recognized method as a decimal (avoids under-scaling)', () => {
+    // Missing/unknown method → decimal interpretation (safe: never under-scales).
+    const credential = Buffer.from(JSON.stringify({
+      challenge: { id: 'ch_1', amount: '0.05' },
+    })).toString('base64');
+    const session = new PaymentSessionState('mpp', credential, {}, logger);
+    expect(session.cap.toNumber()).toBe(0.05);
   });
 
   it('derives cap from atxp credential options[].amount (human-readable)', () => {

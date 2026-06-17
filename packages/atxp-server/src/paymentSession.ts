@@ -12,7 +12,16 @@ import type { DetectedCredential } from "./atxpContext.js";
  * request and requirePayment() debited the auth ledger via paymentServer.charge.
  */
 export interface PaymentSession {
-  /** Authorized amount derived from the credential. */
+  /**
+   * Authorized amount derived from the credential.
+   *
+   * Forward-looking guard only. In Phase 1, settlement uses the credential's
+   * own amount (see settlePaymentSession), NOT `spent`, so the cap does not yet
+   * bound the settled amount — it merely rejects local charges that exceed it.
+   * Full enforcement (settling `spent` up to the cap) arrives with the `upto`
+   * scheme in a later phase. For ATXP credentials carrying no amount, the cap is
+   * Infinity so the single-charge path always works.
+   */
   readonly cap: BigNumber;
   /** Accumulated charges recorded against this session. */
   readonly spent: BigNumber;
@@ -52,7 +61,20 @@ function deriveCap(
       const request = challenge?.request as Record<string, unknown> | undefined;
       const amount = (request?.amount ?? challenge?.amount) as string | number | undefined;
       if (amount != null) {
-        return new BigNumber(amount).dividedBy(USDC_ATOMIC);
+        // MPP amount encoding is chain-dependent (see protocol.ts MppChallengeData):
+        //   - Solana: micro-units integer string (e.g. "1000" = 0.001 USDC) → /1e6
+        //   - Tempo:  human-readable decimal string (e.g. "0.001")          → as-is
+        // Branch on challenge.method (the chain). When method is unavailable,
+        // prefer the decimal interpretation: dividing a decimal by 1e6 under-scales
+        // the cap to ~1e-8, which would falsely re-challenge an already-paid request.
+        const method = challenge?.method as string | undefined;
+        if (method === 'solana') {
+          return new BigNumber(amount).dividedBy(USDC_ATOMIC);
+        }
+        if (method !== 'tempo') {
+          logger.debug(`PaymentSession: MPP credential has no recognized method ('${method ?? 'undefined'}'); treating amount as decimal to avoid under-scaling the cap`);
+        }
+        return new BigNumber(amount);
       }
     } else if (protocol === 'atxp') {
       const parsed = parseCredentialBase64(credential);
@@ -144,6 +166,9 @@ export async function settlePaymentSession(
     );
     logger.info(`Settled ${session.protocol} at session close: txHash=${result.txHash ?? '<already-settled>'}, amount=${result.settledAmount}`);
   } catch (error) {
-    logger.error(`Session close settlement failed for ${session.protocol}: ${error instanceof Error ? error.message : String(error)}`);
+    // Phase 1 has no retry/outbox: the request is already served, settled=true
+    // prevents re-attempt at close. Log a greppable, metric-able marker carrying
+    // protocol + amount so an unbilled served request can be reconciled later.
+    logger.error(`settle_failed_at_close protocol=${session.protocol} amount=${session.spent.toString()}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
