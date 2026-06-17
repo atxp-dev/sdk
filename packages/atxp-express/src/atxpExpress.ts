@@ -26,8 +26,14 @@ import {
   parseCredentialBase64,
 } from "@atxp/server";
 
-/** Max time the close-time settle may run before the response is finished anyway. */
-const SETTLE_AT_CLOSE_TIMEOUT_MS = 10_000;
+/**
+ * Max time the close-time settle may run before the response is finished anyway.
+ * Must exceed a legitimate slow settle: an ATXP IOU→USDC conversion `/pay`
+ * (two on-chain transfers + Base confirmations) was observed at ~14.5s end-to-end.
+ * Set well above that so `settle_unconfirmed_at_close` flags genuinely stuck
+ * settles, not normal on-chain latency; still bounds a truly hung auth server.
+ */
+const SETTLE_AT_CLOSE_TIMEOUT_MS = 30_000;
 
 /**
  * Resolve when `promise` settles, or reject after `ms` so a slow/hung auth
