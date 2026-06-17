@@ -326,6 +326,15 @@ export class ProtocolSettlement {
    * voucher amount) land in their own phases.
    */
   private buildRequestBody(protocol: PaymentProtocol, credential: string, context?: SettlementContext, actualAmount?: BigNumber): unknown {
+    // actualAmount (the metered "up-to" amount) is only wired for ATXP this phase.
+    // For x402/mpp the settle body still carries the credential's cap, so a
+    // multi-charge session over-settles relative to the metered actual until
+    // their up-to mappings land (x402 settlementOverrides.amount, mpp voucher).
+    // Emit a greppable marker so that silent overcharge is visible, not invisible.
+    if (actualAmount && protocol !== 'atxp') {
+      this.logger.warn(`settle_actual_dropped protocol=${protocol} actual=${actualAmount.toFixed()}: up-to settlement not yet wired for ${protocol}; settling the credential cap`);
+    }
+
     if (protocol === 'x402') {
       // X402: auth expects { payload, paymentRequirements }
       // The credential is the base64-encoded PAYMENT-SIGNATURE header containing the payload.
@@ -406,9 +415,11 @@ export class ProtocolSettlement {
     // "up-to" semantics: when an actual metered amount is supplied, settle that
     // (≤ the authorized cap) instead of the cap baked into the option. This is
     // what makes /pay charge the actual. A decimal USDC string matches the
-    // human-readable amount format ATXP options already use.
+    // human-readable amount format ATXP options already use. Use toFixed() (not
+    // toString()) so sub-1e-6 totals never serialize in exponential notation
+    // ("3e-7"), which /pay would fail to parse as a decimal USDC string.
     if (actualAmount) {
-      const actual = actualAmount.toString();
+      const actual = actualAmount.toFixed();
       options = options.map(opt => ({ ...opt, amount: actual }));
     }
 

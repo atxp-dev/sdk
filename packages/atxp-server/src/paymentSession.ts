@@ -17,10 +17,12 @@ export interface PaymentSession {
    *
    * "up-to" semantics: settlement settles the accumulated `spent` (≤ cap), not
    * the cap itself (see settlePaymentSession). The cap bounds local charges,
-   * rejecting any that would exceed it. For a single requirePayment(price),
-   * `spent === price === cap`, so the settled amount equals the credential's
-   * amount. For ATXP credentials carrying no amount, the cap is Infinity so the
-   * single-charge path always works. (streaming-payment-sessions design doc:
+   * rejecting any that would exceed it. Each `requirePayment(price)` charges
+   * `price`, so `spent` is the sum of prices (≤ cap) — note `spent < cap` even
+   * for a single charge when the cap was inflated by the server's
+   * `minimumPayment` (cap = max(minimumPayment, price)). For ATXP credentials
+   * carrying no amount, the cap is Infinity so the single-charge path always
+   * works. (streaming-payment-sessions design doc:
    * https://github.com/circuitandchisel/accounts/blob/main/docs/STREAMING_PAYMENT_SESSIONS.md)
    */
   readonly cap: BigNumber;
