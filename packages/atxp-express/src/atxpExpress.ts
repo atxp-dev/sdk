@@ -14,14 +14,44 @@ import {
   detectProtocol,
   getPendingPaymentChallenge,
   setPaymentRequestId,
+  setDetectedCredential,
+  openPaymentSession,
+  settlePaymentSession,
+  type PaymentSessionState,
   type PaymentProtocol,
   type ATXPConfig,
   type TokenCheck,
   type PendingPaymentChallenge,
   verifyOpaqueIdentity,
   parseCredentialBase64,
-  ProtocolSettlement,
 } from "@atxp/server";
+
+/**
+ * Max time the close-time settle may run before the response is finished anyway.
+ * Must exceed a legitimate slow settle: an ATXP IOU→USDC conversion `/pay`
+ * (two on-chain transfers + Base confirmations) was observed at ~14.5s end-to-end.
+ * Set well above that so `settle_unconfirmed_at_close` flags genuinely stuck
+ * settles, not normal on-chain latency; still bounds a truly hung auth server.
+ */
+const SETTLE_AT_CLOSE_TIMEOUT_MS = 30_000;
+
+/**
+ * Resolve when `promise` settles, or reject after `ms` so a slow/hung auth
+ * server cannot stall the client's connection at response close.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`settle timed out after ${ms}ms`)), ms);
+    // Don't keep the event loop alive solely for this timer.
+    if (typeof timer === 'object' && typeof (timer as { unref?: () => void }).unref === 'function') {
+      (timer as { unref: () => void }).unref();
+    }
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
 
 export function atxpExpress(args: ATXPArgs): Router {
   const config = buildServerConfig(args);
@@ -107,29 +137,26 @@ export function atxpExpress(args: ATXPArgs): Router {
         return;
       }
 
-      // Set up ATXP context, settle any payment credential, then run route.
-      // Settlement happens HERE (in middleware) rather than in requirePayment()
-      // so the ledger is credited before any route code runs. This avoids
-      // footguns where tool handlers call requirePayment() multiple times
-      // (e.g., pre-flight balance check + post-generation charge) and the
-      // first call consumes the credential, leaving nothing for the second.
+      // Set up ATXP context, stash any payment credential, then run route.
+      // Settlement no longer happens here. Instead the middleware opens an
+      // implicit, request-scoped PaymentSession holding the credential and the
+      // settlement context; requirePayment() charges the session locally, and
+      // the session settles exactly once at response close (see below). This
+      // keeps a single credential usable across multiple requirePayment() calls
+      // in one request while deferring the actual settle until the route's
+      // charges have accumulated.
       return withATXPContext(config, resource, tokenCheck, async () => {
+        let session: PaymentSessionState | null = null;
+        // Resolved once here (inside withATXPContext) and reused for both the
+        // settlement context and the close-time settle closure below.
+        let destinationAccountId: string | undefined;
         if (detected) {
           // Resolve identity for the settlement ledger credit.
           const sourceAccountId = (detected.protocol === 'mpp' && user)
             ? user
             : resolveIdentitySync(config, req, detected.protocol, detected.credential) || user || undefined;
 
-          // Settle the credential immediately — credits the auth server's
-          // ledger so subsequent charge() calls in requirePayment() succeed.
-          const destinationAccountId = await config.destination.getAccountId();
-          const settlement = new ProtocolSettlement(
-            config.server,
-            logger,
-            fetch.bind(globalThis),
-            destinationAccountId,
-            { appName: config.appName },
-          );
+          destinationAccountId = await config.destination.getAccountId();
 
           // For X402: the credential's parsed payload contains `accepted` — the
           // exact payment requirement the client signed off on. Pass it directly
@@ -151,24 +178,35 @@ export function atxpExpress(args: ATXPArgs): Router {
             }
           }
 
-          try {
-            const result = await settlement.settle(
-              detected.protocol,
-              detected.credential,
-              context as Parameters<typeof settlement.settle>[2],
-            );
-            logger.info(`Settled ${detected.protocol} in middleware: txHash=${result.txHash ?? '<already-settled>'}, amount=${result.settledAmount}`);
-          } catch (error) {
-            logger.error(`Middleware settlement failed for ${detected.protocol}: ${error instanceof Error ? error.message : String(error)}`);
-            // Don't store the credential — it's already consumed/invalid.
-            // requirePayment() will see no credential, charge will fail,
-            // and a fresh payment challenge will be issued.
-          }
+          setDetectedCredential({ ...detected, ...(sourceAccountId && { sourceAccountId }) });
+          session = openPaymentSession(detected, context as Parameters<typeof openPaymentSession>[1]);
         }
 
-        // Intercept the response to rewrite McpServer's wrapped payment errors
-        // back into proper JSON-RPC errors with full challenge data.
-        installPaymentResponseRewriter(res, logger);
+        // Capture everything settle needs in a closure built HERE, inside
+        // withATXPContext (the ALS context is guaranteed present). The res.end
+        // hook can fire OUTSIDE the AsyncLocalStorage causal chain — true SSE
+        // streaming, client abort, server timeout — at which point
+        // contextStorage.getStore() returns null and a getStore()-based settle
+        // would be silently skipped, leaving a served request unbilled. Binding
+        // the session reference + server/destination/appName/logger now makes
+        // the close-time settle independent of ALS at res.end.
+        const onBeforeEnd = session
+          ? async () => {
+              await settlePaymentSession(
+                session!,
+                config.server,
+                destinationAccountId,
+                config.appName,
+                config.logger,
+              );
+            }
+          : undefined;
+
+        // Intercept the response to (1) settle the payment session at close —
+        // after the route has run and all requirePayment() charges have
+        // accumulated, but before the response finishes — and (2) rewrite
+        // McpServer's wrapped payment errors into proper JSON-RPC errors.
+        installPaymentResponseRewriter(res, logger, onBeforeEnd);
 
         return next();
       });
@@ -198,8 +236,23 @@ export function atxpExpress(args: ATXPArgs): Router {
  * Old clients: see JSON-RPC error with code -30402 → Branch 1 matches
  * New clients: see JSON-RPC error with code -30402 + full error.data → x402/mpp works
  */
-/** @internal Exported for testing only. */
-export function installPaymentResponseRewriter(res: Response, logger: import("@atxp/common").Logger): void {
+/**
+ * @internal Exported for testing only.
+ *
+ * @param onBeforeEnd Optional async hook run once when res.end is first invoked.
+ *   Used to settle the payment session at close (after the route ran). For
+ *   buffered responses (enableJsonResponse) the body is delivered in res.end, so
+ *   the hook completes before the client sees the body. For SSE the body is
+ *   already flushed via res.write before res.end, so the hook only delays the
+ *   stream's terminator — it cannot run before the body is seen. The hook is
+ *   bounded by SETTLE_AT_CLOSE_TIMEOUT_MS so a hung auth server can't stall the
+ *   connection. When omitted, res.end stays fully synchronous.
+ */
+export function installPaymentResponseRewriter(
+  res: Response,
+  logger: import("@atxp/common").Logger,
+  onBeforeEnd?: () => Promise<void>,
+): void {
   const origEnd = res.end;
   const origWrite = res.write;
   const origWriteHead = res.writeHead;
@@ -246,9 +299,18 @@ export function installPaymentResponseRewriter(res: Response, logger: import("@a
     return (origWrite as any).apply(this, args);
   } as any;
 
-  // Hook res.end for non-SSE (enableJsonResponse) responses.
+  // Guard against double-invocation: the async settle window between the first
+  // res.end and finalizeEnd can let a second res.end through (e.g. client abort
+  // racing the settle). Without this, origEnd would be applied twice and Node
+  // throws ERR_STREAM_WRITE_AFTER_END.
+  let finalized = false;
+
+  // Finalize the response: rewrite the body, flush the deferred writeHead with
+  // a corrected Content-Length, restore the original methods, and call origEnd.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
+  function finalizeEnd(self: Response, args: any[]): any {
+    if (finalized) return self;
+    finalized = true;
     res.end = origEnd;
     res.write = origWrite;
     res.writeHead = origWriteHead;
@@ -272,11 +334,51 @@ export function installPaymentResponseRewriter(res: Response, logger: import("@a
           }
         }
       }
-      (origWriteHead as any).apply(this, deferredWriteHead);
+      (origWriteHead as any).apply(self, deferredWriteHead);
       deferredWriteHead = null;
     }
 
-    return (origEnd as any).apply(this, args);
+    return (origEnd as any).apply(self, args);
+  }
+
+  // Guard so the onBeforeEnd hook (session settle) runs at most once even if
+  // res.end is invoked multiple times.
+  let closed = false;
+
+  // Hook res.end for non-SSE (enableJsonResponse) responses.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res.end = function endWithPaymentRewrite(this: Response, ...args: any[]): any {
+    if (!onBeforeEnd) {
+      return finalizeEnd(this, args);
+    }
+    // The hook runs at most once (idempotent via `closed`); a second res.end
+    // during the settle window finalizes immediately (guarded again in
+    // finalizeEnd against double origEnd).
+    if (closed) {
+      return finalizeEnd(this, args);
+    }
+    closed = true;
+    // For buffered responses (enableJsonResponse), the body is delivered in this
+    // res.end call, so awaiting onBeforeEnd here guarantees the settle completes
+    // before the client sees the body. For SSE the body has already been flushed
+    // via res.write before res.end, so this only delays the stream's terminator
+    // (settlement still completes server-side before the connection closes).
+    // Bound the settle with a timeout so a slow/hung auth server can't stall the
+    // client's connection indefinitely.
+    // settlePaymentSession catches its own errors (logs `settle_failed_at_close`)
+    // and never rejects, so the only rejection here is the timeout. The in-flight
+    // settle is NOT aborted and may still complete after this fires — so this is
+    // "not confirmed within the timeout", NOT "definitely unbilled". Use a
+    // distinct marker so reconciliation doesn't treat late-but-successful settles
+    // as failures.
+    withTimeout(onBeforeEnd(), SETTLE_AT_CLOSE_TIMEOUT_MS)
+      .catch((error) => {
+        logger.warn(`settle_unconfirmed_at_close: ${error instanceof Error ? error.message : String(error)} (settle may still complete; not confirmed within ${SETTLE_AT_CLOSE_TIMEOUT_MS}ms)`);
+      })
+      .finally(() => {
+        finalizeEnd(this, args);
+      });
+    return this;
   } as any;
 }
 

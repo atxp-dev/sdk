@@ -30,9 +30,19 @@ export {
   getDetectedCredential,
   setDetectedCredential,
   getPendingPaymentChallenge,
+  openPaymentSession,
+  paymentSession,
+  closePaymentSession,
   type DetectedCredential,
   type PendingPaymentChallenge,
 } from './atxpContext.js';
+
+// Payment session (request-scoped local charging + settle-at-close)
+export {
+  type PaymentSession,
+  type PaymentSessionState,
+  settlePaymentSession,
+} from './paymentSession.js';
 
 // Core platform-agnostic business logic (no I/O dependencies)
 export {

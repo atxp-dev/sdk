@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { atxpExpress } from './atxpExpress.js';
 import { MemoryOAuthDb } from '@atxp/common';
+import { requirePayment } from '@atxp/server';
 import * as TH from '@atxp/server/serverTestHelpers';
+import { BigNumber } from 'bignumber.js';
 import express from 'express';
 import request from 'supertest';
 
@@ -220,7 +222,11 @@ describe('ATXP', () => {
       const app = express();
       app.use(express.json());
       app.use(router);
-      app.post('/', (_req, res) => res.json({ ok: true }));
+      // requirePayment charges the implicit session; settlement fires at close.
+      app.post('/', async (_req, res) => {
+        await requirePayment({ price: BigNumber(0.01) });
+        res.json({ ok: true });
+      });
 
       await sendMcpToolCall(app).expect(200);
 
@@ -241,7 +247,10 @@ describe('ATXP', () => {
         const app = express();
         app.use(express.json());
         app.use(router);
-        app.post('/', (_req, res) => res.json({ ok: true }));
+        app.post('/', async (_req, res) => {
+          await requirePayment({ price: BigNumber(0.01) });
+          res.json({ ok: true });
+        });
 
         await sendMcpToolCall(app).expect(200);
 
@@ -253,6 +262,199 @@ describe('ATXP', () => {
         if (savedAppName === undefined) delete process.env.APP_NAME;
         else process.env.APP_NAME = savedAppName;
       }
+    });
+  });
+
+  // Phase 1: settlement moved off the inbound request and onto session close.
+  describe('settlement happens once at session close (not inbound)', () => {
+    const mockFetch = vi.fn();
+
+    beforeEach(() => {
+      mockFetch.mockReset();
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ txHash: '0xabc', settledAmount: '0.01' }),
+        text: async () => '',
+      });
+      vi.stubGlobal('fetch', mockFetch);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const atxpCredential = JSON.stringify({
+      sourceAccountId: 'atxp_acct_test123',
+      sourceAccountToken: 'tok_abc',
+    });
+
+    const settleCalls = () => mockFetch.mock.calls.filter(
+      ([url]) => typeof url === 'string' && url.includes('/settle/'),
+    );
+
+    const sendPaidMcpCall = (app: express.Application) =>
+      request(app)
+        .post('/')
+        .set('Content-Type', 'application/json')
+        .set('Authorization', 'Bearer test-access-token')
+        .set('X-ATXP-PAYMENT', atxpCredential)
+        .send(TH.mcpToolRequest());
+
+    it('settles exactly once, AFTER the route ran, for a single paid tool call', async () => {
+      const order: string[] = [];
+      mockFetch.mockImplementation(async (url: string | URL) => {
+        if (String(url).includes('/settle/')) order.push('settle');
+        return { ok: true, json: async () => ({ txHash: '0xabc', settledAmount: '0.01' }), text: async () => '' };
+      });
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', async (_req, res) => {
+        order.push('route');
+        await requirePayment({ price: BigNumber(0.01) });
+        res.json({ ok: true });
+      });
+
+      await sendPaidMcpCall(app).expect(200);
+
+      expect(settleCalls()).toHaveLength(1);
+      // Settle is deferred until response close, so it runs after the route.
+      expect(order).toEqual(['route', 'settle']);
+    });
+
+    it('does NOT settle when the route never calls requirePayment (nothing charged)', async () => {
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', (_req, res) => res.json({ ok: true }));
+
+      await sendPaidMcpCall(app).expect(200);
+
+      expect(settleCalls()).toHaveLength(0);
+    });
+
+    it('settles once even when the route calls requirePayment multiple times', async () => {
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', async (_req, res) => {
+        await requirePayment({ price: BigNumber(0.01) });
+        await requirePayment({ price: BigNumber(0.01) });
+        res.json({ ok: true });
+      });
+
+      await sendPaidMcpCall(app).expect(200);
+
+      expect(settleCalls()).toHaveLength(1);
+    });
+
+    it('settles even when res.end fires OUTSIDE the AsyncLocalStorage context', async () => {
+      // Guards the ALS-independence fix: the route charges the session in-context,
+      // captures `res`, and returns WITHOUT ending the response. The test then
+      // ends it from its OWN context — outside the middleware's withATXPContext
+      // run — so a getStore()-based settle would see a null store and silently
+      // skip billing. The captured-closure settle (bound in-context) must still
+      // fire. (The enableJsonResponse integration test can't reach this: there
+      // res.end runs in-context, so it passes for both impls — this is the case
+      // that actually fails against the old getStore() code.)
+      let capturedRes: import('express').Response | null = null;
+      let signalCaptured!: () => void;
+      const captured = new Promise<void>((r) => { signalCaptured = r; });
+
+      const router = atxpExpress(TH.config({
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', async (_req, res) => {
+        await requirePayment({ price: BigNumber(0.01) }); // charges the session in-context
+        capturedRes = res;
+        signalCaptured(); // hand res to the test; do NOT end the response here
+      });
+
+      // .then() triggers supertest to send immediately (it otherwise defers
+      // until awaited). The route captures res and returns without ending, so
+      // the response stays open until the test ends it below.
+      const reqPromise = sendPaidMcpCall(app).then((r) => r);
+      await captured; // resumes in the TEST's context — outside the withATXPContext run
+      capturedRes!.end(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true } })); // res.end fires here; ALS store is null
+      await reqPromise;
+
+      expect(settleCalls()).toHaveLength(1);
+    });
+  });
+
+  // FIX 3: a close-time settle failure must NOT
+  // fail the already-served request — the route still returns 200 — and the
+  // failure must be logged with a greppable, metric-able marker.
+  describe('settle failure at close: route still returns 200 and logs a marker', () => {
+    const mockFetch = vi.fn();
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const atxpCredential = JSON.stringify({
+      sourceAccountId: 'atxp_acct_test123',
+      sourceAccountToken: 'tok_abc',
+    });
+
+    const sendPaidMcpCall = (app: express.Application) =>
+      request(app)
+        .post('/')
+        .set('Content-Type', 'application/json')
+        .set('Authorization', 'Bearer test-access-token')
+        .set('X-ATXP-PAYMENT', atxpCredential)
+        .send(TH.mcpToolRequest());
+
+    it('returns 200 and logs settle_failed_at_close when /settle/* rejects', async () => {
+      // Auth /settle/* returns a non-OK status → ProtocolSettlement.settle throws.
+      mockFetch.mockReset();
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+        text: async () => 'settle exploded',
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const logger = TH.logger();
+      const router = atxpExpress(TH.config({
+        logger,
+        oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'test-user' }) }),
+      }));
+
+      const app = express();
+      app.use(express.json());
+      app.use(router);
+      app.post('/', async (_req, res) => {
+        await requirePayment({ price: BigNumber(0.01) });
+        res.json({ ok: true });
+      });
+
+      // The served request still succeeds despite the settle failure.
+      const response = await sendPaidMcpCall(app).expect(200);
+      expect(response.body).toMatchObject({ ok: true });
+
+      // The failure is logged with the actionable marker (protocol + amount).
+      const errorLog = (logger.error as any).mock.calls.map((c: any[]) => String(c[0])).join('\n');
+      expect(errorLog).toContain('settle_failed_at_close');
+      expect(errorLog).toContain('protocol=atxp');
+      expect(errorLog).toContain('amount=0.01');
     });
   });
 });

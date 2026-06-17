@@ -272,11 +272,16 @@ describe('credential detection Express middleware', () => {
       expect(storedCredential).toBeNull();
     });
 
-    // Settlement now happens in the middleware, not in requirePayment().
-    // The credential is NOT stored — it's settled immediately, so
-    // getDetectedCredential() returns null in route handlers.
-    it('should settle ATXP credential in middleware (not store for later)', async () => {
+    // Phase 1: the middleware no longer settles on the inbound request. It
+    // stashes the credential (via setDetectedCredential) and opens an implicit
+    // PaymentSession; settlement happens at response close once requirePayment()
+    // has charged the session. So getDetectedCredential() now returns the
+    // credential in route handlers, and fetch (/settle/*) is NOT called inbound.
+    it('should store ATXP credential in context without settling inbound', async () => {
       let storedCredential: DetectedCredential | null = null;
+      mockFetch.mockImplementation(async () => {
+        throw new Error('fetch should not be called — middleware does not settle inbound');
+      });
 
       const atxpCredential = JSON.stringify({
         sourceAccountId: 'atxp_acct_raw123',
@@ -303,12 +308,14 @@ describe('credential detection Express middleware', () => {
         .send(TH.mcpToolRequest());
 
       expect(response.status).toBe(200);
-      // Credential was settled in middleware, not stored for requirePayment()
-      expect(storedCredential).toBeNull();
+      expect(storedCredential).toMatchObject({ protocol: 'atxp', credential: atxpCredential });
     });
 
-    it('should settle X402 credential in middleware (not store for later)', async () => {
+    it('should store X402 credential in context without settling inbound', async () => {
       let storedCredential: DetectedCredential | null = null;
+      mockFetch.mockImplementation(async () => {
+        throw new Error('fetch should not be called — middleware does not settle inbound');
+      });
 
       const router = atxpExpress(TH.config({
         oAuthClient: TH.oAuthClient({ introspectResult: TH.tokenData({ active: true, sub: 'atxp:atxp_acct_x402user' }) }),
@@ -330,11 +337,14 @@ describe('credential detection Express middleware', () => {
         .send(TH.mcpToolRequest());
 
       expect(response.status).toBe(200);
-      expect(storedCredential).toBeNull();
+      expect(storedCredential).toMatchObject({ protocol: 'x402', credential: 'x402-payment-credential' });
     });
 
-    it('should settle base64-encoded ATXP credential in middleware (not store for later)', async () => {
+    it('should store base64-encoded ATXP credential in context without settling inbound', async () => {
       let storedCredential: DetectedCredential | null = null;
+      mockFetch.mockImplementation(async () => {
+        throw new Error('fetch should not be called — middleware does not settle inbound');
+      });
 
       const atxpCredential = Buffer.from(JSON.stringify({
         sourceAccountId: 'atxp_acct_b64_456',
@@ -361,7 +371,7 @@ describe('credential detection Express middleware', () => {
         .send(TH.mcpToolRequest());
 
       expect(response.status).toBe(200);
-      expect(storedCredential).toBeNull();
+      expect(storedCredential).toMatchObject({ protocol: 'atxp', credential: atxpCredential });
     });
   });
 });

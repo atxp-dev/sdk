@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { requirePayment } from './index.js';
 import * as TH from './serverTestHelpers.js';
 import { BigNumber } from 'bignumber.js';
-import { withATXPContext } from './atxpContext.js';
+import { withATXPContext, openPaymentSession, paymentSession } from './atxpContext.js';
 import { PAYMENT_REQUIRED_ERROR_CODE } from '@atxp/common';
 import { ProtocolSettlement } from './protocol.js';
 
@@ -340,10 +340,11 @@ describe('requirePayment', () => {
     });
   });
 
-  // Settlement is now handled by the middleware (atxpExpress), not requirePayment().
-  // See atxpExpress.test.ts for settlement tests.
-  describe('requirePayment does not settle (settlement moved to middleware)', () => {
-    it('should charge directly without settling — middleware handles settlement before route code runs', async () => {
+  // Settlement is now handled at response close via the implicit PaymentSession,
+  // not by requirePayment() itself. requirePayment() only records local charges.
+  // See atxpExpress.test.ts for the settle-at-close integration tests.
+  describe('requirePayment does not settle directly', () => {
+    it('should charge directly without settling — settlement happens at session close', async () => {
       const mockSettle = vi.fn();
       vi.spyOn(ProtocolSettlement.prototype, 'settle').mockImplementation(mockSettle);
 
@@ -357,6 +358,70 @@ describe('requirePayment', () => {
       });
 
       vi.restoreAllMocks();
+    });
+  });
+
+  // When the middleware has opened an implicit PaymentSession, requirePayment()
+  // charges it locally instead of debiting the auth ledger via paymentServer.charge.
+  describe('implicit PaymentSession charging', () => {
+    const atxpCredential = {
+      protocol: 'atxp' as const,
+      // No amount in the credential → cap is Infinity (best-effort Phase 1),
+      // so the local charge always succeeds.
+      credential: JSON.stringify({ sourceAccountId: 'test-user', sourceAccountToken: 'tok' }),
+    };
+
+    it('charges the session locally and does NOT call paymentServer.charge', async () => {
+      const paymentServer = TH.paymentServer({ charge: vi.fn().mockResolvedValue(true) });
+      const config = TH.config({ paymentServer });
+
+      await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
+        openPaymentSession(atxpCredential, {});
+        await expect(requirePayment({ price: BigNumber(0.01) })).resolves.not.toThrow();
+
+        expect(paymentServer.charge).not.toHaveBeenCalled();
+        expect(paymentSession()!.spent.toNumber()).toBeCloseTo(0.01);
+      });
+    });
+
+    it('accumulates multiple charges into one session', async () => {
+      const paymentServer = TH.paymentServer({ charge: vi.fn().mockResolvedValue(true) });
+      const config = TH.config({ paymentServer });
+
+      await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
+        openPaymentSession(atxpCredential, {});
+        await requirePayment({ price: BigNumber(0.01) });
+        await requirePayment({ price: BigNumber(0.02) });
+
+        expect(paymentServer.charge).not.toHaveBeenCalled();
+        expect(paymentSession()!.spent.toNumber()).toBeCloseTo(0.03);
+      });
+    });
+
+    it('creates a payment request and throws when a charge would exceed the cap', async () => {
+      const paymentServer = TH.paymentServer({ charge: vi.fn().mockResolvedValue(true) });
+      const config = TH.config({ paymentServer });
+
+      // x402 session capped at 0.01 USDC; a 0.02 charge exceeds it.
+      const x402Credential = {
+        protocol: 'x402' as const,
+        credential: 'x402-cred',
+      };
+
+      await withATXPContext(config, new URL('https://example.com'), TH.tokenCheck(), async () => {
+        openPaymentSession(x402Credential, { paymentRequirements: { amount: '10000' } });
+        try {
+          await requirePayment({ price: BigNumber(0.02) });
+          throw new Error('expected requirePayment to throw a payment challenge');
+        } catch (err: any) {
+          expect(err.code).toBe(PAYMENT_REQUIRED_ERROR_CODE);
+          // Did not fall through to ledger charge — session path was used.
+          expect(paymentServer.charge).not.toHaveBeenCalled();
+          expect(paymentServer.createPaymentRequest).toHaveBeenCalled();
+          // Nothing recorded against the session.
+          expect(paymentSession()!.spent.toNumber()).toBe(0);
+        }
+      });
     });
   });
 

@@ -1,6 +1,6 @@
 import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAccountId, Network, AuthorizationServerUrl } from "@atxp/common";
 import { BigNumber } from "bignumber.js";
-import { getATXPConfig, atxpAccountId, atxpToken, getPaymentRequestId, setPendingPaymentChallenge } from "./atxpContext.js";
+import { getATXPConfig, atxpAccountId, atxpToken, getPaymentRequestId, setPendingPaymentChallenge, paymentSession } from "./atxpContext.js";
 import { buildPaymentOptions, omniChallengeMcpError } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { signOpaqueIdentity } from "./opaqueIdentity.js";
@@ -45,14 +45,27 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
     ...(paymentRequestId && { paymentRequestId }),
   };
 
-  // Settlement is handled by the middleware (atxpExpress) before route code runs.
-  // The ledger is already credited by the time we get here on a retry request.
   config.logger.debug(`Charging ${paymentConfig.price} to ${charge.options.length} options for source ${user}`);
 
-  const chargeSucceeded = await config.paymentServer.charge(charge);
-  if (chargeSucceeded) {
-    config.logger.info(`Charged ${paymentConfig.price} for source ${user}`);
-    return;
+  // Prefer the implicit request-scoped session: charge locally and let the
+  // credential settle once at response close. The session is opened by the
+  // middleware when a payment credential is detected on the request.
+  //
+  // When no session is open (e.g. the Cloudflare path, or a direct caller
+  // outside the express middleware), fall back to debiting the auth ledger via
+  // paymentServer.charge — preserving the prior behavior for those callers.
+  const session = paymentSession();
+  if (session) {
+    if (session.charge(paymentConfig.price)) {
+      config.logger.info(`Charged ${paymentConfig.price} to session for source ${user}`);
+      return;
+    }
+  } else {
+    const chargeSucceeded = await config.paymentServer.charge(charge);
+    if (chargeSucceeded) {
+      config.logger.info(`Charged ${paymentConfig.price} for source ${user}`);
+      return;
+    }
   }
 
   // Check for an existing payment ID first (idempotency) — avoids the
