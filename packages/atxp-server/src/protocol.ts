@@ -353,16 +353,23 @@ export class ProtocolSettlement {
         // authorize route — SVM payloads have solana: network, EVM have eip155:).
         // If the parsed payload includes an accepted object, use its network directly.
         const payloadObj = payload as Record<string, unknown> | null;
-        const acceptedNetwork = (payloadObj?.accepted as Record<string, unknown> | undefined)?.network as string | undefined;
+        const accepted = payloadObj?.accepted as Record<string, unknown> | undefined;
+        const acceptedNetwork = accepted?.network as string | undefined;
+        const acceptedScheme = accepted?.scheme as string | undefined;
 
         if (acceptedNetwork) {
-          const match = accepts.find(a => a.network === acceptedNetwork);
+          // Match on network AND scheme: the challenge advertises both 'exact' and
+          // 'upto' per EVM network, so a network-only match could return the wrong
+          // scheme (e.g. exact when the credential is upto) and drop the override.
+          const match = accepts.find(a => a.network === acceptedNetwork && (acceptedScheme == null || a.scheme === acceptedScheme))
+            ?? accepts.find(a => a.network === acceptedNetwork);
           if (!match) {
             this.logger.warn(`ProtocolSettlement: credential network ${acceptedNetwork} not in accepts [${accepts.map(a => a.network).join(', ')}], using first accept`);
           }
           requirements = match ?? accepts[0];
         } else {
-          // Fallback for EVM payloads which don't embed accepted (x402HTTPClient format)
+          // No `accepted` on the payload (raw/older credential formats): fall back to
+          // the first EVM accept.
           const evmMatch = accepts.find(a => a.network?.startsWith('eip155'));
           if (!evmMatch) {
             this.logger.warn(`ProtocolSettlement: no EVM accept found in [${accepts.map(a => a.network).join(', ')}], using first accept`);

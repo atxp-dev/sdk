@@ -18,18 +18,20 @@ const SOLANA_FEE_PAYERS: Record<string, string> = {
 };
 
 /**
- * Map of CAIP-2 network → upto facilitator address, cached per auth server URL
- * for the process lifetime. The promise (not the value) is cached so concurrent
- * first callers share one fetch; an empty/failed result is not cached so a later
- * call can retry.
+ * Map of CAIP-2 network → upto facilitator address, cached per auth server URL with
+ * a bounded TTL. The promise (not the value) is cached so concurrent first callers
+ * share one fetch; an empty/failed result is not cached so a later call can retry.
+ * The TTL bounds staleness if the facilitator's settle address rotates while a
+ * long-lived resource-server process is up (a stale witness would revert settles).
  */
-const _facilitatorAddressCache = new Map<string, Promise<Record<string, string>>>();
+const _FACILITATOR_ADDRESS_TTL_MS = 10 * 60 * 1000;
+const _facilitatorAddressCache = new Map<string, { at: number; value: Promise<Record<string, string>> }>();
 
 /**
  * Fetch the upto facilitator addresses from the auth server's GET /x402/supported
- * endpoint. The response is a flat CAIP-2 network → address map. Fetched at most
- * once per process per auth server URL. On failure, returns {} (so the upto accept
- * is simply omitted) and does not cache, allowing a later retry.
+ * endpoint. The response is a flat CAIP-2 network → address map. Cached per auth
+ * server URL for up to TTL. On failure, returns {} (so the upto accept is simply
+ * omitted) and does not cache, allowing a later retry.
  */
 export async function fetchUptoFacilitatorAddresses(
   authServerUrl: AuthorizationServerUrl | string,
@@ -38,7 +40,7 @@ export async function fetchUptoFacilitatorAddresses(
 ): Promise<Record<string, string>> {
   const url = new URL('/x402/supported', authServerUrl).toString();
   const cached = _facilitatorAddressCache.get(url);
-  if (cached) return cached;
+  if (cached && Date.now() - cached.at < _FACILITATOR_ADDRESS_TTL_MS) return cached.value;
 
   const pending = (async () => {
     try {
@@ -55,7 +57,7 @@ export async function fetchUptoFacilitatorAddresses(
     }
   })();
 
-  _facilitatorAddressCache.set(url, pending);
+  _facilitatorAddressCache.set(url, { at: Date.now(), value: pending });
   const result = await pending;
   // Don't cache an empty map — let a later call retry once the facilitator is up.
   if (Object.keys(result).length === 0) {

@@ -418,6 +418,35 @@ describe('ProtocolSettlement', () => {
       expect(body.settlementOverrides).toEqual({ amount: '10000' });
     });
 
+    it('selects the accept matching the credential scheme when one network has both exact and upto', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xx402', settledAmount: '3000' }) });
+      // The real challenge advertises exact AND upto for the same network (exact first).
+      // The credential is upto, so selection must match by scheme — not return exact-first.
+      const credential = Buffer.from(JSON.stringify({
+        signature: '0xabc',
+        accepted: { network: 'eip155:8453', scheme: 'upto' },
+      })).toString('base64');
+
+      await settlement.settle(
+        'x402',
+        credential,
+        {
+          paymentRequirements: {
+            x402Version: 2,
+            accepts: [
+              { scheme: 'exact', network: 'eip155:8453', amount: '10000' },
+              { scheme: 'upto', network: 'eip155:8453', amount: '10000' },
+            ],
+          },
+        },
+        BigNumber('0.003'),
+      );
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.paymentRequirements.scheme).toBe('upto');
+      expect(body.settlementOverrides).toEqual({ amount: '3000' });
+    });
+
     it('still warns (greppable) and drops actualAmount for mpp (up-to not yet wired)', async () => {
       mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xmpp', settledAmount: '10000' }) });
       const mppCredential = Buffer.from(JSON.stringify({
