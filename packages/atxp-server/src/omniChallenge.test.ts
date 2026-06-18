@@ -31,7 +31,7 @@ describe('omniChallenge', () => {
       expect(result.x402Version).toBe(2);
       expect(result.accepts).toHaveLength(1);
       expect(result.accepts[0]).toMatchObject({
-        scheme: 'exact',
+        scheme: 'upto',
         network: 'eip155:8453',
         amount: '10000', // 0.01 * 1e6
         resource: 'https://example.com/api',
@@ -40,6 +40,25 @@ describe('omniChallenge', () => {
         payTo: '0xDestination',
         asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
       });
+    });
+
+    it('emits scheme=upto for EVM (Base) options and scheme=exact for SVM (Solana)', () => {
+      const options = [
+        { network: 'base', currency: 'USDC', address: '0xAddr1', amount: new BigNumber('0.01') },
+        { network: 'solana', currency: 'USDC', address: '7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV', amount: new BigNumber('0.02') },
+      ];
+
+      const result = buildX402Requirements({
+        options,
+        resource: 'https://example.com',
+        payeeName: 'Multi-chain Server',
+      });
+
+      // EVM advertises upto (settle-the-actual); SVM upto is not implemented yet.
+      expect(result.accepts[0].network).toBe('eip155:8453');
+      expect(result.accepts[0].scheme).toBe('upto');
+      expect(result.accepts[1].network).toBe('solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp');
+      expect(result.accepts[1].scheme).toBe('exact');
     });
 
     it('should include both EVM and Solana X402 options', () => {

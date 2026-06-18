@@ -319,19 +319,19 @@ export class ProtocolSettlement {
   /**
    * Build the protocol-specific request body for verify/settle calls.
    *
-   * `actualAmount` (optional, ATXP only this phase) is the metered "up-to"
-   * amount actually spent. When provided, it overrides the ATXP options[].amount
-   * so /pay charges the actual instead of the authorized cap. x402 and mpp ignore
-   * it for now — their "up-to" mappings (x402 settlementOverrides.amount, mpp
-   * voucher amount) land in their own phases.
+   * `actualAmount` (optional) is the metered "up-to" amount actually spent.
+   * When provided it settles the actual (≤ the authorized cap) instead of the cap:
+   * - ATXP: overrides options[].amount (decimal USDC string).
+   * - x402: adds settlementOverrides.amount (atomic micro-USDC string) so the
+   *   facilitator settles the actual against the Permit2 cap.
+   * mpp still drops it (its voucher up-to mapping lands in a later phase).
+   * See docs/STREAMING_PAYMENT_SESSIONS.md.
    */
   private buildRequestBody(protocol: PaymentProtocol, credential: string, context?: SettlementContext, actualAmount?: BigNumber): unknown {
-    // actualAmount (the metered "up-to" amount) is only wired for ATXP this phase.
-    // For x402/mpp the settle body still carries the credential's cap, so a
-    // multi-charge session over-settles relative to the metered actual until
-    // their up-to mappings land (x402 settlementOverrides.amount, mpp voucher).
-    // Emit a greppable marker so that silent overcharge is visible, not invisible.
-    if (actualAmount && protocol !== 'atxp') {
+    // mpp has no up-to mapping yet, so the settle body still carries the
+    // credential's cap and a multi-charge session over-settles relative to the
+    // metered actual. Emit a greppable marker so the overcharge is visible.
+    if (actualAmount && protocol === 'mpp') {
       this.logger.warn(`settle_actual_dropped protocol=${protocol} actual=${actualAmount.toFixed()}: up-to settlement not yet wired for ${protocol}; settling the credential cap`);
     }
 
@@ -371,9 +371,19 @@ export class ProtocolSettlement {
         }
       }
 
+      // "up-to" semantics: settle the metered actual (≤ the Permit2 cap) by
+      // passing settlementOverrides.amount in atomic micro-USDC. toFixed(0) keeps
+      // it an integer string with no decimals or exponential notation. The
+      // facilitator caps it at the signed permitted amount, so this is safe even
+      // if a caller miscomputes. Cap-only settlement (no actualAmount) omits it.
+      const settlementOverrides = actualAmount
+        ? { settlementOverrides: { amount: actualAmount.times(1e6).toFixed(0) } }
+        : {};
+
       return {
         payload,
         paymentRequirements: requirements,
+        ...settlementOverrides,
         ...(context?.paymentRequestId && { paymentRequestId: context.paymentRequestId }),
         ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
         ...(this.destinationAccountId && { destinationAccountId: this.destinationAccountId }),

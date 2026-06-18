@@ -35,8 +35,12 @@ export function buildX402Requirements(args: {
   );
 
   const accepts: X402PaymentOption[] = [
+    // EVM (Base) advertises 'upto': the payer signs a Permit2 capped at `amount`,
+    // the session meters locally, and settlement charges the actual ≤ cap via
+    // settlementOverrides.amount. See docs/STREAMING_PAYMENT_SESSIONS.md.
+    // SVM stays 'exact' — Solana upto is not implemented yet.
     ...evmOptions.map(option => ({
-      scheme: 'exact' as const,
+      scheme: 'upto' as const,
       network: CAIP2_NETWORKS[option.network] || option.network,
       amount: option.amount.times(1e6).toFixed(0),
       resource: args.resource,

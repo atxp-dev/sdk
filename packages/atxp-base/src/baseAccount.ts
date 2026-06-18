@@ -6,6 +6,7 @@ import { BasePaymentMaker } from './basePaymentMaker.js';
 import { createWalletClient, http, WalletClient, LocalAccount } from 'viem';
 import { base } from 'viem/chains';
 import { ExactEvmScheme, toClientEvmSigner } from '@x402/evm';
+import { UptoEvmScheme } from '@x402/evm/upto/client';
 import { x402HTTPClient, x402Client } from '@x402/core/client';
 
 export class BaseAccount implements Account {
@@ -96,7 +97,12 @@ export class BaseAccount implements Account {
         // encodePaymentSignatureHeader) is duplicated in x402Wrapper.ts. Extract a shared helper
         // once both packages can import from a common location that depends on @x402/core + @x402/evm.
         const signer = toClientEvmSigner(this.getLocalAccount());
-        const scheme = new ExactEvmScheme(signer);
+        // 'upto' caps the Permit2 at the advertised amount and settles the actual;
+        // 'exact' transfers the advertised amount. The upto scheme requires
+        // reqs.extra.facilitatorAddress (the only address allowed to settle).
+        const scheme = reqs.scheme === 'upto'
+          ? new UptoEvmScheme(signer)
+          : new ExactEvmScheme(signer);
         const client = new x402Client();
         // v2 uses CAIP-2 network IDs ("eip155:8453")
         client.register(reqs.network as `${string}:${string}`, scheme);

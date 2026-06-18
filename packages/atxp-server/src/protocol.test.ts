@@ -308,13 +308,55 @@ describe('ProtocolSettlement', () => {
       expect(body.options[0].amount).not.toContain('e');
     });
 
-    it('warns (greppable) and settles the cap when actualAmount is supplied for x402 (up-to not yet wired)', async () => {
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xx402', settledAmount: '0.01' }) });
+    it('adds settlementOverrides.amount (atomic micro-USDC) for x402 when actualAmount is supplied', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xx402', settledAmount: '3000' }) });
       const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
 
+      // Authorized cap is the credential's Permit2 amount; the metered actual is $0.003.
       await settlement.settle('x402', credential, { paymentRequirements: { network: 'base' } }, BigNumber(0.003));
 
-      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('settle_actual_dropped protocol=x402'));
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      // 0.003 USDC → 3000 micro-USDC, integer string, no exponential notation.
+      expect(body.settlementOverrides).toEqual({ amount: '3000' });
+      expect(body.settlementOverrides.amount).not.toContain('e');
+      expect(body.settlementOverrides.amount).not.toContain('.');
+      // No longer dropped for x402.
+      expect(mockLogger.warn).not.toHaveBeenCalledWith(expect.stringContaining('settle_actual_dropped protocol=x402'));
+    });
+
+    it('omits settlementOverrides for x402 when actualAmount is not supplied', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xx402', settledAmount: '10000' }) });
+      const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
+
+      await settlement.settle('x402', credential, { paymentRequirements: { network: 'base' } });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.settlementOverrides).toBeUndefined();
+    });
+
+    it('serializes a sub-1e-6 x402 actualAmount as an integer micro-USDC string, never exponential', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xtiny', settledAmount: '0' }) });
+      const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
+
+      // 0.0000003 USDC × 1e6 = 0.3 micro-USDC → toFixed(0) floors to "0".
+      await settlement.settle('x402', credential, { paymentRequirements: { network: 'base' } }, BigNumber('0.0000003'));
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.settlementOverrides.amount).toBe('0');
+      expect(body.settlementOverrides.amount).not.toContain('e');
+    });
+
+    it('still warns (greppable) and drops actualAmount for mpp (up-to not yet wired)', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xmpp', settledAmount: '10000' }) });
+      const mppCredential = Buffer.from(JSON.stringify({
+        challenge: { id: 'ch', method: 'tempo', intent: 'charge', request: { amount: '10000' } },
+        payload: { type: 'transaction', signature: '0xtx' },
+        source: {},
+      })).toString('base64url');
+
+      await settlement.settle('mpp', mppCredential, undefined, BigNumber(0.003));
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('settle_actual_dropped protocol=mpp'));
     });
 
     it('should call /settle/mpp with standard MPP credential', async () => {
