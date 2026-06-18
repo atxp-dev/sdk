@@ -319,19 +319,19 @@ export class ProtocolSettlement {
   /**
    * Build the protocol-specific request body for verify/settle calls.
    *
-   * `actualAmount` (optional, ATXP only this phase) is the metered "up-to"
-   * amount actually spent. When provided, it overrides the ATXP options[].amount
-   * so /pay charges the actual instead of the authorized cap. x402 and mpp ignore
-   * it for now — their "up-to" mappings (x402 settlementOverrides.amount, mpp
-   * voucher amount) land in their own phases.
+   * `actualAmount` (optional) is the metered "up-to" amount actually spent.
+   * When provided it settles the actual (≤ the authorized cap) instead of the cap:
+   * - ATXP: overrides options[].amount (decimal USDC string).
+   * - x402: adds settlementOverrides.amount (atomic micro-USDC string) so the
+   *   facilitator settles the actual against the Permit2 cap.
+   * mpp still drops it (its voucher up-to mapping lands in a later phase).
+   * See docs/STREAMING_PAYMENT_SESSIONS.md.
    */
   private buildRequestBody(protocol: PaymentProtocol, credential: string, context?: SettlementContext, actualAmount?: BigNumber): unknown {
-    // actualAmount (the metered "up-to" amount) is only wired for ATXP this phase.
-    // For x402/mpp the settle body still carries the credential's cap, so a
-    // multi-charge session over-settles relative to the metered actual until
-    // their up-to mappings land (x402 settlementOverrides.amount, mpp voucher).
-    // Emit a greppable marker so that silent overcharge is visible, not invisible.
-    if (actualAmount && protocol !== 'atxp') {
+    // mpp has no up-to mapping yet, so the settle body still carries the
+    // credential's cap and a multi-charge session over-settles relative to the
+    // metered actual. Emit a greppable marker so the overcharge is visible.
+    if (actualAmount && protocol === 'mpp') {
       this.logger.warn(`settle_actual_dropped protocol=${protocol} actual=${actualAmount.toFixed()}: up-to settlement not yet wired for ${protocol}; settling the credential cap`);
     }
 
@@ -353,16 +353,23 @@ export class ProtocolSettlement {
         // authorize route — SVM payloads have solana: network, EVM have eip155:).
         // If the parsed payload includes an accepted object, use its network directly.
         const payloadObj = payload as Record<string, unknown> | null;
-        const acceptedNetwork = (payloadObj?.accepted as Record<string, unknown> | undefined)?.network as string | undefined;
+        const accepted = payloadObj?.accepted as Record<string, unknown> | undefined;
+        const acceptedNetwork = accepted?.network as string | undefined;
+        const acceptedScheme = accepted?.scheme as string | undefined;
 
         if (acceptedNetwork) {
-          const match = accepts.find(a => a.network === acceptedNetwork);
+          // Match on network AND scheme: the challenge advertises both 'exact' and
+          // 'upto' per EVM network, so a network-only match could return the wrong
+          // scheme (e.g. exact when the credential is upto) and drop the override.
+          const match = accepts.find(a => a.network === acceptedNetwork && (acceptedScheme == null || a.scheme === acceptedScheme))
+            ?? accepts.find(a => a.network === acceptedNetwork);
           if (!match) {
             this.logger.warn(`ProtocolSettlement: credential network ${acceptedNetwork} not in accepts [${accepts.map(a => a.network).join(', ')}], using first accept`);
           }
           requirements = match ?? accepts[0];
         } else {
-          // Fallback for EVM payloads which don't embed accepted (x402HTTPClient format)
+          // No `accepted` on the payload (raw/older credential formats): fall back to
+          // the first EVM accept.
           const evmMatch = accepts.find(a => a.network?.startsWith('eip155'));
           if (!evmMatch) {
             this.logger.warn(`ProtocolSettlement: no EVM accept found in [${accepts.map(a => a.network).join(', ')}], using first accept`);
@@ -371,9 +378,31 @@ export class ProtocolSettlement {
         }
       }
 
+      // "up-to" semantics: settle the metered actual (≤ the Permit2 cap) by
+      // passing settlementOverrides.amount in atomic micro-USDC. ONLY for the
+      // 'upto' scheme: 'exact'/EIP-3009 commits the signature to a specific value,
+      // so overriding the amount makes it mismatch the signed authorization and the
+      // facilitator rejects it (400). Clamp to the cap: Permit2 reverts the whole
+      // settle when the requested amount exceeds the permitted amount, so a meter
+      // overshoot must collect the cap, not revert. The cap is the selected
+      // requirement's `amount` (already atomic µUSDC); when absent we pass the
+      // actual through. toFixed(0) (ROUND_HALF_UP, not floor) keeps it an integer
+      // string with no decimals/exponential. Cap-only settlement (no actualAmount,
+      // or exact scheme) omits it.
+      const isUptoScheme = (requirements as { scheme?: unknown } | undefined)?.scheme === 'upto';
+      let settlementOverrides = {};
+      if (actualAmount && isUptoScheme) {
+        const actualAtomic = new BigNumber(actualAmount.times(1e6).toFixed(0));
+        const capRaw = (requirements as { amount?: unknown } | undefined)?.amount;
+        const cap = (typeof capRaw === 'string' || typeof capRaw === 'number') ? new BigNumber(capRaw) : undefined;
+        const settleAtomic = cap && cap.isFinite() ? BigNumber.min(actualAtomic, cap) : actualAtomic;
+        settlementOverrides = { settlementOverrides: { amount: settleAtomic.toFixed(0) } };
+      }
+
       return {
         payload,
         paymentRequirements: requirements,
+        ...settlementOverrides,
         ...(context?.paymentRequestId && { paymentRequestId: context.paymentRequestId }),
         ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
         ...(this.destinationAccountId && { destinationAccountId: this.destinationAccountId }),

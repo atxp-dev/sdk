@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { BigNumber } from 'bignumber.js';
 import {
   buildX402Requirements,
@@ -11,6 +11,7 @@ import {
   buildOmniChallenge,
   buildPaymentOptions,
   buildAuthorizeParamsFromSources,
+  fetchUptoFacilitatorAddresses,
 } from './omniChallenge.js';
 import { PAYMENT_REQUIRED_PREAMBLE, PAYMENT_REQUIRED_ERROR_CODE } from '@atxp/common';
 import { parseMPPHeader } from '@atxp/mpp';
@@ -20,8 +21,14 @@ describe('omniChallenge', () => {
     { network: 'base', currency: 'USDC', address: '0xDestination', amount: new BigNumber('0.01') },
   ];
 
+  // CAIP-2 → upto facilitator address map (from GET /x402/supported).
+  const FACILITATORS = {
+    'eip155:8453': '0x7720030000000000000000000000000000000000',
+    'eip155:84532': '0x14fDa00000000000000000000000000000000000',
+  };
+
   describe('buildX402Requirements', () => {
-    it('should build valid X402 payment requirements', () => {
+    it('should build valid X402 payment requirements (exact accept)', () => {
       const result = buildX402Requirements({
         options: defaultOptions,
         resource: 'https://example.com/api',
@@ -29,6 +36,7 @@ describe('omniChallenge', () => {
       });
 
       expect(result.x402Version).toBe(2);
+      // Without a facilitator address, only the exact accept is advertised.
       expect(result.accepts).toHaveLength(1);
       expect(result.accepts[0]).toMatchObject({
         scheme: 'exact',
@@ -40,6 +48,62 @@ describe('omniChallenge', () => {
         payTo: '0xDestination',
         asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
       });
+    });
+
+    it('advertises BOTH exact and upto for EVM when a facilitatorAddress is known', () => {
+      const result = buildX402Requirements({
+        options: defaultOptions,
+        resource: 'https://example.com/api',
+        payeeName: 'Test Server',
+        facilitatorAddresses: FACILITATORS,
+      });
+
+      // exact first, then upto — both for the same Base network.
+      expect(result.accepts).toHaveLength(2);
+      expect(result.accepts[0].scheme).toBe('exact');
+      expect(result.accepts[0].extra).toEqual({ name: 'USD Coin', version: '2' });
+      expect(result.accepts[1].scheme).toBe('upto');
+      expect(result.accepts[1].network).toBe('eip155:8453');
+      // upto carries the facilitator address (the only address allowed to settle).
+      expect(result.accepts[1].extra).toEqual({
+        name: 'USD Coin',
+        version: '2',
+        facilitatorAddress: FACILITATORS['eip155:8453'],
+      });
+    });
+
+    it('omits upto (exact only) for a network with no facilitatorAddress', () => {
+      const result = buildX402Requirements({
+        options: defaultOptions,
+        resource: 'https://example.com/api',
+        payeeName: 'Test Server',
+        facilitatorAddresses: { 'eip155:84532': FACILITATORS['eip155:84532'] }, // wrong network
+      });
+
+      expect(result.accepts).toHaveLength(1);
+      expect(result.accepts[0].scheme).toBe('exact');
+    });
+
+    it('emits exact (+upto when facilitator known) for EVM and exact-only for SVM (Solana)', () => {
+      const options = [
+        { network: 'base', currency: 'USDC', address: '0xAddr1', amount: new BigNumber('0.01') },
+        { network: 'solana', currency: 'USDC', address: '7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV', amount: new BigNumber('0.02') },
+      ];
+
+      const result = buildX402Requirements({
+        options,
+        resource: 'https://example.com',
+        payeeName: 'Multi-chain Server',
+        facilitatorAddresses: FACILITATORS,
+      });
+
+      // EVM: exact + upto; SVM: exact only (Solana upto not implemented).
+      expect(result.accepts[0].network).toBe('eip155:8453');
+      expect(result.accepts[0].scheme).toBe('exact');
+      expect(result.accepts[1].network).toBe('eip155:8453');
+      expect(result.accepts[1].scheme).toBe('upto');
+      expect(result.accepts[2].network).toBe('solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp');
+      expect(result.accepts[2].scheme).toBe('exact');
     });
 
     it('should include both EVM and Solana X402 options', () => {
@@ -55,11 +119,14 @@ describe('omniChallenge', () => {
         payeeName: 'Multi-chain Server',
       });
 
-      // EVM options first, then Solana
-      expect(result.accepts).toHaveLength(3);
+      // The same chain appears twice (two Base addresses). Dedupe keeps the first
+      // per (scheme, network) — a destination has one receiving address per chain —
+      // so the second Base option (0xAddr2) is dropped. No facilitatorAddresses were
+      // passed, so only exact accepts: one Base, one Solana.
+      expect(result.accepts).toHaveLength(2);
       expect(result.accepts[0].payTo).toBe('0xAddr1');
-      expect(result.accepts[1].payTo).toBe('0xAddr2');
-      expect(result.accepts[2].payTo).toBe('7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV');
+      expect(result.accepts[0].network).toBe('eip155:8453');
+      expect(result.accepts[1].payTo).toBe('7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV');
     });
 
     it('should include feePayer in extra for Solana X402 options', () => {
@@ -608,6 +675,73 @@ describe('omniChallenge', () => {
       expect(result.paymentRequirements!.x402Version).toBe(2);
       expect(result.paymentRequirements!.accepts[0].payTo).toBe('0xBaseOnly');
       expect(result.challenges).toEqual([]);
+    });
+
+    it('threads facilitatorAddresses through to the upto accept', () => {
+      const result = buildAuthorizeParamsFromSources({
+        amount: new BigNumber('0.10'),
+        sources: [{ chain: 'base', address: '0xBaseAddr' }],
+        facilitatorAddresses: { 'eip155:8453': '0x7720030000000000000000000000000000000000' },
+      });
+
+      const accepts = result.paymentRequirements!.accepts;
+      expect(accepts.map(a => a.scheme)).toEqual(['exact', 'upto']);
+      expect(accepts[1].extra).toMatchObject({ facilitatorAddress: '0x7720030000000000000000000000000000000000' });
+    });
+  });
+
+  describe('fetchUptoFacilitatorAddresses', () => {
+    function okResponse(body: unknown) {
+      return { ok: true, json: async () => body } as unknown as Response;
+    }
+
+    it('fetches GET /x402/supported and returns the flat network → address map', async () => {
+      const map = { 'eip155:8453': '0x7720030000000000000000000000000000000000' };
+      const fetchFn = vi.fn().mockResolvedValue(okResponse(map));
+
+      const result = await fetchUptoFacilitatorAddresses('https://auth1.test', fetchFn as any);
+
+      expect(result).toEqual(map);
+      expect(fetchFn).toHaveBeenCalledWith('https://auth1.test/x402/supported');
+    });
+
+    it('caches the result per URL (fetches at most once)', async () => {
+      const map = { 'eip155:8453': '0xabc0000000000000000000000000000000000000' };
+      const fetchFn = vi.fn().mockResolvedValue(okResponse(map));
+
+      await fetchUptoFacilitatorAddresses('https://auth2.test', fetchFn as any);
+      await fetchUptoFacilitatorAddresses('https://auth2.test', fetchFn as any);
+
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns {} and does not throw when the fetch fails', async () => {
+      const fetchFn = vi.fn().mockRejectedValue(new Error('network down'));
+      const warn = vi.fn();
+
+      const result = await fetchUptoFacilitatorAddresses('https://auth3.test', fetchFn as any, { warn });
+
+      expect(result).toEqual({});
+      expect(warn).toHaveBeenCalled();
+    });
+
+    it('returns {} on a non-OK response', async () => {
+      const fetchFn = vi.fn().mockResolvedValue({ ok: false, status: 503 } as unknown as Response);
+
+      const result = await fetchUptoFacilitatorAddresses('https://auth4.test', fetchFn as any);
+
+      expect(result).toEqual({});
+    });
+
+    it('does not cache an empty result (allows a later retry)', async () => {
+      const map = { 'eip155:8453': '0xdef0000000000000000000000000000000000000' };
+      const fetchFn = vi.fn()
+        .mockRejectedValueOnce(new Error('down'))
+        .mockResolvedValue(okResponse(map));
+
+      expect(await fetchUptoFacilitatorAddresses('https://auth5.test', fetchFn as any)).toEqual({});
+      expect(await fetchUptoFacilitatorAddresses('https://auth5.test', fetchFn as any)).toEqual(map);
+      expect(fetchFn).toHaveBeenCalledTimes(2);
     });
   });
 });

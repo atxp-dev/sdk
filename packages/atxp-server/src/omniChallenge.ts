@@ -1,5 +1,5 @@
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
-import { PAYMENT_REQUIRED_PREAMBLE, PAYMENT_REQUIRED_ERROR_CODE, AuthorizationServerUrl, USDC_ADDRESSES, CAIP2_NETWORKS } from "@atxp/common";
+import { PAYMENT_REQUIRED_PREAMBLE, PAYMENT_REQUIRED_ERROR_CODE, AuthorizationServerUrl, USDC_ADDRESSES, CAIP2_NETWORKS, FetchLike } from "@atxp/common";
 import { BigNumber } from "bignumber.js";
 import type { OmniChallenge, X402PaymentRequirements, AtxpMcpChallengeData, MppChallengeData, X402PaymentOption } from "./protocol.js";
 
@@ -18,14 +18,77 @@ const SOLANA_FEE_PAYERS: Record<string, string> = {
 };
 
 /**
+ * Map of CAIP-2 network → upto facilitator address, cached per auth server URL with
+ * a bounded TTL. The promise (not the value) is cached so concurrent first callers
+ * share one fetch; an empty/failed result is not cached so a later call can retry.
+ * The TTL bounds staleness if the facilitator's settle address rotates while a
+ * long-lived resource-server process is up (a stale witness would revert settles).
+ */
+const _FACILITATOR_ADDRESS_TTL_MS = 10 * 60 * 1000;
+const _facilitatorAddressCache = new Map<string, { at: number; value: Promise<Record<string, string>> }>();
+
+/**
+ * Fetch the upto facilitator addresses from the auth server's GET /x402/supported
+ * endpoint. The response is a flat CAIP-2 network → address map. Cached per auth
+ * server URL for up to TTL. On failure, returns {} (so the upto accept is simply
+ * omitted) and does not cache, allowing a later retry.
+ */
+export async function fetchUptoFacilitatorAddresses(
+  authServerUrl: AuthorizationServerUrl | string,
+  fetchFn: FetchLike = fetch.bind(globalThis),
+  logger?: { warn: (msg: string) => void },
+): Promise<Record<string, string>> {
+  const url = new URL('/x402/supported', authServerUrl).toString();
+  const cached = _facilitatorAddressCache.get(url);
+  if (cached && Date.now() - cached.at < _FACILITATOR_ADDRESS_TTL_MS) return cached.value;
+
+  const pending = (async () => {
+    try {
+      const response = await fetchFn(url);
+      if (!response.ok) {
+        logger?.warn(`fetchUptoFacilitatorAddresses: ${url} returned ${response.status}; advertising exact only`);
+        return {};
+      }
+      const body = await response.json() as Record<string, string>;
+      return (body && typeof body === 'object') ? body : {};
+    } catch (error) {
+      logger?.warn(`fetchUptoFacilitatorAddresses: failed to fetch ${url}: ${error}; advertising exact only`);
+      return {};
+    }
+  })();
+
+  _facilitatorAddressCache.set(url, { at: Date.now(), value: pending });
+  const result = await pending;
+  // Don't cache an empty map — let a later call retry once the facilitator is up.
+  if (Object.keys(result).length === 0) {
+    _facilitatorAddressCache.delete(url);
+  }
+  return result;
+}
+
+/**
  * Build X402 payment requirements from charge options.
- * Returns EVM (Base) and SVM (Solana) options. The accepts array is ordered
- * EVM-first — clients that don't have a chain preference use the first option.
+ *
+ * Each EVM (Base) network advertises BOTH schemes so any client can pay:
+ * - 'exact': transfer the advertised amount (EIP-3009). Always advertised.
+ * - 'upto': sign a Permit2 capped at `amount`, meter locally, settle the actual
+ *   ≤ cap via settlementOverrides.amount. Only advertised when we have a
+ *   facilitatorAddress for that network (the only address allowed to settle the
+ *   permit), supplied via `facilitatorAddresses` (from GET /x402/supported).
+ *   Without one, the upto accept would be unusable, so it's omitted.
+ * SVM (Solana) stays 'exact' only — Solana upto is not implemented yet.
+ * See docs/STREAMING_PAYMENT_SESSIONS.md.
+ *
+ * The accepts array is ordered EVM-first — clients without a chain preference use
+ * the first option.
  */
 export function buildX402Requirements(args: {
   options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
   resource: string;
   payeeName: string;
+  /** CAIP-2 network → upto facilitator address. When absent for a network, only
+   *  the exact accept is advertised for it. */
+  facilitatorAddresses?: Record<string, string>;
 }): X402PaymentRequirements {
   const evmOptions = args.options.filter(o =>
     X402_EVM_NETWORKS.has(o.network) && o.address.startsWith('0x')
@@ -33,11 +96,14 @@ export function buildX402Requirements(args: {
   const svmOptions = args.options.filter(o =>
     X402_SVM_NETWORKS.has(o.network) && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(o.address)
   );
+  const facilitatorAddresses = args.facilitatorAddresses ?? {};
 
-  const accepts: X402PaymentOption[] = [
-    ...evmOptions.map(option => ({
-      scheme: 'exact' as const,
-      network: CAIP2_NETWORKS[option.network] || option.network,
+  const accepts: X402PaymentOption[] = [];
+
+  for (const option of evmOptions) {
+    const caip2 = CAIP2_NETWORKS[option.network] || option.network;
+    const base = {
+      network: caip2,
       amount: option.amount.times(1e6).toFixed(0),
       resource: args.resource,
       description: args.payeeName,
@@ -45,10 +111,19 @@ export function buildX402Requirements(args: {
       payTo: option.address,
       maxTimeoutSeconds: 300,
       asset: USDC_ADDRESSES[option.network] || USDC_ADDRESSES['base'],
-      extra: { name: 'USD Coin', version: '2' },
-    })),
-    ...svmOptions.map(option => ({
-      scheme: 'exact' as const,
+    };
+    // Always advertise exact (the EIP-712 domain lives in extra, as today).
+    accepts.push({ ...base, scheme: 'exact', extra: { name: 'USD Coin', version: '2' } });
+    // Advertise upto only when we have a facilitator address to pin in the permit.
+    const facilitatorAddress = facilitatorAddresses[caip2];
+    if (facilitatorAddress) {
+      accepts.push({ ...base, scheme: 'upto', extra: { name: 'USD Coin', version: '2', facilitatorAddress } });
+    }
+  }
+
+  for (const option of svmOptions) {
+    accepts.push({
+      scheme: 'exact',
       network: CAIP2_NETWORKS[option.network] || option.network,
       amount: option.amount.times(1e6).toFixed(0),
       resource: args.resource,
@@ -58,12 +133,25 @@ export function buildX402Requirements(args: {
       maxTimeoutSeconds: 300,
       asset: USDC_ADDRESSES[option.network] || USDC_ADDRESSES['solana'],
       extra: { feePayer: SOLANA_FEE_PAYERS[option.network] || SOLANA_FEE_PAYERS['solana'] },
-    })),
-  ];
+    });
+  }
+
+  // Dedupe by scheme + resolved (CAIP-2) network: fetchAllSources can surface the
+  // same chain more than once (e.g. the destination's address plus a same-chain
+  // entry from getSources, sometimes with a different label/address), which would
+  // otherwise advertise duplicate exact/upto accepts. Keep the first per (scheme,
+  // network) — that's the destination's primary option for the chain.
+  const seenAccept = new Set<string>();
+  const dedupedAccepts = accepts.filter(a => {
+    const key = `${a.scheme}:${a.network}`;
+    if (seenAccept.has(key)) return false;
+    seenAccept.add(key);
+    return true;
+  });
 
   return {
     x402Version: 2,
-    accepts,
+    accepts: dedupedAccepts,
   };
 }
 
@@ -289,6 +377,8 @@ export function buildOmniChallenge(args: {
   payeeName: string;
   /** Unique challenge ID for MPP (e.g. payment request ID) */
   mppChallengeId?: string;
+  /** CAIP-2 network → upto facilitator address (from GET /x402/supported). */
+  facilitatorAddresses?: Record<string, string>;
 }): OmniChallenge {
   const mpp = args.mppChallengeId
     ? buildMppChallenges({ id: args.mppChallengeId, options: args.options, resource: args.resource })
@@ -300,6 +390,7 @@ export function buildOmniChallenge(args: {
       options: args.options,
       resource: args.resource,
       payeeName: args.payeeName,
+      facilitatorAddresses: args.facilitatorAddresses,
     }),
     ...(mpp && { mpp }),
   };
@@ -337,6 +428,9 @@ export function buildPaymentOptions(args: {
   payeeName?: string;
   /** Challenge ID for MPP (auto-generated if not provided) */
   challengeId?: string;
+  /** CAIP-2 network → upto facilitator address (from GET /x402/supported).
+   *  When absent for a network, only the exact x402 accept is advertised. */
+  facilitatorAddresses?: Record<string, string>;
 }): {
   x402: X402PaymentRequirements;
   mpp: MppChallengeData[] | null;
@@ -351,6 +445,7 @@ export function buildPaymentOptions(args: {
       options,
       resource: args.resource ?? '',
       payeeName: args.payeeName ?? '',
+      facilitatorAddresses: args.facilitatorAddresses,
     }),
     mpp: buildMppChallenges({ id: challengeId, options, resource: args.resource }),
     options,
@@ -374,6 +469,8 @@ export function buildAuthorizeParamsFromSources(args: {
   resource?: string;
   payeeName?: string;
   challengeId?: string;
+  /** CAIP-2 network → upto facilitator address (from GET /x402/supported). */
+  facilitatorAddresses?: Record<string, string>;
 }): {
   /** X402: full accepts array — accounts picks chain via ff:x402-chain flag. */
   paymentRequirements?: X402PaymentRequirements;

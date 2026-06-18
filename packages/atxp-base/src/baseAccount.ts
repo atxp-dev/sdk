@@ -96,6 +96,9 @@ export class BaseAccount implements Account {
         // encodePaymentSignatureHeader) is duplicated in x402Wrapper.ts. Extract a shared helper
         // once both packages can import from a common location that depends on @x402/core + @x402/evm.
         const signer = toClientEvmSigner(this.getLocalAccount());
+        // This self-custody EOA path can only complete `exact` (EIP-3009 transfer
+        // authorization). It has no Permit2 approval and no facilitatorAddress to
+        // sign an `upto` permit; the accounts-mediated path is the only upto path.
         const scheme = new ExactEvmScheme(signer);
         const client = new x402Client();
         // v2 uses CAIP-2 network IDs ("eip155:8453")

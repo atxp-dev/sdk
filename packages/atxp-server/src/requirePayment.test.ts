@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { requirePayment } from './index.js';
 import * as TH from './serverTestHelpers.js';
 import { BigNumber } from 'bignumber.js';
@@ -7,6 +7,16 @@ import { PAYMENT_REQUIRED_ERROR_CODE } from '@atxp/common';
 import { ProtocolSettlement } from './protocol.js';
 
 describe('requirePayment', () => {
+  // The omni-challenge build path fetches GET /x402/supported (upto facilitator
+  // addresses). Stub it so tests don't make real network calls; an empty map
+  // means the challenge advertises x402 exact only (the existing expectations).
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('should pass if there is money', async () => {
     const paymentServer = TH.paymentServer({charge: vi.fn().mockResolvedValue(true)});
     const config = TH.config({ paymentServer });

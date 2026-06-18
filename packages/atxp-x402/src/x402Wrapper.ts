@@ -98,11 +98,14 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         });
       }
 
-      // Select the best payment requirements (prefer exact scheme on any base-like network)
+      // This self-custody / local-signing path can only complete `exact`: the
+      // EOA has no Permit2 approval and the challenge carries no facilitatorAddress
+      // for an `upto` permit. The accounts-mediated path is the only upto path.
+      // Prefer the exact accept, falling back to the first option.
       const accepts = paymentChallenge.accepts as Array<Record<string, unknown>>;
-      const selectedPaymentRequirements = accepts.find(
-        (a) => a.scheme === 'exact'
-      ) ?? accepts[0];
+      const selectedPaymentRequirements =
+        accepts.find((a) => a.scheme === 'exact') ??
+        accepts[0];
 
       if (!selectedPaymentRequirements) {
         log.info('No suitable X402 payment option found');
@@ -204,6 +207,7 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       // once both packages can import from a common location that depends on @x402/core + @x402/evm.
       log.debug('Creating X402 payment payload with signer');
       const evmSigner = toClientEvmSigner(signer);
+      // Self-custody EOA signs an exact EIP-3009 transfer authorization.
       const scheme = new ExactEvmScheme(evmSigner);
       const x402ClientInstance = new x402Client();
 

@@ -3,10 +3,15 @@ import { wrapWithX402 } from './x402Wrapper.js';
 import { ATXPAccount, ATXPLocalAccount } from '@atxp/client';
 import { ConsoleLogger, LogLevel } from '@atxp/common';
 
+// Records which EVM scheme class the wrapper constructed, so tests can assert
+// upto vs exact selection without reaching into real signing.
+const schemeConstructions: string[] = [];
+
 // Mock @x402/evm to avoid actual EVM signing
 vi.mock('@x402/evm', () => {
   class MockExactEvmScheme {
     scheme = 'exact';
+    constructor() { schemeConstructions.push('exact'); }
     createPaymentPayload = vi.fn().mockResolvedValue({
       payload: { signature: '0xmocked' },
     });
@@ -15,6 +20,18 @@ vi.mock('@x402/evm', () => {
     toClientEvmSigner: vi.fn((signer: any) => signer),
     ExactEvmScheme: MockExactEvmScheme,
   };
+});
+
+// Mock the upto client subpath so the wrapper can construct UptoEvmScheme.
+vi.mock('@x402/evm/upto/client', () => {
+  class MockUptoEvmScheme {
+    scheme = 'upto';
+    constructor() { schemeConstructions.push('upto'); }
+    createPaymentPayload = vi.fn().mockResolvedValue({
+      payload: { signature: '0xmocked' },
+    });
+  }
+  return { UptoEvmScheme: MockUptoEvmScheme };
 });
 
 // Mock @x402/core/client to avoid real x402 client logic
@@ -82,6 +99,7 @@ describe('wrapWithX402', () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
+    schemeConstructions.length = 0;
 
     // Create a mock ATXPAccount instance using the proper connection string format
     mockAccount = new ATXPAccount('https://test.com?connection_token=test-token&account_id=atxp:test-account');
@@ -409,6 +427,94 @@ describe('wrapWithX402', () => {
 
     // Should only have made one fetch call
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('always selects exact (never upto) even when both schemes are advertised', async () => {
+    // This self-custody path can't complete upto (no Permit2 approval, no
+    // facilitator). When the server advertises both, it must pick exact.
+    const x402Challenge = {
+      x402Version: 2,
+      accepts: [
+        {
+          network: 'eip155:8453',
+          scheme: 'exact',
+          payTo: '0xrecipient',
+          amount: '1000000',
+          description: 'Test payment',
+        },
+        {
+          network: 'eip155:8453',
+          scheme: 'upto',
+          payTo: '0xrecipient',
+          amount: '1000000',
+          description: 'Test payment',
+          extra: { facilitatorAddress: '0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002' },
+        },
+      ],
+    };
+
+    const first402Response = new Response(JSON.stringify(x402Challenge), {
+      status: 402,
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const successResponse = new Response('Success', { status: 200 });
+
+    mockFetch
+      .mockResolvedValueOnce(first402Response)
+      .mockResolvedValueOnce(successResponse);
+
+    const wrappedFetch = wrapWithX402({
+      mcpServer: 'https://example.com/mcp',
+      account: mockAccount,
+      fetchFn: mockFetch,
+      logger: mockLogger,
+      approvePayment: mockApprovePayment,
+    });
+
+    const result = await wrappedFetch('https://example.com/api');
+
+    expect(result.status).toBe(200);
+    expect(schemeConstructions).toContain('exact');
+    expect(schemeConstructions).not.toContain('upto');
+  });
+
+  it('constructs ExactEvmScheme when the selected accept is exact', async () => {
+    const x402Challenge = {
+      x402Version: 2,
+      accepts: [
+        {
+          network: 'eip155:8453',
+          scheme: 'exact',
+          payTo: '0xrecipient',
+          amount: '1000000',
+          description: 'Test payment',
+        },
+      ],
+    };
+
+    const first402Response = new Response(JSON.stringify(x402Challenge), {
+      status: 402,
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const successResponse = new Response('Success', { status: 200 });
+
+    mockFetch
+      .mockResolvedValueOnce(first402Response)
+      .mockResolvedValueOnce(successResponse);
+
+    const wrappedFetch = wrapWithX402({
+      mcpServer: 'https://example.com/mcp',
+      account: mockAccount,
+      fetchFn: mockFetch,
+      logger: mockLogger,
+      approvePayment: mockApprovePayment,
+    });
+
+    const result = await wrappedFetch('https://example.com/api');
+
+    expect(result.status).toBe(200);
+    expect(schemeConstructions).toContain('exact');
+    expect(schemeConstructions).not.toContain('upto');
   });
 
   it('should handle no suitable payment option', async () => {
