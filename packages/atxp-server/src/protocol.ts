@@ -328,13 +328,6 @@ export class ProtocolSettlement {
    * See docs/STREAMING_PAYMENT_SESSIONS.md.
    */
   private buildRequestBody(protocol: PaymentProtocol, credential: string, context?: SettlementContext, actualAmount?: BigNumber): unknown {
-    // mpp has no up-to mapping yet, so the settle body still carries the
-    // credential's cap and a multi-charge session over-settles relative to the
-    // metered actual. Emit a greppable marker so the overcharge is visible.
-    if (actualAmount && protocol === 'mpp') {
-      this.logger.warn(`settle_actual_dropped protocol=${protocol} actual=${actualAmount.toFixed()}: up-to settlement not yet wired for ${protocol}; settling the credential cap`);
-    }
-
     if (protocol === 'x402') {
       // X402: auth expects { payload, paymentRequirements }
       // The credential is the base64-encoded PAYMENT-SIGNATURE header containing the payload.
@@ -417,8 +410,27 @@ export class ProtocolSettlement {
       if (!parsedCredential) {
         throw new Error('MPP credential is not valid base64 JSON or raw JSON');
       }
+
+      // "up-to" semantics for TIP-1034 session credentials: settle the metered
+      // actual (≤ the channel deposit) by passing settlementOverrides.amount in
+      // raw atomic µUSDC. auth signs a voucher for (on-chain settled + this
+      // amount) and submits settle() as the operator. ONLY for session
+      // credentials — the one-shot `charge` path ignores the override and
+      // settles the pre-signed transfer as-is. Detect session via the
+      // challenge intent or a channel descriptor on the payload.
+      const challenge = parsedCredential.challenge as Record<string, unknown> | undefined;
+      const payload = parsedCredential.payload as Record<string, unknown> | undefined;
+      const isSession = challenge?.intent === 'session' || payload?.descriptor != null;
+      let settlementOverrides = {};
+      if (actualAmount && isSession) {
+        // session.spent is decimal USDC; the channel encodes raw µUSDC (uint96).
+        // toFixed(0) keeps it an integer string (no decimals/exponential).
+        settlementOverrides = { settlementOverrides: { amount: new BigNumber(actualAmount.times(1e6).toFixed(0)).toFixed(0) } };
+      }
+
       return {
         credential: parsedCredential,
+        ...settlementOverrides,
         ...(context?.paymentRequestId && { paymentRequestId: context.paymentRequestId }),
         ...(context?.sourceAccountId && { sourceAccountId: context.sourceAccountId }),
         ...(this.destinationAccountId && { destinationAccountId: this.destinationAccountId }),

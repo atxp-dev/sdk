@@ -67,6 +67,61 @@ export async function fetchUptoFacilitatorAddresses(
 }
 
 /**
+ * Tempo MPP session (TIP-1034) parameters advertised by auth's GET /mpp/supported:
+ * the channel `authorizedSigner` + `operator` (auth's settler key), the escrow
+ * precompile, and the chain id. When present, the SDK advertises a `session`-intent
+ * challenge alongside the one-shot `charge` intent so accounts can open a metered
+ * channel; when absent, only `charge` is advertised (graceful fallback).
+ */
+export type MppSessionSupport = {
+  escrowContract: string;
+  authorizedSigner: string;
+  operator: string;
+  chainId: number;
+};
+
+const _mppSupportedCache = new Map<string, { at: number; value: Promise<MppSessionSupport | null> }>();
+
+/**
+ * Fetch Tempo MPP session support from the auth server's GET /mpp/supported.
+ * Response shape: `{ tempo: { authorizedSigner, operator, escrowContract, chainId } | null }`.
+ * Cached per auth server URL with the same TTL/retry semantics as the x402 fetch
+ * (the settler address could rotate; an unreachable auth must not be cached).
+ */
+export async function fetchMppSupported(
+  authServerUrl: AuthorizationServerUrl | string,
+  fetchFn: FetchLike = fetch.bind(globalThis),
+  logger?: { warn: (msg: string) => void },
+): Promise<MppSessionSupport | null> {
+  const url = new URL('/mpp/supported', authServerUrl).toString();
+  const cached = _mppSupportedCache.get(url);
+  if (cached && Date.now() - cached.at < _FACILITATOR_ADDRESS_TTL_MS) return cached.value;
+
+  const pending = (async (): Promise<MppSessionSupport | null> => {
+    try {
+      const response = await fetchFn(url);
+      if (!response.ok) {
+        logger?.warn(`fetchMppSupported: ${url} returned ${response.status}; advertising charge only`);
+        return null;
+      }
+      const body = await response.json() as { tempo?: MppSessionSupport | null };
+      const tempo = body?.tempo;
+      if (tempo && tempo.authorizedSigner && tempo.operator && tempo.escrowContract) return tempo;
+      return null;
+    } catch (error) {
+      logger?.warn(`fetchMppSupported: failed to fetch ${url}: ${error}; advertising charge only`);
+      return null;
+    }
+  })();
+
+  _mppSupportedCache.set(url, { at: Date.now(), value: pending });
+  const result = await pending;
+  // Don't cache a null (auth unreachable / not configured) — allow a later retry.
+  if (result === null) _mppSupportedCache.delete(url);
+  return result;
+}
+
+/**
  * Build X402 payment requirements from charge options.
  *
  * Each EVM (Base) network advertises BOTH schemes so any client can pay:
@@ -187,6 +242,12 @@ export function buildMppChallenges(args: {
   id: string;
   options: Array<{ network: string; currency: string; address: string; amount: BigNumber }>;
   resource?: string;
+  /** When present, advertise a Tempo `session`-intent challenge alongside `charge`
+   *  (TIP-1034 channel sessions). From GET /mpp/supported via fetchMppSupported. */
+  mppSession?: MppSessionSupport;
+  /** Channel deposit budget hint (raw µUSDC) for the session challenge. accounts
+   *  may override; a larger-than-cap deposit lets one channel serve many requests. */
+  mppSuggestedDeposit?: string;
 }): MppChallengeData[] | null {
   const challenges: MppChallengeData[] = [];
   const resourceField = args.resource ? { resource: { url: args.resource } } : {};
@@ -238,6 +299,38 @@ export function buildMppChallenges(args: {
         ...resourceField,
       },
     });
+
+    // Also advertise a `session`-intent challenge (TIP-1034 channel) when auth
+    // exposes the settler params. accounts picks charge vs session via
+    // ff:mpp-intent; both carry the same per-request `amount` (the cap). The
+    // channel params (escrow, authorizedSigner, operator) ride in
+    // request.methodDetails so accounts can open/reuse the channel.
+    if (args.mppSession) {
+      challenges.push({
+        id: args.id,
+        method: 'tempo',
+        intent: 'session',
+        amount: tempoOption.amount.toString(),
+        currency: tempoOption.currency || 'USDC',
+        network: tempoOption.network,
+        recipient: tempoOption.address,
+        expires: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        ...resourceField,
+        request: {
+          amount: tempoOption.amount.toString(),
+          currency: tempoOption.currency || 'USDC',
+          recipient: tempoOption.address,
+          ...resourceField,
+          methodDetails: {
+            chainId: args.mppSession.chainId,
+            escrowContract: args.mppSession.escrowContract,
+            authorizedSigner: args.mppSession.authorizedSigner,
+            operator: args.mppSession.operator,
+            ...(args.mppSuggestedDeposit && { suggestedDeposit: args.mppSuggestedDeposit }),
+          },
+        },
+      });
+    }
   }
 
   return challenges.length > 0 ? challenges : null;
@@ -379,9 +472,11 @@ export function buildOmniChallenge(args: {
   mppChallengeId?: string;
   /** CAIP-2 network → upto facilitator address (from GET /x402/supported). */
   facilitatorAddresses?: Record<string, string>;
+  /** Tempo MPP session support (from GET /mpp/supported). Advertises the session intent. */
+  mppSession?: MppSessionSupport;
 }): OmniChallenge {
   const mpp = args.mppChallengeId
-    ? buildMppChallenges({ id: args.mppChallengeId, options: args.options, resource: args.resource })
+    ? buildMppChallenges({ id: args.mppChallengeId, options: args.options, resource: args.resource, mppSession: args.mppSession })
     : null;
 
   return {
@@ -431,6 +526,8 @@ export function buildPaymentOptions(args: {
   /** CAIP-2 network → upto facilitator address (from GET /x402/supported).
    *  When absent for a network, only the exact x402 accept is advertised. */
   facilitatorAddresses?: Record<string, string>;
+  /** Tempo MPP session support (from GET /mpp/supported). Advertises the session intent. */
+  mppSession?: MppSessionSupport;
 }): {
   x402: X402PaymentRequirements;
   mpp: MppChallengeData[] | null;
@@ -447,7 +544,7 @@ export function buildPaymentOptions(args: {
       payeeName: args.payeeName ?? '',
       facilitatorAddresses: args.facilitatorAddresses,
     }),
-    mpp: buildMppChallenges({ id: challengeId, options, resource: args.resource }),
+    mpp: buildMppChallenges({ id: challengeId, options, resource: args.resource, mppSession: args.mppSession }),
     options,
   };
 }
