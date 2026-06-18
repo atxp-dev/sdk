@@ -3,7 +3,6 @@ import { BaseAccount } from '@atxp/base';
 import { FetchLike } from '@atxp/common';
 import { BigNumber } from 'bignumber.js';
 import { ExactEvmScheme, toClientEvmSigner } from '@x402/evm';
-import { UptoEvmScheme } from '@x402/evm/upto/client';
 import { x402HTTPClient, x402Client } from '@x402/core/client';
 import { LocalAccount } from 'viem';
 
@@ -99,11 +98,12 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
         });
       }
 
-      // Select the best payment requirements. Prefer a settle-the-actual scheme
-      // (upto), then exact, then whatever's first — both EVM schemes are supported.
+      // This self-custody / local-signing path can only complete `exact`: the
+      // EOA has no Permit2 approval and the challenge carries no facilitatorAddress
+      // for an `upto` permit. The accounts-mediated path is the only upto path.
+      // Prefer the exact accept, falling back to the first option.
       const accepts = paymentChallenge.accepts as Array<Record<string, unknown>>;
       const selectedPaymentRequirements =
-        accepts.find((a) => a.scheme === 'upto') ??
         accepts.find((a) => a.scheme === 'exact') ??
         accepts[0];
 
@@ -207,13 +207,8 @@ export const wrapWithX402: FetchWrapper = (config: ClientArgs): FetchLike => {
       // once both packages can import from a common location that depends on @x402/core + @x402/evm.
       log.debug('Creating X402 payment payload with signer');
       const evmSigner = toClientEvmSigner(signer);
-      // 'upto' caps the Permit2 at the advertised amount and settles the actual;
-      // 'exact' transfers the advertised amount. The upto scheme requires
-      // paymentRequirements.extra.facilitatorAddress (the only address allowed
-      // to settle) — the server's challenge must advertise it.
-      const scheme = selectedPaymentRequirements.scheme === 'upto'
-        ? new UptoEvmScheme(evmSigner)
-        : new ExactEvmScheme(evmSigner);
+      // Self-custody EOA signs an exact EIP-3009 transfer authorization.
+      const scheme = new ExactEvmScheme(evmSigner);
       const x402ClientInstance = new x402Client();
 
       // v2 uses CAIP-2 network IDs ("eip155:8453")

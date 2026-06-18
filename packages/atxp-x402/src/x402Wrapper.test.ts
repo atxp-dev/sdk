@@ -429,10 +429,19 @@ describe('wrapWithX402', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('constructs UptoEvmScheme when the selected accept is upto', async () => {
+  it('always selects exact (never upto) even when both schemes are advertised', async () => {
+    // This self-custody path can't complete upto (no Permit2 approval, no
+    // facilitator). When the server advertises both, it must pick exact.
     const x402Challenge = {
       x402Version: 2,
       accepts: [
+        {
+          network: 'eip155:8453',
+          scheme: 'exact',
+          payTo: '0xrecipient',
+          amount: '1000000',
+          description: 'Test payment',
+        },
         {
           network: 'eip155:8453',
           scheme: 'upto',
@@ -465,8 +474,8 @@ describe('wrapWithX402', () => {
     const result = await wrappedFetch('https://example.com/api');
 
     expect(result.status).toBe(200);
-    expect(schemeConstructions).toContain('upto');
-    expect(schemeConstructions).not.toContain('exact');
+    expect(schemeConstructions).toContain('exact');
+    expect(schemeConstructions).not.toContain('upto');
   });
 
   it('constructs ExactEvmScheme when the selected accept is exact', async () => {

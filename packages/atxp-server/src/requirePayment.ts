@@ -1,7 +1,7 @@
 import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAccountId, Network, AuthorizationServerUrl } from "@atxp/common";
 import { BigNumber } from "bignumber.js";
 import { getATXPConfig, atxpAccountId, atxpToken, getPaymentRequestId, setPendingPaymentChallenge, paymentSession } from "./atxpContext.js";
-import { buildPaymentOptions, omniChallengeMcpError } from "./omniChallenge.js";
+import { buildPaymentOptions, omniChallengeMcpError, fetchUptoFacilitatorAddresses } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { signOpaqueIdentity } from "./opaqueIdentity.js";
 
@@ -74,7 +74,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   if (existingPaymentId) {
     config.logger.info(`Found existing payment ID ${existingPaymentId}`);
     const sources = await fetchAllSources(config, destinationNetwork, destinationAddress);
-    throw buildOmniError(config, existingPaymentId, paymentAmount, sources);
+    throw await buildOmniError(config, existingPaymentId, paymentAmount, sources);
   }
 
   // Fetch all destination chain addresses for the omni-challenge.
@@ -99,7 +99,7 @@ export async function requirePayment(paymentConfig: RequirePaymentConfig): Promi
   config.logger.debug(`Creating payment request with sourceAccountId: ${user}, destinationAccountId: ${charge.destinationAccountId}`);
   const paymentId = await config.paymentServer.createPaymentRequest(paymentRequest);
   config.logger.info(`Created payment request ${paymentId}`);
-  throw buildOmniError(config, paymentId, paymentAmount, allSources);
+  throw await buildOmniError(config, paymentId, paymentAmount, allSources);
 }
 
 /**
@@ -134,7 +134,7 @@ async function fetchAllSources(
  * Uses buildPaymentOptions (shared with buildAuthorizeParamsFromSources) to
  * ensure consistent challenge generation across MCP servers and LLM callers.
  */
-function buildOmniError(
+async function buildOmniError(
   config: { server: AuthorizationServerUrl; logger: import("@atxp/common").Logger },
   paymentId: string,
   paymentAmount: BigNumber,
@@ -142,12 +142,18 @@ function buildOmniError(
 ) {
   const resource = getATXPResource()?.toString() ?? '';
 
+  // Fetch (once per process) the upto facilitator addresses so the x402 challenge
+  // can advertise the upto accept for networks the facilitator supports. On
+  // failure this returns {} and only the exact accept is advertised.
+  const facilitatorAddresses = await fetchUptoFacilitatorAddresses(config.server, undefined, config.logger);
+
   const payment = buildPaymentOptions({
     amount: paymentAmount,
     sources,
     resource,
     payeeName: '',
     challengeId: paymentId,
+    facilitatorAddresses,
   });
 
   if (payment.x402.accepts.length === 0 && sources.length > 0) {

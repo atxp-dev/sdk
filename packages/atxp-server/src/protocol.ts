@@ -372,13 +372,25 @@ export class ProtocolSettlement {
       }
 
       // "up-to" semantics: settle the metered actual (≤ the Permit2 cap) by
-      // passing settlementOverrides.amount in atomic micro-USDC. toFixed(0) keeps
-      // it an integer string with no decimals or exponential notation. The
-      // facilitator caps it at the signed permitted amount, so this is safe even
-      // if a caller miscomputes. Cap-only settlement (no actualAmount) omits it.
-      const settlementOverrides = actualAmount
-        ? { settlementOverrides: { amount: actualAmount.times(1e6).toFixed(0) } }
-        : {};
+      // passing settlementOverrides.amount in atomic micro-USDC. ONLY for the
+      // 'upto' scheme: 'exact'/EIP-3009 commits the signature to a specific value,
+      // so overriding the amount makes it mismatch the signed authorization and the
+      // facilitator rejects it (400). Clamp to the cap: Permit2 reverts the whole
+      // settle when the requested amount exceeds the permitted amount, so a meter
+      // overshoot must collect the cap, not revert. The cap is the selected
+      // requirement's `amount` (already atomic µUSDC); when absent we pass the
+      // actual through. toFixed(0) (ROUND_HALF_UP, not floor) keeps it an integer
+      // string with no decimals/exponential. Cap-only settlement (no actualAmount,
+      // or exact scheme) omits it.
+      const isUptoScheme = (requirements as { scheme?: unknown } | undefined)?.scheme === 'upto';
+      let settlementOverrides = {};
+      if (actualAmount && isUptoScheme) {
+        const actualAtomic = new BigNumber(actualAmount.times(1e6).toFixed(0));
+        const capRaw = (requirements as { amount?: unknown } | undefined)?.amount;
+        const cap = (typeof capRaw === 'string' || typeof capRaw === 'number') ? new BigNumber(capRaw) : undefined;
+        const settleAtomic = cap && cap.isFinite() ? BigNumber.min(actualAtomic, cap) : actualAtomic;
+        settlementOverrides = { settlementOverrides: { amount: settleAtomic.toFixed(0) } };
+      }
 
       return {
         payload,

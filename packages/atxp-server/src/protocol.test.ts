@@ -313,7 +313,7 @@ describe('ProtocolSettlement', () => {
       const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
 
       // Authorized cap is the credential's Permit2 amount; the metered actual is $0.003.
-      await settlement.settle('x402', credential, { paymentRequirements: { network: 'base' } }, BigNumber(0.003));
+      await settlement.settle('x402', credential, { paymentRequirements: { scheme: 'upto', network: 'base' } }, BigNumber(0.003));
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       // 0.003 USDC → 3000 micro-USDC, integer string, no exponential notation.
@@ -334,16 +334,88 @@ describe('ProtocolSettlement', () => {
       expect(body.settlementOverrides).toBeUndefined();
     });
 
+    it('omits settlementOverrides for the exact scheme even when actualAmount is supplied', async () => {
+      // exact/EIP-3009 commits the signature to a specific value; overriding the
+      // amount would mismatch the signed authorization and the facilitator rejects it.
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xexact', settledAmount: '10000' }) });
+      const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
+
+      await settlement.settle('x402', credential, { paymentRequirements: { scheme: 'exact', network: 'base', amount: '10000' } }, BigNumber(0.003));
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.settlementOverrides).toBeUndefined();
+    });
+
     it('serializes a sub-1e-6 x402 actualAmount as an integer micro-USDC string, never exponential', async () => {
       mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xtiny', settledAmount: '0' }) });
       const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
 
-      // 0.0000003 USDC × 1e6 = 0.3 micro-USDC → toFixed(0) floors to "0".
-      await settlement.settle('x402', credential, { paymentRequirements: { network: 'base' } }, BigNumber('0.0000003'));
+      // 0.0000003 USDC × 1e6 = 0.3 micro-USDC → toFixed(0) rounds (HALF_UP) to "0".
+      await settlement.settle('x402', credential, { paymentRequirements: { scheme: 'upto', network: 'base' } }, BigNumber('0.0000003'));
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.settlementOverrides.amount).toBe('0');
       expect(body.settlementOverrides.amount).not.toContain('e');
+    });
+
+    it('clamps a meter overshoot to the cap (Permit2 reverts when requested > permitted)', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xx402', settledAmount: '10000' }) });
+      const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
+
+      // Cap is the selected requirement's amount (10000 µUSDC = $0.01). The metered
+      // actual ($0.02 = 20000 µUSDC) overshoots → settle the cap, not the overshoot.
+      await settlement.settle(
+        'x402',
+        credential,
+        { paymentRequirements: { scheme: 'upto', network: 'eip155:8453', amount: '10000' } },
+        BigNumber('0.02'),
+      );
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.settlementOverrides).toEqual({ amount: '10000' });
+    });
+
+    it('settles the actual (not the cap) when the metered amount is under the cap', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xx402', settledAmount: '3000' }) });
+      const credential = Buffer.from(JSON.stringify({ signature: '0xabc' })).toString('base64');
+
+      // Cap $0.01 (10000), actual $0.003 (3000) → settle the actual.
+      await settlement.settle(
+        'x402',
+        credential,
+        { paymentRequirements: { scheme: 'upto', network: 'eip155:8453', amount: '10000' } },
+        BigNumber('0.003'),
+      );
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.settlementOverrides).toEqual({ amount: '3000' });
+    });
+
+    it('clamps against the cap selected from a full accepts array (matching credential network)', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xx402', settledAmount: '10000' }) });
+      // Credential payload embeds accepted.network so the matching accept is selected.
+      const credential = Buffer.from(JSON.stringify({
+        signature: '0xabc',
+        accepted: { network: 'eip155:8453' },
+      })).toString('base64');
+
+      await settlement.settle(
+        'x402',
+        credential,
+        {
+          paymentRequirements: {
+            x402Version: 2,
+            accepts: [
+              { scheme: 'upto', network: 'eip155:8453', amount: '10000' },
+              { scheme: 'exact', network: 'eip155:84532', amount: '5000' },
+            ],
+          },
+        },
+        BigNumber('0.05'), // 50000 µUSDC overshoot → clamp to the 10000 cap.
+      );
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.settlementOverrides).toEqual({ amount: '10000' });
     });
 
     it('still warns (greppable) and drops actualAmount for mpp (up-to not yet wired)', async () => {

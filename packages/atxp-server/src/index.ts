@@ -124,6 +124,7 @@ export {
   sourcesToOptions,
   buildPaymentOptions,
   buildAuthorizeParamsFromSources,
+  fetchUptoFacilitatorAddresses,
 } from './omniChallenge.js';
 
 // Opaque identity for MPP Authorization: Payment ↔ OAuth Bearer coexistence
