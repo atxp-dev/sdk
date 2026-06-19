@@ -183,6 +183,20 @@ export function parseCredentialBase64(credential: string): Record<string, unknow
 }
 
 /**
+ * True when an MPP credential is a TIP-1034 *session* (an on-chain payment
+ * channel was opened at authorize) rather than a one-shot `charge`. Authoritative
+ * signal is `challenge.intent === 'session'` (the SDK sets it); a channel
+ * descriptor on the payload is a structural backstop. Shared by the settle-body
+ * builder and the request session so both classify a credential identically.
+ */
+export function isMppSessionCredential(credential: string): boolean {
+  const parsed = parseCredentialBase64(credential);
+  const challenge = parsed?.challenge as Record<string, unknown> | undefined;
+  const payload = parsed?.payload as Record<string, unknown> | undefined;
+  return challenge?.intent === 'session' || payload?.descriptor != null;
+}
+
+/**
  * Constructor options for `ProtocolSettlement`. Kept as a trailing options
  * bag so new knobs can be added without shifting positional arguments.
  */
@@ -418,9 +432,7 @@ export class ProtocolSettlement {
       // credentials — the one-shot `charge` path ignores the override and
       // settles the pre-signed transfer as-is. Detect session via the
       // challenge intent or a channel descriptor on the payload.
-      const challenge = parsedCredential.challenge as Record<string, unknown> | undefined;
-      const payload = parsedCredential.payload as Record<string, unknown> | undefined;
-      const isSession = challenge?.intent === 'session' || payload?.descriptor != null;
+      const isSession = isMppSessionCredential(credential);
       let settlementOverrides = {};
       if (actualAmount && isSession) {
         // session.spent is decimal USDC; the channel encodes raw µUSDC (uint96).

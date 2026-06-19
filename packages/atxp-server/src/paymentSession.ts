@@ -1,6 +1,6 @@
 import { BigNumber } from "bignumber.js";
 import { Logger, type PaymentProtocol } from "@atxp/common";
-import { ProtocolSettlement, SettlementContext, parseCredentialBase64 } from "./protocol.js";
+import { ProtocolSettlement, SettlementContext, parseCredentialBase64, isMppSessionCredential } from "./protocol.js";
 import type { DetectedCredential } from "./atxpContext.js";
 
 /**
@@ -105,6 +105,16 @@ export class PaymentSessionState implements PaymentSession {
   cap: BigNumber;
   spent: BigNumber = new BigNumber(0);
   settled = false;
+  /** Guards against re-entrant settle (e.g. res.end firing more than once). */
+  settling = false;
+  /**
+   * True when settling tears down an on-chain resource that exists regardless of
+   * spend — a TIP-1034 MPP session opens a channel (deposit locked) at authorize.
+   * Such a session MUST settle even at `spent == 0` to refund the locked deposit,
+   * and a failed settle must stay retryable. One-shot protocols have nothing to
+   * tear down, so a zero-spend or failed settle is a no-op / fire-and-forget.
+   */
+  readonly requiresClose: boolean;
 
   constructor(
     readonly protocol: PaymentProtocol,
@@ -113,6 +123,7 @@ export class PaymentSessionState implements PaymentSession {
     logger: Logger,
   ) {
     this.cap = deriveCap(protocol, credential, context, logger);
+    this.requiresClose = protocol === 'mpp' && isMppSessionCredential(credential);
   }
 
   charge(cost: BigNumber): boolean {
@@ -138,9 +149,19 @@ export function buildPaymentSession(
 }
 
 /**
- * Settle the session if it was charged and not already settled. Idempotent:
- * subsequent calls (e.g. if res.end fires more than once) are no-ops. Builds
- * the ProtocolSettlement from config exactly as the middleware did previously.
+ * Settle the session at response close. Idempotent and re-entrancy-safe:
+ * concurrent or repeat calls (e.g. res.end firing more than once) settle at most
+ * once. Builds the ProtocolSettlement from config exactly as the middleware did
+ * previously.
+ *
+ * Two protocol-shape-dependent rules (see PaymentSessionState.requiresClose):
+ * - A session that locked funds on-chain (MPP channel) settles even at
+ *   `spent == 0` — that close refunds the locked deposit. One-shot protocols
+ *   have nothing to settle at zero spend, so they short-circuit.
+ * - On settle failure, a channel session stays unsettled so the locked deposit
+ *   can be re-driven later (on-chain settle is idempotent). One-shot protocols
+ *   have nothing to re-drive — the served request is marked settled to avoid a
+ *   pointless re-attempt (reconcile via the logged marker; atxp-dev/sdk#178).
  */
 export async function settlePaymentSession(
   session: PaymentSessionState,
@@ -149,9 +170,9 @@ export async function settlePaymentSession(
   appName: string | undefined,
   logger: Logger,
 ): Promise<void> {
-  if (session.settled) return;
-  if (session.spent.isLessThanOrEqualTo(0)) return;
-  session.settled = true;
+  if (session.settled || session.settling) return;
+  if (session.spent.isLessThanOrEqualTo(0) && !session.requiresClose) return;
+  session.settling = true;
 
   const settlement = new ProtocolSettlement(
     authServer,
@@ -169,15 +190,20 @@ export async function settlePaymentSession(
       // "up-to" semantics: settle the accumulated actual (the sum of charged
       // prices, ≤ cap), not the cap. For a single requirePayment(price), spent
       // is that price — which equals the cap only when the cap wasn't inflated
-      // by the server's minimumPayment.
+      // by the server's minimumPayment. For a channel session at zero spend this
+      // is 0: auth closes the channel capturing nothing and refunds the deposit.
       session.spent,
     );
+    session.settled = true;
     logger.info(`Settled ${session.protocol} at session close: txHash=${result.txHash ?? '<already-settled>'}, amount=${result.settledAmount}`);
   } catch (error) {
-    // No retry/outbox yet (tracked in atxp-dev/sdk#178): the request is already
-    // served and settled=true prevents re-attempt at close. Log a greppable,
-    // metric-able marker carrying protocol + amount so an unbilled served
-    // request can be reconciled later.
+    // Log a greppable, metric-able marker carrying protocol + amount so an
+    // unbilled served request can be reconciled later.
     logger.error(`settle_failed_at_close protocol=${session.protocol} amount=${session.spent.toFixed()}: ${error instanceof Error ? error.message : String(error)}`);
+    // One-shot protocols: nothing to re-drive, mark settled. Channel sessions:
+    // leave unsettled so the locked deposit can be closed on a later re-drive.
+    if (!session.requiresClose) session.settled = true;
+  } finally {
+    session.settling = false;
   }
 }
