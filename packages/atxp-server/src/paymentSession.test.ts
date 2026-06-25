@@ -6,6 +6,30 @@ import * as TH from './serverTestHelpers.js';
 
 const logger = TH.logger();
 
+/** A TIP-1034 Tempo session credential (channel opened on-chain at authorize). */
+function sessionCredential(amountDecimal = '0.01'): string {
+  return Buffer.from(JSON.stringify({
+    challenge: { id: 'ch_1', method: 'tempo', intent: 'session', request: { amount: amountDecimal } },
+    payload: {
+      action: 'voucher',
+      channelId: '0x' + 'aa'.repeat(32),
+      descriptor: { payer: '0x2', payee: '0x1' },
+      cumulativeAmount: '10000',
+      signature: '0x' + 'bb'.repeat(65),
+    },
+    source: 'tempo:0xpayer',
+  })).toString('base64');
+}
+
+/** An MPP one-shot `charge` credential (no on-chain channel; no intent/descriptor). */
+function chargeCredential(): string {
+  return Buffer.from(JSON.stringify({
+    challenge: { id: 'ch_1', method: 'tempo', request: { amount: '0.01' } },
+    payload: { action: 'transaction', transaction: '0xdeadbeef' },
+    source: 'tempo:0xpayer',
+  })).toString('base64');
+}
+
 describe('PaymentSession.charge', () => {
   it('accumulates charges across multiple calls', () => {
     // x402 cap of 1.00 USDC (atomic 1_000_000 / 1e6).
@@ -168,5 +192,62 @@ describe('settlePaymentSession', () => {
     const actualAmount = settleSpy.mock.calls[0][3] as BigNumber;
     expect(actualAmount.toNumber()).toBeCloseTo(0.001);
     expect(actualAmount.isLessThan(session.cap)).toBe(true);
+  });
+
+  // --- TIP-1034 channel sessions (requiresClose) ---
+
+  it('flags requiresClose only for MPP session credentials', () => {
+    expect(new PaymentSessionState('mpp', sessionCredential(), {}, logger).requiresClose).toBe(true);
+    // One-shot MPP charge: no on-chain channel to tear down.
+    expect(new PaymentSessionState('mpp', chargeCredential(), {}, logger).requiresClose).toBe(false);
+    expect(new PaymentSessionState('atxp', JSON.stringify({ options: [{ amount: '0.01' }] }), {}, logger).requiresClose).toBe(false);
+    expect(new PaymentSessionState('x402', 'cred', { paymentRequirements: { amount: '100000' } }, logger).requiresClose).toBe(false);
+  });
+
+  it('settles a channel session even at spent == 0 (closes + refunds the locked deposit)', async () => {
+    // Bug: the early-return on spent<=0 strands the on-chain deposit opened at
+    // authorize. A session must still settle (capture 0, refund the deposit).
+    const settleSpy = vi.spyOn(ProtocolSettlement.prototype, 'settle').mockResolvedValue({ txHash: '0xclose', settledAmount: '0' });
+    const session = new PaymentSessionState('mpp', sessionCredential(), {}, logger);
+    expect(session.spent.toNumber()).toBe(0);
+
+    await settlePaymentSession(session, 'https://auth.atxp.ai', 'tempo:dest', undefined, logger);
+
+    expect(settleSpy).toHaveBeenCalledTimes(1);
+    expect((settleSpy.mock.calls[0][3] as BigNumber).toNumber()).toBe(0);
+    expect(session.settled).toBe(true);
+  });
+
+  it('leaves a channel session unsettled when settle throws, so the locked deposit can be re-driven', async () => {
+    const settleSpy = vi.spyOn(ProtocolSettlement.prototype, 'settle').mockRejectedValueOnce(new Error('auth unreachable'));
+    const session = new PaymentSessionState('mpp', sessionCredential(), {}, logger);
+    session.charge(BigNumber(0.003));
+
+    await settlePaymentSession(session, 'https://auth.atxp.ai', 'tempo:dest', undefined, logger);
+    // Failure must NOT mark settled — otherwise the deposit is stranded forever.
+    expect(session.settled).toBe(false);
+    expect(settleSpy).toHaveBeenCalledTimes(1);
+
+    // A later re-drive succeeds (on-chain close is idempotent).
+    settleSpy.mockResolvedValueOnce({ txHash: '0xclose', settledAmount: '0.003' });
+    await settlePaymentSession(session, 'https://auth.atxp.ai', 'tempo:dest', undefined, logger);
+    expect(settleSpy).toHaveBeenCalledTimes(2);
+    expect(session.settled).toBe(true);
+  });
+
+  it('settles at most once under re-entrant calls (settling guard)', async () => {
+    let resolveSettle: (v: { txHash: string; settledAmount: string }) => void = () => {};
+    const settleSpy = vi.spyOn(ProtocolSettlement.prototype, 'settle')
+      .mockReturnValue(new Promise((r) => { resolveSettle = r; }));
+    const session = new PaymentSessionState('mpp', sessionCredential(), {}, logger);
+    session.charge(BigNumber(0.001));
+
+    const p1 = settlePaymentSession(session, 'https://auth.atxp.ai', 'tempo:dest', undefined, logger);
+    const p2 = settlePaymentSession(session, 'https://auth.atxp.ai', 'tempo:dest', undefined, logger);
+    resolveSettle({ txHash: '0xclose', settledAmount: '0.001' });
+    await Promise.all([p1, p2]);
+
+    expect(settleSpy).toHaveBeenCalledTimes(1);
+    expect(session.settled).toBe(true);
   });
 });

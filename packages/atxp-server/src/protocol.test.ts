@@ -447,7 +447,10 @@ describe('ProtocolSettlement', () => {
       expect(body.settlementOverrides).toEqual({ amount: '3000' });
     });
 
-    it('still warns (greppable) and drops actualAmount for mpp (up-to not yet wired)', async () => {
+    it('does not set settlementOverrides for a one-shot mpp charge credential (up-to is session-only)', async () => {
+      // A `charge`-intent credential settles the pre-signed transfer as-is, so
+      // actualAmount must NOT become a settlementOverrides.amount — that override
+      // is only for `session`-intent (TIP-1034 channel) credentials.
       mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xmpp', settledAmount: '10000' }) });
       const mppCredential = Buffer.from(JSON.stringify({
         challenge: { id: 'ch', method: 'tempo', intent: 'charge', request: { amount: '10000' } },
@@ -457,7 +460,22 @@ describe('ProtocolSettlement', () => {
 
       await settlement.settle('mpp', mppCredential, undefined, BigNumber(0.003));
 
-      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('settle_actual_dropped protocol=mpp'));
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.settlementOverrides).toBeUndefined();
+    });
+
+    it('sets settlementOverrides.amount (raw µUSDC) for a session-intent mpp credential', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ txHash: '0xmpp', settledAmount: '3000' }) });
+      const sessionCredential = Buffer.from(JSON.stringify({
+        challenge: { id: 'ch', method: 'tempo', intent: 'session', request: { amount: '0.01' } },
+        payload: { action: 'voucher', channelId: '0x' + 'aa'.repeat(32), descriptor: { payer: '0x2', payee: '0x1' }, cumulativeAmount: '10000', signature: '0x' + 'bb'.repeat(65) },
+        source: 'tempo:0xpayer',
+      })).toString('base64url');
+
+      await settlement.settle('mpp', sessionCredential, undefined, BigNumber(0.003));
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.settlementOverrides).toEqual({ amount: '3000' });
     });
 
     it('should call /settle/mpp with standard MPP credential', async () => {

@@ -1,7 +1,7 @@
 import { RequirePaymentConfig, extractNetworkFromAccountId, extractAddressFromAccountId, Network, AuthorizationServerUrl } from "@atxp/common";
 import { BigNumber } from "bignumber.js";
 import { getATXPConfig, atxpAccountId, atxpToken, getPaymentRequestId, setPendingPaymentChallenge, paymentSession } from "./atxpContext.js";
-import { buildPaymentOptions, omniChallengeMcpError, fetchUptoFacilitatorAddresses } from "./omniChallenge.js";
+import { buildPaymentOptions, omniChallengeMcpError, fetchUptoFacilitatorAddresses, fetchMppSupported } from "./omniChallenge.js";
 import { getATXPResource } from "./atxpContext.js";
 import { signOpaqueIdentity } from "./opaqueIdentity.js";
 
@@ -142,10 +142,14 @@ async function buildOmniError(
 ) {
   const resource = getATXPResource()?.toString() ?? '';
 
-  // Fetch (once per process) the upto facilitator addresses so the x402 challenge
-  // can advertise the upto accept for networks the facilitator supports. On
-  // failure this returns {} and only the exact accept is advertised.
-  const facilitatorAddresses = await fetchUptoFacilitatorAddresses(config.server, undefined, config.logger);
+  // Fetch (once per process, TTL-cached) the protocol "supported" params so the
+  // challenge can advertise the metered variants: x402 upto (facilitator address)
+  // and MPP session (Tempo TIP-1034 channel settler). On failure each returns
+  // empty/null and only the base variant (x402 exact / MPP charge) is advertised.
+  const [facilitatorAddresses, mppSession] = await Promise.all([
+    fetchUptoFacilitatorAddresses(config.server, undefined, config.logger),
+    fetchMppSupported(config.server, undefined, config.logger),
+  ]);
 
   const payment = buildPaymentOptions({
     amount: paymentAmount,
@@ -154,6 +158,7 @@ async function buildOmniError(
     payeeName: '',
     challengeId: paymentId,
     facilitatorAddresses,
+    mppSession: mppSession ?? undefined,
   });
 
   if (payment.x402.accepts.length === 0 && sources.length > 0) {
