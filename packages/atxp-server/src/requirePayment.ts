@@ -146,7 +146,7 @@ async function buildOmniError(
   // challenge can advertise the metered variants: x402 upto (facilitator address)
   // and MPP session (Tempo TIP-1034 channel settler). On failure each returns
   // empty/null and only the base variant (x402 exact / MPP charge) is advertised.
-  const [facilitatorAddresses, mppSession] = await Promise.all([
+  const [facilitatorAddresses, mppSupported] = await Promise.all([
     fetchUptoFacilitatorAddresses(config.server, undefined, config.logger),
     fetchMppSupported(config.server, undefined, config.logger),
   ]);
@@ -158,7 +158,8 @@ async function buildOmniError(
     payeeName: '',
     challengeId: paymentId,
     facilitatorAddresses,
-    mppSession: mppSession ?? undefined,
+    mppSession: mppSupported?.tempo ?? undefined,
+    mppSolanaSession: mppSupported?.solana ?? undefined,
   });
 
   if (payment.x402.accepts.length === 0 && sources.length > 0) {

@@ -80,7 +80,18 @@ export type MppSessionSupport = {
   chainId: number;
 };
 
-const _mppSupportedCache = new Map<string, { at: number; value: Promise<MppSessionSupport | null> }>();
+/** Solana MPP session params from auth's GET /mpp/supported. accounts opens the channel and
+ *  uses its own operator/fee-payer, so the SDK only needs auth's Solana authorizedSigner. */
+export type SolanaMppSessionSupport = {
+  chain: 'solana';
+  network: string;
+  authorizedSigner: string;
+};
+
+/** Combined MPP session support across chains, from GET /mpp/supported. */
+export type MppSupported = { tempo: MppSessionSupport | null; solana: SolanaMppSessionSupport | null };
+
+const _mppSupportedCache = new Map<string, { at: number; value: Promise<MppSupported | null> }>();
 
 /**
  * Fetch Tempo MPP session support from the auth server's GET /mpp/supported.
@@ -92,22 +103,23 @@ export async function fetchMppSupported(
   authServerUrl: AuthorizationServerUrl | string,
   fetchFn: FetchLike = fetch.bind(globalThis),
   logger?: { warn: (msg: string) => void },
-): Promise<MppSessionSupport | null> {
+): Promise<MppSupported | null> {
   const url = new URL('/mpp/supported', authServerUrl).toString();
   const cached = _mppSupportedCache.get(url);
   if (cached && Date.now() - cached.at < _FACILITATOR_ADDRESS_TTL_MS) return cached.value;
 
-  const pending = (async (): Promise<MppSessionSupport | null> => {
+  const pending = (async (): Promise<MppSupported | null> => {
     try {
       const response = await fetchFn(url);
       if (!response.ok) {
         logger?.warn(`fetchMppSupported: ${url} returned ${response.status}; advertising charge only`);
         return null;
       }
-      const body = await response.json() as { tempo?: MppSessionSupport | null };
-      const tempo = body?.tempo;
-      if (tempo && tempo.authorizedSigner && tempo.operator && tempo.escrowContract) return tempo;
-      return null;
+      const body = await response.json() as { tempo?: MppSessionSupport | null; solana?: SolanaMppSessionSupport | null };
+      const tempo = (body?.tempo && body.tempo.authorizedSigner && body.tempo.operator && body.tempo.escrowContract) ? body.tempo : null;
+      const solana = (body?.solana && body.solana.authorizedSigner) ? body.solana : null;
+      if (!tempo && !solana) return null;
+      return { tempo, solana };
     } catch (error) {
       logger?.warn(`fetchMppSupported: failed to fetch ${url}: ${error}; advertising charge only`);
       return null;
@@ -245,6 +257,8 @@ export function buildMppChallenges(args: {
   /** When present, advertise a Tempo `session`-intent challenge alongside `charge`
    *  (TIP-1034 channel sessions). From GET /mpp/supported via fetchMppSupported. */
   mppSession?: MppSessionSupport;
+  /** When present, advertise a Solana `session`-intent challenge alongside the Solana charge. */
+  mppSolanaSession?: SolanaMppSessionSupport;
   /** Channel deposit budget hint (raw µUSDC) for the session challenge. accounts
    *  may override; a larger-than-cap deposit lets one channel serve many requests. */
   mppSuggestedDeposit?: string;
@@ -273,6 +287,34 @@ export function buildMppChallenges(args: {
         ...resourceField,
       },
     });
+
+    // Solana `session`-intent challenge (payment-channels program) when auth advertises it.
+    // accounts opens the channel + uses its own operator/fee-payer; methodDetails carries
+    // only auth's Solana authorizedSigner. Same micro-units amount as the Solana charge.
+    if (args.mppSolanaSession) {
+      const solCurrency = USDC_ADDRESSES[isDevnet ? 'solana_devnet' : 'solana'];
+      const solAmount = solanaOption.amount.times(10 ** STABLECOIN_DECIMALS).toFixed(0);
+      challenges.push({
+        id: args.id,
+        method: 'solana',
+        intent: 'session',
+        amount: solAmount,
+        currency: solCurrency,
+        network: isDevnet ? 'devnet' : 'mainnet-beta',
+        recipient: solanaOption.address,
+        ...resourceField,
+        request: {
+          amount: solAmount,
+          currency: solCurrency,
+          recipient: solanaOption.address,
+          ...resourceField,
+          methodDetails: {
+            authorizedSigner: args.mppSolanaSession.authorizedSigner,
+            ...(args.mppSuggestedDeposit && { suggestedDeposit: args.mppSuggestedDeposit }),
+          },
+        },
+      });
+    }
   }
 
   // Tempo option (USDC on Tempo mainnet, pathUSD on moderato)
@@ -528,6 +570,8 @@ export function buildPaymentOptions(args: {
   facilitatorAddresses?: Record<string, string>;
   /** Tempo MPP session support (from GET /mpp/supported). Advertises the session intent. */
   mppSession?: MppSessionSupport;
+  /** Solana MPP session support (from GET /mpp/supported). Advertises the Solana session intent. */
+  mppSolanaSession?: SolanaMppSessionSupport;
 }): {
   x402: X402PaymentRequirements;
   mpp: MppChallengeData[] | null;
@@ -544,7 +588,7 @@ export function buildPaymentOptions(args: {
       payeeName: args.payeeName ?? '',
       facilitatorAddresses: args.facilitatorAddresses,
     }),
-    mpp: buildMppChallenges({ id: challengeId, options, resource: args.resource, mppSession: args.mppSession }),
+    mpp: buildMppChallenges({ id: challengeId, options, resource: args.resource, mppSession: args.mppSession, mppSolanaSession: args.mppSolanaSession }),
     options,
   };
 }
