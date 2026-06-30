@@ -149,6 +149,7 @@ export class X402ProtocolHandler implements ProtocolHandler {
         protocols: ['x402'],
         destination: url,
         paymentRequirements: enrichedRequirements,
+        paymentRequestId: paymentChallenge.paymentRequestId,
       });
       const paymentHeader = authorizeResult.credential;
 
