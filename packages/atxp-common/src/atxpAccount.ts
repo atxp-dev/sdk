@@ -339,6 +339,8 @@ export class ATXPAccount implements Account {
     body.currency = 'USDC';
     // X402 fields
     if (params.paymentRequirements) body.paymentRequirements = params.paymentRequirements;
+    // Phase 6: lets accounts key the X402 cap reservation to the challenge so it releases on settle.
+    if (params.paymentRequestId) body.paymentRequestId = params.paymentRequestId;
     // MPP fields
     if (params.challenges) body.challenges = params.challenges;
     if (params.challenge) body.challenge = params.challenge;

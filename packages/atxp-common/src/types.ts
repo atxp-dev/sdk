@@ -208,6 +208,11 @@ export interface AuthorizeParams {
   challenge?: unknown;
   /** MPP: array of challenges from multi-chain omni-challenge (preferred) */
   challenges?: unknown[];
+  /**
+   * The challenge's payment-request id. Threaded to accounts at authorize so it can key the
+   * X402 binding cap reservation (upto sessions) to it and release it on settle (Phase 6).
+   */
+  paymentRequestId?: string;
 }
 
 export interface AuthorizeResult {

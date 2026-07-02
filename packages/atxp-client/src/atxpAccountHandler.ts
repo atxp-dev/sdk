@@ -76,6 +76,7 @@ export class ATXPAccountHandler implements ProtocolHandler {
         paymentRequirements: authorizeParams.paymentRequirements,
         challenge: authorizeParams.challenge,
         challenges: authorizeParams.challenges as unknown[] | undefined,
+        paymentRequestId: typeof challengeData.paymentRequestId === 'string' ? challengeData.paymentRequestId : undefined,
       });
     } catch (error) {
       logger.error(`ATXPAccountHandler: authorize failed: ${error instanceof Error ? error.message : String(error)}`);
