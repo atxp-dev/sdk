@@ -11,9 +11,10 @@ export {
 } from './memoryOAuthDb.js';
 
 // OAuth resource client
-export { 
+export {
   OAuthResourceClient,
-  type OAuthResourceClientConfig 
+  isInvalidClientError,
+  type OAuthResourceClientConfig
 } from './oAuthResource.js';
 
 // Payment error handling

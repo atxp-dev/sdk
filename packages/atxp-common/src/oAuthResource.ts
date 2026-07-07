@@ -3,6 +3,28 @@ import * as oauth from 'oauth4webapi';
 import { ClientCredentials, FetchLike, OAuthResourceDb, OAuthDb, TokenData, Logger } from './types.js';
 import { ConsoleLogger } from './logger.js';
 
+/**
+ * Returns true only when a 401/403 response explicitly identifies the failure
+ * as `error=invalid_client` (per RFC 6749 §5.2 / RFC 6750), via either the
+ * JSON body or the WWW-Authenticate header. Other 401/403 reasons
+ * (`invalid_token`, `invalid_grant`, AS hiccups, empty bodies) return false:
+ * re-registering the client wouldn't fix them and rotating the shared
+ * client_secret amplifies failure across users in multi-user deployments.
+ */
+export async function isInvalidClientError(response: Response): Promise<boolean> {
+  if (response.status !== 401 && response.status !== 403) return false;
+  const wwwAuth = response.headers.get('www-authenticate');
+  if (wwwAuth && /error\s*=\s*"?invalid_client"?/i.test(wwwAuth)) return true;
+  try {
+    const text = await response.clone().text();
+    if (!text) return false;
+    const body = JSON.parse(text) as { error?: unknown };
+    return body?.error === 'invalid_client';
+  } catch {
+    return false;
+  }
+}
+
 export interface OAuthResourceClientConfig {
   db: OAuthDb;
   callbackUrl?: string;
@@ -82,6 +104,15 @@ export class OAuthResourceClient {
     return res === url ? null : res;
   }
 
+  /**
+   * Returns true only when the response is a 401/403 whose body or
+   * WWW-Authenticate header explicitly identifies the failure as
+   * `error=invalid_client` (RFC 6749 §5.2 / RFC 6750). Other 401/403 reasons
+   * (`invalid_token`, `invalid_grant`, transient network/AS hiccups, empty
+   * bodies) MUST NOT trigger DCR — re-registering rotates the shared
+   * client_secret and amplifies failure across users.
+   */
+
   introspectToken = async (authorizationServerUrl: string, token: string, additionalParameters?: Record<string, string>): Promise<TokenData> => {
     // Don't use getAuthorizationServer here, because we're not using the resource server url
     const authorizationServer = await this.authorizationServerFromUrl(new URL(authorizationServerUrl));
@@ -110,8 +141,8 @@ export class OAuthResourceClient {
       }
     );
 
-    if(introspectionResponse.status === 403 || introspectionResponse.status === 401) {
-      this.logger.info(`Bad response status doing token introspection: ${introspectionResponse.statusText}. Could be due to bad client credentials - trying to re-register`);
+    if (await isInvalidClientError(introspectionResponse)) {
+      this.logger.info(`Token introspection rejected our client credentials (invalid_client) — re-registering`);
       clientCredentials = await this.registerClient(authorizationServer);
       client = {
         client_id: clientCredentials.clientId,
@@ -123,9 +154,9 @@ export class OAuthResourceClient {
         client,
         clientAuth,
         token,
-        { 
-          additionalParameters, 
-          [oauth.customFetch]: this.sideChannelFetch, 
+        {
+          additionalParameters,
+          [oauth.customFetch]: this.sideChannelFetch,
           [oauth.allowInsecureRequests]: this.allowInsecureRequests
         }
       );

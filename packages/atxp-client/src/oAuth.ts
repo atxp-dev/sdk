@@ -1,5 +1,5 @@
 import * as oauth from 'oauth4webapi';
-import { OAuthResourceClient } from '@atxp/common';
+import { OAuthResourceClient, isInvalidClientError } from '@atxp/common';
 import { crypto } from '@atxp/common';
 import { AccessToken, ClientCredentials, FetchLike, Logger, OAuthDb, PKCEValues } from '@atxp/common';
 import { ConsoleLogger } from '@atxp/common';
@@ -290,8 +290,8 @@ export class OAuthClient extends OAuthResourceClient {
     // Get the client credentials
     let credentials = await this.getClientCredentials(authorizationServer);
     let [response, client] = await this.makeTokenRequestAndClient(authorizationServer, credentials, codeVerifier, authResponse);
-    if(response.status === 403 || response.status === 401) {
-      this.logger.info(`Bad response status exchanging code for token: ${response.statusText}. Could be due to bad client credentials - trying to re-register`);
+    if (await isInvalidClientError(response)) {
+      this.logger.info(`Token endpoint rejected our client credentials (invalid_client) — re-registering`);
       credentials = await this.registerClient(authorizationServer);
       [response, client] = await this.makeTokenRequestAndClient(authorizationServer, credentials, codeVerifier, authResponse);
     }

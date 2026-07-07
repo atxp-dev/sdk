@@ -467,12 +467,12 @@ describe('oauthClient', () => {
       expect(registerCall).toBeDefined();
     });
 
-    it('should re-register client if code exchange fails with bad credentials', async () => {
+    it('should re-register client if code exchange fails with invalid_client (self-healing)', async () => {
       const f = fetchMock.createInstance();
       mockResourceServer(f, 'https://example.com', '/mcp');
       mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
-        .modifyRoute(`${DEFAULT_AUTHORIZATION_SERVER}/token`, {method: 'post', response: {status: 401, body: {}}})
-        .postOnce(`${DEFAULT_AUTHORIZATION_SERVER}/token`, 
+        .modifyRoute(`${DEFAULT_AUTHORIZATION_SERVER}/token`, {method: 'post', response: {status: 401, body: {error: 'invalid_client', error_description: 'bad client creds'}}})
+        .postOnce(`${DEFAULT_AUTHORIZATION_SERVER}/token`,
           {
             access_token: 'test-access-token',
             refresh_token: 'test-refresh-token',
@@ -498,6 +498,65 @@ describe('oauthClient', () => {
 
       const authCallbackUrl = `https://example.com/callback?code=test-code&state=test-state`;
       await client.handleCallback(authCallbackUrl);
+    });
+
+    it('should NOT re-register client if code exchange fails with invalid_grant (false-positive guard)', async () => {
+      // RFC 6749 §5.2: invalid_grant means the user's authorization code is bad.
+      // Re-registering the client would not help — re-issuing client_id/secret
+      // does not fix a bad auth code, it only rotates the shared client and
+      // amplifies failure across all users.
+      const f = fetchMock.createInstance();
+      mockResourceServer(f, 'https://example.com', '/mcp');
+      mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
+        .modifyRoute(`${DEFAULT_AUTHORIZATION_SERVER}/token`, {method: 'post', response: {status: 400, body: {error: 'invalid_grant', error_description: 'auth code expired'}}});
+
+      const db = new MemoryOAuthDb();
+      db.savePKCEValues('bdj', 'test-state', {
+        url: 'https://example.com/mcp',
+        codeVerifier: 'test-code-verifier',
+        codeChallenge: 'test-code-challenge',
+        resourceUrl: 'https://example.com/mcp'
+      });
+      db.saveClientCredentials(DEFAULT_AUTHORIZATION_SERVER, {
+        clientId: 'good-client-id',
+        clientSecret: 'good-client-secret',
+        redirectUri: 'https://atxp.ai'
+      });
+
+      const client = oauthClient(f.fetchHandler, db);
+      const authCallbackUrl = `https://example.com/callback?code=test-code&state=test-state`;
+      await expect(client.handleCallback(authCallbackUrl)).rejects.toThrow();
+
+      // /register must NOT have been called — invalid_grant doesn't mean bad client creds
+      const registerCalls = f.callHistory.calls(`${DEFAULT_AUTHORIZATION_SERVER}/register`);
+      expect(registerCalls).toHaveLength(0);
+    });
+
+    it('should NOT re-register client if code exchange returns 401 with empty body (ambiguous, default safe)', async () => {
+      const f = fetchMock.createInstance();
+      mockResourceServer(f, 'https://example.com', '/mcp');
+      mockAuthorizationServer(f, DEFAULT_AUTHORIZATION_SERVER)
+        .modifyRoute(`${DEFAULT_AUTHORIZATION_SERVER}/token`, {method: 'post', response: {status: 401, body: {}}});
+
+      const db = new MemoryOAuthDb();
+      db.savePKCEValues('bdj', 'test-state', {
+        url: 'https://example.com/mcp',
+        codeVerifier: 'test-code-verifier',
+        codeChallenge: 'test-code-challenge',
+        resourceUrl: 'https://example.com/mcp'
+      });
+      db.saveClientCredentials(DEFAULT_AUTHORIZATION_SERVER, {
+        clientId: 'good-client-id',
+        clientSecret: 'good-client-secret',
+        redirectUri: 'https://atxp.ai'
+      });
+
+      const client = oauthClient(f.fetchHandler, db);
+      const authCallbackUrl = `https://example.com/callback?code=test-code&state=test-state`;
+      await expect(client.handleCallback(authCallbackUrl)).rejects.toThrow();
+
+      const registerCalls = f.callHistory.calls(`${DEFAULT_AUTHORIZATION_SERVER}/register`);
+      expect(registerCalls).toHaveLength(0);
     });
 
 
